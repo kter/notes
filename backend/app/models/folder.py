@@ -16,7 +16,7 @@ class Folder(FolderBase, table=True):
     __tablename__ = "folders"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: str = Field(index=True)  # Cognito user sub
+    user_id: str = Field()  # Cognito user sub (no index for DSQL compatibility)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

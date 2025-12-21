@@ -28,7 +28,6 @@ locals {
   current_env = local.env_config[terraform.workspace]
 }
 
-# Cognito settings
 variable "cognito_callback_urls" {
   description = "Cognito callback URLs"
   type        = list(string)
@@ -39,4 +38,11 @@ variable "cognito_logout_urls" {
   description = "Cognito logout URLs"
   type        = list(string)
   default     = ["http://localhost:3000"]
+}
+
+# Lambda image tag (use digest for production deployments)
+variable "lambda_image_tag" {
+  description = "Docker image tag for Lambda function (e.g., 'latest' or sha256 digest)"
+  type        = string
+  default     = "latest"
 }

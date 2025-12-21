@@ -17,8 +17,8 @@ class Note(NoteBase, table=True):
     __tablename__ = "notes"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: str = Field(index=True)  # Cognito user sub
-    folder_id: UUID | None = Field(default=None, index=True)  # Logical FK, no constraint
+    user_id: str = Field()  # Cognito user sub (no index for DSQL compatibility)
+    folder_id: UUID | None = Field(default=None)  # Logical FK, no constraint (no index for DSQL)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -15,9 +15,14 @@ output "cognito_domain" {
 }
 
 # DSQL outputs
-output "dsql_endpoint" {
-  description = "Aurora DSQL cluster endpoint"
-  value       = aws_dsql_cluster.main.endpoint
+output "dsql_identifier" {
+  description = "Aurora DSQL cluster identifier"
+  value       = aws_dsql_cluster.main.identifier
+}
+
+output "dsql_arn" {
+  description = "Aurora DSQL cluster ARN"
+  value       = aws_dsql_cluster.main.arn
 }
 
 # CloudFront outputs

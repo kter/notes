@@ -8,8 +8,12 @@ import {
   EditorPanel,
 } from "@/components/layout";
 import { AIChatPanel } from "@/components/ai";
+import { LandingPage } from "@/components/landing";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import type { Folder, Note, ChatMessage } from "@/types";
+import { Button } from "@/components/ui/button";
+import { LogOutIcon, Loader2Icon } from "lucide-react";
 
 // Debounce helper for auto-save
 function useDebounce<T extends (...args: Parameters<T>) => void>(
@@ -27,7 +31,9 @@ function useDebounce<T extends (...args: Parameters<T>) => void>(
   );
 }
 
-export default function NotesApp() {
+export default function Home() {
+  const { user, isLoading: authLoading, isAuthenticated, signOut, getAccessToken } = useAuth();
+  
   // State
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -50,10 +56,20 @@ export default function NotesApp() {
     ? notes.filter((n) => n.folder_id === selectedFolderId)
     : notes;
 
-  // Load initial data
+  // Load initial data when authenticated
   useEffect(() => {
     async function loadData() {
+      if (!isAuthenticated) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
+        const token = await getAccessToken();
+        if (token) {
+          api.setToken(token);
+        }
+        
         const [foldersData, notesData] = await Promise.all([
           api.listFolders(),
           api.listNotes(),
@@ -66,12 +82,17 @@ export default function NotesApp() {
         setIsLoading(false);
       }
     }
-    loadData();
-  }, []);
+    
+    if (!authLoading) {
+      loadData();
+    }
+  }, [isAuthenticated, authLoading, getAccessToken]);
 
   // Folder handlers
   const handleCreateFolder = async (name: string) => {
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       const folder = await api.createFolder({ name });
       setFolders((prev) => [folder, ...prev]);
     } catch (error) {
@@ -81,6 +102,8 @@ export default function NotesApp() {
 
   const handleRenameFolder = async (id: string, name: string) => {
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       const folder = await api.updateFolder(id, { name });
       setFolders((prev) => prev.map((f) => (f.id === id ? folder : f)));
     } catch (error) {
@@ -90,6 +113,8 @@ export default function NotesApp() {
 
   const handleDeleteFolder = async (id: string) => {
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       await api.deleteFolder(id);
       setFolders((prev) => prev.filter((f) => f.id !== id));
       if (selectedFolderId === id) {
@@ -103,6 +128,8 @@ export default function NotesApp() {
   // Note handlers
   const handleCreateNote = async () => {
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       const note = await api.createNote({
         title: "",
         content: "",
@@ -118,6 +145,8 @@ export default function NotesApp() {
   const debouncedUpdateNote = useDebounce(
     async (id: string, updates: { title?: string; content?: string }) => {
       try {
+        const token = await getAccessToken();
+        if (token) api.setToken(token);
         const note = await api.updateNote(id, updates);
         setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
       } catch (error) {
@@ -140,6 +169,8 @@ export default function NotesApp() {
 
   const handleDeleteNote = async (id: string) => {
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       await api.deleteNote(id);
       setNotes((prev) => prev.filter((n) => n.id !== id));
       if (selectedNoteId === id) {
@@ -155,6 +186,8 @@ export default function NotesApp() {
     setIsAILoading(true);
     setSummary(null);
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       const result = await api.summarizeNote({ note_id: noteId });
       setSummary(result.summary);
     } catch (error) {
@@ -172,6 +205,8 @@ export default function NotesApp() {
     setIsAILoading(true);
 
     try {
+      const token = await getAccessToken();
+      if (token) api.setToken(token);
       const result = await api.chatWithNote({
         note_id: selectedNoteId,
         question: message,
@@ -196,6 +231,21 @@ export default function NotesApp() {
     setIsChatOpen(false);
   }, [selectedNoteId]);
 
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show landing page for unauthenticated users
+  if (!isAuthenticated) {
+    return <LandingPage />;
+  }
+
+  // Show loading while fetching data
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -208,14 +258,33 @@ export default function NotesApp() {
     <div className="flex h-screen">
       <ThreeColumnLayout
         sidebar={
-          <Sidebar
-            folders={folders}
-            selectedFolderId={selectedFolderId}
-            onSelectFolder={setSelectedFolderId}
-            onCreateFolder={handleCreateFolder}
-            onRenameFolder={handleRenameFolder}
-            onDeleteFolder={handleDeleteFolder}
-          />
+          <div className="flex flex-col h-full">
+            <Sidebar
+              folders={folders}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={setSelectedFolderId}
+              onCreateFolder={handleCreateFolder}
+              onRenameFolder={handleRenameFolder}
+              onDeleteFolder={handleDeleteFolder}
+            />
+            {/* User info and sign out */}
+            <div className="p-4 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground truncate">
+                  {user?.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={signOut}
+                  title="Sign out"
+                >
+                  <LogOutIcon className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
         }
         noteList={
           <NoteList

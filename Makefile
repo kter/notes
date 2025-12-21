@@ -1,0 +1,120 @@
+# Notes App Makefile
+# Simplifies deployment and development tasks
+
+# Configuration
+AWS_PROFILE ?= dev
+AWS_REGION ?= ap-northeast-1
+AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
+ECR_REPO := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
+ENV ?= dev
+
+.PHONY: help
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# =============================================================================
+# Development
+# =============================================================================
+
+.PHONY: dev-backend
+dev-backend: ## Run backend locally
+	cd backend && uv run uvicorn app.main:app --reload --port 8000
+
+.PHONY: dev-frontend
+dev-frontend: ## Run frontend locally
+	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_ENVIRONMENT=dev npm run dev
+
+.PHONY: dev
+dev: ## Run both backend and frontend (requires tmux or run in separate terminals)
+	@echo "Run in separate terminals:"
+	@echo "  make dev-backend"
+	@echo "  make dev-frontend"
+
+# =============================================================================
+# Backend Deployment
+# =============================================================================
+
+.PHONY: ecr-login
+ecr-login: ## Login to ECR
+	aws ecr get-login-password --region $(AWS_REGION) --profile $(AWS_PROFILE) | \
+		docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+
+.PHONY: build-backend
+build-backend: ## Build backend Docker image
+	cd backend && docker build --platform linux/amd64 -t $(ECR_REPO):latest .
+
+.PHONY: push-backend
+push-backend: ecr-login build-backend ## Build and push backend Docker image to ECR
+	docker push $(ECR_REPO):latest
+	@echo "Image pushed: $(ECR_REPO):latest"
+
+.PHONY: get-image-digest
+get-image-digest: ## Get the latest image digest from ECR
+	@aws ecr describe-images --repository-name notes-app-api-$(ENV) \
+		--image-ids imageTag=latest \
+		--profile $(AWS_PROFILE) \
+		--query 'imageDetails[0].imageDigest' \
+		--output text
+
+.PHONY: deploy-backend
+deploy-backend: push-backend ## Build, push, and deploy backend via Terraform
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
+	@echo "Backend deployed!"
+
+# =============================================================================
+# Frontend Deployment
+# =============================================================================
+
+.PHONY: build-frontend
+build-frontend: ## Build frontend for production
+	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) npm run build
+
+.PHONY: deploy-frontend
+deploy-frontend: build-frontend ## Build and deploy frontend to S3
+	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
+	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
+	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
+	@echo "Frontend deployed to $(BUCKET)"
+
+# =============================================================================
+# Full Deployment
+# =============================================================================
+
+.PHONY: deploy
+deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend
+	@echo "Full deployment complete!"
+
+# =============================================================================
+# Terraform
+# =============================================================================
+
+.PHONY: tf-init
+tf-init: ## Initialize Terraform
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform init
+
+.PHONY: tf-plan
+tf-plan: ## Run Terraform plan
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform plan
+
+.PHONY: tf-apply
+tf-apply: ## Run Terraform apply
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply
+
+.PHONY: tf-output
+tf-output: ## Show Terraform outputs
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output
+
+# =============================================================================
+# Utilities
+# =============================================================================
+
+.PHONY: logs
+logs: ## Tail Lambda logs
+	aws logs tail /aws/lambda/notes-app-api-$(ENV) --follow --profile $(AWS_PROFILE)
+
+.PHONY: clean
+clean: ## Clean build artifacts
+	rm -rf frontend/out frontend/.next
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

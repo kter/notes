@@ -109,6 +109,20 @@ terraform plan
 terraform apply
 ```
 
+## Application Deployment
+
+### Lambda Code Update (Quick)
+```bash
+# Update Lambda function code only (faster, no Terraform)
+make update-lambda ENV=dev AWS_PROFILE=dev
+```
+
+### Full Deployment
+```bash
+# Full deployment including infrastructure changes
+make deploy ENV=dev AWS_PROFILE=dev
+```
+
 ## API Endpoints
 
 | Method | Endpoint | Description |

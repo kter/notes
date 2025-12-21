@@ -61,6 +61,16 @@ deploy-backend: push-backend ## Build, push, and deploy backend via Terraform
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
 	@echo "Backend deployed!"
 
+.PHONY: update-lambda
+update-lambda: push-backend ## Update Lambda function code only (without Terraform)
+	$(eval LAMBDA_NAME := notes-app-api-$(ENV))
+	$(eval IMAGE_URI := $(shell aws ecr describe-repositories --repository-names $(LAMBDA_NAME) --profile $(AWS_PROFILE) --query 'repositories[0].repositoryUri' --output text):latest)
+	aws lambda update-function-code \
+		--function-name $(LAMBDA_NAME) \
+		--image-uri $(IMAGE_URI) \
+		--profile $(AWS_PROFILE)
+	@echo "Lambda function $(LAMBDA_NAME) updated!"
+
 # =============================================================================
 # Frontend Deployment
 # =============================================================================

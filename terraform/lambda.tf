@@ -15,7 +15,7 @@ resource "aws_lambda_function" "api" {
       COGNITO_APP_CLIENT_ID  = aws_cognito_user_pool_client.main.id
       COGNITO_REGION         = var.aws_region
       BEDROCK_REGION         = "us-east-1"
-      BEDROCK_MODEL_ID       = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+      BEDROCK_MODEL_ID       = "anthropic.claude-3-5-sonnet-20240620-v1:0"
       DSQL_CLUSTER_ENDPOINT  = aws_dsql_cluster.main.identifier
       CORS_ORIGINS           = jsonencode(["https://${local.current_env.domain_name}"])
     }

@@ -255,8 +255,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen">
-      <ThreeColumnLayout
+    <ThreeColumnLayout
         sidebar={
           <div className="flex flex-col h-full">
             <Sidebar
@@ -316,7 +315,6 @@ export default function Home() {
             />
           </div>
         }
-      />
-    </div>
+    />
   );
 }

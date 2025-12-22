@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 const isProduction = process.env.NEXT_PUBLIC_ENVIRONMENT === "prd";
 
 export const metadata: Metadata = {
-  title: "Notes - Mac Clone",
-  description: "A Mac Notes app clone with AI-powered features",
+  title: "Notes",
+  description: "A Notes app with AI-powered features",
   robots: isProduction ? "index, follow" : "noindex, nofollow",
 };
 

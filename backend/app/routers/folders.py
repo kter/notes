@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -76,7 +76,7 @@ def update_folder(
     for key, value in update_data.items():
         setattr(folder, key, value)
 
-    folder.updated_at = datetime.utcnow()
+    folder.updated_at = datetime.now(timezone.utc)
     session.add(folder)
     session.commit()
     session.refresh(folder)

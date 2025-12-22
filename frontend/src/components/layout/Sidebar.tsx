@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import type { Folder } from "@/types";
 import { cn } from "@/lib/utils";
-import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon } from "lucide-react";
+import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon } from "lucide-react";
 import { useState } from "react";
 
 interface SidebarProps {
@@ -15,6 +15,7 @@ interface SidebarProps {
   onCreateFolder: (name: string) => void;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
+  onToggleCollapse: () => void;
 }
 
 export function Sidebar({
@@ -24,6 +25,7 @@ export function Sidebar({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
+  onToggleCollapse,
 }: SidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -51,9 +53,20 @@ export function Sidebar({
       {/* Header */}
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Folders
-          </h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 -ml-2 text-muted-foreground hover:text-foreground"
+              onClick={onToggleCollapse}
+              title="Collapse sidebar"
+            >
+              <PanelLeftCloseIcon className="h-4 w-4" />
+            </Button>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Folders
+            </h2>
+          </div>
           <Button
             variant="ghost"
             size="icon"

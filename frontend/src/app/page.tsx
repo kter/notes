@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { Folder, Note, ChatMessage } from "@/types";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Debounce helper for auto-save
 function useDebounce<T extends (...args: Parameters<T>) => void>(
@@ -40,6 +41,7 @@ export default function Home() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAILoading, setIsAILoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
@@ -256,6 +258,8 @@ export default function Home() {
 
   return (
     <ThreeColumnLayout
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         sidebar={
           <div className="flex flex-col h-full">
             <Sidebar
@@ -265,13 +269,22 @@ export default function Home() {
               onCreateFolder={handleCreateFolder}
               onRenameFolder={handleRenameFolder}
               onDeleteFolder={handleDeleteFolder}
+              onToggleCollapse={() => setIsSidebarOpen(!isSidebarOpen)}
             />
             {/* User info and sign out */}
-            <div className="p-4 border-t border-border/50">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground truncate">
-                  {user?.email}
-                </span>
+            <div className={cn(
+              "p-4 border-t border-border/50 transition-all duration-300",
+              !isSidebarOpen && "items-center justify-center p-2"
+            )}>
+              <div className={cn(
+                "flex items-center",
+                isSidebarOpen ? "justify-between" : "justify-center"
+              )}>
+                {isSidebarOpen && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {user?.email}
+                  </span>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"

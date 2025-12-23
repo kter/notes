@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ThreeColumnLayout,
   Sidebar,
@@ -16,19 +16,29 @@ import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Debounce helper for auto-save
+// Debounce helper for auto-save using useRef to avoid re-renders
 function useDebounce<T extends (...args: Parameters<T>) => void>(
   callback: T,
   delay: number
 ): T {
-  const [pending, setPending] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbackRef = useRef(callback);
+  
+  // Keep callback ref updated
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   return useCallback(
     ((...args: Parameters<T>) => {
-      if (pending) clearTimeout(pending);
-      setPending(setTimeout(() => callback(...args), delay));
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current(...args);
+      }, delay);
     }) as T,
-    [callback, delay, pending]
+    [delay]
   );
 }
 

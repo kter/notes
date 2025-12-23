@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 
 interface EditorPanelProps {
@@ -16,6 +16,7 @@ interface EditorPanelProps {
   onSummarize: (id: string) => void;
   onOpenChat: () => void;
   isChatOpen: boolean;
+  isSaving?: boolean;
 }
 
 export function EditorPanel({
@@ -26,6 +27,7 @@ export function EditorPanel({
   onSummarize,
   onOpenChat,
   isChatOpen,
+  isSaving = false,
 }: EditorPanelProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -176,6 +178,32 @@ export function EditorPanel({
           placeholder="Start writing your note..."
           className="flex-1 resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px]"
         />
+      </div>
+
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-6 py-2 border-t border-border/50 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          {isSaving ? (
+            <>
+              <Loader2Icon className="h-3 w-3 animate-spin" />
+              <span>保存中...</span>
+            </>
+          ) : (
+            <>
+              <CheckIcon className="h-3 w-3 text-green-500" />
+              <span>保存済み</span>
+            </>
+          )}
+        </div>
+        <div>
+          最終更新: {new Date(note.updated_at).toLocaleString("ja-JP", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </div>
       </div>
     </div>
   );

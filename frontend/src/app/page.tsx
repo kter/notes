@@ -46,6 +46,7 @@ export default function Home() {
   const [isAILoading, setIsAILoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Selected note
   const selectedNote = notes.find((n) => n.id === selectedNoteId) || null;
@@ -146,6 +147,7 @@ export default function Home() {
 
   const debouncedUpdateNote = useDebounce(
     async (id: string, updates: { title?: string; content?: string; folder_id?: string | null }) => {
+      setIsSaving(true);
       try {
         const token = await getAccessToken();
         if (token) api.setToken(token);
@@ -153,6 +155,8 @@ export default function Home() {
         setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
       } catch (error) {
         console.error("Failed to update note:", error);
+      } finally {
+        setIsSaving(false);
       }
     },
     500
@@ -320,6 +324,7 @@ export default function Home() {
               onSummarize={handleSummarize}
               onOpenChat={() => setIsChatOpen(!isChatOpen)}
               isChatOpen={isChatOpen}
+              isSaving={isSaving}
             />
             <AIChatPanel
               isOpen={isChatOpen}

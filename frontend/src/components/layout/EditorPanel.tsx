@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface EditorPanelProps {
   note: Note | null;
@@ -33,6 +35,7 @@ export function EditorPanel({
   const [content, setContent] = useState("");
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -216,6 +219,20 @@ export function EditorPanel({
               </div>
             )}
           </div>
+          {/* Preview Toggle Button */}
+          <Button
+            variant={isPreviewOpen ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+            className="gap-2"
+          >
+            {isPreviewOpen ? (
+              <EyeOffIcon className="h-4 w-4" />
+            ) : (
+              <EyeIcon className="h-4 w-4" />
+            )}
+            Preview
+          </Button>
         </div>
         <Button
           variant="ghost"
@@ -236,12 +253,33 @@ export function EditorPanel({
           className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto mb-4"
         />
         <Separator className="mb-4" />
-        <Textarea
-          value={content}
-          onChange={(e) => handleContentChange(e.target.value)}
-          placeholder="Start writing your note..."
-          className="flex-1 resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px]"
-        />
+        
+        {/* Editor and Preview Area */}
+        <div className={`flex-1 flex ${isPreviewOpen ? "gap-4" : ""}`}>
+          {/* Markdown Editor */}
+          <div className={isPreviewOpen ? "flex-1 min-w-0" : "flex-1"}>
+            <Textarea
+              value={content}
+              onChange={(e) => handleContentChange(e.target.value)}
+              placeholder="Start writing your note in Markdown..."
+              className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
+            />
+          </div>
+          
+          {/* Markdown Preview */}
+          {isPreviewOpen && (
+            <>
+              <Separator orientation="vertical" />
+              <div className="flex-1 min-w-0 overflow-auto">
+                <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {content || "*Start writing to see the preview...*"}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Status bar */}

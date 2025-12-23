@@ -136,18 +136,23 @@ export function Sidebar({
               ) : (
                 <button
                   className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors relative",
                     selectedFolderId === folder.id
                       ? "bg-primary/10 text-primary"
                       : "text-foreground hover:bg-accent"
                   )}
                   onClick={() => onSelectFolder(folder.id)}
                 >
-                  <FolderIcon className="h-4 w-4" />
+                  <FolderIcon className="h-4 w-4 flex-shrink-0" />
                   <span className="truncate flex-1 text-left">{folder.name}</span>
                   
-                  {/* Action buttons */}
-                  <div className="hidden group-hover:flex items-center gap-1">
+                  {/* Action buttons - positioned absolutely to prevent layout shift */}
+                  <div className={cn(
+                    "absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 pl-4",
+                    selectedFolderId === folder.id
+                      ? "bg-gradient-to-l from-primary/10 via-primary/10 to-transparent"
+                      : "bg-gradient-to-l from-accent via-accent to-transparent"
+                  )}>
                     <Button
                       variant="ghost"
                       size="icon"

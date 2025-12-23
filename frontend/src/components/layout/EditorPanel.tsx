@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 
 interface EditorPanelProps {
@@ -32,7 +32,9 @@ export function EditorPanel({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (note) {
@@ -49,6 +51,9 @@ export function EditorPanel({
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsFolderDropdownOpen(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setIsExportDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -74,6 +79,34 @@ export function EditorPanel({
       onUpdateNote(note.id, { folder_id: folderId });
     }
     setIsFolderDropdownOpen(false);
+  };
+
+  // Export handlers
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setIsExportDropdownOpen(false);
+  };
+
+  const handleExportMarkdown = () => {
+    if (!note) return;
+    const markdown = `# ${title}\n\n${content}`;
+    const filename = `${title || "untitled"}.md`;
+    downloadFile(markdown, filename, "text/markdown");
+  };
+
+  const handleExportText = () => {
+    if (!note) return;
+    const text = `${title}\n\n${content}`;
+    const filename = `${title || "untitled"}.txt`;
+    downloadFile(text, filename, "text/plain");
   };
 
   const currentFolder = folders.find((f) => f.id === note?.folder_id);
@@ -152,6 +185,37 @@ export function EditorPanel({
             <MessageSquareIcon className="h-4 w-4" />
             Chat
           </Button>
+          {/* Export Button */}
+          <div className="relative" ref={exportDropdownRef}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              className="gap-2"
+            >
+              <DownloadIcon className="h-4 w-4" />
+              Export
+              <ChevronDownIcon className="h-3 w-3" />
+            </Button>
+            {isExportDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
+                <div className="py-1">
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                    onClick={handleExportMarkdown}
+                  >
+                    Markdown (.md)
+                  </button>
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                    onClick={handleExportText}
+                  >
+                    Plain Text (.txt)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <Button
           variant="ghost"

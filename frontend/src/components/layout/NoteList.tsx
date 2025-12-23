@@ -2,10 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import type { Note } from "@/types";
 import { cn } from "@/lib/utils";
-import { FilePlusIcon, FileTextIcon } from "lucide-react";
+import { FilePlusIcon, FileTextIcon, PencilIcon, TrashIcon, CheckIcon, XIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useState, useEffect } from "react";
 
 interface NoteListProps {
   notes: Note[];
@@ -13,6 +15,9 @@ interface NoteListProps {
   onSelectNote: (id: string) => void;
   onCreateNote: () => void;
   folderName?: string;
+  folderId?: string | null;
+  onRenameFolder?: (id: string, name: string) => void;
+  onDeleteFolder?: (id: string) => void;
 }
 
 export function NoteList({
@@ -21,23 +26,118 @@ export function NoteList({
   onSelectNote,
   onCreateNote,
   folderName,
+  folderId,
+  onRenameFolder,
+  onDeleteFolder,
 }: NoteListProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingName, setEditingName] = useState("");
+
+  // Cancel editing when folder changes
+  useEffect(() => {
+    setIsEditing(false);
+    setEditingName("");
+  }, [folderId]);
+
+  const handleStartEdit = () => {
+    setEditingName(folderName || "");
+    setIsEditing(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (folderId && editingName.trim() && onRenameFolder) {
+      onRenameFolder(folderId, editingName.trim());
+    }
+    setIsEditing(false);
+    setEditingName("");
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingName("");
+  };
+
+  const handleDelete = () => {
+    if (folderId && onDeleteFolder) {
+      if (confirm("Are you sure you want to delete this folder?")) {
+        onDeleteFolder(folderId);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-border/50">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider truncate">
-            {folderName || "All Notes"}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={onCreateNote}
-          >
-            <FilePlusIcon className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          {isEditing ? (
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              <Input
+                autoFocus
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmEdit();
+                  if (e.key === "Escape") handleCancelEdit();
+                }}
+                className="h-7 text-sm"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-green-600 hover:text-green-700"
+                onClick={handleConfirmEdit}
+              >
+                <CheckIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={handleCancelEdit}
+              >
+                <XIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                  {folderName || "All Notes"}
+                </h2>
+                {folderId && onRenameFolder && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 flex-shrink-0"
+                    onClick={handleStartEdit}
+                    title="Rename folder"
+                  >
+                    <PencilIcon className="h-3 w-3" />
+                  </Button>
+                )}
+                {folderId && onDeleteFolder && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 flex-shrink-0 text-destructive hover:text-destructive"
+                    onClick={handleDelete}
+                    title="Delete folder"
+                  >
+                    <TrashIcon className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 flex-shrink-0"
+                onClick={onCreateNote}
+              >
+                <FilePlusIcon className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {notes.length} {notes.length === 1 ? "note" : "notes"}

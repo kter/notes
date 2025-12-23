@@ -305,6 +305,9 @@ export default function Home() {
             onSelectNote={setSelectedNoteId}
             onCreateNote={handleCreateNote}
             folderName={selectedFolderName}
+            folderId={selectedFolderId}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={handleDeleteFolder}
           />
         }
         editor={

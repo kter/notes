@@ -145,7 +145,7 @@ export default function Home() {
   };
 
   const debouncedUpdateNote = useDebounce(
-    async (id: string, updates: { title?: string; content?: string }) => {
+    async (id: string, updates: { title?: string; content?: string; folder_id?: string | null }) => {
       try {
         const token = await getAccessToken();
         if (token) api.setToken(token);
@@ -160,7 +160,7 @@ export default function Home() {
 
   const handleUpdateNote = (
     id: string,
-    updates: { title?: string; content?: string }
+    updates: { title?: string; content?: string; folder_id?: string | null }
   ) => {
     // Optimistic update
     setNotes((prev) =>
@@ -314,6 +314,7 @@ export default function Home() {
           <div className="flex flex-1 h-full">
             <EditorPanel
               note={selectedNote}
+              folders={folders}
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
               onSummarize={handleSummarize}

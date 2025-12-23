@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import type { Note } from "@/types";
-import { SparklesIcon, TrashIcon, MessageSquareIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import type { Note, Folder } from "@/types";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
 
 interface EditorPanelProps {
   note: Note | null;
-  onUpdateNote: (id: string, updates: { title?: string; content?: string }) => void;
+  folders: Folder[];
+  onUpdateNote: (id: string, updates: { title?: string; content?: string; folder_id?: string | null }) => void;
   onDeleteNote: (id: string) => void;
   onSummarize: (id: string) => void;
   onOpenChat: () => void;
@@ -19,6 +20,7 @@ interface EditorPanelProps {
 
 export function EditorPanel({
   note,
+  folders,
   onUpdateNote,
   onDeleteNote,
   onSummarize,
@@ -27,6 +29,8 @@ export function EditorPanel({
 }: EditorPanelProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (note) {
@@ -37,6 +41,17 @@ export function EditorPanel({
       setContent("");
     }
   }, [note]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsFolderDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -51,6 +66,15 @@ export function EditorPanel({
       onUpdateNote(note.id, { content: value });
     }
   };
+
+  const handleFolderChange = (folderId: string | null) => {
+    if (note) {
+      onUpdateNote(note.id, { folder_id: folderId });
+    }
+    setIsFolderDropdownOpen(false);
+  };
+
+  const currentFolder = folders.find((f) => f.id === note?.folder_id);
 
   if (!note) {
     return (
@@ -68,6 +92,46 @@ export function EditorPanel({
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 border-b border-border/50">
         <div className="flex items-center gap-2">
+          {/* Folder Selector */}
+          <div className="relative" ref={dropdownRef}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+              className="gap-2"
+            >
+              <FolderIcon className="h-4 w-4" />
+              <span className="max-w-[120px] truncate">
+                {currentFolder?.name || "All Notes"}
+              </span>
+              <ChevronDownIcon className="h-3 w-3" />
+            </Button>
+            {isFolderDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
+                <div className="py-1">
+                  <button
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
+                      !note.folder_id ? "bg-accent" : ""
+                    }`}
+                    onClick={() => handleFolderChange(null)}
+                  >
+                    All Notes
+                  </button>
+                  {folders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
+                        note.folder_id === folder.id ? "bg-accent" : ""
+                      }`}
+                      onClick={() => handleFolderChange(folder.id)}
+                    >
+                      {folder.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="sm"

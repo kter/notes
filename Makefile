@@ -124,6 +124,23 @@ tf-output: ## Show Terraform outputs
 logs: ## Tail Lambda logs
 	aws logs tail /aws/lambda/notes-app-api-$(ENV) --follow --profile $(AWS_PROFILE)
 
+# =============================================================================
+# Cost Report Lambda
+# =============================================================================
+
+.PHONY: update-cost-report
+update-cost-report: ## Update cost report Lambda function code
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -target=aws_lambda_function.cost_report -auto-approve
+	@echo "Cost report Lambda updated!"
+
+.PHONY: test-cost-report
+test-cost-report: ## Manually invoke cost report Lambda
+	aws lambda invoke --function-name $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cost_report_lambda_name) \
+		--profile $(AWS_PROFILE) \
+		/tmp/cost-report-output.json
+	@cat /tmp/cost-report-output.json
+	@echo ""
+
 .PHONY: clean
 clean: ## Clean build artifacts
 	rm -rf frontend/out frontend/.next

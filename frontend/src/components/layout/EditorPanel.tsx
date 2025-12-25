@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -19,6 +19,7 @@ interface EditorPanelProps {
   onOpenChat: () => void;
   isChatOpen: boolean;
   isSaving?: boolean;
+  saveError?: string | null;
 }
 
 export function EditorPanel({
@@ -30,6 +31,7 @@ export function EditorPanel({
   onOpenChat,
   isChatOpen,
   isSaving = false,
+  saveError = null,
 }: EditorPanelProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -285,7 +287,12 @@ export function EditorPanel({
       {/* Status bar */}
       <div className="flex items-center justify-between px-6 py-2 border-t border-border/50 text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
-          {isSaving ? (
+          {saveError ? (
+            <>
+              <AlertCircleIcon className="h-3 w-3 text-destructive" />
+              <span className="text-destructive">{saveError}</span>
+            </>
+          ) : isSaving ? (
             <>
               <Loader2Icon className="h-3 w-3 animate-spin" />
               <span>保存中...</span>

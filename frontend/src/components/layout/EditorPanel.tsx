@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -40,6 +40,7 @@ export function EditorPanel({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (note) {
@@ -85,6 +86,85 @@ export function EditorPanel({
     }
     setIsFolderDropdownOpen(false);
   };
+
+  // Handle Enter key to maintain indentation and list markers
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter") return;
+    
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const { selectionStart, value } = textarea;
+    
+    // Find the start of the current line
+    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+    const currentLine = value.slice(lineStart, selectionStart);
+    
+    // Match leading whitespace and optional list markers
+    // Supports: -, *, +, 1., 2., etc.
+    const match = currentLine.match(/^(\s*)([-*+]|\d+\.)?(\s*)/);
+    
+    if (!match) return;
+    
+    const [fullMatch, indent, marker, markerSpace] = match;
+    
+    // Check if the line only contains the marker (empty list item)
+    const contentAfterMarker = currentLine.slice(fullMatch.length);
+    if (marker && contentAfterMarker.trim() === "") {
+      // Empty list item - remove the marker and indent on Enter
+      e.preventDefault();
+      const beforeLine = value.slice(0, lineStart);
+      const afterCursor = value.slice(selectionStart);
+      const newValue = beforeLine + "\n" + afterCursor;
+      
+      setContent(newValue);
+      if (note) {
+        onUpdateNote(note.id, { content: newValue });
+      }
+      
+      // Set cursor position after React re-render
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const newPos = lineStart + 1;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+      });
+      return;
+    }
+    
+    // Build the continuation string
+    let continuation = indent;
+    if (marker) {
+      // Increment number for ordered lists
+      const numMatch = marker.match(/^(\d+)\.$/);
+      if (numMatch) {
+        continuation += (parseInt(numMatch[1], 10) + 1) + "." + markerSpace;
+      } else {
+        continuation += marker + markerSpace;
+      }
+    }
+    
+    // Only intercept if there's something to continue
+    if (continuation) {
+      e.preventDefault();
+      const before = value.slice(0, selectionStart);
+      const after = value.slice(selectionStart);
+      const newValue = before + "\n" + continuation + after;
+      
+      setContent(newValue);
+      if (note) {
+        onUpdateNote(note.id, { content: newValue });
+      }
+      
+      // Set cursor position after React re-render
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const newPos = selectionStart + 1 + continuation.length;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+      });
+    }
+  }, [note, onUpdateNote]);
 
   // Export handlers
   const downloadFile = (content: string, filename: string, mimeType: string) => {
@@ -261,8 +341,10 @@ export function EditorPanel({
           {/* Markdown Editor */}
           <div className={isPreviewOpen ? "flex-1 min-w-0" : "flex-1"}>
             <Textarea
+              ref={textareaRef}
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Start writing your note in Markdown..."
               className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
             />

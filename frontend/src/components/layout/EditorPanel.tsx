@@ -88,13 +88,95 @@ export function EditorPanel({
   };
 
   // Handle Enter key to maintain indentation and list markers
+  // Handle Tab/Shift+Tab for indentation
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== "Enter") return;
-    
+    // Skip handling during IME composition (e.g., Japanese input)
+    if (e.nativeEvent.isComposing) return;
+
     const textarea = textareaRef.current;
     if (!textarea) return;
-    
-    const { selectionStart, value } = textarea;
+
+    const { selectionStart, selectionEnd, value } = textarea;
+
+    // Handle Tab and Shift+Tab for indentation
+    if (e.key === "Tab") {
+      e.preventDefault();
+
+      // Find the start of the current line
+      const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+      const currentLine = value.slice(lineStart, selectionStart);
+
+      // Check if the line is a list item (starts with optional whitespace + list marker)
+      const listMatch = currentLine.match(/^(\s*)([-*+]|\d+\.)\s/);
+
+      if (listMatch || currentLine.match(/^\s+/)) {
+        // We're in a list item or indented line
+        if (e.shiftKey) {
+          // Shift+Tab: Remove indentation (2 spaces from the beginning of the line)
+          const lineContent = value.slice(lineStart);
+          const indentMatch = lineContent.match(/^(\s{1,2})/);
+
+          if (indentMatch) {
+            const spacesToRemove = indentMatch[1].length;
+            const before = value.slice(0, lineStart);
+            const after = value.slice(lineStart + spacesToRemove);
+            const newValue = before + after;
+
+            setContent(newValue);
+            if (note) {
+              onUpdateNote(note.id, { content: newValue });
+            }
+
+            // Adjust cursor position
+            requestAnimationFrame(() => {
+              if (textareaRef.current) {
+                const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
+                textareaRef.current.setSelectionRange(newPos, newPos);
+              }
+            });
+          }
+        } else {
+          // Tab: Add indentation (2 spaces at the beginning of the line)
+          const before = value.slice(0, lineStart);
+          const after = value.slice(lineStart);
+          const newValue = before + "  " + after;
+
+          setContent(newValue);
+          if (note) {
+            onUpdateNote(note.id, { content: newValue });
+          }
+
+          // Adjust cursor position
+          requestAnimationFrame(() => {
+            if (textareaRef.current) {
+              const newPos = selectionStart + 2;
+              textareaRef.current.setSelectionRange(newPos, newPos);
+            }
+          });
+        }
+      } else {
+        // Not in a list item - insert tab characters at cursor position
+        const before = value.slice(0, selectionStart);
+        const after = value.slice(selectionEnd);
+        const newValue = before + "  " + after;
+
+        setContent(newValue);
+        if (note) {
+          onUpdateNote(note.id, { content: newValue });
+        }
+
+        requestAnimationFrame(() => {
+          if (textareaRef.current) {
+            const newPos = selectionStart + 2;
+            textareaRef.current.setSelectionRange(newPos, newPos);
+          }
+        });
+      }
+      return;
+    }
+
+
+    if (e.key !== "Enter") return;
     
     // Find the start of the current line
     const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;

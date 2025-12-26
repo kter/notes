@@ -39,6 +39,18 @@ class ChatResponse(BaseModel):
     answer: str
 
 
+class GenerateTitleRequest(BaseModel):
+    """Request schema for title generation."""
+
+    note_id: UUID
+
+
+class GenerateTitleResponse(BaseModel):
+    """Response schema for title generation."""
+
+    title: str
+
+
 @router.post("/summarize", response_model=SummarizeResponse)
 async def summarize_note(
     request: SummarizeRequest,
@@ -91,3 +103,28 @@ async def chat_with_note(
         history=request.history,
     )
     return ChatResponse(answer=answer)
+
+
+@router.post("/generate-title", response_model=GenerateTitleResponse)
+async def generate_title(
+    request: GenerateTitleRequest,
+    user_id: UserId,
+    session: Annotated[Session, Depends(get_session)],
+    ai_service: Annotated[AIService, Depends(get_ai_service)],
+):
+    """Generate a title for a note's content using AI."""
+    note = session.get(Note, request.note_id)
+    if not note or note.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Note not found",
+        )
+
+    if not note.content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Note content is empty",
+        )
+
+    title = await ai_service.generate_title(note.content)
+    return GenerateTitleResponse(title=title)

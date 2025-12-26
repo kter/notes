@@ -61,3 +61,11 @@ export interface ChatRequest {
 export interface ChatResponse {
   answer: string;
 }
+
+export interface GenerateTitleRequest {
+  note_id: string;
+}
+
+export interface GenerateTitleResponse {
+  title: string;
+}

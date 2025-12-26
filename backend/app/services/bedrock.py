@@ -21,6 +21,11 @@ class AIService(ABC):
         """Answer a question based on the given content context."""
         pass
 
+    @abstractmethod
+    async def generate_title(self, content: str) -> str:
+        """Generate a concise title for the given content."""
+        pass
+
 
 class BedrockService(AIService):
     """Amazon Bedrock service using Claude."""
@@ -69,6 +74,24 @@ class BedrockService(AIService):
         ]
 
         return self._invoke_model(messages, system)
+
+    async def generate_title(self, content: str) -> str:
+        """Generate a concise title for the note content."""
+        system = (
+            "You are a helpful assistant that generates concise titles for notes. "
+            "Generate a single, short title (max 60 characters) that captures the main topic. "
+            "Do not include quotes, periods, or any formatting. Just output the title text. "
+            "Match the language of the content (if content is in Japanese, generate Japanese title)."
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": f"Generate a concise title for this note:\n\n{content}",
+            }
+        ]
+
+        return self._invoke_model(messages, system).strip()
 
     async def chat(
         self, content: str, question: str, history: list[dict] | None = None

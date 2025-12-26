@@ -4,6 +4,8 @@ import type {
   Folder,
   FolderCreate,
   FolderUpdate,
+  GenerateTitleRequest,
+  GenerateTitleResponse,
   Note,
   NoteCreate,
   NoteUpdate,
@@ -118,6 +120,13 @@ class ApiClient {
 
   async chatWithNote(data: ChatRequest): Promise<ChatResponse> {
     return this.request<ChatResponse>("/api/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async generateTitle(data: GenerateTitleRequest): Promise<GenerateTitleResponse> {
+    return this.request<GenerateTitleResponse>("/api/ai/generate-title", {
       method: "POST",
       body: JSON.stringify(data),
     });

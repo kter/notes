@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
+import { api } from "@/lib/api";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
@@ -38,6 +39,7 @@ export function EditorPanel({
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -85,6 +87,21 @@ export function EditorPanel({
       onUpdateNote(note.id, { folder_id: folderId });
     }
     setIsFolderDropdownOpen(false);
+  };
+
+  const handleGenerateTitle = async () => {
+    if (!note || !content.trim() || isGeneratingTitle) return;
+    
+    setIsGeneratingTitle(true);
+    try {
+      const response = await api.generateTitle({ note_id: note.id });
+      setTitle(response.title);
+      onUpdateNote(note.id, { title: response.title });
+    } catch (error) {
+      console.error("Failed to generate title:", error);
+    } finally {
+      setIsGeneratingTitle(false);
+    }
   };
 
   // Handle Enter key to maintain indentation and list markers
@@ -410,12 +427,28 @@ export function EditorPanel({
 
       {/* Editor */}
       <div className="flex-1 flex flex-col p-6 overflow-auto">
-        <Input
-          value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Note title"
-          className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto mb-4"
-        />
+        <div className="relative mb-4">
+          <Input
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            placeholder="Note title"
+            className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={handleGenerateTitle}
+            disabled={!content.trim() || isGeneratingTitle}
+            title="Generate title from content"
+          >
+            {isGeneratingTitle ? (
+              <Loader2Icon className="h-4 w-4 animate-spin" />
+            ) : (
+              <SparklesIcon className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
         <Separator className="mb-4" />
         
         {/* Editor and Preview Area */}

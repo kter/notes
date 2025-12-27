@@ -2,10 +2,11 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlmodel import Session, select
 
 from app.auth import UserId
+from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import Note, NoteCreate, NoteRead, NoteUpdate
 
@@ -50,12 +51,7 @@ def get_note(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Get a specific note by ID."""
-    note = session.get(Note, note_id)
-    if not note or note.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    note = get_owned_resource(session, Note, note_id, user_id, "Note")
     return note
 
 
@@ -67,12 +63,7 @@ def update_note(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Update a note."""
-    note = session.get(Note, note_id)
-    if not note or note.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    note = get_owned_resource(session, Note, note_id, user_id, "Note")
 
     update_data = note_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -92,12 +83,7 @@ def delete_note(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Delete a note."""
-    note = session.get(Note, note_id)
-    if not note or note.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    note = get_owned_resource(session, Note, note_id, user_id, "Note")
 
     session.delete(note)
     session.commit()

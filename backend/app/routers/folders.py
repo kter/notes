@@ -2,10 +2,11 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlmodel import Session, select
 
 from app.auth import UserId
+from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import Folder, FolderCreate, FolderRead, FolderUpdate
 
@@ -48,12 +49,7 @@ def get_folder(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Get a specific folder by ID."""
-    folder = session.get(Folder, folder_id)
-    if not folder or folder.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Folder not found",
-        )
+    folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
     return folder
 
 
@@ -65,12 +61,7 @@ def update_folder(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Update a folder."""
-    folder = session.get(Folder, folder_id)
-    if not folder or folder.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Folder not found",
-        )
+    folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
 
     update_data = folder_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -90,12 +81,7 @@ def delete_folder(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Delete a folder."""
-    folder = session.get(Folder, folder_id)
-    if not folder or folder.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Folder not found",
-        )
+    folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
 
     session.delete(folder)
     session.commit()

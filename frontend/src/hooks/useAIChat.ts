@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { useApi } from "./useApi";
 import type { ChatMessage } from "@/types";
 
 interface UseAIChatReturn {
@@ -15,9 +15,9 @@ interface UseAIChatReturn {
 }
 
 export function useAIChat(
-  getAccessToken: () => Promise<string | null>,
   selectedNoteId: string | null
 ): UseAIChatReturn {
+  const { getApi } = useApi();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [summary, setSummary] = useState<string | null>(null);
   const [isAILoading, setIsAILoading] = useState(false);
@@ -32,9 +32,8 @@ export function useAIChat(
     setIsAILoading(true);
     setSummary(null);
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const result = await api.summarizeNote({ note_id: noteId });
+      const apiClient = await getApi();
+      const result = await apiClient.summarizeNote({ note_id: noteId });
       setSummary(result.summary);
     } catch (error) {
       console.error("Failed to summarize:", error);
@@ -51,9 +50,8 @@ export function useAIChat(
     setIsAILoading(true);
 
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const result = await api.chatWithNote({
+      const apiClient = await getApi();
+      const result = await apiClient.chatWithNote({
         note_id: selectedNoteId,
         question: message,
         history: chatMessages,

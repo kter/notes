@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
-import { api } from "@/lib/api";
+import { useApi } from "@/hooks";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
@@ -34,6 +34,7 @@ export function EditorPanel({
   isSaving = false,
   saveError = null,
 }: EditorPanelProps) {
+  const { getApi } = useApi();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
@@ -94,7 +95,8 @@ export function EditorPanel({
     
     setIsGeneratingTitle(true);
     try {
-      const response = await api.generateTitle({ note_id: note.id });
+      const apiClient = await getApi();
+      const response = await apiClient.generateTitle({ note_id: note.id });
       setTitle(response.title);
       onUpdateNote(note.id, { title: response.title });
     } catch (error) {

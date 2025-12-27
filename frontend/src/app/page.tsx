@@ -10,15 +10,15 @@ import {
 } from "@/components/layout";
 import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
-import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { useFolders, useNotes, useAIChat } from "@/hooks";
+import { useFolders, useNotes, useAIChat, useApi } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
-  const { user, isLoading: authLoading, isAuthenticated, signOut, getAccessToken } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, signOut } = useAuth();
+  const { getApi } = useApi();
   
   // UI State
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export default function Home() {
     handleCreateFolder,
     handleRenameFolder,
     handleDeleteFolder,
-  } = useFolders(getAccessToken, selectedFolderId, setSelectedFolderId);
+  } = useFolders(selectedFolderId, setSelectedFolderId);
 
   const {
     notes,
@@ -45,7 +45,7 @@ export default function Home() {
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
-  } = useNotes(getAccessToken, selectedFolderId, selectedNoteId, setSelectedNoteId);
+  } = useNotes(selectedFolderId, selectedNoteId, setSelectedNoteId);
 
   const {
     chatMessages,
@@ -54,7 +54,7 @@ export default function Home() {
     handleSummarize,
     handleSendMessage,
     clearSummary,
-  } = useAIChat(getAccessToken, selectedNoteId);
+  } = useAIChat(selectedNoteId);
 
   // Selected note
   const selectedNote = notes.find((n) => n.id === selectedNoteId) || null;
@@ -76,14 +76,11 @@ export default function Home() {
       }
 
       try {
-        const token = await getAccessToken();
-        if (token) {
-          api.setToken(token);
-        }
+        const apiClient = await getApi();
         
         const [foldersData, notesData] = await Promise.all([
-          api.listFolders(),
-          api.listNotes(),
+          apiClient.listFolders(),
+          apiClient.listNotes(),
         ]);
         setFolders(foldersData);
         setNotes(notesData);
@@ -97,7 +94,7 @@ export default function Home() {
     if (!authLoading) {
       loadData();
     }
-  }, [isAuthenticated, authLoading, getAccessToken, setFolders, setNotes]);
+  }, [isAuthenticated, authLoading, getApi, setFolders, setNotes]);
 
   // Close chat when note changes
   useEffect(() => {
@@ -219,7 +216,6 @@ export default function Home() {
     <SettingsDialog
       open={isSettingsOpen}
       onOpenChange={setIsSettingsOpen}
-      getAccessToken={getAccessToken}
     />
     </>
   );

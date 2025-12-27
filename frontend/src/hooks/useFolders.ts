@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { useApi } from "./useApi";
 import type { Folder } from "@/types";
 
 interface UseFoldersReturn {
@@ -13,17 +13,16 @@ interface UseFoldersReturn {
 }
 
 export function useFolders(
-  getAccessToken: () => Promise<string | null>,
   selectedFolderId: string | null,
   setSelectedFolderId: (id: string | null) => void
 ): UseFoldersReturn {
+  const { getApi } = useApi();
   const [folders, setFolders] = useState<Folder[]>([]);
 
   const handleCreateFolder = async (name: string) => {
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const folder = await api.createFolder({ name });
+      const apiClient = await getApi();
+      const folder = await apiClient.createFolder({ name });
       setFolders((prev) => [folder, ...prev]);
     } catch (error) {
       console.error("Failed to create folder:", error);
@@ -32,9 +31,8 @@ export function useFolders(
 
   const handleRenameFolder = async (id: string, name: string) => {
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const folder = await api.updateFolder(id, { name });
+      const apiClient = await getApi();
+      const folder = await apiClient.updateFolder(id, { name });
       setFolders((prev) => prev.map((f) => (f.id === id ? folder : f)));
     } catch (error) {
       console.error("Failed to rename folder:", error);
@@ -43,9 +41,8 @@ export function useFolders(
 
   const handleDeleteFolder = async (id: string) => {
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      await api.deleteFolder(id);
+      const apiClient = await getApi();
+      await apiClient.deleteFolder(id);
       setFolders((prev) => prev.filter((f) => f.id !== id));
       if (selectedFolderId === id) {
         setSelectedFolderId(null);

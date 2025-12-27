@@ -7,6 +7,7 @@ import {
   NoteList,
   EditorPanel,
   SettingsDialog,
+  type MobileView,
 } from "@/components/layout";
 import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
@@ -27,6 +28,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<MobileView>("folders");
 
   // Custom hooks
   const {
@@ -36,6 +38,18 @@ export default function Home() {
     handleRenameFolder,
     handleDeleteFolder,
   } = useFolders(selectedFolderId, setSelectedFolderId);
+
+  // Handle folder selection with mobile view change
+  const handleSelectFolder = (id: string | null) => {
+    setSelectedFolderId(id);
+    setMobileView("notes");
+  };
+
+  // Handle note selection with mobile view change
+  const handleSelectNote = (id: string) => {
+    setSelectedNoteId(id);
+    setMobileView("editor");
+  };
 
   const {
     notes,
@@ -134,7 +148,7 @@ export default function Home() {
             <Sidebar
               folders={folders}
               selectedFolderId={selectedFolderId}
-              onSelectFolder={setSelectedFolderId}
+              onSelectFolder={handleSelectFolder}
               onCreateFolder={handleCreateFolder}
               onRenameFolder={handleRenameFolder}
               onDeleteFolder={handleDeleteFolder}
@@ -176,11 +190,13 @@ export default function Home() {
             </div>
           </div>
         }
+        mobileView={mobileView}
+        onMobileViewChange={setMobileView}
         noteList={
           <NoteList
             notes={filteredNotes}
             selectedNoteId={selectedNoteId}
-            onSelectNote={setSelectedNoteId}
+            onSelectNote={handleSelectNote}
             onCreateNote={handleCreateNote}
             folderName={selectedFolderName}
             folderId={selectedFolderId}

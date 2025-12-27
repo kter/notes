@@ -46,7 +46,13 @@ export function AIChatPanel({
   if (!isOpen && !summary) return null;
 
   return (
-    <div className="w-80 border-l border-border/50 flex flex-col bg-card/50">
+    <div className={cn(
+      "border-l border-border/50 flex flex-col bg-card/50",
+      // Desktop: fixed width sidebar
+      "md:w-80",
+      // Mobile: full screen overlay
+      "fixed md:relative inset-0 md:inset-auto w-full md:w-80 z-40 md:z-auto"
+    )}>
       {/* Header */}
       <div className="p-4 border-b border-border/50 flex items-center justify-between">
         <h3 className="font-semibold text-sm">AI Assistant</h3>

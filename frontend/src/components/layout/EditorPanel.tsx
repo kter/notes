@@ -349,18 +349,18 @@ export function EditorPanel({
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">
+        <div className="flex items-center gap-1 md:gap-2 flex-wrap">
           {/* Folder Selector */}
           <div className="relative" ref={dropdownRef}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-              className="gap-2"
+              className="gap-1 md:gap-2"
             >
               <FolderIcon className="h-4 w-4" />
-              <span className="max-w-[120px] truncate">
+              <span className="max-w-[80px] md:max-w-[120px] truncate hidden sm:inline">
                 {currentFolder?.name || "All Notes"}
               </span>
               <ChevronDownIcon className="h-3 w-3" />
@@ -396,23 +396,23 @@ export function EditorPanel({
             size="sm"
             onClick={() => onSummarize(note.id)}
             disabled={isSummarizing}
-            className="gap-2"
+            className="gap-1 md:gap-2"
           >
             {isSummarizing ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
             ) : (
               <SparklesIcon className="h-4 w-4" />
             )}
-            {isSummarizing ? "処理中..." : "Summarize"}
+            <span className="hidden md:inline">{isSummarizing ? "処理中..." : "Summarize"}</span>
           </Button>
           <Button
             variant={isChatOpen ? "secondary" : "ghost"}
             size="sm"
             onClick={onOpenChat}
-            className="gap-2"
+            className="gap-1 md:gap-2"
           >
             <MessageSquareIcon className="h-4 w-4" />
-            Chat
+            <span className="hidden md:inline">Chat</span>
           </Button>
           {/* Export Button */}
           <div className="relative" ref={exportDropdownRef}>
@@ -420,10 +420,10 @@ export function EditorPanel({
               variant="ghost"
               size="sm"
               onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-              className="gap-2"
+              className="gap-1 md:gap-2"
             >
               <DownloadIcon className="h-4 w-4" />
-              Export
+              <span className="hidden md:inline">Export</span>
               <ChevronDownIcon className="h-3 w-3" />
             </Button>
             {isExportDropdownOpen && (
@@ -450,14 +450,14 @@ export function EditorPanel({
             variant={isPreviewOpen ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-            className="gap-2"
+            className="gap-1 md:gap-2"
           >
             {isPreviewOpen ? (
               <EyeOffIcon className="h-4 w-4" />
             ) : (
               <EyeIcon className="h-4 w-4" />
             )}
-            Preview
+            <span className="hidden md:inline">Preview</span>
           </Button>
         </div>
         <Button
@@ -471,7 +471,7 @@ export function EditorPanel({
       </div>
 
       {/* Editor */}
-      <div className="flex-1 flex flex-col p-6 overflow-auto">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-auto">
         <div className="relative mb-4">
           <Input
             value={title}

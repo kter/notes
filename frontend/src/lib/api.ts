@@ -18,6 +18,17 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public data: unknown
+  ) {
+    super(`API error: ${status} ${statusText}`);
+    this.name = "ApiError";
+  }
+}
+
 class ApiClient {
   private token: string | null = null;
 
@@ -44,7 +55,18 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      let errorData: unknown;
+      try {
+        errorData = await response.json();
+      } catch {
+        // If parsing JSON fails, try to get text or fallback to empty object
+        try {
+            errorData = await response.text();
+        } catch {
+            errorData = {};
+        }
+      }
+      throw new ApiError(response.status, response.statusText, errorData);
     }
 
     if (response.status === 204) {

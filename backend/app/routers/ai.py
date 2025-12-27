@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.auth import UserId
+from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import DEFAULT_LLM_MODEL_ID, Note, UserSettings
 from app.services import AIService, get_ai_service
@@ -67,12 +68,7 @@ async def summarize_note(
     ai_service: Annotated[AIService, Depends(get_ai_service)],
 ):
     """Summarize a note's content using AI."""
-    note = session.get(Note, request.note_id)
-    if not note or note.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
 
     if not note.content.strip():
         raise HTTPException(
@@ -93,12 +89,7 @@ async def chat_with_note(
     ai_service: Annotated[AIService, Depends(get_ai_service)],
 ):
     """Chat with AI about a note's content."""
-    note = session.get(Note, request.note_id)
-    if not note or note.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
 
     if not note.content.strip():
         raise HTTPException(
@@ -124,12 +115,7 @@ async def generate_title(
     ai_service: Annotated[AIService, Depends(get_ai_service)],
 ):
     """Generate a title for a note's content using AI."""
-    note = session.get(Note, request.note_id)
-    if not note or note.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
 
     if not note.content.strip():
         raise HTTPException(
@@ -140,4 +126,3 @@ async def generate_title(
     model_id = get_user_model_id(session, user_id)
     title = await ai_service.generate_title(note.content, model_id=model_id)
     return GenerateTitleResponse(title=title)
-

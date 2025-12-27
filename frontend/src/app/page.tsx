@@ -198,6 +198,7 @@ export default function Home() {
               onSummarize={handleSummarize}
               onOpenChat={() => setIsChatOpen(!isChatOpen)}
               isChatOpen={isChatOpen}
+              isSummarizing={isAILoading}
               isSaving={isSaving}
               saveError={saveError}
             />

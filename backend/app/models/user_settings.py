@@ -2,35 +2,37 @@ from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
-# Default model ID (Claude Sonnet 4.5 - latest and most capable)
-DEFAULT_LLM_MODEL_ID = "anthropic.claude-sonnet-4-5-20250929-v1:0"
+# Default model ID (Claude Sonnet 4.5 via cross-region inference profile)
+DEFAULT_LLM_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
-# Available models for user selection (ordered by capability)
+# Available models for user selection
+# Models with "us." prefix use cross-region inference profiles for US region
+# Models without prefix use on-demand (only available for older models)
 AVAILABLE_MODELS = [
     {
-        "id": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         "name": "Claude Sonnet 4.5",
         "description": "最新・最高性能",
     },
     {
-        "id": "anthropic.claude-sonnet-4-20250514-v1:0",
+        "id": "us.anthropic.claude-sonnet-4-20250514-v1:0",
         "name": "Claude Sonnet 4",
         "description": "高性能",
     },
     {
-        "id": "anthropic.claude-haiku-4-5-20251001-v1:0",
-        "name": "Claude Haiku 4.5",
-        "description": "高速・低コスト（推奨）",
+        "id": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "name": "Claude 3.5 Sonnet v2",
+        "description": "高性能・安定",
     },
     {
-        "id": "anthropic.claude-3-5-haiku-20241022-v1:0",
+        "id": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
         "name": "Claude 3.5 Haiku",
-        "description": "高速・低コスト",
+        "description": "高速・低コスト（推奨）",
     },
     {
         "id": "anthropic.claude-3-haiku-20240307-v1:0",
         "name": "Claude 3 Haiku",
-        "description": "最速・最低コスト",
+        "description": "高速・最低コスト",
     },
 ]
 

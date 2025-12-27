@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage } from "@/types";
 import { SendIcon, XIcon, Loader2Icon, SparklesIcon } from "lucide-react";
@@ -119,19 +119,23 @@ export function AIChatPanel({
 
           {/* Input */}
           <div className="p-4 border-t border-border/50">
-            <div className="flex gap-2">
-              <Input
+            <div className="flex gap-2 items-end">
+              <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about this note..."
+                placeholder="Ask about this note... (Shift+Enter for newline)"
                 onKeyDown={(e) => {
+                  // Skip handling during IME composition (e.g., Japanese input)
+                  if (e.nativeEvent.isComposing) return;
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleSend();
                   }
+                  // Shift+Enter allows default behavior (newline)
                 }}
                 disabled={isLoading}
-                className="flex-1"
+                className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+                rows={1}
               />
               <Button
                 size="icon"

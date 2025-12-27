@@ -4,11 +4,12 @@ AWS Cost Report Lambda Function
 毎日のAWSコストレポートをメールで送信するLambda関数
 """
 
-import boto3
 import json
 import os
 from datetime import datetime, timedelta
 from typing import Any
+
+import boto3
 
 
 def get_cost_data(ce_client: Any) -> dict:

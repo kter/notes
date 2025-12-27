@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -78,7 +78,7 @@ def update_note(
     for key, value in update_data.items():
         setattr(note, key, value)
 
-    note.updated_at = datetime.now(timezone.utc)
+    note.updated_at = datetime.now(UTC)
     session.add(note)
     session.commit()
     session.refresh(note)

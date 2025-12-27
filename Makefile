@@ -145,3 +145,32 @@ test-cost-report: ## Manually invoke cost report Lambda
 clean: ## Clean build artifacts
 	rm -rf frontend/out frontend/.next
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+.PHONY: test
+test: test-backend test-lint ## Run all tests
+
+.PHONY: test-backend
+test-backend: ## Run backend tests
+	cd backend && uv run python -m pytest -v
+
+.PHONY: test-lint
+test-lint: lint-backend lint-frontend ## Run all linters
+
+.PHONY: lint-backend
+lint-backend: ## Run backend linter (ruff)
+	cd backend && uv run ruff check .
+
+.PHONY: lint-frontend
+lint-frontend: ## Run frontend linter (eslint)
+	cd frontend && npm run lint
+
+.PHONY: install-hooks
+install-hooks: ## Install git pre-commit hooks
+	chmod +x scripts/pre-commit
+	cp scripts/pre-commit .git/hooks/pre-commit
+	@echo "Pre-commit hook installed!"
+

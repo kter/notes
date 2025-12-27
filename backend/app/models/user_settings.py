@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
-
 
 # Default model ID (Claude Sonnet 4.5 - latest and most capable)
 DEFAULT_LLM_MODEL_ID = "anthropic.claude-sonnet-4-5-20250929-v1:0"
@@ -48,8 +47,8 @@ class UserSettings(UserSettingsBase, table=True):
     __tablename__ = "user_settings"
 
     user_id: str = Field(primary_key=True)  # Cognito user sub
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class UserSettingsUpdate(SQLModel):

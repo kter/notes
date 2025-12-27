@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -84,7 +84,7 @@ async def update_settings(
                     detail=f"Invalid model ID. Must be one of: {valid_ids}",
                 )
             settings.llm_model_id = settings_in.llm_model_id
-        settings.updated_at = datetime.now(timezone.utc)
+        settings.updated_at = datetime.now(UTC)
 
     session.commit()
     session.refresh(settings)

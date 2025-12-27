@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from pydantic import field_validator
@@ -20,8 +20,8 @@ class Note(NoteBase, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: str = Field()  # Cognito user sub (no index for DSQL compatibility)
     folder_id: UUID | None = Field(default=None)  # Logical FK, no constraint (no index for DSQL)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class NoteCreate(NoteBase):
@@ -52,5 +52,5 @@ class NoteRead(NoteBase):
     def ensure_utc_timezone(cls, v: datetime) -> datetime:
         """Ensure datetime has UTC timezone info for proper JSON serialization."""
         if isinstance(v, datetime) and v.tzinfo is None:
-            return v.replace(tzinfo=timezone.utc)
+            return v.replace(tzinfo=UTC)
         return v

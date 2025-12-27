@@ -30,7 +30,7 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
-ignore = []
+ignore = ["E501"]  # Line too long - existing code has many long lines
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Generator
+from collections.abc import Generator
 
 import boto3
 from sqlmodel import Session, SQLModel, create_engine

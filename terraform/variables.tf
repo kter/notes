@@ -29,15 +29,15 @@ locals {
 }
 
 variable "cognito_callback_urls" {
-  description = "Cognito callback URLs"
+  description = "Additional Cognito callback URLs (for local development)"
   type        = list(string)
-  default     = ["http://localhost:3000/auth/callback"]
+  default     = []
 }
 
 variable "cognito_logout_urls" {
-  description = "Cognito logout URLs"
+  description = "Additional Cognito logout URLs (for local development)"
   type        = list(string)
-  default     = ["http://localhost:3000"]
+  default     = []
 }
 
 # Lambda image tag (use digest for production deployments)

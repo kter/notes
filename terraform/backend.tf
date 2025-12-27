@@ -1,11 +1,6 @@
+# Backend configuration is provided via -backend-config flag
+# Usage: terraform init -backend-config=backends/dev.hcl
+#    or: terraform init -backend-config=backends/prd.hcl
 terraform {
-  backend "s3" {
-    bucket         = "notes-app-terraform-state-031921999648"
-    key            = "terraform.tfstate"
-    region         = "ap-northeast-1"
-    encrypt        = true
-    dynamodb_table = "notes-app-terraform-locks"
-  }
+  backend "s3" {}
 }
-
-

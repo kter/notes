@@ -6,6 +6,7 @@ import {
   Sidebar,
   NoteList,
   EditorPanel,
+  SettingsDialog,
 } from "@/components/layout";
 import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
@@ -13,7 +14,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { Folder, Note, ChatMessage } from "@/types";
 import { Button } from "@/components/ui/button";
-import { LogOutIcon, Loader2Icon } from "lucide-react";
+import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Debounce helper for auto-save using useRef to avoid re-renders
@@ -58,6 +59,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Selected note
   const selectedNote = notes.find((n) => n.id === selectedNoteId) || null;
@@ -281,6 +283,7 @@ export default function Home() {
   }
 
   return (
+    <>
     <ThreeColumnLayout
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -309,6 +312,15 @@ export default function Home() {
                     {user?.email}
                   </span>
                 )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsSettingsOpen(true)}
+                  title="Settings"
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -359,5 +371,11 @@ export default function Home() {
           </div>
         }
     />
+    <SettingsDialog
+      open={isSettingsOpen}
+      onOpenChange={setIsSettingsOpen}
+      getAccessToken={getAccessToken}
+    />
+    </>
   );
 }

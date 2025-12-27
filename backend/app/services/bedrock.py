@@ -12,17 +12,19 @@ class AIService(ABC):
     """Abstract base class for AI services. Designed for future RAG extensibility."""
 
     @abstractmethod
-    async def summarize(self, content: str) -> str:
+    async def summarize(self, content: str, model_id: str | None = None) -> str:
         """Generate a summary of the given content."""
         pass
 
     @abstractmethod
-    async def chat(self, content: str, question: str, history: list[dict] | None = None) -> str:
+    async def chat(
+        self, content: str, question: str, history: list[dict] | None = None, model_id: str | None = None
+    ) -> str:
         """Answer a question based on the given content context."""
         pass
 
     @abstractmethod
-    async def generate_title(self, content: str) -> str:
+    async def generate_title(self, content: str, model_id: str | None = None) -> str:
         """Generate a concise title for the given content."""
         pass
 
@@ -37,7 +39,9 @@ class BedrockService(AIService):
         )
         self.model_id = settings.bedrock_model_id
 
-    def _invoke_model(self, messages: list[dict], system: str | None = None) -> str:
+    def _invoke_model(
+        self, messages: list[dict], system: str | None = None, model_id: str | None = None
+    ) -> str:
         """Invoke the Bedrock model and return the response text."""
         body = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -48,8 +52,11 @@ class BedrockService(AIService):
         if system:
             body["system"] = system
 
+        # Use provided model_id or fall back to default
+        effective_model_id = model_id or self.model_id
+
         response = self.client.invoke_model(
-            modelId=self.model_id,
+            modelId=effective_model_id,
             body=json.dumps(body),
             contentType="application/json",
             accept="application/json",
@@ -58,7 +65,7 @@ class BedrockService(AIService):
         response_body = json.loads(response["body"].read())
         return response_body["content"][0]["text"]
 
-    async def summarize(self, content: str) -> str:
+    async def summarize(self, content: str, model_id: str | None = None) -> str:
         """Generate a summary of the note content."""
         system = (
             "You are a helpful assistant that summarizes notes. "
@@ -73,9 +80,9 @@ class BedrockService(AIService):
             }
         ]
 
-        return self._invoke_model(messages, system)
+        return self._invoke_model(messages, system, model_id=model_id)
 
-    async def generate_title(self, content: str) -> str:
+    async def generate_title(self, content: str, model_id: str | None = None) -> str:
         """Generate a concise title for the note content."""
         system = (
             "You are a helpful assistant that generates concise titles for notes. "
@@ -91,10 +98,10 @@ class BedrockService(AIService):
             }
         ]
 
-        return self._invoke_model(messages, system).strip()
+        return self._invoke_model(messages, system, model_id=model_id).strip()
 
     async def chat(
-        self, content: str, question: str, history: list[dict] | None = None
+        self, content: str, question: str, history: list[dict] | None = None, model_id: str | None = None
     ) -> str:
         """Answer a question about the note content."""
         system = (
@@ -127,7 +134,7 @@ class BedrockService(AIService):
             ),
         })
 
-        return self._invoke_model(messages, system)
+        return self._invoke_model(messages, system, model_id=model_id)
 
 
 # Singleton instance

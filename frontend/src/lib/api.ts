@@ -9,8 +9,11 @@ import type {
   Note,
   NoteCreate,
   NoteUpdate,
+  SettingsResponse,
   SummarizeRequest,
   SummarizeResponse,
+  UserSettings,
+  UserSettingsUpdate,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -131,6 +134,19 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // Settings API
+  async getSettings(): Promise<SettingsResponse> {
+    return this.request<SettingsResponse>("/api/settings/");
+  }
+
+  async updateSettings(data: UserSettingsUpdate): Promise<UserSettings> {
+    return this.request<UserSettings>("/api/settings/", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiClient();
+

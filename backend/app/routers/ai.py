@@ -7,10 +7,18 @@ from sqlmodel import Session
 
 from app.auth import UserId
 from app.database import get_session
-from app.models import Note
+from app.models import DEFAULT_LLM_MODEL_ID, Note, UserSettings
 from app.services import AIService, get_ai_service
 
 router = APIRouter()
+
+
+def get_user_model_id(session: Session, user_id: str) -> str:
+    """Get the user's preferred LLM model ID."""
+    settings = session.get(UserSettings, user_id)
+    if settings:
+        return settings.llm_model_id
+    return DEFAULT_LLM_MODEL_ID
 
 
 class SummarizeRequest(BaseModel):
@@ -72,7 +80,8 @@ async def summarize_note(
             detail="Note content is empty",
         )
 
-    summary = await ai_service.summarize(note.content)
+    model_id = get_user_model_id(session, user_id)
+    summary = await ai_service.summarize(note.content, model_id=model_id)
     return SummarizeResponse(summary=summary)
 
 
@@ -97,10 +106,12 @@ async def chat_with_note(
             detail="Note content is empty",
         )
 
+    model_id = get_user_model_id(session, user_id)
     answer = await ai_service.chat(
         content=note.content,
         question=request.question,
         history=request.history,
+        model_id=model_id,
     )
     return ChatResponse(answer=answer)
 
@@ -126,5 +137,7 @@ async def generate_title(
             detail="Note content is empty",
         )
 
-    title = await ai_service.generate_title(note.content)
+    model_id = get_user_model_id(session, user_id)
+    title = await ai_service.generate_title(note.content, model_id=model_id)
     return GenerateTitleResponse(title=title)
+

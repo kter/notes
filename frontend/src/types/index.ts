@@ -69,3 +69,26 @@ export interface GenerateTitleRequest {
 export interface GenerateTitleResponse {
   title: string;
 }
+
+// Settings types
+export interface UserSettings {
+  user_id: string;
+  llm_model_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvailableModel {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface SettingsResponse {
+  settings: UserSettings;
+  available_models: AvailableModel[];
+}
+
+export interface UserSettingsUpdate {
+  llm_model_id?: string;
+}

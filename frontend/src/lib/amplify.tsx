@@ -3,12 +3,12 @@
 import { useEffect, useState, ReactNode } from "react";
 import { Amplify, ResourcesConfig } from "aws-amplify";
 
-// Cognito configuration with hardcoded dev values
+// Cognito configuration from environment variables
 const amplifyConfig: ResourcesConfig = {
   Auth: {
     Cognito: {
-      userPoolId: "ap-northeast-1_I3NE9dKT6",
-      userPoolClientId: "3kv8dje13pfu1am91ck2bma0n0",
+      userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || "",
+      userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || "",
       loginWith: {
         email: true,
       },

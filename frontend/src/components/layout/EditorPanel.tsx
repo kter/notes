@@ -104,59 +104,59 @@ export function EditorPanel({
     }
   };
 
-  // Handle Enter key to maintain indentation and list markers
-  // Handle Tab/Shift+Tab for indentation
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Skip handling during IME composition (e.g., Japanese input)
-    if (e.nativeEvent.isComposing) return;
+  // Helper: Get list marker information from current line
+  interface ListMarkerInfo {
+    fullMatch: string;
+    indent: string;
+    marker: string | undefined;
+    markerSpace: string;
+    contentAfterMarker: string;
+  }
 
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  const getListMarkerInfo = useCallback((currentLine: string): ListMarkerInfo | null => {
+    // Match leading whitespace and optional list markers
+    // Supports: -, *, +, 1., 2., etc.
+    const match = currentLine.match(/^(\s*)([-*+]|\d+\.)?(\s*)/);
+    if (!match) return null;
+
+    const [fullMatch, indent, marker, markerSpace] = match;
+    return {
+      fullMatch,
+      indent: indent || "",
+      marker,
+      markerSpace: markerSpace || "",
+      contentAfterMarker: currentLine.slice(fullMatch.length),
+    };
+  }, []);
+
+  // Handle Tab/Shift+Tab for indentation
+  const handleTabKey = useCallback((
+    e: KeyboardEvent<HTMLTextAreaElement>,
+    textarea: HTMLTextAreaElement
+  ): void => {
+    e.preventDefault();
 
     const { selectionStart, selectionEnd, value } = textarea;
 
-    // Handle Tab and Shift+Tab for indentation
-    if (e.key === "Tab") {
-      e.preventDefault();
+    // Find the start of the current line
+    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+    const currentLine = value.slice(lineStart, selectionStart);
 
-      // Find the start of the current line
-      const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-      const currentLine = value.slice(lineStart, selectionStart);
+    // Check if the line is a list item (starts with optional whitespace + list marker)
+    const listMatch = currentLine.match(/^(\s*)([-*+]|\d+\.)\s/);
 
-      // Check if the line is a list item (starts with optional whitespace + list marker)
-      const listMatch = currentLine.match(/^(\s*)([-*+]|\d+\.)\s/);
+    if (listMatch || currentLine.match(/^\s+/)) {
+      // We're in a list item or indented line
+      if (e.shiftKey) {
+        // Shift+Tab: Remove indentation (2 spaces from the beginning of the line)
+        const lineContent = value.slice(lineStart);
+        const indentMatch = lineContent.match(/^(\s{1,2})/);
 
-      if (listMatch || currentLine.match(/^\s+/)) {
-        // We're in a list item or indented line
-        if (e.shiftKey) {
-          // Shift+Tab: Remove indentation (2 spaces from the beginning of the line)
-          const lineContent = value.slice(lineStart);
-          const indentMatch = lineContent.match(/^(\s{1,2})/);
-
-          if (indentMatch) {
-            const spacesToRemove = indentMatch[1].length;
-            const before = value.slice(0, lineStart);
-            const after = value.slice(lineStart + spacesToRemove);
-            const newValue = before + after;
-
-            setContent(newValue);
-            if (note) {
-              onUpdateNote(note.id, { content: newValue });
-            }
-
-            // Adjust cursor position
-            requestAnimationFrame(() => {
-              if (textareaRef.current) {
-                const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
-                textareaRef.current.setSelectionRange(newPos, newPos);
-              }
-            });
-          }
-        } else {
-          // Tab: Add indentation (2 spaces at the beginning of the line)
+        if (indentMatch) {
+          const spacesToRemove = indentMatch[1].length;
           const before = value.slice(0, lineStart);
-          const after = value.slice(lineStart);
-          const newValue = before + "  " + after;
+          const after = value.slice(lineStart + spacesToRemove);
+          const newValue = before + after;
 
           setContent(newValue);
           if (note) {
@@ -166,15 +166,15 @@ export function EditorPanel({
           // Adjust cursor position
           requestAnimationFrame(() => {
             if (textareaRef.current) {
-              const newPos = selectionStart + 2;
+              const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
               textareaRef.current.setSelectionRange(newPos, newPos);
             }
           });
         }
       } else {
-        // Not in a list item - insert tab characters at cursor position
-        const before = value.slice(0, selectionStart);
-        const after = value.slice(selectionEnd);
+        // Tab: Add indentation (2 spaces at the beginning of the line)
+        const before = value.slice(0, lineStart);
+        const after = value.slice(lineStart);
         const newValue = before + "  " + after;
 
         setContent(newValue);
@@ -182,6 +182,7 @@ export function EditorPanel({
           onUpdateNote(note.id, { content: newValue });
         }
 
+        // Adjust cursor position
         requestAnimationFrame(() => {
           if (textareaRef.current) {
             const newPos = selectionStart + 2;
@@ -189,38 +190,55 @@ export function EditorPanel({
           }
         });
       }
-      return;
+    } else {
+      // Not in a list item - insert tab characters at cursor position
+      const before = value.slice(0, selectionStart);
+      const after = value.slice(selectionEnd);
+      const newValue = before + "  " + after;
+
+      setContent(newValue);
+      if (note) {
+        onUpdateNote(note.id, { content: newValue });
+      }
+
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const newPos = selectionStart + 2;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+      });
     }
+  }, [note, onUpdateNote]);
 
+  // Handle Enter key for list continuation
+  const handleEnterKey = useCallback((
+    e: KeyboardEvent<HTMLTextAreaElement>,
+    textarea: HTMLTextAreaElement
+  ): void => {
+    const { selectionStart, value } = textarea;
 
-    if (e.key !== "Enter") return;
-    
     // Find the start of the current line
     const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
     const currentLine = value.slice(lineStart, selectionStart);
-    
-    // Match leading whitespace and optional list markers
-    // Supports: -, *, +, 1., 2., etc.
-    const match = currentLine.match(/^(\s*)([-*+]|\d+\.)?(\s*)/);
-    
-    if (!match) return;
-    
-    const [fullMatch, indent, marker, markerSpace] = match;
-    
+
+    const markerInfo = getListMarkerInfo(currentLine);
+    if (!markerInfo) return;
+
+    const { indent, marker, markerSpace, contentAfterMarker } = markerInfo;
+
     // Check if the line only contains the marker (empty list item)
-    const contentAfterMarker = currentLine.slice(fullMatch.length);
     if (marker && contentAfterMarker.trim() === "") {
       // Empty list item - remove the marker and indent on Enter
       e.preventDefault();
       const beforeLine = value.slice(0, lineStart);
       const afterCursor = value.slice(selectionStart);
       const newValue = beforeLine + "\n" + afterCursor;
-      
+
       setContent(newValue);
       if (note) {
         onUpdateNote(note.id, { content: newValue });
       }
-      
+
       // Set cursor position after React re-render
       requestAnimationFrame(() => {
         if (textareaRef.current) {
@@ -230,7 +248,7 @@ export function EditorPanel({
       });
       return;
     }
-    
+
     // Build the continuation string
     let continuation = indent;
     if (marker) {
@@ -242,19 +260,19 @@ export function EditorPanel({
         continuation += marker + markerSpace;
       }
     }
-    
+
     // Only intercept if there's something to continue
     if (continuation) {
       e.preventDefault();
       const before = value.slice(0, selectionStart);
       const after = value.slice(selectionStart);
       const newValue = before + "\n" + continuation + after;
-      
+
       setContent(newValue);
       if (note) {
         onUpdateNote(note.id, { content: newValue });
       }
-      
+
       // Set cursor position after React re-render
       requestAnimationFrame(() => {
         if (textareaRef.current) {
@@ -263,7 +281,25 @@ export function EditorPanel({
         }
       });
     }
-  }, [note, onUpdateNote]);
+  }, [note, onUpdateNote, getListMarkerInfo]);
+
+  // Main keyboard event handler - delegates to specific handlers
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Skip handling during IME composition (e.g., Japanese input)
+    if (e.nativeEvent.isComposing) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    if (e.key === "Tab") {
+      handleTabKey(e, textarea);
+      return;
+    }
+
+    if (e.key === "Enter") {
+      handleEnterKey(e, textarea);
+    }
+  }, [handleTabKey, handleEnterKey]);
 
   // Export handlers
   const downloadFile = (content: string, filename: string, mimeType: string) => {

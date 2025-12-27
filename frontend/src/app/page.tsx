@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   ThreeColumnLayout,
   Sidebar,
@@ -12,54 +12,49 @@ import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Folder, Note, ChatMessage } from "@/types";
+import { useFolders, useNotes, useAIChat } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Debounce helper for auto-save using useRef to avoid re-renders
-function useDebounce<T extends (...args: Parameters<T>) => void>(
-  callback: T,
-  delay: number
-): T {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const callbackRef = useRef(callback);
-  
-  // Keep callback ref updated
-  useEffect(() => {
-    callbackRef.current = callback;
-  }, [callback]);
-
-  return useCallback(
-    ((...args: Parameters<T>) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        callbackRef.current(...args);
-      }, delay);
-    }) as T,
-    [delay]
-  );
-}
-
 export default function Home() {
   const { user, isLoading: authLoading, isAuthenticated, signOut, getAccessToken } = useAuth();
   
-  // State
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
+  // UI State
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isAILoading, setIsAILoading] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Custom hooks
+  const {
+    folders,
+    setFolders,
+    handleCreateFolder,
+    handleRenameFolder,
+    handleDeleteFolder,
+  } = useFolders(getAccessToken, selectedFolderId, setSelectedFolderId);
+
+  const {
+    notes,
+    setNotes,
+    isSaving,
+    saveError,
+    handleCreateNote,
+    handleUpdateNote,
+    handleDeleteNote,
+  } = useNotes(getAccessToken, selectedFolderId, selectedNoteId, setSelectedNoteId);
+
+  const {
+    chatMessages,
+    summary,
+    isAILoading,
+    handleSummarize,
+    handleSendMessage,
+    clearSummary,
+  } = useAIChat(getAccessToken, selectedNoteId);
 
   // Selected note
   const selectedNote = notes.find((n) => n.id === selectedNoteId) || null;
@@ -102,160 +97,10 @@ export default function Home() {
     if (!authLoading) {
       loadData();
     }
-  }, [isAuthenticated, authLoading, getAccessToken]);
+  }, [isAuthenticated, authLoading, getAccessToken, setFolders, setNotes]);
 
-  // Folder handlers
-  const handleCreateFolder = async (name: string) => {
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const folder = await api.createFolder({ name });
-      setFolders((prev) => [folder, ...prev]);
-    } catch (error) {
-      console.error("Failed to create folder:", error);
-    }
-  };
-
-  const handleRenameFolder = async (id: string, name: string) => {
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const folder = await api.updateFolder(id, { name });
-      setFolders((prev) => prev.map((f) => (f.id === id ? folder : f)));
-    } catch (error) {
-      console.error("Failed to rename folder:", error);
-    }
-  };
-
-  const handleDeleteFolder = async (id: string) => {
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      await api.deleteFolder(id);
-      setFolders((prev) => prev.filter((f) => f.id !== id));
-      if (selectedFolderId === id) {
-        setSelectedFolderId(null);
-      }
-    } catch (error) {
-      console.error("Failed to delete folder:", error);
-    }
-  };
-
-  // Note handlers
-  const handleCreateNote = async () => {
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const note = await api.createNote({
-        title: "",
-        content: "",
-        folder_id: selectedFolderId,
-      });
-      setNotes((prev) => [note, ...prev]);
-      setSelectedNoteId(note.id);
-    } catch (error) {
-      console.error("Failed to create note:", error);
-    }
-  };
-
-  const debouncedUpdateNote = useDebounce(
-    async (id: string, updates: { title?: string; content?: string; folder_id?: string | null }) => {
-      setIsSaving(true);
-      setSaveError(null);
-      try {
-        const token = await getAccessToken();
-        if (token) api.setToken(token);
-        const note = await api.updateNote(id, updates);
-        // Only update metadata (updated_at), not content/title to avoid overwriting user input
-        setNotes((prev) =>
-          prev.map((n) =>
-            n.id === id
-              ? { ...n, updated_at: note.updated_at }
-              : n
-          )
-        );
-      } catch (error) {
-        console.error("Failed to update note:", error);
-        setSaveError("保存に失敗しました");
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    500
-  );
-
-  const handleUpdateNote = (
-    id: string,
-    updates: { title?: string; content?: string; folder_id?: string | null }
-  ) => {
-    // Optimistic update
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, ...updates } : n))
-    );
-    debouncedUpdateNote(id, updates);
-  };
-
-  const handleDeleteNote = async (id: string) => {
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      await api.deleteNote(id);
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-      if (selectedNoteId === id) {
-        setSelectedNoteId(null);
-      }
-    } catch (error) {
-      console.error("Failed to delete note:", error);
-    }
-  };
-
-  // AI handlers
-  const handleSummarize = async (noteId: string) => {
-    setIsAILoading(true);
-    setSummary(null);
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const result = await api.summarizeNote({ note_id: noteId });
-      setSummary(result.summary);
-    } catch (error) {
-      console.error("Failed to summarize:", error);
-    } finally {
-      setIsAILoading(false);
-    }
-  };
-
-  const handleSendMessage = async (message: string) => {
-    if (!selectedNoteId) return;
-
-    const userMessage: ChatMessage = { role: "user", content: message };
-    setChatMessages((prev) => [...prev, userMessage]);
-    setIsAILoading(true);
-
-    try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const result = await api.chatWithNote({
-        note_id: selectedNoteId,
-        question: message,
-        history: chatMessages,
-      });
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        content: result.answer,
-      };
-      setChatMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error("Failed to chat:", error);
-    } finally {
-      setIsAILoading(false);
-    }
-  };
-
-  // Clear chat when note changes
+  // Close chat when note changes
   useEffect(() => {
-    setChatMessages([]);
-    setSummary(null);
     setIsChatOpen(false);
   }, [selectedNoteId]);
 
@@ -366,7 +211,7 @@ export default function Home() {
               onSendMessage={handleSendMessage}
               isLoading={isAILoading}
               summary={summary}
-              onClearSummary={() => setSummary(null)}
+              onClearSummary={clearSummary}
             />
           </div>
         }

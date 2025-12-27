@@ -73,3 +73,42 @@ class TestNoteModels:
         assert note.id is not None
         assert note.created_at is not None
         assert note.updated_at is not None
+
+
+class TestUserSettingsModels:
+    """Tests for UserSettings models."""
+
+    def test_user_settings_defaults(self):
+        """Test UserSettings default values."""
+        from app.models.user_settings import DEFAULT_LLM_MODEL_ID, UserSettings
+        
+        settings = UserSettings(user_id="user-123")
+        
+        assert settings.user_id == "user-123"
+        assert settings.llm_model_id == DEFAULT_LLM_MODEL_ID
+        assert settings.created_at is not None
+        assert settings.updated_at is not None
+
+    def test_user_settings_update_schema(self):
+        """Test UserSettingsUpdate allows partial updates."""
+        from app.models.user_settings import UserSettingsUpdate
+        
+        update = UserSettingsUpdate(llm_model_id="test-model")
+        assert update.llm_model_id == "test-model"
+        
+        update_empty = UserSettingsUpdate()
+        assert update_empty.llm_model_id is None
+
+    def test_available_models_structure(self):
+        """Test AVAILABLE_MODELS constant is properly structured."""
+        from app.models.user_settings import AVAILABLE_MODELS
+        
+        assert len(AVAILABLE_MODELS) > 0
+        
+        for model in AVAILABLE_MODELS:
+            assert "id" in model
+            assert "name" in model
+            assert "description" in model
+            assert isinstance(model["id"], str)
+            assert isinstance(model["name"], str)
+            assert isinstance(model["description"], str)

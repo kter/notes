@@ -38,7 +38,11 @@ resource "aws_iam_role_policy" "bedrock_access" {
           "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
-          "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+          # Foundation models (on-demand)
+          "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+          # Cross-region inference profiles
+          "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-*",
+          "arn:aws:bedrock:*:*:inference-profile/eu.anthropic.claude-*"
         ]
       }
     ]

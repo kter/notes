@@ -19,6 +19,7 @@ interface EditorPanelProps {
   onSummarize: (id: string) => void;
   onOpenChat: () => void;
   isChatOpen: boolean;
+  isSummarizing?: boolean;
   isSaving?: boolean;
   saveError?: string | null;
 }
@@ -31,6 +32,7 @@ export function EditorPanel({
   onSummarize,
   onOpenChat,
   isChatOpen,
+  isSummarizing = false,
   isSaving = false,
   saveError = null,
 }: EditorPanelProps) {
@@ -393,10 +395,15 @@ export function EditorPanel({
             variant="ghost"
             size="sm"
             onClick={() => onSummarize(note.id)}
+            disabled={isSummarizing}
             className="gap-2"
           >
-            <SparklesIcon className="h-4 w-4" />
-            Summarize
+            {isSummarizing ? (
+              <Loader2Icon className="h-4 w-4 animate-spin" />
+            ) : (
+              <SparklesIcon className="h-4 w-4" />
+            )}
+            {isSummarizing ? "処理中..." : "Summarize"}
           </Button>
           <Button
             variant={isChatOpen ? "secondary" : "ghost"}

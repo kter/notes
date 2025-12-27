@@ -9,6 +9,7 @@ from app.auth import UserId
 from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import Folder, FolderCreate, FolderRead, FolderUpdate
+from app.routers.db_exceptions import commit_with_error_handling
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ def create_folder(
     """Create a new folder."""
     folder = Folder(**folder_in.model_dump(), user_id=user_id)
     session.add(folder)
-    session.commit()
+    commit_with_error_handling(session, "Folder")
     session.refresh(folder)
     return folder
 
@@ -69,7 +70,7 @@ def update_folder(
 
     folder.updated_at = datetime.now(UTC)
     session.add(folder)
-    session.commit()
+    commit_with_error_handling(session, "Folder")
     session.refresh(folder)
     return folder
 
@@ -84,4 +85,4 @@ def delete_folder(
     folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
 
     session.delete(folder)
-    session.commit()
+    commit_with_error_handling(session, "Folder")

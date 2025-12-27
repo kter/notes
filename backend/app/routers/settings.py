@@ -15,6 +15,7 @@ from app.models import (
     UserSettingsRead,
     UserSettingsUpdate,
 )
+from app.routers.db_exceptions import commit_with_error_handling
 
 router = APIRouter()
 
@@ -41,7 +42,7 @@ async def get_settings(
             llm_model_id=DEFAULT_LLM_MODEL_ID,
         )
         session.add(settings)
-        session.commit()
+        commit_with_error_handling(session, "UserSettings")
         session.refresh(settings)
 
     return SettingsResponse(
@@ -86,7 +87,7 @@ async def update_settings(
             settings.llm_model_id = settings_in.llm_model_id
         settings.updated_at = datetime.now(UTC)
 
-    session.commit()
+    commit_with_error_handling(session, "UserSettings")
     session.refresh(settings)
 
     return UserSettingsRead(

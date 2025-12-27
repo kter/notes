@@ -18,20 +18,19 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2Icon, CheckIcon } from "lucide-react";
-import { api } from "@/lib/api";
+import { useApi } from "@/hooks";
 import type { AvailableModel } from "@/types";
 
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  getAccessToken: () => Promise<string | null>;
 }
 
 export function SettingsDialog({
   open,
   onOpenChange,
-  getAccessToken,
 }: SettingsDialogProps) {
+  const { getApi } = useApi();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,10 +48,8 @@ export function SettingsDialog({
       setSaveSuccess(false);
 
       try {
-        const token = await getAccessToken();
-        if (token) api.setToken(token);
-
-        const response = await api.getSettings();
+        const apiClient = await getApi();
+        const response = await apiClient.getSettings();
         setSelectedModelId(response.settings.llm_model_id);
         setAvailableModels(response.available_models);
       } catch (err) {
@@ -64,7 +61,7 @@ export function SettingsDialog({
     }
 
     loadSettings();
-  }, [open, getAccessToken]);
+  }, [open, getApi]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -72,10 +69,8 @@ export function SettingsDialog({
     setSaveSuccess(false);
 
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-
-      await api.updateSettings({ llm_model_id: selectedModelId });
+      const apiClient = await getApi();
+      await apiClient.updateSettings({ llm_model_id: selectedModelId });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {

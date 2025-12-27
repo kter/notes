@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { api } from "@/lib/api";
+import { useApi } from "./useApi";
 import type { Note } from "@/types";
 
 // Debounce helper for auto-save using useRef to avoid re-renders
@@ -41,11 +41,11 @@ interface UseNotesReturn {
 }
 
 export function useNotes(
-  getAccessToken: () => Promise<string | null>,
   selectedFolderId: string | null,
   selectedNoteId: string | null,
   setSelectedNoteId: (id: string | null) => void
 ): UseNotesReturn {
+  const { getApi } = useApi();
   const [notes, setNotes] = useState<Note[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -55,9 +55,8 @@ export function useNotes(
       setIsSaving(true);
       setSaveError(null);
       try {
-        const token = await getAccessToken();
-        if (token) api.setToken(token);
-        const note = await api.updateNote(id, updates);
+        const apiClient = await getApi();
+        const note = await apiClient.updateNote(id, updates);
         // Only update metadata (updated_at), not content/title to avoid overwriting user input
         setNotes((prev) =>
           prev.map((n) =>
@@ -78,9 +77,8 @@ export function useNotes(
 
   const handleCreateNote = async () => {
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      const note = await api.createNote({
+      const apiClient = await getApi();
+      const note = await apiClient.createNote({
         title: "",
         content: "",
         folder_id: selectedFolderId,
@@ -105,9 +103,8 @@ export function useNotes(
 
   const handleDeleteNote = async (id: string) => {
     try {
-      const token = await getAccessToken();
-      if (token) api.setToken(token);
-      await api.deleteNote(id);
+      const apiClient = await getApi();
+      await apiClient.deleteNote(id);
       setNotes((prev) => prev.filter((n) => n.id !== id));
       if (selectedNoteId === id) {
         setSelectedNoteId(null);

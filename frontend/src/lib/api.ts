@@ -30,11 +30,7 @@ export class ApiError extends Error {
 }
 
 class ApiClient {
-  private token: string | null = null;
-
-  setToken(token: string | null) {
-    this.token = token;
-  }
+  constructor(private readonly token: string | null = null) {}
 
   private async request<T>(
     endpoint: string,
@@ -170,5 +166,7 @@ class ApiClient {
   }
 }
 
-export const api = new ApiClient();
+export function createApiClient(token: string | null): ApiClient {
+  return new ApiClient(token);
+}
 

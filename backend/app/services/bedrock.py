@@ -4,6 +4,11 @@ from abc import ABC, abstractmethod
 import boto3
 
 from app.config import get_settings
+from app.core.prompts import (
+    CHAT_SYSTEM_PROMPT,
+    GENERATE_TITLE_SYSTEM_PROMPT,
+    SUMMARIZE_SYSTEM_PROMPT,
+)
 
 settings = get_settings()
 
@@ -67,11 +72,7 @@ class BedrockService(AIService):
 
     async def summarize(self, content: str, model_id: str | None = None) -> str:
         """Generate a summary of the note content."""
-        system = (
-            "You are a helpful assistant that summarizes notes. "
-            "Provide a concise, well-structured summary that captures the key points. "
-            "Use bullet points for multiple topics. Keep the summary brief but informative."
-        )
+        system = SUMMARIZE_SYSTEM_PROMPT
 
         messages = [
             {
@@ -84,12 +85,7 @@ class BedrockService(AIService):
 
     async def generate_title(self, content: str, model_id: str | None = None) -> str:
         """Generate a concise title for the note content."""
-        system = (
-            "You are a helpful assistant that generates concise titles for notes. "
-            "Generate a single, short title (max 60 characters) that captures the main topic. "
-            "Do not include quotes, periods, or any formatting. Just output the title text. "
-            "Match the language of the content (if content is in Japanese, generate Japanese title)."
-        )
+        system = GENERATE_TITLE_SYSTEM_PROMPT
 
         messages = [
             {
@@ -104,12 +100,7 @@ class BedrockService(AIService):
         self, content: str, question: str, history: list[dict] | None = None, model_id: str | None = None
     ) -> str:
         """Answer a question about the note content."""
-        system = (
-            "You are a helpful assistant that answers questions about notes. "
-            "Base your answers on the provided note content. "
-            "If the answer cannot be found in the note, say so clearly. "
-            "Be concise and helpful."
-        )
+        system = CHAT_SYSTEM_PROMPT
 
         # Build context message
         context_message = f"Here is the note content:\n\n{content}\n\n---\n\n"

@@ -9,6 +9,7 @@ from app.auth import UserId
 from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import Note, NoteCreate, NoteRead, NoteUpdate
+from app.routers.db_exceptions import commit_with_error_handling
 
 router = APIRouter()
 
@@ -39,7 +40,7 @@ def create_note(
     """Create a new note."""
     note = Note(**note_in.model_dump(), user_id=user_id)
     session.add(note)
-    session.commit()
+    commit_with_error_handling(session, "Note")
     session.refresh(note)
     return note
 
@@ -71,7 +72,7 @@ def update_note(
 
     note.updated_at = datetime.now(UTC)
     session.add(note)
-    session.commit()
+    commit_with_error_handling(session, "Note")
     session.refresh(note)
     return note
 
@@ -86,4 +87,4 @@ def delete_note(
     note = get_owned_resource(session, Note, note_id, user_id, "Note")
 
     session.delete(note)
-    session.commit()
+    commit_with_error_handling(session, "Note")

@@ -5,7 +5,7 @@ resource "aws_lambda_function" "api" {
   function_name = "${var.project_name}-api-${terraform.workspace}"
   role          = aws_iam_role.backend.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.api.repository_url}:${var.lambda_image_tag}"
+  image_uri     = length(regexall("@?sha256:", var.lambda_image_tag)) > 0 ? "${aws_ecr_repository.api.repository_url}@${var.lambda_image_tag}" : "${aws_ecr_repository.api.repository_url}:${var.lambda_image_tag}"
   timeout       = 30
   memory_size   = 512
 

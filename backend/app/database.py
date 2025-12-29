@@ -5,6 +5,7 @@ import os
 from collections.abc import Generator
 
 import boto3
+from sqlalchemy import text
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.config import get_settings
@@ -98,6 +99,29 @@ def create_db_and_tables() -> None:
             try:
                 table.create(engine, checkfirst=True)
                 logger.info(f"Table '{table_name}' created or already exists")
+                
+                # Self-healing migration: Add 'language' column to 'user_settings' if missing
+                if table_name == "user_settings":
+                    logger.info("Checking for 'language' column in 'user_settings'...")
+                    try:
+                        with engine.connect() as conn:
+                            # Step 1: Add the column without DEFAULT or constraints
+                            try:
+                                conn.execute(text("ALTER TABLE user_settings ADD COLUMN language VARCHAR(10)"))
+                                conn.commit()
+                                logger.info("Successfully added 'language' column to 'user_settings'")
+                                
+                                # Step 2: Set the default value for existing rows
+                                conn.execute(text("UPDATE user_settings SET language = 'auto' WHERE language IS NULL"))
+                                conn.commit()
+                                logger.info("Successfully initialized 'language' column values")
+                            except Exception as add_error:
+                                if "already exists" in str(add_error).lower() or "duplicate column" in str(add_error).lower():
+                                    logger.info("Column 'language' already exists in 'user_settings'")
+                                else:
+                                    raise add_error
+                    except Exception as alter_error:
+                        logger.warning(f"Failed to migrate 'user_settings' table: {alter_error}")
             except Exception as table_error:
                 # Log but continue if table already exists or other non-critical error
                 logger.warning(f"Table '{table_name}' creation: {table_error}")

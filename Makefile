@@ -63,7 +63,8 @@ get-image-digest: ## Get the latest image digest from ECR
 
 .PHONY: deploy-backend
 deploy-backend: tf-switch push-backend ## Build, push, and deploy backend via Terraform
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
+	$(eval DIGEST := $(shell $(MAKE) get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$(DIGEST)" -auto-approve
 	@echo "Backend deployed!"
 
 .PHONY: update-lambda

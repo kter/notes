@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { createApiClient } from "@/lib/api";
 
@@ -16,5 +16,5 @@ export function useApi() {
     return createApiClient(token);
   }, [getAccessToken]);
 
-  return { getApi };
+  return useMemo(() => ({ getApi }), [getApi]);
 }

@@ -48,7 +48,7 @@ class TestCreateNote:
     def test_create_note_minimal(self, client: TestClient):
         """Test creating a note with minimal data."""
         response = client.post("/api/notes", json={})
-        
+
         assert response.status_code == 201
         note = response.json()
         assert note["title"] == ""
@@ -66,7 +66,7 @@ class TestCreateNote:
             "/api/notes",
             json={"title": "My Note", "content": "Hello World", "folder_id": folder_id},
         )
-        
+
         assert response.status_code == 201
         note = response.json()
         assert note["title"] == "My Note"
@@ -127,13 +127,11 @@ class TestUpdateNote:
         # Create folder and note
         folder_response = client.post("/api/folders", json={"name": "Folder"})
         folder_id = folder_response.json()["id"]
-        
+
         create_response = client.post("/api/notes", json={"title": "Note"})
         note_id = create_response.json()["id"]
 
-        response = client.patch(
-            f"/api/notes/{note_id}", json={"folder_id": folder_id}
-        )
+        response = client.patch(f"/api/notes/{note_id}", json={"folder_id": folder_id})
         assert response.status_code == 200
         assert response.json()["folder_id"] == folder_id
 
@@ -201,4 +199,3 @@ class TestNoteAuthorization:
         other_client = make_client("other-user-456")
         response = other_client.delete(f"/api/notes/{note_id}")
         assert response.status_code == 404
-

@@ -38,6 +38,7 @@ export function SettingsDialog({
   const [availableLanguages, setAvailableLanguages] = useState<AvailableLanguage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +99,33 @@ export function SettingsDialog({
       setError(t("settings.saveError"));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    setError(null);
+
+    try {
+      const apiClient = await getApi();
+      const blob = await apiClient.exportNotes();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `notes_export_${new Date().toISOString().split('T')[0]}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export notes:", err);
+      setError(t("common.error"));
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -173,6 +201,28 @@ export function SettingsDialog({
               <p className="text-xs text-muted-foreground">
                 {t("settings.aiModelDescription")}
               </p>
+            </div>
+
+            <div className="border-t pt-6 space-y-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium leading-none">
+                  {t("settings.exportTitle")}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.exportDescription")}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleExport}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {t("settings.exportButton")}
+              </Button>
             </div>
 
             <div className="flex justify-end gap-2">

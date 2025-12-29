@@ -32,7 +32,7 @@ class TestCreateFolder:
     def test_create_folder(self, client: TestClient):
         """Test creating a folder."""
         response = client.post("/api/folders", json={"name": "My Folder"})
-        
+
         assert response.status_code == 201
         folder = response.json()
         assert folder["name"] == "My Folder"
@@ -145,4 +145,3 @@ class TestFolderAuthorization:
         other_client = make_client("other-user-456")
         response = other_client.delete(f"/api/folders/{folder_id}")
         assert response.status_code == 404
-

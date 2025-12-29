@@ -164,6 +164,20 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  async exportNotes(): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/api/notes/export/all`, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new ApiError(response.status, response.statusText, await response.text());
+    }
+
+    return response.blob();
+  }
 }
 
 export function createApiClient(token: string | null): ApiClient {

@@ -148,10 +148,7 @@ export function EditorPanel({
       const endPos = value.indexOf("\n", selectionEnd);
       const effectiveEndPos = endPos === -1 ? value.length : endPos;
 
-      const before = value.slice(0, startPos);
       const selection = value.slice(startPos, effectiveEndPos);
-      const after = value.slice(effectiveEndPos);
-
       const lines = selection.split("\n");
       let newSelection = "";
       let totalOffsetStart = 0;
@@ -183,19 +180,14 @@ export function EditorPanel({
         totalOffsetStart = 2;
       }
 
-      const newValue = before + newSelection + after;
-      setContent(newValue);
-      if (note) {
-        onUpdateNote(note.id, { content: newValue });
-      }
+      // Use document.execCommand to preserve undo history
+      textarea.setSelectionRange(startPos, effectiveEndPos);
+      document.execCommand("insertText", false, newSelection);
 
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          const newStart = Math.max(startPos, selectionStart + totalOffsetStart);
-          const newEnd = selectionEnd + totalOffsetEnd;
-          textareaRef.current.setSelectionRange(newStart, newEnd);
-        }
-      });
+      // Adjust cursor position
+      const newStart = Math.max(startPos, selectionStart + totalOffsetStart);
+      const newEnd = selectionEnd + totalOffsetEnd;
+      textarea.setSelectionRange(newStart, newEnd);
       return;
     }
 
@@ -215,41 +207,23 @@ export function EditorPanel({
 
         if (indentMatch) {
           const spacesToRemove = indentMatch[1].length;
-          const before = value.slice(0, lineStart);
-          const after = value.slice(lineStart + spacesToRemove);
-          const newValue = before + after;
-
-          setContent(newValue);
-          if (note) {
-            onUpdateNote(note.id, { content: newValue });
-          }
+          
+          // Use document.execCommand to preserve undo history
+          textarea.setSelectionRange(lineStart, lineStart + spacesToRemove);
+          document.execCommand("delete");
 
           // Adjust cursor position
-          requestAnimationFrame(() => {
-            if (textareaRef.current) {
-              const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
-              textareaRef.current.setSelectionRange(newPos, newPos);
-            }
-          });
+          const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
+          textarea.setSelectionRange(newPos, newPos);
         }
       } else {
         // Tab: Add indentation (2 spaces at the beginning of the line)
-        const before = value.slice(0, lineStart);
-        const after = value.slice(lineStart);
-        const newValue = before + "  " + after;
-
-        setContent(newValue);
-        if (note) {
-          onUpdateNote(note.id, { content: newValue });
-        }
+        textarea.setSelectionRange(lineStart, lineStart);
+        document.execCommand("insertText", false, "  ");
 
         // Adjust cursor position
-        requestAnimationFrame(() => {
-          if (textareaRef.current) {
-            const newPos = selectionStart + 2;
-            textareaRef.current.setSelectionRange(newPos, newPos);
-          }
-        });
+        const newPos = selectionStart + 2;
+        textarea.setSelectionRange(newPos, newPos);
       }
     } else {
       // Not in a list item - insert tab characters at cursor position
@@ -259,40 +233,19 @@ export function EditorPanel({
         const indentMatch = lineContent.match(/^(\s{1,2})/);
         if (indentMatch) {
           const spacesToRemove = indentMatch[1].length;
-          const before = value.slice(0, lineStart);
-          const after = value.slice(lineStart + spacesToRemove);
-          const newValue = before + after;
+          
+          // Use document.execCommand to preserve undo history
+          textarea.setSelectionRange(lineStart, lineStart + spacesToRemove);
+          document.execCommand("delete");
 
-          setContent(newValue);
-          if (note) {
-            onUpdateNote(note.id, { content: newValue });
-          }
-
-          requestAnimationFrame(() => {
-            if (textareaRef.current) {
-              const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
-              textareaRef.current.setSelectionRange(newPos, newPos);
-            }
-          });
+          const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
+          textarea.setSelectionRange(newPos, newPos);
           return;
         }
       }
 
-      const before = value.slice(0, selectionStart);
-      const after = value.slice(selectionEnd);
-      const newValue = before + "  " + after;
-
-      setContent(newValue);
-      if (note) {
-        onUpdateNote(note.id, { content: newValue });
-      }
-
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          const newPos = selectionStart + 2;
-          textareaRef.current.setSelectionRange(newPos, newPos);
-        }
-      });
+      // Insert 2 spaces at current cursor position
+      document.execCommand("insertText", false, "  ");
     }
   }, [note, onUpdateNote]);
 
@@ -316,22 +269,10 @@ export function EditorPanel({
     if (marker && contentAfterMarker.trim() === "") {
       // Empty list item - remove the marker and indent on Enter
       e.preventDefault();
-      const beforeLine = value.slice(0, lineStart);
-      const afterCursor = value.slice(selectionStart);
-      const newValue = beforeLine + "\n" + afterCursor;
-
-      setContent(newValue);
-      if (note) {
-        onUpdateNote(note.id, { content: newValue });
-      }
-
-      // Set cursor position after React re-render
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          const newPos = lineStart + 1;
-          textareaRef.current.setSelectionRange(newPos, newPos);
-        }
-      });
+      
+      // Use document.execCommand to preserve undo history
+      textarea.setSelectionRange(lineStart, selectionStart);
+      document.execCommand("insertText", false, "\n");
       return;
     }
 
@@ -350,22 +291,9 @@ export function EditorPanel({
     // Only intercept if there's something to continue
     if (continuation) {
       e.preventDefault();
-      const before = value.slice(0, selectionStart);
-      const after = value.slice(selectionStart);
-      const newValue = before + "\n" + continuation + after;
-
-      setContent(newValue);
-      if (note) {
-        onUpdateNote(note.id, { content: newValue });
-      }
-
-      // Set cursor position after React re-render
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          const newPos = selectionStart + 1 + continuation.length;
-          textareaRef.current.setSelectionRange(newPos, newPos);
-        }
-      });
+      
+      // Use document.execCommand to preserve undo history
+      document.execCommand("insertText", false, "\n" + continuation);
     }
   }, [note, onUpdateNote, getListMarkerInfo]);
 

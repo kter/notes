@@ -39,7 +39,7 @@ def session_fixture(engine) -> Generator[Session, None, None]:
 @pytest.fixture(name="client")
 def client_fixture(session: Session) -> Generator[TestClient, None, None]:
     """Create a test client with mocked dependencies for the default test user."""
-    
+
     def get_session_override():
         yield session
 
@@ -51,21 +51,23 @@ def client_fixture(session: Session) -> Generator[TestClient, None, None]:
 
     with TestClient(app) as client:
         yield client
-    
+
     app.dependency_overrides.clear()
 
 
 @pytest.fixture(name="make_client")
-def make_client_fixture(session: Session) -> Generator[Callable[[str], TestClient], None, None]:
+def make_client_fixture(
+    session: Session,
+) -> Generator[Callable[[str], TestClient], None, None]:
     """Factory fixture to create test clients for specific users.
-    
+
     Usage:
         client = make_client("user-123")
         # or
         client = make_client(TEST_USER_ID)
     """
     clients = []
-    
+
     def _make_client(user_id: str) -> TestClient:
         def get_session_override():
             yield session
@@ -79,9 +81,9 @@ def make_client_fixture(session: Session) -> Generator[Callable[[str], TestClien
         client = TestClient(app)
         clients.append(client)
         return client
-    
+
     yield _make_client
-    
+
     for client in clients:
         client.close()
     app.dependency_overrides.clear()

@@ -24,7 +24,7 @@ def get_user_model_id(session: Session, user_id: str) -> str:
 
 def get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
     """Get the user's preferred LLM model ID and language.
-    
+
     Returns:
         Tuple of (model_id, language)
     """
@@ -91,7 +91,9 @@ async def summarize_note(
         )
 
     model_id, language = get_user_settings(session, user_id)
-    summary = await ai_service.summarize(note.content, model_id=model_id, language=language)
+    summary = await ai_service.summarize(
+        note.content, model_id=model_id, language=language
+    )
     return SummarizeResponse(summary=summary)
 
 
@@ -122,10 +124,15 @@ async def chat_with_context(
             )
         # Validate folder ownership
         from app.models import Folder
+
         get_owned_resource(session, Folder, request.folder_id, user_id, "Folder")
-        
+
         # Get all notes in this folder
-        statement = select(Note).where(Note.user_id == user_id).where(Note.folder_id == request.folder_id)
+        statement = (
+            select(Note)
+            .where(Note.user_id == user_id)
+            .where(Note.folder_id == request.folder_id)
+        )
         notes = session.exec(statement).all()
         content = "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
     elif request.scope == "all":
@@ -173,5 +180,7 @@ async def generate_title(
         )
 
     model_id, language = get_user_settings(session, user_id)
-    title = await ai_service.generate_title(note.content, model_id=model_id, language=language)
+    title = await ai_service.generate_title(
+        note.content, model_id=model_id, language=language
+    )
     return GenerateTitleResponse(title=title)

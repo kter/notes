@@ -1,6 +1,5 @@
 """Tests for model validation."""
 
-
 from app.models import Folder, FolderCreate, FolderUpdate, Note, NoteCreate, NoteUpdate
 
 
@@ -23,7 +22,7 @@ class TestFolderModels:
     def test_folder_model_defaults(self):
         """Test Folder model default values."""
         folder = Folder(name="Test", user_id="user-123")
-        
+
         assert folder.name == "Test"
         assert folder.user_id == "user-123"
         assert folder.id is not None
@@ -44,8 +43,9 @@ class TestNoteModels:
     def test_note_create_full(self):
         """Test NoteCreate with all fields."""
         from uuid import uuid4
+
         folder_id = uuid4()
-        
+
         note = NoteCreate(
             title="Test Title",
             content="Test Content",
@@ -65,7 +65,7 @@ class TestNoteModels:
     def test_note_model_defaults(self):
         """Test Note model default values."""
         note = Note(user_id="user-123")
-        
+
         assert note.title == ""
         assert note.content == ""
         assert note.user_id == "user-123"
@@ -81,9 +81,9 @@ class TestUserSettingsModels:
     def test_user_settings_defaults(self):
         """Test UserSettings default values."""
         from app.models.user_settings import DEFAULT_LLM_MODEL_ID, UserSettings
-        
+
         settings = UserSettings(user_id="user-123")
-        
+
         assert settings.user_id == "user-123"
         assert settings.llm_model_id == DEFAULT_LLM_MODEL_ID
         assert settings.created_at is not None
@@ -92,19 +92,19 @@ class TestUserSettingsModels:
     def test_user_settings_update_schema(self):
         """Test UserSettingsUpdate allows partial updates."""
         from app.models.user_settings import UserSettingsUpdate
-        
+
         update = UserSettingsUpdate(llm_model_id="test-model")
         assert update.llm_model_id == "test-model"
-        
+
         update_empty = UserSettingsUpdate()
         assert update_empty.llm_model_id is None
 
     def test_available_models_structure(self):
         """Test AVAILABLE_MODELS constant is properly structured."""
         from app.models.user_settings import AVAILABLE_MODELS
-        
+
         assert len(AVAILABLE_MODELS) > 0
-        
+
         for model in AVAILABLE_MODELS:
             assert "id" in model
             assert "name" in model

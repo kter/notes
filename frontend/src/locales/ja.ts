@@ -25,6 +25,9 @@ export const ja = {
     selectLanguage: "言語を選択",
     loadError: "設定の読み込みに失敗しました",
     saveError: "設定の保存に失敗しました",
+    exportTitle: "データエクスポート",
+    exportDescription: "すべてのノートをZIP形式でエクスポートします。",
+    exportButton: "ZIPをダウンロード",
   },
 
   // Sidebar
@@ -112,6 +115,9 @@ export type TranslationKeys = {
     selectLanguage: string;
     loadError: string;
     saveError: string;
+    exportTitle: string;
+    exportDescription: string;
+    exportButton: string;
   };
   sidebar: {
     folders: string;

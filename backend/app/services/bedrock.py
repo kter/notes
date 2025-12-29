@@ -13,20 +13,28 @@ class AIService(ABC):
     """Abstract base class for AI services. Designed for future RAG extensibility."""
 
     @abstractmethod
-    async def summarize(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
+    async def summarize(
+        self, content: str, model_id: str | None = None, language: str = "auto"
+    ) -> str:
         """Generate a summary of the given content."""
         pass
 
     @abstractmethod
     async def chat(
-        self, content: str, question: str, history: list[dict] | None = None, 
-        model_id: str | None = None, language: str = "auto"
+        self,
+        content: str,
+        question: str,
+        history: list[dict] | None = None,
+        model_id: str | None = None,
+        language: str = "auto",
     ) -> str:
         """Answer a question based on the given content context."""
         pass
 
     @abstractmethod
-    async def generate_title(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
+    async def generate_title(
+        self, content: str, model_id: str | None = None, language: str = "auto"
+    ) -> str:
         """Generate a concise title for the given content."""
         pass
 
@@ -42,7 +50,10 @@ class BedrockService(AIService):
         self.model_id = settings.bedrock_model_id
 
     def _invoke_model(
-        self, messages: list[dict], system: str | None = None, model_id: str | None = None
+        self,
+        messages: list[dict],
+        system: str | None = None,
+        model_id: str | None = None,
     ) -> str:
         """Invoke the Bedrock model and return the response text."""
         body = {
@@ -73,7 +84,9 @@ class BedrockService(AIService):
             return "en"
         return language
 
-    async def summarize(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
+    async def summarize(
+        self, content: str, model_id: str | None = None, language: str = "auto"
+    ) -> str:
         """Generate a summary of the note content."""
         resolved_lang = self._resolve_language(language)
         system = get_prompt("summarize", resolved_lang)
@@ -87,7 +100,9 @@ class BedrockService(AIService):
 
         return self._invoke_model(messages, system, model_id=model_id)
 
-    async def generate_title(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
+    async def generate_title(
+        self, content: str, model_id: str | None = None, language: str = "auto"
+    ) -> str:
         """Generate a concise title for the note content."""
         resolved_lang = self._resolve_language(language)
         system = get_prompt("generate_title", resolved_lang)
@@ -102,8 +117,12 @@ class BedrockService(AIService):
         return self._invoke_model(messages, system, model_id=model_id).strip()
 
     async def chat(
-        self, content: str, question: str, history: list[dict] | None = None, 
-        model_id: str | None = None, language: str = "auto"
+        self,
+        content: str,
+        question: str,
+        history: list[dict] | None = None,
+        model_id: str | None = None,
+        language: str = "auto",
     ) -> str:
         """Answer a question about the note content."""
         resolved_lang = self._resolve_language(language)
@@ -117,20 +136,24 @@ class BedrockService(AIService):
         # Add conversation history if provided
         if history:
             for item in history:
-                messages.append({
-                    "role": item.get("role", "user"),
-                    "content": item.get("content", ""),
-                })
+                messages.append(
+                    {
+                        "role": item.get("role", "user"),
+                        "content": item.get("content", ""),
+                    }
+                )
 
         # Add current question with context
-        messages.append({
-            "role": "user",
-            "content": (
-                context_message + f"Question: {question}"
-                if not history
-                else f"Question: {question}"
-            ),
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    context_message + f"Question: {question}"
+                    if not history
+                    else f"Question: {question}"
+                ),
+            }
+        )
 
         return self._invoke_model(messages, system, model_id=model_id)
 

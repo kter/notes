@@ -17,7 +17,9 @@ try:
     create_db_and_tables()
     logger.info("Lambda cold start: database initialization complete")
 except Exception as e:
-    logger.error(f"Lambda cold start: database initialization failed: {e}", exc_info=True)
+    logger.error(
+        f"Lambda cold start: database initialization failed: {e}", exc_info=True
+    )
     # Re-raise to ensure Lambda reports the error
     raise
 
@@ -27,4 +29,3 @@ handler = Mangum(
     lifespan="off",
     api_gateway_base_path="/",
 )
-

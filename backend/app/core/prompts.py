@@ -60,11 +60,11 @@ CHAT_PROMPTS = {
 
 def get_prompt(prompt_type: str, language: str) -> str:
     """Get the appropriate prompt for the given type and language.
-    
+
     Args:
         prompt_type: One of 'summarize', 'generate_title', 'chat'
         language: Language code ('ja', 'en', or 'auto')
-        
+
     Returns:
         The prompt string for the specified type and language.
         Falls back to English if language not found.
@@ -74,9 +74,9 @@ def get_prompt(prompt_type: str, language: str) -> str:
         "generate_title": GENERATE_TITLE_PROMPTS,
         "chat": CHAT_PROMPTS,
     }
-    
+
     prompts = prompts_map.get(prompt_type, SUMMARIZE_PROMPTS)
-    
+
     # Default to English if language not found
     return prompts.get(language, prompts["en"])
 

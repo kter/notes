@@ -27,6 +27,9 @@ export const en: TranslationKeys = {
     selectLanguage: "Select language",
     loadError: "Failed to load settings",
     saveError: "Failed to save settings",
+    exportTitle: "Data Export",
+    exportDescription: "Export all notes as a ZIP file.",
+    exportButton: "Download ZIP",
   },
 
   // Sidebar

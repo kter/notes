@@ -4,29 +4,31 @@ import { useState, useEffect } from "react";
 import { useApi } from "./useApi";
 import type { ChatMessage } from "@/types";
 
+export type ChatScope = "note" | "folder" | "all";
+
 interface UseAIChatReturn {
   chatMessages: ChatMessage[];
   summary: string | null;
   isAILoading: boolean;
   handleSummarize: (noteId: string) => Promise<void>;
-  handleSendMessage: (message: string) => Promise<void>;
+  handleSendMessage: (
+    message: string,
+    scope: ChatScope,
+    noteId?: string | null,
+    folderId?: string | null
+  ) => Promise<void>;
   clearChat: () => void;
   clearSummary: () => void;
 }
 
-export function useAIChat(
-  selectedNoteId: string | null
-): UseAIChatReturn {
+export function useAIChat(): UseAIChatReturn {
   const { getApi } = useApi();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [summary, setSummary] = useState<string | null>(null);
   const [isAILoading, setIsAILoading] = useState(false);
 
-  // Clear chat when note changes
-  useEffect(() => {
-    setChatMessages([]);
-    setSummary(null);
-  }, [selectedNoteId]);
+  // We no longer clear chat automatically when note changes to allow persistent chat.
+  // The user can clear it manually if needed.
 
   const handleSummarize = async (noteId: string) => {
     setIsAILoading(true);
@@ -42,9 +44,12 @@ export function useAIChat(
     }
   };
 
-  const handleSendMessage = async (message: string) => {
-    if (!selectedNoteId) return;
-
+  const handleSendMessage = async (
+    message: string,
+    scope: ChatScope,
+    noteId?: string | null,
+    folderId?: string | null
+  ) => {
     const userMessage: ChatMessage = { role: "user", content: message };
     setChatMessages((prev) => [...prev, userMessage]);
     setIsAILoading(true);
@@ -52,7 +57,9 @@ export function useAIChat(
     try {
       const apiClient = await getApi();
       const result = await apiClient.chatWithNote({
-        note_id: selectedNoteId,
+        scope,
+        note_id: noteId || undefined,
+        folder_id: folderId || undefined,
         question: message,
         history: chatMessages,
       });

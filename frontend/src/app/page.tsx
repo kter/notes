@@ -67,8 +67,9 @@ export default function Home() {
     isAILoading,
     handleSummarize,
     handleSendMessage,
+    clearChat,
     clearSummary,
-  } = useAIChat(selectedNoteId);
+  } = useAIChat();
 
   // Selected note
   const selectedNote = notes.find((n) => n.id === selectedNoteId) || null;
@@ -110,10 +111,7 @@ export default function Home() {
     }
   }, [isAuthenticated, authLoading, getApi, setFolders, setNotes]);
 
-  // Close chat when note changes
-  useEffect(() => {
-    setIsChatOpen(false);
-  }, [selectedNoteId]);
+  // No longer auto-closing chat when note changes to allow persistent folder/all chat.
 
   // Show loading while checking auth
   if (authLoading) {
@@ -220,12 +218,15 @@ export default function Home() {
             />
             <AIChatPanel
               isOpen={isChatOpen}
-              onClose={() => setIsChatOpen(false)}
+              onClose={() => setIsChatOpen(!isChatOpen)}
               messages={chatMessages}
               onSendMessage={handleSendMessage}
+              onClearChat={clearChat}
               isLoading={isAILoading}
               summary={summary}
               onClearSummary={clearSummary}
+              selectedNote={selectedNote}
+              selectedFolder={folders.find(f => f.id === selectedFolderId) || null}
             />
           </div>
         }

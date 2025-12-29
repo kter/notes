@@ -53,7 +53,9 @@ export interface ChatMessage {
 }
 
 export interface ChatRequest {
-  note_id: string;
+  scope?: "note" | "folder" | "all";
+  note_id?: string;
+  folder_id?: string;
   question: string;
   history?: ChatMessage[];
 }

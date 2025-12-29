@@ -31,12 +31,12 @@ export function ThreeColumnLayout({
       {/* Left sidebar - Folders */}
       <aside 
         className={cn(
-          "flex-shrink-0 border-r border-border/50 bg-sidebar transition-all duration-300 ease-in-out relative",
+          "flex-shrink-0 border-r border-border/50 bg-sidebar transition-all duration-300 ease-in-out relative h-full",
           // Desktop: always visible with normal sidebar behavior
           isSidebarOpen ? "md:w-60" : "md:w-12",
           "md:block",
           // Mobile: full width only when folders view is active, otherwise hidden
-          mobileView === "folders" ? "block w-full md:w-60" : "hidden"
+          mobileView === "folders" ? "block w-full md:w-60 h-full" : "hidden"
         )}
       >
         <div className={cn(
@@ -64,7 +64,7 @@ export function ThreeColumnLayout({
 
       {/* Middle column - Note list */}
       <div className={cn(
-        "flex-shrink-0 border-r border-border/50 bg-card/50",
+        "flex-shrink-0 border-r border-border/50 bg-card/50 h-full flex flex-col",
         // Desktop: always visible with fixed width
         "md:block md:w-72",
         // Mobile: full width only when notes view is active, otherwise hidden
@@ -75,7 +75,7 @@ export function ThreeColumnLayout({
 
       {/* Right column - Editor and AI panel */}
       <main className={cn(
-        "flex-1 min-w-0 flex flex-col bg-background",
+        "flex-1 min-w-0 flex flex-col bg-background h-full",
         // Desktop: always visible
         "md:flex",
         // Mobile: visible only when editor view is active, otherwise hidden

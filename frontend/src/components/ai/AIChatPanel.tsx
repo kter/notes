@@ -1,10 +1,27 @@
-"use client";
-
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ChatMessage } from "@/types";
-import { SendIcon, XIcon, Loader2Icon, SparklesIcon } from "lucide-react";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import type { ChatMessage, Note, Folder } from "@/types";
+import type { ChatScope } from "@/hooks/useAIChat";
+import { 
+  SendIcon, 
+  XIcon, 
+  Loader2Icon, 
+  SparklesIcon, 
+  Trash2Icon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  FileTextIcon,
+  FolderIcon,
+  GlobeIcon
+} from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +29,18 @@ interface AIChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
   messages: ChatMessage[];
-  onSendMessage: (message: string) => void;
+  onSendMessage: (
+    message: string, 
+    scope: ChatScope, 
+    noteId?: string | null, 
+    folderId?: string | null
+  ) => void;
+  onClearChat: () => void;
   isLoading: boolean;
   summary: string | null;
   onClearSummary: () => void;
+  selectedNote: Note | null;
+  selectedFolder: Folder | null;
 }
 
 export function AIChatPanel({
@@ -23,55 +48,146 @@ export function AIChatPanel({
   onClose,
   messages,
   onSendMessage,
+  onClearChat,
   isLoading,
   summary,
   onClearSummary,
+  selectedNote,
+  selectedFolder,
 }: AIChatPanelProps) {
   const [input, setInput] = useState("");
+  const [scope, setScope] = useState<ChatScope>("note");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Default scope to "note" if a note is selected, otherwise "all"
+  useEffect(() => {
+    if (selectedNote) {
+      setScope("note");
+    } else if (selectedFolder) {
+      setScope("folder");
+    } else {
+      setScope("all");
+    }
+  }, [selectedNote?.id, selectedFolder?.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
     }
   }, [messages]);
 
   const handleSend = () => {
     if (input.trim() && !isLoading) {
-      onSendMessage(input.trim());
+      onSendMessage(
+        input.trim(), 
+        scope, 
+        scope === "note" ? selectedNote?.id : null,
+        scope === "folder" ? (selectedFolder?.id || selectedNote?.folder_id) : null
+      );
       setInput("");
     }
   };
 
-  if (!isOpen && !summary) return null;
+  if (!isOpen) {
+    return (
+      <div className="border-l border-border/50 flex flex-col items-center py-4 bg-card/30 w-12 hidden md:flex">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground"
+          onClick={onClose}
+          title="Open AI Chat"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
-      "border-l border-border/50 flex flex-col bg-card/50",
+      "border-l border-border/50 flex flex-col bg-card/50 transition-all duration-300 ease-in-out h-full",
       // Desktop: fixed width sidebar
       "md:w-80",
       // Mobile: full screen overlay
       "fixed md:relative inset-0 md:inset-auto w-full md:w-80 z-40 md:z-auto"
     )}>
       {/* Header */}
-      <div className="p-4 border-b border-border/50 flex items-center justify-between">
-        <h3 className="font-semibold text-sm">AI Assistant</h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => {
-            onClose();
-            onClearSummary();
-          }}
-        >
-          <XIcon className="h-4 w-4" />
-        </Button>
+      <div className="p-4 border-b border-border/50">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <SparklesIcon className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">AI Assistant</h3>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={onClearChat}
+              title="Clear chat"
+            >
+              <Trash2Icon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onClose}
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Scope Selector */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+              Chat Context
+            </label>
+          </div>
+          <Select value={scope} onValueChange={(v) => setScope(v as ChatScope)}>
+            <SelectTrigger className="w-full h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="note">
+                <div className="flex items-center gap-2">
+                  <FileTextIcon className="h-3 w-3" />
+                  <span>Current Note</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="folder">
+                <div className="flex items-center gap-2">
+                  <FolderIcon className="h-3 w-3" />
+                  <span>Current Folder</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="all">
+                <div className="flex items-center gap-2">
+                  <GlobeIcon className="h-3 w-3" />
+                  <span>All Notes</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {/* Context indicator */}
+          <div className="text-[11px] text-muted-foreground truncate px-1">
+            {scope === "note" && (selectedNote?.title || "No note selected")}
+            {scope === "folder" && (selectedFolder?.name || "No folder selected")}
+            {scope === "all" && "All notes and folders"}
+          </div>
+        </div>
       </div>
 
       {/* Summary section */}
       {summary && (
-        <div className="p-4 border-b border-border/50 bg-primary/5">
+        <div className="p-4 border-b border-border/50 bg-primary/5 relative group">
           <div className="flex items-center gap-2 mb-2">
             <SparklesIcon className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium">Summary</span>
@@ -79,81 +195,102 @@ export function AIChatPanel({
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">
             {summary}
           </p>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={onClearSummary}
+          >
+            <XIcon className="h-3 w-3" />
+          </Button>
         </div>
       )}
 
       {/* Chat messages */}
-      {isOpen && (
-        <>
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-            <div className="space-y-4">
-              {messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Ask questions about this note...
-                </p>
-              ) : (
-                messages?.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "flex",
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-lg px-3 py-2 text-sm",
-                        msg.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      )}
-                    >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-muted rounded-lg px-3 py-2">
-                    <Loader2Icon className="h-4 w-4 animate-spin" />
-                  </div>
-                </div>
-              )}
+      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center py-12 px-4">
+              <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                <SparklesIcon className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-sm font-medium mb-1">How can I help you?</p>
+              <p className="text-xs text-muted-foreground">
+                Ask questions about your {scope === "all" ? "notes" : scope === "folder" ? "folder" : "note"}.
+              </p>
             </div>
-          </ScrollArea>
-
-          {/* Input */}
-          <div className="p-4 border-t border-border/50">
-            <div className="flex gap-2 items-end">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about this note... (Shift+Enter for newline)"
-                onKeyDown={(e) => {
-                  // Skip handling during IME composition (e.g., Japanese input)
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                  // Shift+Enter allows default behavior (newline)
-                }}
-                disabled={isLoading}
-                className="flex-1 min-h-[40px] max-h-[120px] resize-none"
-                rows={1}
-              />
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+          ) : (
+            messages?.map((msg, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "flex",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
               >
-                <SendIcon className="h-4 w-4" />
-              </Button>
+                <div
+                  className={cn(
+                    "max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm",
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-tr-none"
+                      : "bg-muted rounded-tl-none border border-border/50"
+                  )}
+                >
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                </div>
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 border border-border/50 shadow-sm">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-foreground/20 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-foreground/20 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-foreground/20 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Input */}
+      <div className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm">
+        <div className="flex gap-2 items-end bg-background rounded-xl border border-border p-2 focus-within:border-primary/50 transition-colors shadow-sm">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={
+              scope === "note" ? "Ask about current note..." :
+              scope === "folder" ? "Ask about this folder..." :
+              "Ask about all your notes..."
+            }
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            disabled={isLoading}
+            className="flex-1 min-h-[40px] max-h-[200px] border-none shadow-none focus-visible:ring-0 px-2 py-1 resize-none text-sm"
+            rows={1}
+          />
+          <Button
+            size="icon"
+            className="h-8 w-8 rounded-lg"
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+          >
+            {isLoading ? (
+              <Loader2Icon className="h-4 w-4 animate-spin" />
+            ) : (
+              <SendIcon className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

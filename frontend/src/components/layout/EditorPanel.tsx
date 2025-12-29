@@ -142,6 +142,63 @@ export function EditorPanel({
 
     const { selectionStart, selectionEnd, value } = textarea;
 
+    // Handle multi-line selection
+    if (selectionStart !== selectionEnd) {
+      const startPos = value.lastIndexOf("\n", selectionStart - 1) + 1;
+      const endPos = value.indexOf("\n", selectionEnd);
+      const effectiveEndPos = endPos === -1 ? value.length : endPos;
+
+      const before = value.slice(0, startPos);
+      const selection = value.slice(startPos, effectiveEndPos);
+      const after = value.slice(effectiveEndPos);
+
+      const lines = selection.split("\n");
+      let newSelection = "";
+      let totalOffsetStart = 0;
+      let totalOffsetEnd = 0;
+
+      if (e.shiftKey) {
+        // Unindent multiple lines
+        newSelection = lines
+          .map((line, index) => {
+            const indentMatch = line.match(/^(\s{1,2})/);
+            const spacesToRemove = indentMatch ? indentMatch[1].length : 0;
+            
+            if (index === 0) {
+              totalOffsetStart -= Math.min(spacesToRemove, Math.max(0, selectionStart - startPos));
+            }
+            totalOffsetEnd -= spacesToRemove;
+            
+            return line.slice(spacesToRemove);
+          })
+          .join("\n");
+      } else {
+        // Indent multiple lines
+        newSelection = lines
+          .map((line) => {
+            totalOffsetEnd += 2;
+            return "  " + line;
+          })
+          .join("\n");
+        totalOffsetStart = 2;
+      }
+
+      const newValue = before + newSelection + after;
+      setContent(newValue);
+      if (note) {
+        onUpdateNote(note.id, { content: newValue });
+      }
+
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const newStart = Math.max(startPos, selectionStart + totalOffsetStart);
+          const newEnd = selectionEnd + totalOffsetEnd;
+          textareaRef.current.setSelectionRange(newStart, newEnd);
+        }
+      });
+      return;
+    }
+
     // Find the start of the current line
     const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
     const currentLine = value.slice(lineStart, selectionStart);
@@ -196,6 +253,31 @@ export function EditorPanel({
       }
     } else {
       // Not in a list item - insert tab characters at cursor position
+      if (e.shiftKey) {
+        // Optional: handle Shift+Tab even for non-list items if it has leading spaces
+        const lineContent = value.slice(lineStart);
+        const indentMatch = lineContent.match(/^(\s{1,2})/);
+        if (indentMatch) {
+          const spacesToRemove = indentMatch[1].length;
+          const before = value.slice(0, lineStart);
+          const after = value.slice(lineStart + spacesToRemove);
+          const newValue = before + after;
+
+          setContent(newValue);
+          if (note) {
+            onUpdateNote(note.id, { content: newValue });
+          }
+
+          requestAnimationFrame(() => {
+            if (textareaRef.current) {
+              const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
+              textareaRef.current.setSelectionRange(newPos, newPos);
+            }
+          });
+          return;
+        }
+      }
+
       const before = value.slice(0, selectionStart);
       const after = value.slice(selectionEnd);
       const newValue = before + "  " + after;

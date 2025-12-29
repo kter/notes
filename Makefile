@@ -62,7 +62,7 @@ get-image-digest: ## Get the latest image digest from ECR
 		--output text
 
 .PHONY: deploy-backend
-deploy-backend: push-backend ## Build, push, and deploy backend via Terraform
+deploy-backend: tf-switch push-backend ## Build, push, and deploy backend via Terraform
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
 	@echo "Backend deployed!"
 
@@ -81,7 +81,7 @@ update-lambda: push-backend ## Update Lambda function code only (without Terrafo
 # =============================================================================
 
 .PHONY: build-frontend
-build-frontend: ## Build frontend for production
+build-frontend: tf-switch ## Build frontend for production
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
@@ -144,12 +144,12 @@ logs: ## Tail Lambda logs
 # =============================================================================
 
 .PHONY: update-cost-report
-update-cost-report: ## Update cost report Lambda function code
+update-cost-report: tf-switch ## Update cost report Lambda function code
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -target=aws_lambda_function.cost_report -auto-approve
 	@echo "Cost report Lambda updated!"
 
 .PHONY: test-cost-report
-test-cost-report: ## Manually invoke cost report Lambda
+test-cost-report: tf-switch ## Manually invoke cost report Lambda
 	aws lambda invoke --function-name $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cost_report_lambda_name) \
 		--profile $(AWS_PROFILE) \
 		/tmp/cost-report-output.json

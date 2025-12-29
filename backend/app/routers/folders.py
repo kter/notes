@@ -14,7 +14,7 @@ from app.routers.db_exceptions import commit_with_error_handling
 router = APIRouter()
 
 
-@router.get("/", response_model=list[FolderRead])
+@router.get("", response_model=list[FolderRead])
 def list_folders(
     user_id: UserId,
     session: Annotated[Session, Depends(get_session)],
@@ -29,7 +29,7 @@ def list_folders(
     return folders
 
 
-@router.post("/", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
 def create_folder(
     folder_in: FolderCreate,
     user_id: UserId,

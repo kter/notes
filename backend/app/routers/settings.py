@@ -31,7 +31,7 @@ class SettingsResponse(BaseModel):
     available_languages: list[AvailableLanguage]
 
 
-@router.get("/", response_model=SettingsResponse)
+@router.get("", response_model=SettingsResponse)
 async def get_settings(
     user_id: UserId,
     session: Annotated[Session, Depends(get_session)],
@@ -62,7 +62,7 @@ async def get_settings(
     )
 
 
-@router.put("/", response_model=UserSettingsRead)
+@router.put("", response_model=UserSettingsRead)
 async def update_settings(
     settings_in: UserSettingsUpdate,
     user_id: UserId,

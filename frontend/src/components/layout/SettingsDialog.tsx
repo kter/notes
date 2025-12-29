@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Loader2Icon, CheckIcon } from "lucide-react";
-import { useApi } from "@/hooks";
-import type { AvailableModel } from "@/types";
+import { useApi, useTranslation } from "@/hooks";
+import type { AvailableModel, AvailableLanguage } from "@/types";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -31,8 +31,11 @@ export function SettingsDialog({
   onOpenChange,
 }: SettingsDialogProps) {
   const { getApi } = useApi();
+  const { t, language, setLanguage } = useTranslation();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(language);
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<AvailableLanguage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -51,17 +54,19 @@ export function SettingsDialog({
         const apiClient = await getApi();
         const response = await apiClient.getSettings();
         setSelectedModelId(response.settings.llm_model_id);
+        setSelectedLanguage(response.settings.language);
         setAvailableModels(response.available_models);
+        setAvailableLanguages(response.available_languages);
       } catch (err) {
         console.error("Failed to load settings:", err);
-        setError("設定の読み込みに失敗しました");
+        setError(t("settings.loadError"));
       } finally {
         setIsLoading(false);
       }
     }
 
     loadSettings();
-  }, [open, getApi]);
+  }, [open, getApi, t]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -70,12 +75,17 @@ export function SettingsDialog({
 
     try {
       const apiClient = await getApi();
-      await apiClient.updateSettings({ llm_model_id: selectedModelId });
+      await apiClient.updateSettings({ 
+        llm_model_id: selectedModelId,
+        language: selectedLanguage,
+      });
+      // Update the language context
+      setLanguage(selectedLanguage as "auto" | "ja" | "en");
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error("Failed to save settings:", err);
-      setError("設定の保存に失敗しました");
+      setError(t("settings.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -85,9 +95,9 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>設定</DialogTitle>
+          <DialogTitle>{t("settings.title")}</DialogTitle>
           <DialogDescription>
-            アプリケーションの設定を変更します
+            {t("settings.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -99,14 +109,43 @@ export function SettingsDialog({
           <div className="text-sm text-red-500 py-4">{error}</div>
         ) : (
           <div className="space-y-6 py-4">
+            {/* Language Selection */}
             <div className="space-y-2">
-              <Label htmlFor="model-select">AIモデル</Label>
+              <Label htmlFor="language-select">{t("settings.language")}</Label>
+              <Select
+                value={selectedLanguage}
+                onValueChange={setSelectedLanguage}
+              >
+                <SelectTrigger id="language-select">
+                  <SelectValue placeholder={t("settings.selectLanguage")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableLanguages.map((lang) => (
+                    <SelectItem key={lang.id} value={lang.id}>
+                      <div className="flex flex-col">
+                        <span>{lang.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {lang.description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.languageDescription")}
+              </p>
+            </div>
+
+            {/* AI Model Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="model-select">{t("settings.aiModel")}</Label>
               <Select
                 value={selectedModelId}
                 onValueChange={setSelectedModelId}
               >
                 <SelectTrigger id="model-select">
-                  <SelectValue placeholder="モデルを選択" />
+                  <SelectValue placeholder={t("settings.selectModel")} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableModels.map((model) => (
@@ -122,7 +161,7 @@ export function SettingsDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                タイトル生成、要約、チャットで使用するAIモデルを選択します
+                {t("settings.aiModelDescription")}
               </p>
             </div>
 
@@ -131,7 +170,7 @@ export function SettingsDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                キャンセル
+                {t("common.cancel")}
               </Button>
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? (
@@ -139,7 +178,7 @@ export function SettingsDialog({
                 ) : saveSuccess ? (
                   <CheckIcon className="h-4 w-4 mr-2" />
                 ) : null}
-                {saveSuccess ? "保存しました" : "保存"}
+                {saveSuccess ? t("common.saved") : t("common.save")}
               </Button>
             </div>
           </div>

@@ -74,6 +74,7 @@ export interface GenerateTitleResponse {
 export interface UserSettings {
   user_id: string;
   llm_model_id: string;
+  language: string;
   created_at: string;
   updated_at: string;
 }
@@ -84,11 +85,19 @@ export interface AvailableModel {
   description: string;
 }
 
+export interface AvailableLanguage {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface SettingsResponse {
   settings: UserSettings;
   available_models: AvailableModel[];
+  available_languages: AvailableLanguage[];
 }
 
 export interface UserSettingsUpdate {
   llm_model_id?: string;
+  language?: string;
 }

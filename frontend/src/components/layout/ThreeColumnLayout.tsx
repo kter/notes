@@ -3,9 +3,9 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronRightIcon, FolderIcon, FileTextIcon, PenSquareIcon } from "lucide-react";
+import { ChevronRightIcon, FolderIcon, FileTextIcon, PenSquareIcon, MessageSquareIcon } from "lucide-react";
 
-export type MobileView = "folders" | "notes" | "editor";
+export type MobileView = "folders" | "notes" | "editor" | "chat";
 
 interface ThreeColumnLayoutProps {
   sidebar: ReactNode;
@@ -78,8 +78,8 @@ export function ThreeColumnLayout({
         "flex-1 min-w-0 flex flex-col bg-background h-full",
         // Desktop: always visible
         "md:flex",
-        // Mobile: visible only when editor view is active, otherwise hidden
-        mobileView === "editor" ? "flex w-full" : "hidden"
+        // Mobile: visible only when editor or chat view is active, otherwise hidden
+        (mobileView === "editor" || mobileView === "chat") ? "flex w-full" : "hidden"
       )}>
         {editor}
       </main>
@@ -122,6 +122,18 @@ export function ThreeColumnLayout({
           >
             <PenSquareIcon className="h-5 w-5" />
             <span className="text-xs">Editor</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "flex-1 h-full flex flex-col items-center justify-center gap-1 rounded-none",
+              mobileView === "chat" && "text-primary bg-primary/10"
+            )}
+            onClick={() => onMobileViewChange("chat")}
+          >
+            <MessageSquareIcon className="h-5 w-5" />
+            <span className="text-xs">Chat</span>
           </Button>
         </div>
       </nav>

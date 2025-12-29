@@ -95,33 +95,35 @@ NEXT_PUBLIC_ENVIRONMENT=dev
 
 ## Infrastructure Deployment
 
+The infrastructure is managed using Terraform and separated into `dev` and `prd` environments using both separate AWS accounts (S3 buckets) and Terraform workspaces.
+
 ```bash
-cd terraform
+# Initialize and select environment (automatically handles profile and backend-config)
+make tf-init ENV=dev
 
-# Initialize
-terraform init
-
-# Select workspace
-terraform workspace select dev  # or prd
-
-# Deploy
-terraform plan
-terraform apply
+# Deployment commands
+make tf-plan ENV=dev
+make tf-apply ENV=dev
 ```
 
 ## Application Deployment
 
-### Lambda Code Update (Quick)
+Deployment is simplified through the Makefile. By default, `ENV=dev` is used.
+
+### Quick Lambda Update
 ```bash
-# Update Lambda function code only (faster, no Terraform)
-make update-lambda ENV=dev AWS_PROFILE=dev
+# Update Lambda function code only (fast)
+make update-lambda ENV=dev
 ```
 
 ### Full Deployment
 ```bash
-# Full deployment including infrastructure changes
-make deploy ENV=dev AWS_PROFILE=dev
+# Build and deploy both backend (Docker) and frontend (S3/CloudFront)
+make deploy ENV=prd
 ```
+
+> [!NOTE]
+> The Makefile automatically uses the AWS profile named after the `ENV` value (e.g., `ENV=prd` uses `--profile prd`). Ensure these profiles are configured in your `~/.aws/credentials`.
 
 ## API Endpoints
 

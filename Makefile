@@ -2,11 +2,16 @@
 # Simplifies deployment and development tasks
 
 # Configuration
-AWS_PROFILE ?= dev
-AWS_REGION ?= ap-northeast-1
-AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
-ECR_REPO := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
 ENV ?= dev
+
+# Use ENV as the default profile, but allow override from command line
+# Using '=' instead of '?=' to override environment variables like 'export AWS_PROFILE=dev'
+AWS_PROFILE = $(ENV)
+AWS_REGION ?= ap-northeast-1
+
+# Use deferred evaluation (=) so these are evaluated when used, picked up after profile/env is set
+AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
+ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
 
 .PHONY: help
 help: ## Show this help
@@ -103,20 +108,27 @@ deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend
 # Terraform
 # =============================================================================
 
+# Internal target to ensure terraform is initialized and workspace is selected for the correct environment
+.PHONY: tf-switch
+tf-switch: ## Re-initialize backend and switch workspace based on ENV (dev/prd)
+	@echo "Switching to $(ENV) environment..."
+	cd terraform && \
+	AWS_PROFILE=$(AWS_PROFILE) terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
+	(terraform workspace select $(ENV) || terraform workspace new $(ENV))
+
 .PHONY: tf-init
-tf-init: ## Initialize Terraform
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform init
+tf-init: tf-switch ## Initialize Terraform for the current environment
 
 .PHONY: tf-plan
-tf-plan: ## Run Terraform plan
+tf-plan: tf-switch ## Run Terraform plan
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform plan
 
 .PHONY: tf-apply
-tf-apply: ## Run Terraform apply
+tf-apply: tf-switch ## Run Terraform apply
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply
 
 .PHONY: tf-output
-tf-output: ## Show Terraform outputs
+tf-output: tf-switch ## Show Terraform outputs
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output
 
 # =============================================================================

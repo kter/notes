@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
-import { useApi } from "@/hooks";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon } from "lucide-react";
+import { useApi, useTranslation } from "@/hooks";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon, HashIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -37,6 +37,7 @@ export function EditorPanel({
   saveError = null,
 }: EditorPanelProps) {
   const { getApi } = useApi();
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
@@ -537,27 +538,35 @@ export function EditorPanel({
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between px-6 py-2 border-t border-border/50 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1">
-          {saveError ? (
-            <>
-              <AlertCircleIcon className="h-3 w-3 text-destructive" />
-              <span className="text-destructive">{saveError}</span>
-            </>
-          ) : isSaving ? (
-            <>
-              <Loader2Icon className="h-3 w-3 animate-spin" />
-              <span>保存中...</span>
-            </>
-          ) : (
-            <>
-              <CheckIcon className="h-3 w-3 text-green-500" />
-              <span>保存済み</span>
-            </>
-          )}
+      <div className="flex flex-wrap items-center justify-between px-4 md:px-6 py-2 border-t border-border/50 text-xs text-muted-foreground gap-y-2">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1">
+            {saveError ? (
+              <>
+                <AlertCircleIcon className="h-3 w-3 text-destructive" />
+                <span className="text-destructive font-medium">{saveError}</span>
+              </>
+            ) : isSaving ? (
+              <>
+                <Loader2Icon className="h-3 w-3 animate-spin" />
+                <span>{t("common.loading")}</span>
+              </>
+            ) : (
+              <>
+                <CheckIcon className="h-3 w-3 text-green-500" />
+                <span>{t("common.saved")}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-1 border-l border-border/50 pl-4">
+            <HashIcon className="h-3 w-3" />
+            <span>
+              {t("editor.characters")}: <span className="font-medium text-foreground">{content.length}</span>
+            </span>
+          </div>
         </div>
-        <div>
-          最終更新: {new Date(note.updated_at).toLocaleString("ja-JP", {
+        <div className="whitespace-nowrap">
+          {t("editor.lastSaved")}: {new Date(note.updated_at).toLocaleString("ja-JP", {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",

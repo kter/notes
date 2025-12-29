@@ -36,7 +36,7 @@ export function ThreeColumnLayout({
           isSidebarOpen ? "md:w-60" : "md:w-12",
           "md:block",
           // Mobile: full width only when folders view is active, otherwise hidden
-          mobileView === "folders" ? "block w-full md:w-60 h-full" : "hidden"
+          mobileView === "folders" ? "block w-full md:w-60 h-full pb-14 md:pb-0" : "hidden"
         )}
       >
         <div className={cn(
@@ -68,7 +68,7 @@ export function ThreeColumnLayout({
         // Desktop: always visible with fixed width
         "md:block md:w-72",
         // Mobile: full width only when notes view is active, otherwise hidden
-        mobileView === "notes" ? "block w-full" : "hidden"
+        mobileView === "notes" ? "block w-full pb-14 md:pb-0" : "hidden"
       )}>
         {noteList}
       </div>
@@ -79,7 +79,7 @@ export function ThreeColumnLayout({
         // Desktop: always visible
         "md:flex",
         // Mobile: visible only when editor or chat view is active, otherwise hidden
-        (mobileView === "editor" || mobileView === "chat") ? "flex w-full" : "hidden"
+        (mobileView === "editor" || mobileView === "chat") ? "flex w-full pb-14 md:pb-0" : "hidden"
       )}>
         {editor}
       </main>
@@ -138,11 +138,11 @@ export function ThreeColumnLayout({
         </div>
       </nav>
 
-      {/* Add padding to main content for bottom nav on mobile */}
+      {/* Style for dynamic viewport height on mobile */}
       <style jsx global>{`
         @media (max-width: 767px) {
-          .h-screen {
-            height: calc(100dvh - 56px);
+          .h-[100dvh] {
+            height: 100dvh;
           }
         }
       `}</style>

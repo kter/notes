@@ -109,11 +109,11 @@ export function AIChatPanel({
 
   return (
     <div className={cn(
-      "border-l border-border/50 flex flex-col bg-card/50 transition-all duration-300 ease-in-out h-full",
-      // Desktop: fixed width sidebar
-      "md:w-80",
-      // Mobile: full screen overlay
-      "fixed md:relative inset-0 md:inset-auto w-full md:w-80 z-40 md:z-auto"
+      "border-l border-border/50 flex flex-col transition-all duration-300 ease-in-out h-full",
+      // Desktop: fixed width sidebar, subtle background
+      "md:w-80 md:bg-card/50",
+      // Mobile: full screen overlay, solid background
+      "fixed md:relative inset-0 md:inset-auto w-full md:w-80 z-40 md:z-auto bg-background md:bg-transparent pb-14 md:pb-0"
     )}>
       {/* Header */}
       <div className="p-4 border-b border-border/50">

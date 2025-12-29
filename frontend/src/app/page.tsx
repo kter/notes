@@ -190,7 +190,10 @@ export default function Home() {
           </div>
         }
         mobileView={mobileView}
-        onMobileViewChange={setMobileView}
+        onMobileViewChange={(view) => {
+          setMobileView(view);
+          setIsChatOpen(view === "chat");
+        }}
         noteList={
           <NoteList
             notes={filteredNotes}
@@ -210,7 +213,11 @@ export default function Home() {
               folders={folders}
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
-              onSummarize={handleSummarize}
+              onSummarize={(id) => {
+                handleSummarize(id);
+                setIsChatOpen(true);
+                setMobileView("chat");
+              }}
               onOpenChat={() => setIsChatOpen(!isChatOpen)}
               isChatOpen={isChatOpen}
               isSummarizing={isAILoading}

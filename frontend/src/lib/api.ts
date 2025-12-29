@@ -104,7 +104,7 @@ class ApiClient {
   // Notes API
   async listNotes(folderId?: string): Promise<Note[]> {
     const query = folderId ? `?folder_id=${folderId}` : "";
-    return this.request<Note[]>(`/api/notes/${query}`);
+    return this.request<Note[]>(`/api/notes${query}`);
   }
 
   async createNote(data: NoteCreate): Promise<Note> {

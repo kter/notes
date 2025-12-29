@@ -117,7 +117,7 @@ export function Sidebar({
           )}
 
           {/* Folder items */}
-          {folders.map((folder) => (
+          {folders?.map((folder) => (
             <div key={folder.id} className="group relative">
               {editingId === folder.id ? (
                 <div className="px-2 py-1">

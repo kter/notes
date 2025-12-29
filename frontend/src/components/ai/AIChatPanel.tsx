@@ -92,7 +92,7 @@ export function AIChatPanel({
                   Ask questions about this note...
                 </p>
               ) : (
-                messages.map((msg, idx) => (
+                messages?.map((msg, idx) => (
                   <div
                     key={idx}
                     className={cn(

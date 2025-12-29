@@ -159,7 +159,7 @@ export function NoteList({
               </button>
             </div>
           ) : (
-            notes.map((note) => (
+            notes?.map((note) => (
               <button
                 key={note.id}
                 className={cn(

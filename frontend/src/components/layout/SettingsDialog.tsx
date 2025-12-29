@@ -53,10 +53,20 @@ export function SettingsDialog({
       try {
         const apiClient = await getApi();
         const response = await apiClient.getSettings();
-        setSelectedModelId(response.settings.llm_model_id);
-        setSelectedLanguage(response.settings.language);
-        setAvailableModels(response.available_models);
-        setAvailableLanguages(response.available_languages);
+        console.log("Settings API response:", response);
+
+        if (response?.settings) {
+          setSelectedModelId(response.settings.llm_model_id);
+          setSelectedLanguage(response.settings.language);
+        }
+        
+        if (response?.available_models) {
+          setAvailableModels(response.available_models);
+        }
+        
+        if (response?.available_languages) {
+          setAvailableLanguages(response.available_languages);
+        }
       } catch (err) {
         console.error("Failed to load settings:", err);
         setError(t("settings.loadError"));
@@ -120,7 +130,7 @@ export function SettingsDialog({
                   <SelectValue placeholder={t("settings.selectLanguage")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableLanguages.map((lang) => (
+                  {availableLanguages?.map((lang) => (
                     <SelectItem key={lang.id} value={lang.id}>
                       <div className="flex flex-col">
                         <span>{lang.name}</span>
@@ -148,7 +158,7 @@ export function SettingsDialog({
                   <SelectValue placeholder={t("settings.selectModel")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableModels.map((model) => (
+                  {availableModels?.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       <div className="flex flex-col">
                         <span>{model.name}</span>

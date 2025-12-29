@@ -49,7 +49,9 @@ class SummarizeResponse(BaseModel):
 class ChatRequest(BaseModel):
     """Request schema for chat."""
 
-    note_id: UUID
+    scope: str = "note"  # "note", "folder", or "all"
+    note_id: UUID | None = None
+    folder_id: UUID | None = None
     question: str
     history: list[dict] | None = None
 
@@ -94,24 +96,58 @@ async def summarize_note(
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_with_note(
+async def chat_with_context(
     request: ChatRequest,
     user_id: UserId,
     session: Annotated[Session, Depends(get_session)],
     ai_service: Annotated[AIService, Depends(get_ai_service)],
 ):
-    """Chat with AI about a note's content."""
-    note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
+    """Chat with AI about notes' content."""
+    from sqlmodel import select
 
-    if not note.content.strip():
+    content = ""
+    if request.scope == "note":
+        if not request.note_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="note_id is required for note scope",
+            )
+        note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
+        content = note.content
+    elif request.scope == "folder":
+        if not request.folder_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="folder_id is required for folder scope",
+            )
+        # Validate folder ownership
+        from app.models import Folder
+        get_owned_resource(session, Folder, request.folder_id, user_id, "Folder")
+        
+        # Get all notes in this folder
+        statement = select(Note).where(Note.user_id == user_id).where(Note.folder_id == request.folder_id)
+        notes = session.exec(statement).all()
+        content = "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
+    elif request.scope == "all":
+        # Get all notes for the user
+        statement = select(Note).where(Note.user_id == user_id)
+        notes = session.exec(statement).all()
+        content = "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
+    else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Note content is empty",
+            detail=f"Invalid scope: {request.scope}",
+        )
+
+    if not content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Context content is empty",
         )
 
     model_id, language = get_user_settings(session, user_id)
     answer = await ai_service.chat(
-        content=note.content,
+        content=content,
         question=request.question,
         history=request.history,
         model_id=model_id,

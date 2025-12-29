@@ -58,6 +58,7 @@ export const en: TranslationKeys = {
     generating: "Generating...",
     lastSaved: "Last saved",
     unsaved: "Unsaved",
+    characters: "Characters",
   },
 
   // AI Panel

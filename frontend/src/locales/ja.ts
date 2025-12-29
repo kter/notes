@@ -56,6 +56,7 @@ export const ja = {
     generating: "生成中...",
     lastSaved: "最終保存",
     unsaved: "未保存",
+    characters: "文字数",
   },
 
   // AI Panel
@@ -136,6 +137,7 @@ export type TranslationKeys = {
     generating: string;
     lastSaved: string;
     unsaved: string;
+    characters: string;
   };
   ai: {
     title: string;

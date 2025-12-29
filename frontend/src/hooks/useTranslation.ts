@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKeys } from "@/locales";
 
@@ -31,9 +32,12 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string {
 export function useTranslation() {
   const { translations, effectiveLanguage, language, setLanguage, isLoading } = useLanguage();
 
-  const t = (path: TranslationPath): string => {
-    return getNestedValue(translations as unknown as Record<string, unknown>, path);
-  };
+  const t = useCallback(
+    (path: TranslationPath): string => {
+      return getNestedValue(translations as unknown as Record<string, unknown>, path);
+    },
+    [translations]
+  );
 
   return {
     t,

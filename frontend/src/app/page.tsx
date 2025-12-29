@@ -155,7 +155,8 @@ export default function Home() {
             {/* User info and sign out */}
             <div className={cn(
               "p-4 border-t border-border/50 transition-all duration-300",
-              !isSidebarOpen && "items-center justify-center p-2"
+              !isSidebarOpen && "items-center justify-center p-2",
+              "pb-20 md:pb-4" // Extra padding on mobile to clear the bottom nav
             )}>
               <div className={cn(
                 "flex items-center",

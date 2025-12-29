@@ -27,7 +27,7 @@ export function ThreeColumnLayout({
   onMobileViewChange,
 }: ThreeColumnLayoutProps) {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-[100dvh] overflow-hidden bg-background">
       {/* Left sidebar - Folders */}
       <aside 
         className={cn(
@@ -130,7 +130,7 @@ export function ThreeColumnLayout({
       <style jsx global>{`
         @media (max-width: 767px) {
           .h-screen {
-            height: calc(100vh - 56px);
+            height: calc(100dvh - 56px);
           }
         }
       `}</style>

@@ -22,6 +22,18 @@ def get_user_model_id(session: Session, user_id: str) -> str:
     return DEFAULT_LLM_MODEL_ID
 
 
+def get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
+    """Get the user's preferred LLM model ID and language.
+    
+    Returns:
+        Tuple of (model_id, language)
+    """
+    settings = session.get(UserSettings, user_id)
+    if settings:
+        return settings.llm_model_id, settings.language
+    return DEFAULT_LLM_MODEL_ID, "auto"
+
+
 class SummarizeRequest(BaseModel):
     """Request schema for summarization."""
 
@@ -76,8 +88,8 @@ async def summarize_note(
             detail="Note content is empty",
         )
 
-    model_id = get_user_model_id(session, user_id)
-    summary = await ai_service.summarize(note.content, model_id=model_id)
+    model_id, language = get_user_settings(session, user_id)
+    summary = await ai_service.summarize(note.content, model_id=model_id, language=language)
     return SummarizeResponse(summary=summary)
 
 
@@ -97,12 +109,13 @@ async def chat_with_note(
             detail="Note content is empty",
         )
 
-    model_id = get_user_model_id(session, user_id)
+    model_id, language = get_user_settings(session, user_id)
     answer = await ai_service.chat(
         content=note.content,
         question=request.question,
         history=request.history,
         model_id=model_id,
+        language=language,
     )
     return ChatResponse(answer=answer)
 
@@ -123,6 +136,6 @@ async def generate_title(
             detail="Note content is empty",
         )
 
-    model_id = get_user_model_id(session, user_id)
-    title = await ai_service.generate_title(note.content, model_id=model_id)
+    model_id, language = get_user_settings(session, user_id)
+    title = await ai_service.generate_title(note.content, model_id=model_id, language=language)
     return GenerateTitleResponse(title=title)

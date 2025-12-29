@@ -4,11 +4,7 @@ from abc import ABC, abstractmethod
 import boto3
 
 from app.config import get_settings
-from app.core.prompts import (
-    CHAT_SYSTEM_PROMPT,
-    GENERATE_TITLE_SYSTEM_PROMPT,
-    SUMMARIZE_SYSTEM_PROMPT,
-)
+from app.core.prompts import get_prompt
 
 settings = get_settings()
 
@@ -17,19 +13,20 @@ class AIService(ABC):
     """Abstract base class for AI services. Designed for future RAG extensibility."""
 
     @abstractmethod
-    async def summarize(self, content: str, model_id: str | None = None) -> str:
+    async def summarize(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
         """Generate a summary of the given content."""
         pass
 
     @abstractmethod
     async def chat(
-        self, content: str, question: str, history: list[dict] | None = None, model_id: str | None = None
+        self, content: str, question: str, history: list[dict] | None = None, 
+        model_id: str | None = None, language: str = "auto"
     ) -> str:
         """Answer a question based on the given content context."""
         pass
 
     @abstractmethod
-    async def generate_title(self, content: str, model_id: str | None = None) -> str:
+    async def generate_title(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
         """Generate a concise title for the given content."""
         pass
 
@@ -70,9 +67,16 @@ class BedrockService(AIService):
         response_body = json.loads(response["body"].read())
         return response_body["content"][0]["text"]
 
-    async def summarize(self, content: str, model_id: str | None = None) -> str:
+    def _resolve_language(self, language: str) -> str:
+        """Resolve 'auto' language to default 'en'."""
+        if language == "auto":
+            return "en"
+        return language
+
+    async def summarize(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
         """Generate a summary of the note content."""
-        system = SUMMARIZE_SYSTEM_PROMPT
+        resolved_lang = self._resolve_language(language)
+        system = get_prompt("summarize", resolved_lang)
 
         messages = [
             {
@@ -83,9 +87,10 @@ class BedrockService(AIService):
 
         return self._invoke_model(messages, system, model_id=model_id)
 
-    async def generate_title(self, content: str, model_id: str | None = None) -> str:
+    async def generate_title(self, content: str, model_id: str | None = None, language: str = "auto") -> str:
         """Generate a concise title for the note content."""
-        system = GENERATE_TITLE_SYSTEM_PROMPT
+        resolved_lang = self._resolve_language(language)
+        system = get_prompt("generate_title", resolved_lang)
 
         messages = [
             {
@@ -97,10 +102,12 @@ class BedrockService(AIService):
         return self._invoke_model(messages, system, model_id=model_id).strip()
 
     async def chat(
-        self, content: str, question: str, history: list[dict] | None = None, model_id: str | None = None
+        self, content: str, question: str, history: list[dict] | None = None, 
+        model_id: str | None = None, language: str = "auto"
     ) -> str:
         """Answer a question about the note content."""
-        system = CHAT_SYSTEM_PROMPT
+        resolved_lang = self._resolve_language(language)
+        system = get_prompt("chat", resolved_lang)
 
         # Build context message
         context_message = f"Here is the note content:\n\n{content}\n\n---\n\n"

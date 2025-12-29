@@ -8,8 +8,11 @@ from sqlmodel import Session
 from app.auth import UserId
 from app.database import get_session
 from app.models import (
+    AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
+    DEFAULT_LANGUAGE,
     DEFAULT_LLM_MODEL_ID,
+    AvailableLanguage,
     AvailableModel,
     UserSettings,
     UserSettingsRead,
@@ -25,6 +28,7 @@ class SettingsResponse(BaseModel):
 
     settings: UserSettingsRead
     available_models: list[AvailableModel]
+    available_languages: list[AvailableLanguage]
 
 
 @router.get("/", response_model=SettingsResponse)
@@ -49,10 +53,12 @@ async def get_settings(
         settings=UserSettingsRead(
             user_id=settings.user_id,
             llm_model_id=settings.llm_model_id,
+            language=settings.language,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         ),
         available_models=[AvailableModel(**m) for m in AVAILABLE_MODELS],
+        available_languages=[AvailableLanguage(**lang) for lang in AVAILABLE_LANGUAGES],
     )
 
 
@@ -70,6 +76,7 @@ async def update_settings(
         settings = UserSettings(
             user_id=user_id,
             llm_model_id=settings_in.llm_model_id or DEFAULT_LLM_MODEL_ID,
+            language=settings_in.language or DEFAULT_LANGUAGE,
         )
         session.add(settings)
     else:
@@ -85,6 +92,17 @@ async def update_settings(
                     detail=f"Invalid model ID. Must be one of: {valid_ids}",
                 )
             settings.llm_model_id = settings_in.llm_model_id
+        if settings_in.language is not None:
+            # Validate language is in available languages
+            valid_langs = [lang["id"] for lang in AVAILABLE_LANGUAGES]
+            if settings_in.language not in valid_langs:
+                from fastapi import HTTPException, status
+
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid language. Must be one of: {valid_langs}",
+                )
+            settings.language = settings_in.language
         settings.updated_at = datetime.now(UTC)
 
     commit_with_error_handling(session, "UserSettings")
@@ -93,6 +111,7 @@ async def update_settings(
     return UserSettingsRead(
         user_id=settings.user_id,
         llm_model_id=settings.llm_model_id,
+        language=settings.language,
         created_at=settings.created_at,
         updated_at=settings.updated_at,
     )

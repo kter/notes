@@ -36,11 +36,34 @@ AVAILABLE_MODELS = [
     },
 ]
 
+# Default language setting (auto-detect from browser)
+DEFAULT_LANGUAGE = "auto"
+
+# Available language options
+AVAILABLE_LANGUAGES = [
+    {
+        "id": "auto",
+        "name": "Auto",
+        "description": "ブラウザの言語設定に従う",
+    },
+    {
+        "id": "ja",
+        "name": "日本語",
+        "description": "Japanese",
+    },
+    {
+        "id": "en",
+        "name": "English",
+        "description": "英語",
+    },
+]
+
 
 class UserSettingsBase(SQLModel):
     """Base UserSettings schema."""
 
     llm_model_id: str = Field(default=DEFAULT_LLM_MODEL_ID, max_length=255)
+    language: str = Field(default=DEFAULT_LANGUAGE, max_length=10)
 
 
 class UserSettings(UserSettingsBase, table=True):
@@ -57,6 +80,7 @@ class UserSettingsUpdate(SQLModel):
     """Schema for updating user settings."""
 
     llm_model_id: str | None = None
+    language: str | None = None
 
 
 class UserSettingsRead(UserSettingsBase):
@@ -69,6 +93,14 @@ class UserSettingsRead(UserSettingsBase):
 
 class AvailableModel(SQLModel):
     """Schema for available model info."""
+
+    id: str
+    name: str
+    description: str
+
+
+class AvailableLanguage(SQLModel):
+    """Schema for available language info."""
 
     id: str
     name: str

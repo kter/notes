@@ -14,7 +14,7 @@ from app.routers.db_exceptions import commit_with_error_handling
 router = APIRouter()
 
 
-@router.get("/", response_model=list[NoteRead])
+@router.get("", response_model=list[NoteRead])
 def list_notes(
     user_id: UserId,
     session: Annotated[Session, Depends(get_session)],
@@ -31,7 +31,7 @@ def list_notes(
     return notes
 
 
-@router.post("/", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
 def create_note(
     note_in: NoteCreate,
     user_id: UserId,

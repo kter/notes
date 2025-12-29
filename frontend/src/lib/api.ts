@@ -74,11 +74,11 @@ class ApiClient {
 
   // Folders API
   async listFolders(): Promise<Folder[]> {
-    return this.request<Folder[]>("/api/folders/");
+    return this.request<Folder[]>("/api/folders");
   }
 
   async createFolder(data: FolderCreate): Promise<Folder> {
-    return this.request<Folder>("/api/folders/", {
+    return this.request<Folder>("/api/folders", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -108,7 +108,7 @@ class ApiClient {
   }
 
   async createNote(data: NoteCreate): Promise<Note> {
-    return this.request<Note>("/api/notes/", {
+    return this.request<Note>("/api/notes", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -155,11 +155,11 @@ class ApiClient {
 
   // Settings API
   async getSettings(): Promise<SettingsResponse> {
-    return this.request<SettingsResponse>("/api/settings/");
+    return this.request<SettingsResponse>("/api/settings");
   }
 
   async updateSettings(data: UserSettingsUpdate): Promise<UserSettings> {
-    return this.request<UserSettings>("/api/settings/", {
+    return this.request<UserSettings>("/api/settings", {
       method: "PUT",
       body: JSON.stringify(data),
     });

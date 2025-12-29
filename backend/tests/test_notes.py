@@ -10,16 +10,16 @@ class TestListNotes:
 
     def test_list_notes_empty(self, client: TestClient):
         """Test listing notes when none exist."""
-        response = client.get("/api/notes/")
+        response = client.get("/api/notes")
         assert response.status_code == 200
         assert response.json() == []
 
     def test_list_notes(self, client: TestClient):
         """Test listing notes after creating some."""
-        client.post("/api/notes/", json={"title": "Note 1", "content": "Content 1"})
-        client.post("/api/notes/", json={"title": "Note 2", "content": "Content 2"})
+        client.post("/api/notes", json={"title": "Note 1", "content": "Content 1"})
+        client.post("/api/notes", json={"title": "Note 2", "content": "Content 2"})
 
-        response = client.get("/api/notes/")
+        response = client.get("/api/notes")
         assert response.status_code == 200
         notes = response.json()
         assert len(notes) == 2
@@ -27,15 +27,15 @@ class TestListNotes:
     def test_list_notes_filter_by_folder(self, client: TestClient):
         """Test filtering notes by folder_id."""
         # Create a folder
-        folder_response = client.post("/api/folders/", json={"name": "My Folder"})
+        folder_response = client.post("/api/folders", json={"name": "My Folder"})
         folder_id = folder_response.json()["id"]
 
         # Create notes
-        client.post("/api/notes/", json={"title": "In Folder", "folder_id": folder_id})
-        client.post("/api/notes/", json={"title": "No Folder"})
+        client.post("/api/notes", json={"title": "In Folder", "folder_id": folder_id})
+        client.post("/api/notes", json={"title": "No Folder"})
 
         # Filter by folder
-        response = client.get(f"/api/notes/?folder_id={folder_id}")
+        response = client.get(f"/api/notes?folder_id={folder_id}")
         assert response.status_code == 200
         notes = response.json()
         assert len(notes) == 1
@@ -47,7 +47,7 @@ class TestCreateNote:
 
     def test_create_note_minimal(self, client: TestClient):
         """Test creating a note with minimal data."""
-        response = client.post("/api/notes/", json={})
+        response = client.post("/api/notes", json={})
         
         assert response.status_code == 201
         note = response.json()
@@ -59,11 +59,11 @@ class TestCreateNote:
     def test_create_note_full(self, client: TestClient):
         """Test creating a note with all fields."""
         # Create a folder first
-        folder_response = client.post("/api/folders/", json={"name": "Folder"})
+        folder_response = client.post("/api/folders", json={"name": "Folder"})
         folder_id = folder_response.json()["id"]
 
         response = client.post(
-            "/api/notes/",
+            "/api/notes",
             json={"title": "My Note", "content": "Hello World", "folder_id": folder_id},
         )
         
@@ -80,7 +80,7 @@ class TestGetNote:
     def test_get_note(self, client: TestClient):
         """Test getting a specific note."""
         create_response = client.post(
-            "/api/notes/", json={"title": "Test", "content": "Content"}
+            "/api/notes", json={"title": "Test", "content": "Content"}
         )
         note_id = create_response.json()["id"]
 
@@ -101,7 +101,7 @@ class TestUpdateNote:
     def test_update_note_title(self, client: TestClient):
         """Test updating note title."""
         create_response = client.post(
-            "/api/notes/", json={"title": "Original", "content": "Content"}
+            "/api/notes", json={"title": "Original", "content": "Content"}
         )
         note_id = create_response.json()["id"]
 
@@ -113,7 +113,7 @@ class TestUpdateNote:
     def test_update_note_content(self, client: TestClient):
         """Test updating note content."""
         create_response = client.post(
-            "/api/notes/", json={"title": "Title", "content": "Old"}
+            "/api/notes", json={"title": "Title", "content": "Old"}
         )
         note_id = create_response.json()["id"]
 
@@ -125,10 +125,10 @@ class TestUpdateNote:
     def test_update_note_folder(self, client: TestClient):
         """Test moving note to a folder."""
         # Create folder and note
-        folder_response = client.post("/api/folders/", json={"name": "Folder"})
+        folder_response = client.post("/api/folders", json={"name": "Folder"})
         folder_id = folder_response.json()["id"]
         
-        create_response = client.post("/api/notes/", json={"title": "Note"})
+        create_response = client.post("/api/notes", json={"title": "Note"})
         note_id = create_response.json()["id"]
 
         response = client.patch(
@@ -149,7 +149,7 @@ class TestDeleteNote:
 
     def test_delete_note(self, client: TestClient):
         """Test deleting a note."""
-        create_response = client.post("/api/notes/", json={"title": "ToDelete"})
+        create_response = client.post("/api/notes", json={"title": "ToDelete"})
         note_id = create_response.json()["id"]
 
         response = client.delete(f"/api/notes/{note_id}")
@@ -172,7 +172,7 @@ class TestNoteAuthorization:
     def test_cannot_access_other_users_note(self, make_client):
         """Test that users cannot access other users' notes."""
         client = make_client(TEST_USER_ID)
-        create_response = client.post("/api/notes/", json={"title": "Private"})
+        create_response = client.post("/api/notes", json={"title": "Private"})
         note_id = create_response.json()["id"]
 
         other_client = make_client("other-user-456")
@@ -182,7 +182,7 @@ class TestNoteAuthorization:
     def test_cannot_update_other_users_note(self, make_client):
         """Test that users cannot update other users' notes."""
         client = make_client(TEST_USER_ID)
-        create_response = client.post("/api/notes/", json={"title": "Private"})
+        create_response = client.post("/api/notes", json={"title": "Private"})
         note_id = create_response.json()["id"]
 
         other_client = make_client("other-user-456")
@@ -195,7 +195,7 @@ class TestNoteAuthorization:
     def test_cannot_delete_other_users_note(self, make_client):
         """Test that users cannot delete other users' notes."""
         client = make_client(TEST_USER_ID)
-        create_response = client.post("/api/notes/", json={"title": "Private"})
+        create_response = client.post("/api/notes", json={"title": "Private"})
         note_id = create_response.json()["id"]
 
         other_client = make_client("other-user-456")

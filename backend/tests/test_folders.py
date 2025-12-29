@@ -10,17 +10,17 @@ class TestListFolders:
 
     def test_list_folders_empty(self, client: TestClient):
         """Test listing folders when none exist."""
-        response = client.get("/api/folders/")
+        response = client.get("/api/folders")
         assert response.status_code == 200
         assert response.json() == []
 
     def test_list_folders(self, client: TestClient):
         """Test listing folders after creating some."""
         # Create folders
-        client.post("/api/folders/", json={"name": "Folder 1"})
-        client.post("/api/folders/", json={"name": "Folder 2"})
+        client.post("/api/folders", json={"name": "Folder 1"})
+        client.post("/api/folders", json={"name": "Folder 2"})
 
-        response = client.get("/api/folders/")
+        response = client.get("/api/folders")
         assert response.status_code == 200
         folders = response.json()
         assert len(folders) == 2
@@ -31,7 +31,7 @@ class TestCreateFolder:
 
     def test_create_folder(self, client: TestClient):
         """Test creating a folder."""
-        response = client.post("/api/folders/", json={"name": "My Folder"})
+        response = client.post("/api/folders", json={"name": "My Folder"})
         
         assert response.status_code == 201
         folder = response.json()
@@ -48,7 +48,7 @@ class TestGetFolder:
     def test_get_folder(self, client: TestClient):
         """Test getting a specific folder."""
         # Create a folder
-        create_response = client.post("/api/folders/", json={"name": "Test"})
+        create_response = client.post("/api/folders", json={"name": "Test"})
         folder_id = create_response.json()["id"]
 
         response = client.get(f"/api/folders/{folder_id}")
@@ -68,7 +68,7 @@ class TestUpdateFolder:
     def test_update_folder(self, client: TestClient):
         """Test updating a folder."""
         # Create a folder
-        create_response = client.post("/api/folders/", json={"name": "Original"})
+        create_response = client.post("/api/folders", json={"name": "Original"})
         folder_id = create_response.json()["id"]
 
         response = client.patch(
@@ -91,7 +91,7 @@ class TestDeleteFolder:
     def test_delete_folder(self, client: TestClient):
         """Test deleting a folder."""
         # Create a folder
-        create_response = client.post("/api/folders/", json={"name": "ToDelete"})
+        create_response = client.post("/api/folders", json={"name": "ToDelete"})
         folder_id = create_response.json()["id"]
 
         response = client.delete(f"/api/folders/{folder_id}")
@@ -115,7 +115,7 @@ class TestFolderAuthorization:
         """Test that users cannot access other users' folders."""
         # Create folder as test user
         client = make_client(TEST_USER_ID)
-        create_response = client.post("/api/folders/", json={"name": "Private"})
+        create_response = client.post("/api/folders", json={"name": "Private"})
         folder_id = create_response.json()["id"]
 
         # Try to access as other user
@@ -126,7 +126,7 @@ class TestFolderAuthorization:
     def test_cannot_update_other_users_folder(self, make_client):
         """Test that users cannot update other users' folders."""
         client = make_client(TEST_USER_ID)
-        create_response = client.post("/api/folders/", json={"name": "Private"})
+        create_response = client.post("/api/folders", json={"name": "Private"})
         folder_id = create_response.json()["id"]
 
         other_client = make_client("other-user-456")
@@ -139,7 +139,7 @@ class TestFolderAuthorization:
     def test_cannot_delete_other_users_folder(self, make_client):
         """Test that users cannot delete other users' folders."""
         client = make_client(TEST_USER_ID)
-        create_response = client.post("/api/folders/", json={"name": "Private"})
+        create_response = client.post("/api/folders", json={"name": "Private"})
         folder_id = create_response.json()["id"]
 
         other_client = make_client("other-user-456")

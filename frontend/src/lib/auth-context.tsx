@@ -90,14 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const getAccessToken = async (): Promise<string | null> => {
+  const getAccessToken = useCallback(async (): Promise<string | null> => {
     try {
       const session = await fetchAuthSession();
       return session.tokens?.idToken?.toString() || null;
     } catch {
       return null;
     }
-  };
+  }, []);
 
   return (
     <AuthContext.Provider

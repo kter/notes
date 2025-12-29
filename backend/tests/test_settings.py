@@ -16,7 +16,7 @@ class TestGetSettings:
 
     def test_get_settings_creates_default(self, client: TestClient):
         """Test that getting settings creates default settings for new user."""
-        response = client.get("/api/settings/")
+        response = client.get("/api/settings")
         
         assert response.status_code == 200
         data = response.json()
@@ -36,7 +36,7 @@ class TestGetSettings:
 
     def test_get_settings_returns_available_models(self, client: TestClient):
         """Test that available models list is returned."""
-        response = client.get("/api/settings/")
+        response = client.get("/api/settings")
         
         assert response.status_code == 200
         data = response.json()
@@ -52,7 +52,7 @@ class TestGetSettings:
 
     def test_get_settings_returns_available_languages(self, client: TestClient):
         """Test that available languages list is returned."""
-        response = client.get("/api/settings/")
+        response = client.get("/api/settings")
         
         assert response.status_code == 200
         data = response.json()
@@ -68,8 +68,8 @@ class TestGetSettings:
 
     def test_get_settings_idempotent(self, client: TestClient):
         """Test that getting settings multiple times returns same result."""
-        response1 = client.get("/api/settings/")
-        response2 = client.get("/api/settings/")
+        response1 = client.get("/api/settings")
+        response2 = client.get("/api/settings")
         
         assert response1.status_code == 200
         assert response2.status_code == 200
@@ -91,7 +91,7 @@ class TestUpdateSettings:
         valid_model_id = AVAILABLE_MODELS[1]["id"]  # Pick second model
         
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"llm_model_id": valid_model_id},
         )
         
@@ -103,10 +103,10 @@ class TestUpdateSettings:
     def test_update_settings_invalid_model_id(self, client: TestClient):
         """Test that invalid model ID is rejected."""
         # First get current settings (creates default)
-        client.get("/api/settings/")
+        client.get("/api/settings")
         
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"llm_model_id": "invalid-model-that-does-not-exist"},
         )
         
@@ -119,7 +119,7 @@ class TestUpdateSettings:
         
         # Update without getting first
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"llm_model_id": valid_model_id},
         )
         
@@ -134,7 +134,7 @@ class TestUpdateLanguageSettings:
     def test_update_language_to_japanese(self, client: TestClient):
         """Test changing language to Japanese."""
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"language": "ja"},
         )
         
@@ -145,7 +145,7 @@ class TestUpdateLanguageSettings:
     def test_update_language_to_english(self, client: TestClient):
         """Test changing language to English."""
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"language": "en"},
         )
         
@@ -156,11 +156,11 @@ class TestUpdateLanguageSettings:
     def test_update_language_to_auto(self, client: TestClient):
         """Test changing language back to auto."""
         # First set to Japanese
-        client.put("/api/settings/", json={"language": "ja"})
+        client.put("/api/settings", json={"language": "ja"})
         
         # Then change to auto
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"language": "auto"},
         )
         
@@ -171,10 +171,10 @@ class TestUpdateLanguageSettings:
     def test_update_invalid_language_rejected(self, client: TestClient):
         """Test that invalid language is rejected."""
         # First create settings
-        client.get("/api/settings/")
+        client.get("/api/settings")
         
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"language": "invalid-language"},
         )
         
@@ -186,7 +186,7 @@ class TestUpdateLanguageSettings:
         valid_model_id = AVAILABLE_MODELS[1]["id"]
         
         response = client.put(
-            "/api/settings/",
+            "/api/settings",
             json={"llm_model_id": valid_model_id, "language": "ja"},
         )
         
@@ -204,19 +204,19 @@ class TestSettingsUserIsolation:
         # User 1 sets a model
         client1 = make_client("user-1")
         model1 = AVAILABLE_MODELS[0]["id"]
-        response1_update = client1.put("/api/settings/", json={"llm_model_id": model1})
+        response1_update = client1.put("/api/settings", json={"llm_model_id": model1})
         assert response1_update.status_code == 200
         
         # User 2 gets default settings (different from user 1's choice if default differs)
         client2 = make_client("user-2")
-        response2 = client2.get("/api/settings/")
+        response2 = client2.get("/api/settings")
         
         # Both users should have settings
         assert response2.status_code == 200
         assert response2.json()["settings"]["user_id"] == "user-2"
         
         # Verify user 1's setting persisted
-        response1 = client1.get("/api/settings/")
+        response1 = client1.get("/api/settings")
         assert response1.status_code == 200
         # Note: due to make_client fixture behavior with shared session,
         # the user_id in the returned data should match what was set
@@ -226,12 +226,12 @@ class TestSettingsUserIsolation:
         """Test that each user has their own language settings."""
         # User 1 sets Japanese
         client1 = make_client("user-1")
-        response1 = client1.put("/api/settings/", json={"language": "ja"})
+        response1 = client1.put("/api/settings", json={"language": "ja"})
         assert response1.status_code == 200
         assert response1.json()["language"] == "ja"
         
         # User 2 sets English
         client2 = make_client("user-2")
-        response2 = client2.put("/api/settings/", json={"language": "en"})
+        response2 = client2.put("/api/settings", json={"language": "en"})
         assert response2.status_code == 200
         assert response2.json()["language"] == "en"

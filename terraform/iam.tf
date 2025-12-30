@@ -44,6 +44,15 @@ resource "aws_iam_role_policy" "bedrock_access" {
           "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-*",
           "arn:aws:bedrock:*:*:inference-profile/eu.anthropic.claude-*"
         ]
+      },
+      {
+        # Required for Bedrock to auto-subscribe to models on first access
+        Effect = "Allow"
+        Action = [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe"
+        ]
+        Resource = "*"
       }
     ]
   })

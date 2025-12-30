@@ -46,9 +46,11 @@ export default function Home() {
   };
 
   // Handle note selection with mobile view change
-  const handleSelectNote = (id: string) => {
+  const handleSelectNote = (id: string | null) => {
     setSelectedNoteId(id);
-    setMobileView("editor");
+    if (id) {
+      setMobileView("editor");
+    }
   };
 
   const {
@@ -59,7 +61,7 @@ export default function Home() {
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
-  } = useNotes(selectedFolderId, selectedNoteId, setSelectedNoteId);
+  } = useNotes(selectedFolderId, selectedNoteId, handleSelectNote);
 
   const {
     chatMessages,

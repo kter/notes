@@ -72,6 +72,7 @@ export function Sidebar({
             size="icon"
             className="h-7 w-7"
             onClick={() => setIsCreating(true)}
+            aria-label="Add folder"
           >
             <FolderPlusIcon className="h-4 w-4" />
           </Button>

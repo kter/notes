@@ -125,6 +125,58 @@ make deploy ENV=prd
 > [!NOTE]
 > The Makefile automatically uses the AWS profile named after the `ENV` value (e.g., `ENV=prd` uses `--profile prd`). Ensure these profiles are configured in your `~/.aws/credentials`.
 
+## Testing
+
+### Backend Unit Tests
+
+```bash
+cd backend
+uv run pytest
+```
+
+### Frontend E2E Tests (Playwright)
+
+E2E tests use Playwright to test the application across multiple browsers.
+
+#### Setup
+
+1. Create `frontend/.env.local` with test credentials:
+   ```env
+   E2E_TEST_USER_EMAIL=your-test-user@example.com
+   E2E_TEST_USER_PASSWORD=YourTestPassword123!
+   ```
+
+2. Install Playwright browsers:
+   ```bash
+   cd frontend
+   npx playwright install
+   ```
+
+#### Running Tests
+
+```bash
+# Local development (starts dev server automatically)
+npx playwright test
+
+# Against dev environment
+E2E_TARGET=dev npx playwright test
+
+# Against production
+E2E_TARGET=prd npx playwright test
+
+# Run specific test file
+E2E_TARGET=dev npx playwright test tests/auth.spec.ts
+
+# Run with UI mode (interactive)
+npx playwright test --ui
+
+# View HTML report
+npx playwright show-report
+```
+
+> [!TIP]
+> For detailed credential management and CI/CD setup, see [frontend/docs/E2E_CREDENTIALS.md](frontend/docs/E2E_CREDENTIALS.md).
+
 ## API Endpoints
 
 | Method | Endpoint | Description |

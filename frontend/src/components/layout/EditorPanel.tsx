@@ -408,6 +408,7 @@ export function EditorPanel({
             onClick={() => onSummarize(note.id)}
             disabled={isSummarizing}
             className="gap-1 md:gap-2"
+            aria-label="Summarize note"
           >
             {isSummarizing ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -416,27 +417,29 @@ export function EditorPanel({
             )}
             <span className="hidden md:inline">{isSummarizing ? "処理中..." : "Summarize"}</span>
           </Button>
-          <Button
-            variant={isChatOpen ? "secondary" : "ghost"}
-            size="sm"
-            onClick={onOpenChat}
-            className="gap-1 md:gap-2"
-          >
-            <MessageSquareIcon className="h-4 w-4" />
-            <span className="hidden md:inline">Chat</span>
-          </Button>
-          {/* Export Button */}
-          <div className="relative" ref={exportDropdownRef}>
             <Button
-              variant="ghost"
+              variant={isChatOpen ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              onClick={onOpenChat}
               className="gap-1 md:gap-2"
+              aria-label="Toggle chat"
             >
-              <DownloadIcon className="h-4 w-4" />
-              <span className="hidden md:inline">Export</span>
-              <ChevronDownIcon className="h-3 w-3" />
+              <MessageSquareIcon className="h-4 w-4" />
+              <span className="hidden md:inline">Chat</span>
             </Button>
+            {/* Export Button */}
+            <div className="relative" ref={exportDropdownRef}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                className="gap-1 md:gap-2"
+                aria-label="Export note"
+              >
+                <DownloadIcon className="h-4 w-4" />
+                <span className="hidden md:inline">Export</span>
+                <ChevronDownIcon className="h-3 w-3" />
+              </Button>
             {isExportDropdownOpen && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
                 <div className="py-1">
@@ -482,9 +485,11 @@ export function EditorPanel({
       </div>
 
       {/* Editor */}
-      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-auto">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-auto" role="main">
         <div className="relative mb-4">
+          <label htmlFor="note-title" className="sr-only">Note title</label>
           <Input
+            id="note-title"
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
             placeholder="Note title"
@@ -511,7 +516,9 @@ export function EditorPanel({
         <div className={`flex-1 flex ${isPreviewOpen ? "gap-4" : ""}`}>
           {/* Markdown Editor */}
           <div className={isPreviewOpen ? "flex-1 min-w-0" : "flex-1"}>
+            <label htmlFor="note-content" className="sr-only">Note content</label>
             <Textarea
+              id="note-content"
               ref={textareaRef}
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}

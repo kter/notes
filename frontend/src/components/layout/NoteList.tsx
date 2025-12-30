@@ -133,6 +133,7 @@ export function NoteList({
                 size="icon"
                 className="h-7 w-7 flex-shrink-0"
                 onClick={onCreateNote}
+                aria-label="Add note"
               >
                 <FilePlusIcon className="h-4 w-4" />
               </Button>

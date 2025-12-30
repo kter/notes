@@ -95,6 +95,7 @@ export function ThreeColumnLayout({
               mobileView === "folders" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("folders")}
+            aria-label="View Folders"
           >
             <FolderIcon className="h-5 w-5" />
             <span className="text-xs">Folders</span>
@@ -107,6 +108,7 @@ export function ThreeColumnLayout({
               mobileView === "notes" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("notes")}
+            aria-label="View Notes"
           >
             <FileTextIcon className="h-5 w-5" />
             <span className="text-xs">Notes</span>
@@ -119,6 +121,7 @@ export function ThreeColumnLayout({
               mobileView === "editor" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("editor")}
+            aria-label="View Editor"
           >
             <PenSquareIcon className="h-5 w-5" />
             <span className="text-xs">Editor</span>
@@ -131,6 +134,7 @@ export function ThreeColumnLayout({
               mobileView === "chat" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("chat")}
+            aria-label="View Chat"
           >
             <MessageSquareIcon className="h-5 w-5" />
             <span className="text-xs">Chat</span>

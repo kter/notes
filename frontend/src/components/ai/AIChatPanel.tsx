@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks";
 
 interface AIChatPanelProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export function AIChatPanel({
   selectedNote,
   selectedFolder,
 }: AIChatPanelProps) {
+  const { t } = useTranslation();
   const [input, setInput] = useState("");
   const [scope, setScope] = useState<ChatScope>("note");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -99,7 +101,7 @@ export function AIChatPanel({
           size="icon"
           className="h-8 w-8 text-muted-foreground"
           onClick={onClose}
-          title="Open AI Chat"
+          title={t("ai.openAIChat")}
         >
           <ChevronLeftIcon className="h-4 w-4" />
         </Button>
@@ -120,7 +122,7 @@ export function AIChatPanel({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <SparklesIcon className="h-4 w-4 text-primary" />
-            <h3 className="font-semibold text-sm">AI Assistant</h3>
+            <h3 className="font-semibold text-sm">{t("ai.title")}</h3>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -128,7 +130,7 @@ export function AIChatPanel({
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={onClearChat}
-              title="Clear chat"
+              title={t("ai.clearChat")}
             >
               <Trash2Icon className="h-4 w-4" />
             </Button>
@@ -147,7 +149,7 @@ export function AIChatPanel({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-              Chat Context
+              {t("ai.chatContext")}
             </label>
           </div>
           <Select value={scope} onValueChange={(v) => setScope(v as ChatScope)}>
@@ -158,19 +160,19 @@ export function AIChatPanel({
               <SelectItem value="note">
                 <div className="flex items-center gap-2">
                   <FileTextIcon className="h-3 w-3" />
-                  <span>Current Note</span>
+                  <span>{t("ai.currentNote")}</span>
                 </div>
               </SelectItem>
               <SelectItem value="folder">
                 <div className="flex items-center gap-2">
                   <FolderIcon className="h-3 w-3" />
-                  <span>Current Folder</span>
+                  <span>{t("ai.currentFolder")}</span>
                 </div>
               </SelectItem>
               <SelectItem value="all">
                 <div className="flex items-center gap-2">
                   <GlobeIcon className="h-3 w-3" />
-                  <span>All Notes</span>
+                  <span>{t("ai.allNotes")}</span>
                 </div>
               </SelectItem>
             </SelectContent>
@@ -178,9 +180,9 @@ export function AIChatPanel({
           
           {/* Context indicator */}
           <div className="text-[11px] text-muted-foreground truncate px-1">
-            {scope === "note" && (selectedNote?.title || "No note selected")}
-            {scope === "folder" && (selectedFolder?.name || "No folder selected")}
-            {scope === "all" && "All notes and folders"}
+            {scope === "note" && (selectedNote ? (selectedNote.title || t("ai.untitled")) : t("ai.noNoteSelected"))}
+            {scope === "folder" && (selectedFolder?.name || t("ai.noFolderSelected"))}
+            {scope === "all" && t("ai.allNotesAndFolders")}
           </div>
         </div>
       </div>
@@ -190,7 +192,7 @@ export function AIChatPanel({
         <div className="p-4 border-b border-border/50 bg-primary/5 relative group">
           <div className="flex items-center gap-2 mb-2">
             <SparklesIcon className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Summary</span>
+            <span className="text-sm font-medium">{t("ai.summary")}</span>
           </div>
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">
             {summary}
@@ -214,9 +216,9 @@ export function AIChatPanel({
               <div className="bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
                 <SparklesIcon className="h-6 w-6 text-primary" />
               </div>
-              <p className="text-sm font-medium mb-1">How can I help you?</p>
+              <p className="text-sm font-medium mb-1">{t("ai.howCanIHelp")}</p>
               <p className="text-xs text-muted-foreground">
-                Ask questions about your {scope === "all" ? "notes" : scope === "folder" ? "folder" : "note"}.
+                {scope === "all" ? t("ai.askAboutNotes") : scope === "folder" ? t("ai.askAboutFolder") : t("ai.askAboutNote")}
               </p>
             </div>
           ) : (
@@ -262,9 +264,9 @@ export function AIChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              scope === "note" ? "Ask about current note..." :
-              scope === "folder" ? "Ask about this folder..." :
-              "Ask about all your notes..."
+              scope === "note" ? t("ai.askAboutCurrentNote") :
+              scope === "folder" ? t("ai.askAboutThisFolder") :
+              t("ai.askAboutAllNotes")
             }
             onKeyDown={(e) => {
               if (e.nativeEvent.isComposing) return;

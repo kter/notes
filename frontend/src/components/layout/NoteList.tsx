@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { FilePlusIcon, FileTextIcon, PencilIcon, TrashIcon, CheckIcon, XIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState, useEffect } from "react";
+import { useTranslation } from "@/hooks";
 
 interface NoteListProps {
   notes: Note[];
@@ -30,6 +31,7 @@ export function NoteList({
   onRenameFolder,
   onDeleteFolder,
 }: NoteListProps) {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editingName, setEditingName] = useState("");
 
@@ -59,7 +61,7 @@ export function NoteList({
 
   const handleDelete = () => {
     if (folderId && onDeleteFolder) {
-      if (confirm("Are you sure you want to delete this folder?")) {
+      if (confirm(t("sidebar.deleteConfirm"))) {
         onDeleteFolder(folderId);
       }
     }
@@ -103,7 +105,7 @@ export function NoteList({
             <>
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider truncate">
-                  {folderName || "All Notes"}
+                  {folderName || t("sidebar.allNotes")}
                 </h2>
                 {folderId && onRenameFolder && (
                   <Button
@@ -111,7 +113,7 @@ export function NoteList({
                     size="icon"
                     className="h-6 w-6 flex-shrink-0"
                     onClick={handleStartEdit}
-                    title="Rename folder"
+                    title={t("noteList.renameFolder")}
                   >
                     <PencilIcon className="h-3 w-3" />
                   </Button>
@@ -122,7 +124,7 @@ export function NoteList({
                     size="icon"
                     className="h-6 w-6 flex-shrink-0 text-destructive hover:text-destructive"
                     onClick={handleDelete}
-                    title="Delete folder"
+                    title={t("noteList.deleteFolder")}
                   >
                     <TrashIcon className="h-3 w-3" />
                   </Button>
@@ -133,7 +135,7 @@ export function NoteList({
                 size="icon"
                 className="h-7 w-7 flex-shrink-0"
                 onClick={onCreateNote}
-                aria-label="Add note"
+                aria-label={t("noteList.addNote")}
               >
                 <FilePlusIcon className="h-4 w-4" />
               </Button>
@@ -141,7 +143,9 @@ export function NoteList({
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          {notes.length} {notes.length === 1 ? "note" : "notes"}
+          {notes.length === 1 
+            ? t("noteList.noteCountSingular").replace("{{count}}", "1")
+            : t("noteList.noteCount").replace("{{count}}", String(notes.length))}
         </p>
       </div>
 
@@ -150,13 +154,13 @@ export function NoteList({
         <div className="p-2 space-y-1">
           {notes.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground text-sm">
-              No notes yet.
+              {t("noteList.noNotes")}
               <br />
               <button
                 className="text-primary hover:underline mt-2"
                 onClick={onCreateNote}
               >
-                Create one
+                {t("noteList.createOne")}
               </button>
             </div>
           ) : (
@@ -175,10 +179,10 @@ export function NoteList({
                   <FileTextIcon className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-sm truncate">
-                      {note.title || "Untitled"}
+                      {note.title || t("noteList.untitled")}
                     </h3>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {note.content.slice(0, 50) || "No content"}
+                      {note.content.slice(0, 50) || t("noteList.noContent")}
                     </p>
                     <p className="text-xs text-muted-foreground/70 mt-1">
                       {formatDistanceToNow(new Date(note.updated_at), {

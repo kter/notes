@@ -7,6 +7,7 @@ import type { Folder } from "@/types";
 import { cn } from "@/lib/utils";
 import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/hooks";
 
 interface SidebarProps {
   folders: Folder[];
@@ -27,6 +28,7 @@ export function Sidebar({
   onDeleteFolder,
   onToggleCollapse,
 }: SidebarProps) {
+  const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,12 +61,12 @@ export function Sidebar({
               size="icon"
               className="h-7 w-7 -ml-2 text-muted-foreground hover:text-foreground"
               onClick={onToggleCollapse}
-              title="Collapse sidebar"
+              title={t("sidebar.collapseSidebar")}
             >
               <PanelLeftCloseIcon className="h-4 w-4" />
             </Button>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Folders
+              {t("sidebar.folders")}
             </h2>
           </div>
           <Button
@@ -72,7 +74,7 @@ export function Sidebar({
             size="icon"
             className="h-7 w-7"
             onClick={() => setIsCreating(true)}
-            aria-label="Add folder"
+            aria-label={t("sidebar.addFolder")}
           >
             <FolderPlusIcon className="h-4 w-4" />
           </Button>
@@ -93,7 +95,7 @@ export function Sidebar({
             onClick={() => onSelectFolder(null)}
           >
             <FolderIcon className="h-4 w-4" />
-            <span>All Notes</span>
+            <span>{t("sidebar.allNotes")}</span>
           </button>
 
           {/* New folder input */}
@@ -101,7 +103,7 @@ export function Sidebar({
             <div className="px-2 py-1">
               <Input
                 autoFocus
-                placeholder="Folder name"
+                placeholder={t("sidebar.folderName")}
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => {

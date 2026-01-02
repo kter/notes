@@ -109,7 +109,7 @@ export function AIChatPanel({
 
   return (
     <div className={cn(
-      "border-l border-border/50 flex flex-col transition-all duration-300 ease-in-out h-full",
+      "border-l border-border/50 flex flex-col transition-all duration-300 ease-in-out h-full overflow-hidden",
       // Desktop: fixed width sidebar, subtle background
       "md:w-80 md:bg-card/50",
       // Mobile: full screen overlay, solid background
@@ -207,7 +207,7 @@ export function AIChatPanel({
       )}
 
       {/* Chat messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-12 px-4">

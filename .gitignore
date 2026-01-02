@@ -58,3 +58,4 @@ frontend/playwright-report/
 frontend/playwright/.auth/
 
 terraform/cost_report.zip
+*.zip

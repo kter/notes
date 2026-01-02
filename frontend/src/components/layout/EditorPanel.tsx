@@ -478,7 +478,11 @@ export function EditorPanel({
           variant="ghost"
           size="icon"
           className="text-destructive hover:text-destructive"
-          onClick={() => onDeleteNote(note.id)}
+          onClick={() => {
+            if (confirm(t("noteList.deleteConfirm"))) {
+              onDeleteNote(note.id);
+            }
+          }}
         >
           <TrashIcon className="h-4 w-4" />
         </Button>

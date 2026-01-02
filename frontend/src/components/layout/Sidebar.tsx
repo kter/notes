@@ -174,7 +174,9 @@ export function Sidebar({
                       className="h-6 w-6 text-destructive hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDeleteFolder(folder.id);
+                        if (confirm(t("sidebar.deleteConfirm"))) {
+                          onDeleteFolder(folder.id);
+                        }
                       }}
                     >
                       <TrashIcon className="h-3 w-3" />

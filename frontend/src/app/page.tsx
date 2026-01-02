@@ -65,12 +65,10 @@ export default function Home() {
 
   const {
     chatMessages,
-    summary,
     isAILoading,
     handleSummarize,
     handleSendMessage,
     clearChat,
-    clearSummary,
   } = useAIChat();
 
   // Selected note
@@ -233,8 +231,6 @@ export default function Home() {
               onSendMessage={handleSendMessage}
               onClearChat={clearChat}
               isLoading={isAILoading}
-              summary={summary}
-              onClearSummary={clearSummary}
               selectedNote={selectedNote}
               selectedFolder={folders.find(f => f.id === selectedFolderId) || null}
             />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useApi } from "./useApi";
 import type { ChatMessage } from "@/types";
 
@@ -8,7 +8,6 @@ export type ChatScope = "note" | "folder" | "all";
 
 interface UseAIChatReturn {
   chatMessages: ChatMessage[];
-  summary: string | null;
   isAILoading: boolean;
   handleSummarize: (noteId: string) => Promise<void>;
   handleSendMessage: (
@@ -18,13 +17,11 @@ interface UseAIChatReturn {
     folderId?: string | null
   ) => Promise<void>;
   clearChat: () => void;
-  clearSummary: () => void;
 }
 
 export function useAIChat(): UseAIChatReturn {
   const { getApi } = useApi();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [summary, setSummary] = useState<string | null>(null);
   const [isAILoading, setIsAILoading] = useState(false);
 
   // We no longer clear chat automatically when note changes to allow persistent chat.
@@ -32,11 +29,15 @@ export function useAIChat(): UseAIChatReturn {
 
   const handleSummarize = async (noteId: string) => {
     setIsAILoading(true);
-    setSummary(null);
     try {
       const apiClient = await getApi();
       const result = await apiClient.summarizeNote({ note_id: noteId });
-      setSummary(result.summary);
+      // Add summary as a chat message
+      const summaryMessage: ChatMessage = {
+        role: "assistant",
+        content: result.summary,
+      };
+      setChatMessages((prev) => [...prev, summaryMessage]);
     } catch (error) {
       console.error("Failed to summarize:", error);
     } finally {
@@ -79,17 +80,11 @@ export function useAIChat(): UseAIChatReturn {
     setChatMessages([]);
   };
 
-  const clearSummary = () => {
-    setSummary(null);
-  };
-
   return {
     chatMessages,
-    summary,
     isAILoading,
     handleSummarize,
     handleSendMessage,
     clearChat,
-    clearSummary,
   };
 }

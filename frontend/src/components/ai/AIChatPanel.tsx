@@ -38,8 +38,6 @@ interface AIChatPanelProps {
   ) => void;
   onClearChat: () => void;
   isLoading: boolean;
-  summary: string | null;
-  onClearSummary: () => void;
   selectedNote: Note | null;
   selectedFolder: Folder | null;
 }
@@ -51,8 +49,6 @@ export function AIChatPanel({
   onSendMessage,
   onClearChat,
   isLoading,
-  summary,
-  onClearSummary,
   selectedNote,
   selectedFolder,
 }: AIChatPanelProps) {
@@ -186,27 +182,6 @@ export function AIChatPanel({
           </div>
         </div>
       </div>
-
-      {/* Summary section */}
-      {summary && (
-        <div className="p-4 border-b border-border/50 bg-primary/5 relative group">
-          <div className="flex items-center gap-2 mb-2">
-            <SparklesIcon className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">{t("ai.summary")}</span>
-          </div>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-            {summary}
-          </p>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={onClearSummary}
-          >
-            <XIcon className="h-3 w-3" />
-          </Button>
-        </div>
-      )}
 
       {/* Chat messages */}
       <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>

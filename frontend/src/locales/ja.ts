@@ -38,6 +38,10 @@ export const ja = {
     settings: "設定",
     logout: "ログアウト",
     deleteConfirm: "このフォルダを削除しますか？",
+    collapseSidebar: "サイドバーを折りたたむ",
+    expandSidebar: "サイドバーを展開",
+    folderName: "フォルダ名",
+    addFolder: "フォルダを追加",
   },
 
   // Note list
@@ -48,6 +52,13 @@ export const ja = {
     searchPlaceholder: "ノートを検索...",
     untitled: "無題",
     deleteConfirm: "このノートを削除しますか？",
+    noContent: "内容なし",
+    createOne: "作成する",
+    renameFolder: "フォルダ名を変更",
+    deleteFolder: "フォルダを削除",
+    noteCount: "{{count}}件のノート",
+    noteCountSingular: "{{count}}件のノート",
+    addNote: "ノートを追加",
   },
 
   // Editor
@@ -60,6 +71,22 @@ export const ja = {
     lastSaved: "最終保存",
     unsaved: "未保存",
     characters: "文字数",
+    noNoteSelected: "ノートが選択されていません",
+    selectNoteHint: "リストからノートを選択するか、新規作成してください",
+    summarize: "要約",
+    summarizing: "要約中...",
+    chat: "チャット",
+    export: "エクスポート",
+    preview: "プレビュー",
+    markdown: "Markdown (.md)",
+    plainText: "プレーンテキスト (.txt)",
+    previewPlaceholder: "プレビューを見るには書き始めてください...",
+    noteTitlePlaceholder: "ノートのタイトル",
+    noteContentPlaceholder: "Markdownでノートを書き始めましょう...",
+    generateTitleFromContent: "内容からタイトルを生成",
+    summarizeNote: "ノートを要約",
+    toggleChat: "チャットを切り替え",
+    exportNote: "ノートをエクスポート",
   },
 
   // AI Panel
@@ -73,6 +100,22 @@ export const ja = {
     clearChat: "クリア",
     summary: "要約",
     emptyNote: "ノートの内容がありません",
+    chatContext: "チャットコンテキスト",
+    currentNote: "現在のノート",
+    currentFolder: "現在のフォルダ",
+    allNotes: "すべてのノート",
+    noNoteSelected: "ノートが選択されていません",
+    noFolderSelected: "フォルダが選択されていません",
+    allNotesAndFolders: "すべてのノートとフォルダ",
+    untitled: "無題",
+    howCanIHelp: "何かお手伝いできますか？",
+    askAboutNote: "ノートについて質問してください。",
+    askAboutFolder: "フォルダについて質問してください。",
+    askAboutNotes: "ノートについて質問してください。",
+    askAboutCurrentNote: "現在のノートについて質問...",
+    askAboutThisFolder: "このフォルダについて質問...",
+    askAboutAllNotes: "すべてのノートについて質問...",
+    openAIChat: "AIチャットを開く",
   },
 
   // Auth
@@ -88,6 +131,18 @@ export const ja = {
     auto: "自動（ブラウザ設定）",
     ja: "日本語",
     en: "English",
+  },
+
+  // Navigation (mobile)
+  nav: {
+    folders: "フォルダ",
+    notes: "ノート",
+    editor: "エディタ",
+    chat: "チャット",
+    viewFolders: "フォルダを表示",
+    viewNotes: "ノートを表示",
+    viewEditor: "エディタを表示",
+    viewChat: "チャットを表示",
   },
 } as const;
 
@@ -126,6 +181,10 @@ export type TranslationKeys = {
     settings: string;
     logout: string;
     deleteConfirm: string;
+    collapseSidebar: string;
+    expandSidebar: string;
+    folderName: string;
+    addFolder: string;
   };
   noteList: {
     notes: string;
@@ -134,6 +193,13 @@ export type TranslationKeys = {
     searchPlaceholder: string;
     untitled: string;
     deleteConfirm: string;
+    noContent: string;
+    createOne: string;
+    renameFolder: string;
+    deleteFolder: string;
+    noteCount: string;
+    noteCountSingular: string;
+    addNote: string;
   };
   editor: {
     title: string;
@@ -144,6 +210,22 @@ export type TranslationKeys = {
     lastSaved: string;
     unsaved: string;
     characters: string;
+    noNoteSelected: string;
+    selectNoteHint: string;
+    summarize: string;
+    summarizing: string;
+    chat: string;
+    export: string;
+    preview: string;
+    markdown: string;
+    plainText: string;
+    previewPlaceholder: string;
+    noteTitlePlaceholder: string;
+    noteContentPlaceholder: string;
+    generateTitleFromContent: string;
+    summarizeNote: string;
+    toggleChat: string;
+    exportNote: string;
   };
   ai: {
     title: string;
@@ -155,6 +237,22 @@ export type TranslationKeys = {
     clearChat: string;
     summary: string;
     emptyNote: string;
+    chatContext: string;
+    currentNote: string;
+    currentFolder: string;
+    allNotes: string;
+    noNoteSelected: string;
+    noFolderSelected: string;
+    allNotesAndFolders: string;
+    untitled: string;
+    howCanIHelp: string;
+    askAboutNote: string;
+    askAboutFolder: string;
+    askAboutNotes: string;
+    askAboutCurrentNote: string;
+    askAboutThisFolder: string;
+    askAboutAllNotes: string;
+    openAIChat: string;
   };
   auth: {
     login: string;
@@ -166,6 +264,16 @@ export type TranslationKeys = {
     auto: string;
     ja: string;
     en: string;
+  };
+  nav: {
+    folders: string;
+    notes: string;
+    editor: string;
+    chat: string;
+    viewFolders: string;
+    viewNotes: string;
+    viewEditor: string;
+    viewChat: string;
   };
 };
 

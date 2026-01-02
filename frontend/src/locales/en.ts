@@ -40,6 +40,10 @@ export const en: TranslationKeys = {
     settings: "Settings",
     logout: "Logout",
     deleteConfirm: "Delete this folder?",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
+    folderName: "Folder name",
+    addFolder: "Add folder",
   },
 
   // Note list
@@ -50,6 +54,13 @@ export const en: TranslationKeys = {
     searchPlaceholder: "Search notes...",
     untitled: "Untitled",
     deleteConfirm: "Delete this note?",
+    noContent: "No content",
+    createOne: "Create one",
+    renameFolder: "Rename folder",
+    deleteFolder: "Delete folder",
+    noteCount: "{{count}} notes",
+    noteCountSingular: "{{count}} note",
+    addNote: "Add note",
   },
 
   // Editor
@@ -62,6 +73,22 @@ export const en: TranslationKeys = {
     lastSaved: "Last saved",
     unsaved: "Unsaved",
     characters: "Characters",
+    noNoteSelected: "No note selected",
+    selectNoteHint: "Select a note from the list or create a new one",
+    summarize: "Summarize",
+    summarizing: "Summarizing...",
+    chat: "Chat",
+    export: "Export",
+    preview: "Preview",
+    markdown: "Markdown (.md)",
+    plainText: "Plain Text (.txt)",
+    previewPlaceholder: "Start writing to see the preview...",
+    noteTitlePlaceholder: "Note title",
+    noteContentPlaceholder: "Start writing your note in Markdown...",
+    generateTitleFromContent: "Generate title from content",
+    summarizeNote: "Summarize note",
+    toggleChat: "Toggle chat",
+    exportNote: "Export note",
   },
 
   // AI Panel
@@ -75,6 +102,22 @@ export const en: TranslationKeys = {
     clearChat: "Clear",
     summary: "Summary",
     emptyNote: "Note content is empty",
+    chatContext: "Chat Context",
+    currentNote: "Current Note",
+    currentFolder: "Current Folder",
+    allNotes: "All Notes",
+    noNoteSelected: "No note selected",
+    noFolderSelected: "No folder selected",
+    allNotesAndFolders: "All notes and folders",
+    untitled: "Untitled",
+    howCanIHelp: "How can I help you?",
+    askAboutNote: "Ask questions about your note.",
+    askAboutFolder: "Ask questions about your folder.",
+    askAboutNotes: "Ask questions about your notes.",
+    askAboutCurrentNote: "Ask about current note...",
+    askAboutThisFolder: "Ask about this folder...",
+    askAboutAllNotes: "Ask about all your notes...",
+    openAIChat: "Open AI Chat",
   },
 
   // Auth
@@ -90,5 +133,17 @@ export const en: TranslationKeys = {
     auto: "Auto (Browser settings)",
     ja: "日本語",
     en: "English",
+  },
+
+  // Navigation (mobile)
+  nav: {
+    folders: "Folders",
+    notes: "Notes",
+    editor: "Editor",
+    chat: "Chat",
+    viewFolders: "View Folders",
+    viewNotes: "View Notes",
+    viewEditor: "View Editor",
+    viewChat: "View Chat",
   },
 } as const;

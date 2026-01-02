@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChevronRightIcon, FolderIcon, FileTextIcon, PenSquareIcon, MessageSquareIcon } from "lucide-react";
+import { useTranslation } from "@/hooks";
 
 export type MobileView = "folders" | "notes" | "editor" | "chat";
 
@@ -26,6 +27,8 @@ export function ThreeColumnLayout({
   mobileView,
   onMobileViewChange,
 }: ThreeColumnLayoutProps) {
+  const { t } = useTranslation();
+  
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">
       {/* Left sidebar - Folders */}
@@ -54,7 +57,7 @@ export function ThreeColumnLayout({
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={onToggleSidebar}
-              title="Expand sidebar"
+              title={t("sidebar.expandSidebar")}
             >
               <ChevronRightIcon className="h-4 w-4" />
             </Button>
@@ -95,10 +98,10 @@ export function ThreeColumnLayout({
               mobileView === "folders" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("folders")}
-            aria-label="View Folders"
+            aria-label={t("nav.viewFolders")}
           >
             <FolderIcon className="h-5 w-5" />
-            <span className="text-xs">Folders</span>
+            <span className="text-xs">{t("nav.folders")}</span>
           </Button>
           <Button
             variant="ghost"
@@ -108,10 +111,10 @@ export function ThreeColumnLayout({
               mobileView === "notes" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("notes")}
-            aria-label="View Notes"
+            aria-label={t("nav.viewNotes")}
           >
             <FileTextIcon className="h-5 w-5" />
-            <span className="text-xs">Notes</span>
+            <span className="text-xs">{t("nav.notes")}</span>
           </Button>
           <Button
             variant="ghost"
@@ -121,10 +124,10 @@ export function ThreeColumnLayout({
               mobileView === "editor" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("editor")}
-            aria-label="View Editor"
+            aria-label={t("nav.viewEditor")}
           >
             <PenSquareIcon className="h-5 w-5" />
-            <span className="text-xs">Editor</span>
+            <span className="text-xs">{t("nav.editor")}</span>
           </Button>
           <Button
             variant="ghost"
@@ -134,10 +137,10 @@ export function ThreeColumnLayout({
               mobileView === "chat" && "text-primary bg-primary/10"
             )}
             onClick={() => onMobileViewChange("chat")}
-            aria-label="View Chat"
+            aria-label={t("nav.viewChat")}
           >
             <MessageSquareIcon className="h-5 w-5" />
-            <span className="text-xs">Chat</span>
+            <span className="text-xs">{t("nav.chat")}</span>
           </Button>
         </div>
       </nav>

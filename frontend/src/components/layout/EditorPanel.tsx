@@ -350,8 +350,8 @@ export function EditorPanel({
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <div className="text-center">
-          <p className="text-lg">No note selected</p>
-          <p className="text-sm mt-1">Select a note from the list or create a new one</p>
+          <p className="text-lg">{t("editor.noNoteSelected")}</p>
+          <p className="text-sm mt-1">{t("editor.selectNoteHint")}</p>
         </div>
       </div>
     );
@@ -372,7 +372,7 @@ export function EditorPanel({
             >
               <FolderIcon className="h-4 w-4" />
               <span className="max-w-[80px] md:max-w-[120px] truncate hidden sm:inline">
-                {currentFolder?.name || "All Notes"}
+                {currentFolder?.name || t("sidebar.allNotes")}
               </span>
               <ChevronDownIcon className="h-3 w-3" />
             </Button>
@@ -385,7 +385,7 @@ export function EditorPanel({
                     }`}
                     onClick={() => handleFolderChange(null)}
                   >
-                    All Notes
+                    {t("sidebar.allNotes")}
                   </button>
                   {folders.map((folder) => (
                     <button
@@ -408,24 +408,24 @@ export function EditorPanel({
             onClick={() => onSummarize(note.id)}
             disabled={isSummarizing}
             className="gap-1 md:gap-2"
-            aria-label="Summarize note"
+            aria-label={t("editor.summarizeNote")}
           >
             {isSummarizing ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
             ) : (
               <SparklesIcon className="h-4 w-4" />
             )}
-            <span className="hidden md:inline">{isSummarizing ? "処理中..." : "Summarize"}</span>
+            <span className="hidden md:inline">{isSummarizing ? t("editor.summarizing") : t("editor.summarize")}</span>
           </Button>
             <Button
               variant={isChatOpen ? "secondary" : "ghost"}
               size="sm"
               onClick={onOpenChat}
               className="gap-1 md:gap-2"
-              aria-label="Toggle chat"
+              aria-label={t("editor.toggleChat")}
             >
               <MessageSquareIcon className="h-4 w-4" />
-              <span className="hidden md:inline">Chat</span>
+              <span className="hidden md:inline">{t("editor.chat")}</span>
             </Button>
             {/* Export Button */}
             <div className="relative" ref={exportDropdownRef}>
@@ -434,10 +434,10 @@ export function EditorPanel({
                 size="sm"
                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                 className="gap-1 md:gap-2"
-                aria-label="Export note"
+                aria-label={t("editor.exportNote")}
               >
                 <DownloadIcon className="h-4 w-4" />
-                <span className="hidden md:inline">Export</span>
+                <span className="hidden md:inline">{t("editor.export")}</span>
                 <ChevronDownIcon className="h-3 w-3" />
               </Button>
             {isExportDropdownOpen && (
@@ -447,13 +447,13 @@ export function EditorPanel({
                     className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                     onClick={handleExportMarkdown}
                   >
-                    Markdown (.md)
+                    {t("editor.markdown")}
                   </button>
                   <button
                     className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                     onClick={handleExportText}
                   >
-                    Plain Text (.txt)
+                    {t("editor.plainText")}
                   </button>
                 </div>
               </div>
@@ -471,7 +471,7 @@ export function EditorPanel({
             ) : (
               <EyeIcon className="h-4 w-4" />
             )}
-            <span className="hidden md:inline">Preview</span>
+            <span className="hidden md:inline">{t("editor.preview")}</span>
           </Button>
         </div>
         <Button
@@ -492,7 +492,7 @@ export function EditorPanel({
             id="note-title"
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Note title"
+            placeholder={t("editor.noteTitlePlaceholder")}
             className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
           />
           <Button
@@ -501,7 +501,7 @@ export function EditorPanel({
             className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
             onClick={handleGenerateTitle}
             disabled={!content.trim() || isGeneratingTitle}
-            title="Generate title from content"
+            title={t("editor.generateTitleFromContent")}
           >
             {isGeneratingTitle ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -523,7 +523,7 @@ export function EditorPanel({
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Start writing your note in Markdown..."
+              placeholder={t("editor.noteContentPlaceholder")}
               className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
             />
           </div>
@@ -535,7 +535,7 @@ export function EditorPanel({
               <div className="flex-1 min-w-0 overflow-auto">
                 <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {content || "*Start writing to see the preview...*"}
+                    {content || `*${t("editor.previewPlaceholder")}*`}
                   </ReactMarkdown>
                 </div>
               </div>

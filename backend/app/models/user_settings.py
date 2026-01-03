@@ -2,27 +2,20 @@ from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
-# Default model ID (Claude Sonnet 4.5 via cross-region inference profile)
-DEFAULT_LLM_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+# Default model ID (Claude 3.5 Haiku via cross-region inference profile)
+DEFAULT_LLM_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
 # Available models for user selection
 # Models with "us." prefix use cross-region inference profiles for US region
 # Models without prefix use on-demand (only available for older models)
+#
+# Note: Currently limited to Haiku models for cost efficiency.
+# Sonnet models may be added in future with premium subscription.
 AVAILABLE_MODELS = [
     {
-        "id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "name": "Claude Sonnet 4.5",
-        "description": "最新・最高性能",
-    },
-    {
-        "id": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-        "name": "Claude Sonnet 4",
-        "description": "高性能",
-    },
-    {
-        "id": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-        "name": "Claude 3.5 Sonnet v2",
-        "description": "高性能・安定",
+        "id": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "name": "Claude Haiku 4.5",
+        "description": "最新・高性能・低コスト",
     },
     {
         "id": "us.anthropic.claude-3-5-haiku-20241022-v1:0",

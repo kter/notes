@@ -295,6 +295,12 @@ export function EditorPanel({
       
       // Use document.execCommand to preserve undo history
       document.execCommand("insertText", false, "\n" + continuation);
+      
+      // Scroll to keep cursor visible
+      requestAnimationFrame(() => {
+        textarea.blur();
+        textarea.focus();
+      });
     }
   }, [note, onUpdateNote, getListMarkerInfo]);
 

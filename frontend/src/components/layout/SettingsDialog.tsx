@@ -225,6 +225,30 @@ export function SettingsDialog({
               </Button>
             </div>
 
+            {/* Ko-fi Support Button */}
+            <div className="border-t pt-6 space-y-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium leading-none">
+                  {t("settings.supportTitle")}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.supportDescription")}
+                </p>
+              </div>
+              <a
+                href="https://ko-fi.com/J3J41LWG90"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  height="36"
+                  style={{ border: 0, height: "36px" }}
+                  src="https://storage.ko-fi.com/cdn/kofi3.png?v=6"
+                  alt="Buy Me a Coffee at ko-fi.com"
+                />
+              </a>
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"

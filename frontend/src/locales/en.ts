@@ -30,6 +30,8 @@ export const en: TranslationKeys = {
     exportTitle: "Data Export",
     exportDescription: "Export all notes as a ZIP file.",
     exportButton: "Download ZIP",
+    supportTitle: "Support the Developer",
+    supportDescription: "If you like this app, consider supporting on Ko-fi.",
   },
 
   // Sidebar

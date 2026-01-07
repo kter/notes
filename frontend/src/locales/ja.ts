@@ -28,6 +28,8 @@ export const ja = {
     exportTitle: "データエクスポート",
     exportDescription: "すべてのノートをZIP形式でエクスポートします。",
     exportButton: "ZIPをダウンロード",
+    supportTitle: "開発者をサポート",
+    supportDescription: "このアプリが気に入ったら、Ko-fiでサポートをご検討ください。",
   },
 
   // Sidebar
@@ -173,6 +175,8 @@ export type TranslationKeys = {
     exportTitle: string;
     exportDescription: string;
     exportButton: string;
+    supportTitle: string;
+    supportDescription: string;
   };
   sidebar: {
     folders: string;

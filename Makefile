@@ -184,6 +184,18 @@ lint-backend: ## Run backend linter (ruff)
 lint-frontend: ## Run frontend linter (eslint)
 	cd frontend && npm run lint
 
+.PHONY: test-e2e
+test-e2e: ## Run E2E tests against dev or prd (E2E_TARGET=dev|prd)
+	cd frontend && E2E_TARGET=$(ENV) npx playwright test
+
+.PHONY: test-e2e-dev
+test-e2e-dev: ## Run E2E tests against dev environment
+	cd frontend && E2E_TARGET=dev npx playwright test
+
+.PHONY: test-e2e-prd
+test-e2e-prd: ## Run E2E tests against prd environment
+	cd frontend && E2E_TARGET=prd npx playwright test
+
 .PHONY: install-hooks
 install-hooks: ## Install git pre-commit hooks
 	chmod +x scripts/pre-commit

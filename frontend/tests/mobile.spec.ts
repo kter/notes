@@ -11,10 +11,10 @@ test.describe('Mobile Comprehensive Scenario', () => {
     // 1. Folders View - Create a folder
     console.log('[Mobile Test] Creating folder');
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 25000 });
-    await page.getByRole('button', { name: 'Add folder' }).click();
+    await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
     
     const folderName = `Mobile Project ${Date.now()}`;
-    await page.getByPlaceholder(/Folder name|フォルダ/i).fill(folderName);
+    await page.getByPlaceholder(/Folder name|フォルダ名/i).fill(folderName);
     await page.keyboard.press('Enter');
 
     // 2. Select Folder
@@ -25,17 +25,18 @@ test.describe('Mobile Comprehensive Scenario', () => {
 
     // 3. Create Note -> Auto transition to Editor View (fixed in code)
     console.log('[Mobile Test] Creating note');
-    await page.getByRole('button', { name: 'Add note' }).click();
+    await page.getByRole('button', { name: /Add note|ノートを追加/i }).click();
     
     const noteTitle = 'Mobile Note';
     const noteContent = 'Content created on a mobile device.';
     
-    // Wait for editor view elements
-    const titleInput = page.getByLabel(/Note title|タイトル/i);
+    // Wait for editor view elements using placeholder patterns
+    // Use locator that filters for visible elements
+    const titleInput = page.getByPlaceholder(/Note title|ノートのタイトル/i).locator('visible=true').first();
     await expect(titleInput).toBeVisible({ timeout: 20000 });
     
     await titleInput.fill(noteTitle);
-    await page.getByLabel(/Note content|ノートを入力/i).fill(noteContent);
+    await page.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).locator('visible=true').first().fill(noteContent);
     
     // Wait for auto-save
     await page.waitForTimeout(1000);
@@ -44,7 +45,7 @@ test.describe('Mobile Comprehensive Scenario', () => {
 
     // 4. Summarize -> Auto transition to Chat/Summary view
     console.log('[Mobile Test] Summarizing');
-    await page.getByRole('button', { name: 'Summarize note' }).click();
+    await page.getByRole('button', { name: /Summarize note|ノートを要約/i }).click();
     
     // Verify Summary is visible
     await expect(page.getByText(/Summary|要約/i).first()).toBeVisible({ timeout: 60000 });
@@ -52,13 +53,13 @@ test.describe('Mobile Comprehensive Scenario', () => {
     // 5. Navigation tests using bottom nav
     console.log('[Mobile Test] Testing bottom navigation');
     
-    await page.getByRole('button', { name: 'View Folders' }).click();
+    await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 20000 });
 
-    await page.getByRole('button', { name: 'View Notes' }).click();
+    await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
     await expect(page.getByRole('heading', { level: 2, name: new RegExp(folderName, 'i') })).toBeVisible({ timeout: 20000 });
 
-    await page.getByRole('button', { name: 'View Editor' }).click();
-    await expect(page.getByLabel(/Note title|タイトル/i)).toHaveValue(noteTitle, { timeout: 20000 });
+    await page.getByRole('button', { name: /View Editor|エディタを表示/i }).click();
+    await expect(page.getByPlaceholder(/Note title|ノートのタイトル/i).locator('visible=true').first()).toHaveValue(noteTitle, { timeout: 20000 });
   });
 });

@@ -38,17 +38,17 @@ test.describe('Mobile Comprehensive Scenario', () => {
     await titleInput.fill(noteTitle);
     await page.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).locator('visible=true').first().fill(noteContent);
     
-    // Wait for auto-save
-    await page.waitForTimeout(1000);
-    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i });
-    await expect(savedIndicator.first()).toBeVisible({ timeout: 35000 });
+    // Wait for auto-save - use visible filter
+    await page.waitForTimeout(1500);
+    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).locator('visible=true').first();
+    await expect(savedIndicator).toBeVisible({ timeout: 35000 });
 
     // 4. Summarize -> Auto transition to Chat/Summary view
     console.log('[Mobile Test] Summarizing');
     await page.getByRole('button', { name: /Summarize note|ノートを要約/i }).click();
     
-    // Verify Summary is visible
-    await expect(page.getByText(/Summary|要約/i).first()).toBeVisible({ timeout: 60000 });
+    // Verify Summary is visible - use visible filter for mobile
+    await expect(page.getByText(/Summary|要約/i).locator('visible=true').first()).toBeVisible({ timeout: 60000 });
     
     // 5. Navigation tests using bottom nav
     console.log('[Mobile Test] Testing bottom navigation');

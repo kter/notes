@@ -42,18 +42,17 @@ test.describe('Notes Functionality', () => {
     // 3. Wait for auto-save (multi-lingual support)
     // Debounce is 500ms. We use a more robust locator for the status text.
     console.log('[E2E] Waiting for auto-save');
-    await page.waitForTimeout(1000); 
+    await page.waitForTimeout(1500); 
     // ja: "保存しました", en: "Saved"
-    // Using a more general text locator that matches exactly or partially
-    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i });
-    await expect(savedIndicator.first()).toBeVisible({ timeout: 30000 });
+    // Using visible filter to avoid selecting hidden desktop/mobile elements
+    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).locator('visible=true').first();
+    await expect(savedIndicator).toBeVisible({ timeout: 30000 });
 
     // 4. Summarize
     console.log('[E2E] Requesting summary');
     await page.getByRole('button', { name: /Summarize note|ノートを要約/i }).click();
-
-    // Wait for AI summary
-    await expect(page.getByText(/Summary|要約/i).first()).toBeVisible({ timeout: 45000 });
+    // Wait for AI summary - use visible filter for mobile compatibility
+    await expect(page.getByText(/Summary|要約/i).locator('visible=true').first()).toBeVisible({ timeout: 45000 });
 
     // 5. Chat
     console.log('[E2E] Sending chat message');
@@ -61,8 +60,8 @@ test.describe('Notes Functionality', () => {
     await chatInput.fill('What is this note about?');
     await page.keyboard.press('Enter');
 
-    // Verify chat response
-    await expect(page.locator('.bg-muted').last()).toContainText(/Playwright|note/i, { timeout: 30000 });
+    // Verify chat response - use visible filter
+    await expect(page.locator('.bg-muted').locator('visible=true').last()).toContainText(/Playwright|note/i, { timeout: 30000 });
   });
 
   test('should be able to search and filter notes', async ({ page }) => {

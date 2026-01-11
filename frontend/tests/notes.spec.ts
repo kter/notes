@@ -3,14 +3,14 @@ import { test, expect } from '@playwright/test';
 test.describe('Notes Functionality', () => {
   // Authentication is handled by auth.setup.ts for all tests in projects that depend on it.
 
-  test('should perform a full cycle: folder -> note -> summary -> chat', async ({ page }) => {
+  test('should perform a full cycle: folder -> note -> summary -> chat', async ({ page, isMobile }) => {
     await page.goto('/');
 
     // 1. Create a Folder
     console.log('[E2E] Creating folder');
-    await page.getByRole('button', { name: 'Add folder' }).click();
+    await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
     const folderName = `Test Folder ${Date.now()}`;
-    await page.getByPlaceholder('Folder name').fill(folderName);
+    await page.getByPlaceholder(/Folder name|フォルダ名/i).fill(folderName);
     await page.keyboard.press('Enter');
 
     // Select the newly created folder
@@ -24,13 +24,20 @@ test.describe('Notes Functionality', () => {
 
     // 2. Create a Note
     console.log('[E2E] Creating note');
-    await page.getByRole('button', { name: 'Add note' }).click();
+    await page.getByRole('button', { name: /Add note|ノートを追加/i }).click();
     
     const noteTitle = 'E2E Test Note';
     const noteContent = 'This is a test note created by Playwright.\n\nIt contains some content for summarizing markers:\n- Item 1\n- Item 2';
     
-    await page.getByLabel('Note title').fill(noteTitle);
-    await page.getByLabel('Note content').fill(noteContent);
+    // Use placeholder patterns matching both EN and JA
+    // On mobile, need to wait for editor view; on desktop elements may be duplicated
+    // Use locator that filters for visible elements
+    const titleInput = page.getByPlaceholder(/Note title|ノートのタイトル/i).locator('visible=true').first();
+    await expect(titleInput).toBeVisible({ timeout: 20000 });
+    await titleInput.fill(noteTitle);
+    
+    const contentInput = page.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).locator('visible=true').first();
+    await contentInput.fill(noteContent);
 
     // 3. Wait for auto-save (multi-lingual support)
     // Debounce is 500ms. We use a more robust locator for the status text.
@@ -43,14 +50,15 @@ test.describe('Notes Functionality', () => {
 
     // 4. Summarize
     console.log('[E2E] Requesting summary');
-    await page.getByRole('button', { name: 'Summarize note' }).click();
+    await page.getByRole('button', { name: /Summarize note|ノートを要約/i }).click();
 
     // Wait for AI summary
     await expect(page.getByText(/Summary|要約/i).first()).toBeVisible({ timeout: 45000 });
 
     // 5. Chat
     console.log('[E2E] Sending chat message');
-    await page.getByPlaceholder(/Ask about current note|質問を入力/i).fill('What is this note about?');
+    const chatInput = page.getByPlaceholder(/Ask about current note|現在のノートについて質問/i).locator('visible=true').first();
+    await chatInput.fill('What is this note about?');
     await page.keyboard.press('Enter');
 
     // Verify chat response
@@ -73,11 +81,11 @@ test.describe('Notes Functionality', () => {
     await page.goto('/');
     
     // Switch to Notes view
-    await page.getByRole('button', { name: 'View Notes' }).click();
+    await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
     await expect(page.getByRole('heading', { name: /All Notes|ノート/i })).toBeVisible({ timeout: 20000 });
     
     // Switch back to Folders view
-    await page.getByRole('button', { name: 'View Folders' }).click();
+    await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 20000 });
   });
 });

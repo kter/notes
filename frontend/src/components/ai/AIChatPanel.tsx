@@ -40,6 +40,9 @@ interface AIChatPanelProps {
   isLoading: boolean;
   selectedNote: Note | null;
   selectedFolder: Folder | null;
+  width?: number;
+  isResizing?: boolean;
+  onResizeStart?: (e: React.MouseEvent) => void;
 }
 
 export function AIChatPanel({
@@ -51,6 +54,9 @@ export function AIChatPanel({
   isLoading,
   selectedNote,
   selectedFolder,
+  width,
+  isResizing,
+  onResizeStart,
 }: AIChatPanelProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
@@ -106,13 +112,26 @@ export function AIChatPanel({
   }
 
   return (
-    <div className={cn(
-      "border-l border-border/50 flex flex-col transition-all duration-300 ease-in-out h-full overflow-hidden",
-      // Desktop: fixed width sidebar, subtle background
-      "md:w-80 md:bg-card/50",
-      // Mobile: full screen overlay, solid background
-      "fixed md:relative inset-0 md:inset-auto w-full md:w-80 z-40 md:z-auto bg-background md:bg-transparent pb-14 md:pb-0"
-    )}>
+    <div className="flex h-full">
+      {/* Resize Handle - only on desktop */}
+      {onResizeStart && (
+        <div
+          className="hidden md:block w-1 bg-border/30 hover:bg-primary/50 active:bg-primary/70 transition-colors cursor-col-resize flex-shrink-0"
+          onMouseDown={onResizeStart}
+        />
+      )}
+      <div
+        className={cn(
+          "border-l border-border/50 flex flex-col h-full overflow-hidden",
+          // Only apply transition when not resizing
+          !isResizing && "transition-all duration-300 ease-in-out",
+          // Desktop: resizable width, subtle background
+          "md:bg-card/50",
+          // Mobile: full screen overlay, solid background
+          "fixed md:relative inset-0 md:inset-auto w-full z-40 md:z-auto bg-background md:bg-transparent pb-14 md:pb-0"
+        )}
+        style={width ? { width: `${width}px` } : { width: '320px' }}
+      >
       {/* Header */}
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between mb-4">
@@ -267,6 +286,7 @@ export function AIChatPanel({
             )}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import {
 import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
 import { useAuth } from "@/lib/auth-context";
-import { useFolders, useNotes, useAIChat, useApi } from "@/hooks";
+import { useFolders, useNotes, useAIChat, useApi, useResizable } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -70,6 +70,15 @@ export default function Home() {
     handleSendMessage,
     clearChat,
   } = useAIChat();
+
+  // Chat panel resize
+  const chatPanelResize = useResizable({
+    storageKey: "notes-chat-width",
+    defaultWidth: 320,
+    minWidth: 280,
+    maxWidth: 600,
+    direction: 'right',
+  });
 
   // Selected note
   const selectedNote = notes.find((n) => n.id === selectedNoteId) || null;
@@ -233,6 +242,9 @@ export default function Home() {
               isLoading={isAILoading}
               selectedNote={selectedNote}
               selectedFolder={folders.find(f => f.id === selectedFolderId) || null}
+              width={chatPanelResize.width}
+              isResizing={chatPanelResize.isResizing}
+              onResizeStart={chatPanelResize.handleMouseDown}
             />
           </div>
         }

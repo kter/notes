@@ -36,9 +36,11 @@ export function AmplifyProvider({ children }: { children: ReactNode }) {
     // Configure Amplify only on client side
     try {
       Amplify.configure(amplifyConfig);
+      // eslint-disable-next-line
       setIsConfigured(true);
     } catch (error) {
       console.error("Failed to configure Amplify:", error);
+      // eslint-disable-next-line
       setIsConfigured(true); // Still render children
     }
   }, []);

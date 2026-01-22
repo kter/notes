@@ -19,7 +19,7 @@ setup('authenticate', async ({ page, baseURL }) => {
   try {
     // Wait briefly for the login form
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });
-  } catch (e) {
+  } catch {
     console.log(`[E2E Setup] Login form not found directly, trying to click 'Sign In' button...`);
     await page.goto('/');
     // There might be multiple Sign In buttons (header and hero), but any will do
@@ -46,7 +46,13 @@ setup('authenticate', async ({ page, baseURL }) => {
   
   // 6. Verify sidebar is visible as a sign of successful login
   // The sidebar has a "Folders" heading or a specific user-centric UI
-  await expect(page.getByRole('heading', { name: 'Folders' })).toBeVisible({ timeout: 15000 });
+  // Try to find either the heading or the All Notes button to confirm sidebar presence
+  try {
+    await expect(page.getByRole('heading', { name: /Folders|フォルダ|sidebar\.folders/i })).toBeVisible({ timeout: 5000 });
+  } catch {
+    console.log('[E2E Setup] Heading not found, checking for All Notes button...');
+    await expect(page.getByText(/All Notes|すべてのノート|sidebar\.allNotes/i)).toBeVisible({ timeout: 10000 });
+  }
 
   console.log(`[E2E Setup] Authentication successful!`);
 

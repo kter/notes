@@ -24,6 +24,7 @@ export default function Home() {
   // UI State
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +43,7 @@ export default function Home() {
   // Handle folder selection with mobile view change
   const handleSelectFolder = (id: string | null) => {
     setSelectedFolderId(id);
+    setSearchQuery(""); // Clear search when changing folders
     setMobileView("notes");
   };
 
@@ -86,10 +88,19 @@ export default function Home() {
   // Selected folder name
   const selectedFolderName = folders.find((f) => f.id === selectedFolderId)?.name;
 
-  // Filtered notes by folder
-  const filteredNotes = selectedFolderId
-    ? notes.filter((n) => n.folder_id === selectedFolderId)
-    : notes;
+  // Filtered notes by folder and search query
+  const filteredNotes = notes.filter((n) => {
+    // Folder filter
+    const matchesFolder = selectedFolderId ? n.folder_id === selectedFolderId : true;
+    
+    // Search filter
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      (n.title?.toLowerCase().includes(query) ?? false) || 
+      (n.content?.toLowerCase().includes(query) ?? false);
+      
+    return matchesFolder && matchesSearch;
+  });
 
   // Load initial data when authenticated
   useEffect(() => {
@@ -213,6 +224,8 @@ export default function Home() {
             folderId={selectedFolderId}
             onRenameFolder={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
         }
         editor={

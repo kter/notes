@@ -5,9 +5,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import type { Note } from "@/types";
 import { cn } from "@/lib/utils";
-import { FilePlusIcon, FileTextIcon, PencilIcon, TrashIcon, CheckIcon, XIcon } from "lucide-react";
+import { 
+  FilePlusIcon, 
+  FileTextIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  CheckIcon, 
+  XIcon,
+  SearchIcon 
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "@/hooks";
 
 interface NoteListProps {
@@ -19,6 +27,8 @@ interface NoteListProps {
   folderId?: string | null;
   onRenameFolder?: (id: string, name: string) => void;
   onDeleteFolder?: (id: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export function NoteList({
@@ -30,6 +40,8 @@ export function NoteList({
   folderId,
   onRenameFolder,
   onDeleteFolder,
+  searchQuery = "",
+  onSearchChange,
 }: NoteListProps) {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
@@ -67,10 +79,30 @@ export function NoteList({
     }
   };
 
+  // Helper function to highlight text
+  const HighlightedText = ({ text, highlight }: { text: string; highlight: string }) => {
+    if (!highlight.trim()) return <>{text}</>;
+
+    const parts = text.split(new RegExp(`(${highlight})`, "gi"));
+    return (
+      <>
+        {parts.map((part, i) => 
+          part.toLowerCase() === highlight.toLowerCase() ? (
+            <span key={i} className="search-highlight">
+              {part}
+            </span>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-border/50">
+      <div className="p-4 border-b border-border/50 space-y-3">
         <div className="flex items-center justify-between gap-2">
           {isEditing ? (
             <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -142,7 +174,27 @@ export function NoteList({
             </>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
+
+        {/* Search Bar */}
+        <div className="relative">
+          <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => onSearchChange?.(e.target.value)}
+            placeholder={t("noteList.searchPlaceholder")}
+            className="h-8 pl-8 text-sm bg-muted/50 border-transparent focus:bg-background focus:border-input transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange?.("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+            >
+              <XIcon className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground">
           {notes.length === 1 
             ? t("noteList.noteCountSingular").replace("{{count}}", "1")
             : t("noteList.noteCount").replace("{{count}}", String(notes.length))}
@@ -154,14 +206,20 @@ export function NoteList({
         <div className="p-2 space-y-1">
           {notes.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground text-sm">
-              {t("noteList.noNotes")}
-              <br />
-              <button
-                className="text-primary hover:underline mt-2"
-                onClick={onCreateNote}
-              >
-                {t("noteList.createOne")}
-              </button>
+              {searchQuery ? (
+                <span>No results found for "{searchQuery}"</span>
+              ) : (
+                <>
+                  {t("noteList.noNotes")}
+                  <br />
+                  <button
+                    className="text-primary hover:underline mt-2"
+                    onClick={onCreateNote}
+                  >
+                    {t("noteList.createOne")}
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             notes?.map((note) => (
@@ -179,10 +237,16 @@ export function NoteList({
                   <FileTextIcon className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-sm truncate">
-                      {note.title || t("noteList.untitled")}
+                      <HighlightedText 
+                        text={note.title || t("noteList.untitled")} 
+                        highlight={searchQuery} 
+                      />
                     </h3>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {note.content.slice(0, 50) || t("noteList.noContent")}
+                      <HighlightedText 
+                        text={note.content.slice(0, 50) || t("noteList.noContent")} 
+                        highlight={searchQuery} 
+                      />
                     </p>
                     <p className="text-xs text-muted-foreground/70 mt-1">
                       {formatDistanceToNow(new Date(note.updated_at), {
@@ -199,3 +263,4 @@ export function NoteList({
     </div>
   );
 }
+

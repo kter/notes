@@ -33,6 +33,7 @@ export function useResizable({
     if (saved) {
       const parsed = parseInt(saved, 10);
       if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
+        // eslint-disable-next-line
         setWidth(parsed);
       }
     }

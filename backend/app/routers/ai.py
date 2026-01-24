@@ -9,7 +9,9 @@ from app.auth import UserId
 from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import DEFAULT_LLM_MODEL_ID, Note, UserSettings
+from app.models.enums import ChatScope
 from app.services import AIService, get_ai_service
+from app.services.context import ContextService
 
 router = APIRouter()
 
@@ -34,6 +36,13 @@ def get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
     return DEFAULT_LLM_MODEL_ID, "auto"
 
 
+def get_context_service(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> ContextService:
+    return ContextService(session, user_id)
+
+
 class SummarizeRequest(BaseModel):
     """Request schema for summarization."""
 
@@ -49,7 +58,7 @@ class SummarizeResponse(BaseModel):
 class ChatRequest(BaseModel):
     """Request schema for chat."""
 
-    scope: str = "note"  # "note", "folder", or "all"
+    scope: ChatScope = ChatScope.NOTE
     note_id: UUID | None = None
     folder_id: UUID | None = None
     question: str
@@ -103,54 +112,15 @@ async def chat_with_context(
     user_id: UserId,
     session: Annotated[Session, Depends(get_session)],
     ai_service: Annotated[AIService, Depends(get_ai_service)],
+    context_service: Annotated[ContextService, Depends(get_context_service)],
 ):
     """Chat with AI about notes' content."""
-    from sqlmodel import select
-
-    content = ""
-    if request.scope == "note":
-        if not request.note_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="note_id is required for note scope",
-            )
-        note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
-        content = note.content
-    elif request.scope == "folder":
-        if not request.folder_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="folder_id is required for folder scope",
-            )
-        # Validate folder ownership
-        from app.models import Folder
-
-        get_owned_resource(session, Folder, request.folder_id, user_id, "Folder")
-
-        # Get all notes in this folder
-        statement = (
-            select(Note)
-            .where(Note.user_id == user_id)
-            .where(Note.folder_id == request.folder_id)
-        )
-        notes = session.exec(statement).all()
-        content = "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
-    elif request.scope == "all":
-        # Get all notes for the user
-        statement = select(Note).where(Note.user_id == user_id)
-        notes = session.exec(statement).all()
-        content = "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid scope: {request.scope}",
-        )
-
-    if not content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Context content is empty",
-        )
+    
+    content = context_service.get_context(
+        scope=request.scope,
+        note_id=request.note_id,
+        folder_id=request.folder_id
+    )
 
     model_id, language = get_user_settings(session, user_id)
     answer = await ai_service.chat(

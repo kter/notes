@@ -12,7 +12,6 @@ import type { ChatMessage, Note, Folder } from "@/types";
 import type { ChatScope } from "@/hooks/useAIChat";
 import { 
   SendIcon, 
-  XIcon, 
   Loader2Icon, 
   SparklesIcon, 
   Trash2Icon,

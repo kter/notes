@@ -4,3 +4,5 @@ export { useAIChat } from "./useAIChat";
 export { useApi } from "./useApi";
 export { useTranslation } from "./useTranslation";
 export { useResizable } from "./useResizable";
+export { useHomeData } from "./useHomeData";
+export { useNoteFilter } from "./useNoteFilter";

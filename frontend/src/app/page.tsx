@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ThreeColumnLayout,
   Sidebar,
@@ -12,14 +12,13 @@ import {
 import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
 import { useAuth } from "@/lib/auth-context";
-import { useFolders, useNotes, useAIChat, useApi, useResizable } from "@/hooks";
+import { useFolders, useNotes, useAIChat, useResizable, useHomeData, useNoteFilter } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
   const { user, isLoading: authLoading, isAuthenticated, signOut } = useAuth();
-  const { getApi } = useApi();
   
   // UI State
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -27,14 +26,13 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("folders");
 
   // Custom hooks
+  const { folders, notes, isLoading: isDataLoading } = useHomeData(isAuthenticated);
+
   const {
-    folders,
-    setFolders,
     handleCreateFolder,
     handleRenameFolder,
     handleDeleteFolder,
@@ -56,8 +54,6 @@ export default function Home() {
   };
 
   const {
-    notes,
-    setNotes,
     isSaving,
     saveError,
     handleCreateNote,
@@ -89,47 +85,7 @@ export default function Home() {
   const selectedFolderName = folders.find((f) => f.id === selectedFolderId)?.name;
 
   // Filtered notes by folder and search query
-  const filteredNotes = notes.filter((n) => {
-    // Folder filter
-    const matchesFolder = selectedFolderId ? n.folder_id === selectedFolderId : true;
-    
-    // Search filter
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery || 
-      (n.title?.toLowerCase().includes(query) ?? false) || 
-      (n.content?.toLowerCase().includes(query) ?? false);
-      
-    return matchesFolder && matchesSearch;
-  });
-
-  // Load initial data when authenticated
-  useEffect(() => {
-    async function loadData() {
-      if (!isAuthenticated) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const apiClient = await getApi();
-        
-        const [foldersData, notesData] = await Promise.all([
-          apiClient.listFolders(),
-          apiClient.listNotes(),
-        ]);
-        setFolders(foldersData);
-        setNotes(notesData);
-      } catch (error) {
-        console.error("Failed to load data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    
-    if (!authLoading) {
-      loadData();
-    }
-  }, [isAuthenticated, authLoading, getApi, setFolders, setNotes]);
+  const filteredNotes = useNoteFilter(notes, selectedFolderId, searchQuery);
 
   // No longer auto-closing chat when note changes to allow persistent folder/all chat.
 
@@ -148,7 +104,7 @@ export default function Home() {
   }
 
   // Show loading while fetching data
-  if (isLoading) {
+  if (isDataLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>

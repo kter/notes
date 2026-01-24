@@ -15,7 +15,7 @@ import {
   SearchIcon 
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks";
 
 interface NoteListProps {
@@ -207,7 +207,7 @@ export function NoteList({
           {notes.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground text-sm">
               {searchQuery ? (
-                <span>No results found for "{searchQuery}"</span>
+                <span>No results found for &quot;{searchQuery}&quot;</span>
               ) : (
                 <>
                   {t("noteList.noNotes")}

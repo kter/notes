@@ -74,23 +74,43 @@ export function EditorPanel({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Refs to track the last saved state to avoid loops with optimistic updates
+  const lastSavedTitle = useRef(note?.title ?? "");
+  const lastSavedContent = useRef(note?.content ?? "");
+
+  // Update refs when note changes to a different one (switched notes)
+  useEffect(() => {
+    lastSavedTitle.current = note?.title ?? "";
+    lastSavedContent.current = note?.content ?? "";
+    // We also need to update local state if the note prop changes and it's NOT what we just saved.
+    // However, the existing logic `useState(note?.title)` only runs on mount.
+    // The key={note.id} in parent ensures re-mount on switch.
+    // So we don't need to sync state here, just refs.
+  }, [note?.id, note?.title, note?.content]);
 
   // Auto-save effect
   useEffect(() => {
     if (!note) return;
 
-    // Skip if no changes from prop (avoids initial save on mount if they match)
-    // and avoids looping when parent updates match local state
-    if (title === (note.title ?? "") && content === (note.content ?? "")) {
+    // Check against the LAST SAVED state (refs), not the current prop.
+    // This breaks the loop because the prop update from the server won't trigger a save
+    // unless it differs from what we *intended* to save (which handles external updates properly).
+    // Actually, simpler: if current state matches last saved state, don't save.
+    if (title === lastSavedTitle.current && content === lastSavedContent.current) {
       return;
     }
 
     const handler = setTimeout(() => {
       onUpdateNote(note.id, { title, content });
+      // Update refs to reflect that we've triggered a save for this content
+      lastSavedTitle.current = title;
+      lastSavedContent.current = content;
     }, 500);
 
     return () => clearTimeout(handler);
-  }, [title, content, note, onUpdateNote]);
+    // Remove `note` from dependencies, only depend on `note.id`
+  }, [title, content, note?.id, onUpdateNote]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

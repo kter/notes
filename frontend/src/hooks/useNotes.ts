@@ -91,7 +91,7 @@ export function useNotes(
     }
   };
 
-  const handleUpdateNote = (
+  const handleUpdateNote = useCallback((
     id: string,
     updates: { title?: string; content?: string; folder_id?: string | null }
   ) => {
@@ -100,7 +100,7 @@ export function useNotes(
       prev.map((n) => (n.id === id ? { ...n, ...updates } : n))
     );
     debouncedUpdateNote(id, updates);
-  };
+  }, [setNotes, debouncedUpdateNote]);
 
   const handleDeleteNote = async (id: string) => {
     try {

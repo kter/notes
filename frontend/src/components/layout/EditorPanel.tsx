@@ -75,17 +75,22 @@ export function EditorPanel({
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Create debounced updater
-  const debouncedUpdateNote = useDebounce(
-    (id: string, updates: { title?: string; content?: string }) => {
-      onUpdateNote(id, updates);
-    },
-    500
-  );
+  // Auto-save effect
+  useEffect(() => {
+    if (!note) return;
 
-  // Removed useEffect that syncs note -> state. 
-  // We rely on the parent component to remount EditorPanel when note.id changes (via key prop).
-  // This ensures local state is authoritative while typing.
+    // Skip if no changes from prop (avoids initial save on mount if they match)
+    // and avoids looping when parent updates match local state
+    if (title === (note.title ?? "") && content === (note.content ?? "")) {
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      onUpdateNote(note.id, { title, content });
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [title, content, note, onUpdateNote]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -103,16 +108,10 @@ export function EditorPanel({
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
-    if (note) {
-      debouncedUpdateNote(note.id, { title: value });
-    }
   };
 
   const handleContentChange = (value: string) => {
     setContent(value);
-    if (note) {
-      debouncedUpdateNote(note.id, { content: value });
-    }
   };
 
   const handleFolderChange = (folderId: string | null) => {

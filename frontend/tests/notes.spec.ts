@@ -64,27 +64,112 @@ test.describe('Notes Functionality', () => {
     await expect(page.locator('.bg-muted').locator('visible=true').last()).toContainText(/Playwright|note/i, { timeout: 30000 });
   });
 
-  test('should be able to search and filter notes', async ({ page }) => {
+  test('should be able to search and filter notes', async ({ page, isMobile }) => {
+    // Navigate to home
     await page.goto('/');
 
-    const searchInput = page.getByPlaceholder(/Search notes|ノートを検索/i);
-    if (await searchInput.isVisible()) {
-      await searchInput.fill('Non-existent note name');
-      await expect(page.getByText(/No notes|ノートがありません/i)).toBeVisible({ timeout: 10000 });
+    console.log('[E2E] Starting Search Test');
+
+    // 1. Create a note with a unique title to search for
+    // On mobile, ensure we are in Folders view to start clean or just click Add Note if visible
+    // The previous test cycle leaves us in Chat, but this is a fresh test run (page.goto('/'))
+    const searchNoteTitle = `Searchable Note ${Date.now()}`;
+    const searchNoteContent = 'Content for search test';
+
+    // 1. Create a note with specific content
+    if (isMobile) {
+        // Mobile flow
+        await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
     }
+    await page.getByRole('button', { name: /Add Note|新規ノート/i }).click();
+    console.log('[E2E] Creating note for search');
+
+    // Handle Title
+    const titleInput = page.getByPlaceholder(/Note Title|ノートのタイトル/i).locator('visible=true').first();
+    await titleInput.fill(searchNoteTitle);
+
+    // Handle Content
+    const contentInput = page.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).locator('visible=true').first();
+    await contentInput.fill(searchNoteContent);
+
+    // Wait for auto-save and list update (giving it ample time)
+    console.log('[E2E] Waiting for auto-save and list update');
+    await page.waitForTimeout(3000);
+    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).locator('visible=true').first();
+    await expect(savedIndicator).toBeVisible({ timeout: 30000 });
+
+    // Verify that we can generate a title (if applicable) or just check note creation
+    // For this test, we care about the search functionality
+    
+    // 2. Go to Note List to search (Mobile check)
+    // On Desktop, Note List is always visible, but good to ensure we check it.
+    if (isMobile) {
+      console.log('[E2E] Switching to Notes view');
+      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+    }
+
+    // 2.5 Verify Note Title Update in List BEFORE Search
+    console.log('[E2E] Verifying note title updated in list before search');
+    
+    // Use a loose text match first to see if it's there
+    await expect(page.locator('button').filter({ hasText: searchNoteTitle }).first()).toBeVisible({ timeout: 10000 });
+    
+    // 3. Perform Search
+    console.log(`[E2E] Searching for: ${searchNoteTitle}`);
+    const searchInput = page.getByPlaceholder(/Search notes|ノートを検索/i).locator('visible=true').first();
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill(searchNoteTitle);
+
+    // 4. Verify result contains the note
+    console.log('[E2E] Verifying search results');
+    // We check if the text is visible. 
+    // We filter by `button` to ensure we are looking at the list item and not some other element.
+    // And we ensure it is visible.
+    const resultItem = page.locator('button').filter({ hasText: searchNoteTitle }).first();
+    await expect(resultItem).toBeVisible({ timeout: 10000 });
+
+    // 5. Verify negative search
+    console.log('[E2E] Negative search test');
+    await searchInput.fill(`Non-existent ${Date.now()}`);
+    await expect(page.getByText(/No results found|ノートがありません/i).first()).toBeVisible({ timeout: 10000 });
+    
+    // Clear search
+    await searchInput.fill('');
   });
 
-  test('should toggle mobile views correctly', async ({ page, isMobile }) => {
-    if (!isMobile) return;
-
+  test('should open settings and display correct content', async ({ page, isMobile }) => {
     await page.goto('/');
+    console.log('[E2E] Starting Settings Test');
+
+    // 1. Open Settings
+    // On mobile, settings button is in the Footer of the Sidebar (Folders view)
+    if (isMobile) {
+      // Ensure we are in Folders view
+      await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click().catch(() => {});
+      await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible();
+    }
+
+    console.log('[E2E] Opening Settings dialog');
+    // Settings icon button has title="Settings"
+    await page.getByRole('button', { name: 'Settings' }).locator('visible=true').click();
+
+    // 2. Verify Dialog Content
+    console.log('[E2E] Verifying Settings content');
+    // Title
+    await expect(page.getByRole('heading', { name: /Settings|設定/i })).toBeVisible({ timeout: 10000 });
     
-    // Switch to Notes view
-    await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
-    await expect(page.getByRole('heading', { name: /All Notes|ノート/i })).toBeVisible({ timeout: 20000 });
+    // Language Selection
+    await expect(page.getByLabel(/Language|言語/i)).toBeVisible();
     
-    // Switch back to Folders view
-    await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
-    await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 20000 });
+    // Model Selection
+    await expect(page.getByLabel(/AI Model|AIモデル/i)).toBeVisible();
+
+    // 3. Close Settings
+    console.log('[E2E] Closing Settings');
+    // Click Cancel or outside, or hit Escape. The dialog has a Cancel button.
+    await page.getByRole('button', { name: /Cancel|キャンセル/i }).click();
+    
+    // Verify dialog is gone
+    await expect(page.getByRole('heading', { name: /Settings|設定/i })).not.toBeVisible();
   });
 });

@@ -13,11 +13,12 @@ interface UseFoldersReturn {
 }
 
 export function useFolders(
+  folders: Folder[],
+  setFolders: React.Dispatch<React.SetStateAction<Folder[]>>,
   selectedFolderId: string | null,
   setSelectedFolderId: (id: string | null) => void
 ): UseFoldersReturn {
   const { getApi } = useApi();
-  const [folders, setFolders] = useState<Folder[]>([]);
 
   const handleCreateFolder = async (name: string) => {
     try {

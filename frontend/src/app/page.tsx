@@ -30,13 +30,13 @@ export default function Home() {
   const [mobileView, setMobileView] = useState<MobileView>("folders");
 
   // Custom hooks
-  const { folders, notes, isLoading: isDataLoading } = useHomeData(isAuthenticated);
+  const { folders, setFolders, notes, setNotes, isLoading: isDataLoading } = useHomeData(isAuthenticated);
 
   const {
     handleCreateFolder,
     handleRenameFolder,
     handleDeleteFolder,
-  } = useFolders(selectedFolderId, setSelectedFolderId);
+  } = useFolders(folders, setFolders, selectedFolderId, setSelectedFolderId);
 
   // Handle folder selection with mobile view change
   const handleSelectFolder = (id: string | null) => {
@@ -59,7 +59,7 @@ export default function Home() {
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
-  } = useNotes(selectedFolderId, selectedNoteId, handleSelectNote);
+  } = useNotes(notes, setNotes, selectedFolderId, selectedNoteId, handleSelectNote);
 
   const {
     chatMessages,

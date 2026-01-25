@@ -41,12 +41,13 @@ interface UseNotesReturn {
 }
 
 export function useNotes(
+  notes: Note[],
+  setNotes: React.Dispatch<React.SetStateAction<Note[]>>,
   selectedFolderId: string | null,
   selectedNoteId: string | null,
   setSelectedNoteId: (id: string | null) => void
 ): UseNotesReturn {
   const { getApi } = useApi();
-  const [notes, setNotes] = useState<Note[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 

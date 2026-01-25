@@ -187,6 +187,7 @@ export default function Home() {
         editor={
           <div className="flex flex-1 h-full">
             <EditorPanel
+              key={selectedNote?.id ?? 'empty'}
               note={selectedNote}
               folders={folders}
               onUpdateNote={handleUpdateNote}

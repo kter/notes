@@ -11,6 +11,32 @@ import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+// Debounce helper
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function useDebounce<T extends (...args: any[]) => void>(
+  callback: T,
+  delay: number
+): T {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  return useCallback(
+    (...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current(...args);
+      }, delay);
+    },
+    [delay]
+  ) as T;
+}
+
 interface EditorPanelProps {
   note: Note | null;
   folders: Folder[];
@@ -38,8 +64,9 @@ export function EditorPanel({
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  // Initialize state from props - reliance on key={note.id} in parent to reset state on switch
+  const [title, setTitle] = useState(note?.title ?? "");
+  const [content, setContent] = useState(note?.content ?? "");
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -48,15 +75,17 @@ export function EditorPanel({
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    if (note) {
-      setTitle(note.title);
-      setContent(note.content);
-    } else {
-      setTitle("");
-      setContent("");
-    }
-  }, [note]);
+  // Create debounced updater
+  const debouncedUpdateNote = useDebounce(
+    (id: string, updates: { title?: string; content?: string }) => {
+      onUpdateNote(id, updates);
+    },
+    500
+  );
+
+  // Removed useEffect that syncs note -> state. 
+  // We rely on the parent component to remount EditorPanel when note.id changes (via key prop).
+  // This ensures local state is authoritative while typing.
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -75,14 +104,14 @@ export function EditorPanel({
   const handleTitleChange = (value: string) => {
     setTitle(value);
     if (note) {
-      onUpdateNote(note.id, { title: value });
+      debouncedUpdateNote(note.id, { title: value });
     }
   };
 
   const handleContentChange = (value: string) => {
     setContent(value);
     if (note) {
-      onUpdateNote(note.id, { content: value });
+      debouncedUpdateNote(note.id, { content: value });
     }
   };
 

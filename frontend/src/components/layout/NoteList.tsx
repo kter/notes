@@ -49,6 +49,7 @@ export function NoteList({
 
   // Cancel editing when folder changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsEditing(false);
     setEditingName("");
   }, [folderId]);

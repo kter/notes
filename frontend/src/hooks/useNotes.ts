@@ -18,16 +18,16 @@ function useDebounce<T extends (...args: Parameters<T>) => void>(
   }, [callback]);
 
   return useCallback(
-    ((...args: Parameters<T>) => {
+    (...args: Parameters<T>) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
         callbackRef.current(...args);
       }, delay);
-    }) as T,
+    },
     [delay]
-  );
+  ) as T;
 }
 
 interface UseNotesReturn {

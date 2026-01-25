@@ -105,14 +105,16 @@ test.describe('Notes Functionality', () => {
     // On Desktop, Note List is always visible, but good to ensure we check it.
     if (isMobile) {
       console.log('[E2E] Switching to Notes view');
-      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click({ force: true });
+      // Verify we are in the notes view (heading or button state)
+      await expect(page.getByRole('button', { name: /View Notes/i })).toHaveClass(/text-primary bg-primary\/10/);
     }
 
     // 2.5 Verify Note Title Update in List BEFORE Search
     console.log('[E2E] Verifying note title updated in list before search');
     
     // Use a loose text match first to see if it's there
-    await expect(page.locator('button').filter({ hasText: searchNoteTitle }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('button').filter({ hasText: searchNoteTitle }).locator('visible=true')).toBeVisible({ timeout: 10000 });
     
     // 3. Perform Search
     console.log(`[E2E] Searching for: ${searchNoteTitle}`);
@@ -125,13 +127,13 @@ test.describe('Notes Functionality', () => {
     // We check if the text is visible. 
     // We filter by `button` to ensure we are looking at the list item and not some other element.
     // And we ensure it is visible.
-    const resultItem = page.locator('button').filter({ hasText: searchNoteTitle }).first();
+    const resultItem = page.locator('button').filter({ hasText: searchNoteTitle }).locator('visible=true');
     await expect(resultItem).toBeVisible({ timeout: 10000 });
 
     // 5. Verify negative search
     console.log('[E2E] Negative search test');
     await searchInput.fill(`Non-existent ${Date.now()}`);
-    await expect(page.getByText(/No results found|ノートがありません/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/No results found|ノートがありません/i).locator('visible=true')).toBeVisible({ timeout: 10000 });
     
     // Clear search
     await searchInput.fill('');

@@ -11,8 +11,9 @@ import {
 } from "@/components/layout";
 import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
+import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
 import { useAuth } from "@/lib/auth-context";
-import { useFolders, useNotes, useAIChat, useResizable, useHomeData, useNoteFilter } from "@/hooks";
+import { useFolders, useNotes, useAIChat, useResizable, useHomeData, useNoteFilter, useOfflineSync } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -57,10 +58,14 @@ export default function Home() {
   const {
     isSaving,
     saveError,
+    savedLocally,
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
   } = useNotes(notes, setNotes, selectedFolderId, selectedNoteId, handleSelectNote);
+
+  // Offline sync
+  const { isOnline, syncStatus, pendingChangesCount } = useOfflineSync();
 
   const {
     chatMessages,
@@ -206,6 +211,7 @@ export default function Home() {
               isSummarizing={isAILoading}
               isSaving={isSaving}
               saveError={saveError}
+              savedLocally={savedLocally}
             />
             <AIChatPanel
               isOpen={isChatOpen}
@@ -222,6 +228,14 @@ export default function Home() {
             />
           </div>
         }
+    />
+    {/* Sync Status Indicator */}
+    <SyncStatusIndicator
+      isOnline={isOnline}
+      syncStatus={syncStatus}
+      pendingChangesCount={pendingChangesCount}
+      savedLocally={savedLocally}
+      className="fixed bottom-4 right-4 z-50"
     />
     <SettingsDialog
       open={isSettingsOpen}

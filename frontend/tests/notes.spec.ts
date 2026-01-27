@@ -210,4 +210,80 @@ test.describe('Notes Functionality', () => {
     console.log('[E2E] Verifying note list is expanded again');
     await expect(noteListHeading).toBeVisible({ timeout: 5000 });
   });
+
+  test('should save note offline and show sync status indicator', async ({ page, context, isMobile }) => {
+    await page.goto('/');
+    console.log('[E2E] Starting Offline Sync Test');
+
+    // 1. Create a note while online
+    console.log('[E2E] Creating note while online');
+    if (isMobile) {
+      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+    }
+    await page.getByRole('button', { name: /Add Note|新規ノート/i }).click();
+
+    const titleInput = page.getByPlaceholder(/Note Title|ノートのタイトル/i).locator('visible=true').first();
+    await expect(titleInput).toBeVisible({ timeout: 20000 });
+    
+    const onlineNoteTitle = `Online Note ${Date.now()}`;
+    await titleInput.fill(onlineNoteTitle);
+
+    const contentInput = page.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).locator('visible=true').first();
+    await contentInput.fill('Content created while online');
+
+    // Wait for save
+    console.log('[E2E] Waiting for online save');
+    await page.waitForTimeout(1500);
+    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).locator('visible=true').first();
+    await expect(savedIndicator).toBeVisible({ timeout: 30000 });
+
+    // 2. Go offline
+    console.log('[E2E] Going offline');
+    await context.setOffline(true);
+
+    // 3. Edit the note while offline
+    console.log('[E2E] Editing note while offline');
+    const offlineContent = 'Content edited while offline - ' + Date.now();
+    await contentInput.clear();
+    await contentInput.fill(offlineContent);
+
+    // 4. Wait a moment for the local save to process
+    await page.waitForTimeout(1500);
+
+    // 5. Verify offline indicator appears (either in status bar or floating indicator)
+    console.log('[E2E] Verifying offline status');
+    // Check for "Offline" or "ローカルに保存" or "Saved locally" text
+    const offlineIndicator = page.locator('text=/Offline|オフライン|ローカルに保存|Saved locally/i').first();
+    await expect(offlineIndicator).toBeVisible({ timeout: 10000 });
+
+    // 6. Go back online
+    console.log('[E2E] Going back online');
+    await context.setOffline(false);
+
+    // 7. Wait for sync to complete - the offline indicator should disappear or change
+    console.log('[E2E] Waiting for sync');
+    await page.waitForTimeout(3000);
+
+    // 8. Verify save completed (check for "Saved" or "保存しました")
+    console.log('[E2E] Verifying sync completed');
+    const syncedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).locator('visible=true').first();
+    await expect(syncedIndicator).toBeVisible({ timeout: 30000 });
+
+    // 9. Reload page to verify data persisted
+    console.log('[E2E] Reloading page to verify persistence');
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Wait for content to load
+    await page.waitForTimeout(2000);
+
+    // Verify the note content is still there
+    if (isMobile) {
+      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+    }
+
+    // Look for the note in the list
+    const noteItem = page.locator('button').filter({ hasText: onlineNoteTitle }).locator('visible=true');
+    await expect(noteItem).toBeVisible({ timeout: 15000 });
+  });
 });

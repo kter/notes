@@ -48,6 +48,7 @@ interface EditorPanelProps {
   isSummarizing?: boolean;
   isSaving?: boolean;
   saveError?: string | null;
+  savedLocally?: boolean;
 }
 
 export function EditorPanel({
@@ -61,6 +62,7 @@ export function EditorPanel({
   isSummarizing = false,
   isSaving = false,
   saveError = null,
+  savedLocally = false,
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -615,6 +617,11 @@ export function EditorPanel({
               <>
                 <Loader2Icon className="h-3 w-3 animate-spin" />
                 <span>{t("common.loading")}</span>
+              </>
+            ) : savedLocally ? (
+              <>
+                <CheckIcon className="h-3 w-3 text-amber-500" />
+                <span className="text-amber-600">{t("sync.savedLocally")}</span>
               </>
             ) : (
               <>

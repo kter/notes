@@ -148,6 +148,17 @@ export const ja = {
     viewEditor: "エディタを表示",
     viewChat: "チャットを表示",
   },
+
+  // Sync status
+  sync: {
+    online: "オンライン",
+    offline: "オフライン",
+    syncing: "同期中...",
+    pendingChanges: "{{count}}件の未同期",
+    syncComplete: "同期完了",
+    syncError: "同期エラー",
+    savedLocally: "ローカルに保存",
+  },
 } as const;
 
 // Structural type for translations (allows different string values)
@@ -282,6 +293,15 @@ export type TranslationKeys = {
     viewNotes: string;
     viewEditor: string;
     viewChat: string;
+  };
+  sync: {
+    online: string;
+    offline: string;
+    syncing: string;
+    pendingChanges: string;
+    syncComplete: string;
+    syncError: string;
+    savedLocally: string;
   };
 };
 

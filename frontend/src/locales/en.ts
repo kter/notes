@@ -150,4 +150,15 @@ export const en: TranslationKeys = {
     viewEditor: "View Editor",
     viewChat: "View Chat",
   },
+
+  // Sync status
+  sync: {
+    online: "Online",
+    offline: "Offline",
+    syncing: "Syncing...",
+    pendingChanges: "{{count}} pending",
+    syncComplete: "Sync complete",
+    syncError: "Sync error",
+    savedLocally: "Saved locally",
+  },
 } as const;

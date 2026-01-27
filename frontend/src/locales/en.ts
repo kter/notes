@@ -63,6 +63,8 @@ export const en: TranslationKeys = {
     noteCount: "{{count}} notes",
     noteCountSingular: "{{count}} note",
     addNote: "Add note",
+    collapseNoteList: "Collapse note list",
+    expandNoteList: "Expand note list",
   },
 
   // Editor

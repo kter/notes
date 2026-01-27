@@ -61,6 +61,8 @@ export const ja = {
     noteCount: "{{count}}件のノート",
     noteCountSingular: "{{count}}件のノート",
     addNote: "ノートを追加",
+    collapseNoteList: "ノートリストを折りたたむ",
+    expandNoteList: "ノートリストを展開",
   },
 
   // Editor
@@ -204,6 +206,8 @@ export type TranslationKeys = {
     noteCount: string;
     noteCountSingular: string;
     addNote: string;
+    collapseNoteList: string;
+    expandNoteList: string;
   };
   editor: {
     title: string;

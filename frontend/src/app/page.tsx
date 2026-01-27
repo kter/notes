@@ -26,6 +26,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isNoteListOpen, setIsNoteListOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("folders");
 
@@ -117,6 +118,8 @@ export default function Home() {
     <ThreeColumnLayout
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isNoteListOpen={isNoteListOpen}
+        onToggleNoteList={() => setIsNoteListOpen(!isNoteListOpen)}
         sidebar={
           <div className="flex flex-col h-full">
             <Sidebar
@@ -182,6 +185,7 @@ export default function Home() {
             onDeleteFolder={handleDeleteFolder}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            onToggleCollapse={() => setIsNoteListOpen(!isNoteListOpen)}
           />
         }
         editor={

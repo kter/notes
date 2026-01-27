@@ -12,7 +12,8 @@ import {
   TrashIcon, 
   CheckIcon, 
   XIcon,
-  SearchIcon 
+  SearchIcon,
+  PanelLeftCloseIcon 
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState, useEffect } from "react";
@@ -29,6 +30,7 @@ interface NoteListProps {
   onDeleteFolder?: (id: string) => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  onToggleCollapse?: () => void;
 }
 
 export function NoteList({
@@ -42,6 +44,7 @@ export function NoteList({
   onDeleteFolder,
   searchQuery = "",
   onSearchChange,
+  onToggleCollapse,
 }: NoteListProps) {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
@@ -137,6 +140,17 @@ export function NoteList({
           ) : (
             <>
               <div className="flex items-center gap-2 min-w-0 flex-1">
+                {onToggleCollapse && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 -ml-2 text-muted-foreground hover:text-foreground"
+                    onClick={onToggleCollapse}
+                    title={t("noteList.collapseNoteList")}
+                  >
+                    <PanelLeftCloseIcon className="h-4 w-4" />
+                  </Button>
+                )}
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider truncate">
                   {folderName || t("sidebar.allNotes")}
                 </h2>

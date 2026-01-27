@@ -14,6 +14,8 @@ interface ThreeColumnLayoutProps {
   editor: ReactNode;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  isNoteListOpen: boolean;
+  onToggleNoteList: () => void;
   mobileView: MobileView;
   onMobileViewChange: (view: MobileView) => void;
 }
@@ -24,6 +26,8 @@ export function ThreeColumnLayout({
   editor,
   isSidebarOpen,
   onToggleSidebar,
+  isNoteListOpen,
+  onToggleNoteList,
   mobileView,
   onMobileViewChange,
 }: ThreeColumnLayoutProps) {
@@ -83,17 +87,35 @@ export function ThreeColumnLayout({
         )}
 
         {/* Middle column - Note list */}
-        <div
-          className="flex-shrink-0 border-r border-border/50 bg-card/50 h-full flex flex-col"
-          style={{ width: noteListResize.width }}
-        >
-          {noteList}
-        </div>
-        {/* Resize Handle */}
-        <div
-          className="w-1 bg-border/30 hover:bg-primary/50 active:bg-primary/70 transition-colors cursor-col-resize flex-shrink-0"
-          onMouseDown={noteListResize.handleMouseDown}
-        />
+        {isNoteListOpen ? (
+          <>
+            <div
+              className="flex-shrink-0 border-r border-border/50 bg-card/50 h-full flex flex-col"
+              style={{ width: noteListResize.width }}
+            >
+              {noteList}
+            </div>
+            {/* Resize Handle */}
+            <div
+              className="w-1 bg-border/30 hover:bg-primary/50 active:bg-primary/70 transition-colors cursor-col-resize flex-shrink-0"
+              onMouseDown={noteListResize.handleMouseDown}
+            />
+          </>
+        ) : (
+          <aside className="flex-shrink-0 w-12 border-r border-border/50 bg-card/50 relative h-full">
+            <div className="absolute inset-0 flex flex-col items-center pt-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={onToggleNoteList}
+                title={t("noteList.expandNoteList")}
+              >
+                <ChevronRightIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </aside>
+        )}
 
         {/* Right column - Editor and AI panel */}
         <main className="flex-1 min-w-0 flex flex-col bg-background h-full">

@@ -174,4 +174,40 @@ test.describe('Notes Functionality', () => {
     // Verify dialog is gone
     await expect(page.getByRole('heading', { name: /Settings|設定/i })).not.toBeVisible();
   });
+
+  test('should be able to collapse and expand note list panel', async ({ page, isMobile }) => {
+    // Skip on mobile - collapse functionality is desktop only
+    if (isMobile) {
+      console.log('[E2E] Skipping note list collapse test on mobile');
+      return;
+    }
+
+    await page.goto('/');
+    console.log('[E2E] Starting Note List Collapse Test');
+
+    // 1. Verify note list panel is visible with collapse button
+    console.log('[E2E] Verifying note list is initially visible');
+    const noteListHeading = page.getByRole('heading', { name: /All Notes|すべてのノート/i }).locator('visible=true');
+    await expect(noteListHeading).toBeVisible({ timeout: 15000 });
+
+    // 2. Find and click the collapse button
+    console.log('[E2E] Clicking collapse button');
+    const collapseButton = page.getByRole('button', { name: /Collapse note list|ノートリストを折りたたむ/i }).locator('visible=true');
+    await expect(collapseButton).toBeVisible();
+    await collapseButton.click();
+
+    // 3. Verify note list is collapsed (heading should be hidden)
+    console.log('[E2E] Verifying note list is collapsed');
+    await expect(noteListHeading).not.toBeVisible({ timeout: 5000 });
+
+    // 4. Find and click the expand button
+    console.log('[E2E] Clicking expand button');
+    const expandButton = page.getByRole('button', { name: /Expand note list|ノートリストを展開/i }).locator('visible=true');
+    await expect(expandButton).toBeVisible();
+    await expandButton.click();
+
+    // 5. Verify note list is expanded again
+    console.log('[E2E] Verifying note list is expanded again');
+    await expect(noteListHeading).toBeVisible({ timeout: 5000 });
+  });
 });

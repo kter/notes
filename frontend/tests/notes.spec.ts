@@ -160,13 +160,12 @@ test.describe('Notes Functionality', () => {
     const searchNoteContent = 'Content for search test';
 
     // 1. First click on "All Notes" to ensure we're in the right view
-    // On mobile, ensure we are in Folders view first
+    // On mobile, ensure we are in Folders view first so we can click "All Notes" in the sidebar
     if (isMobile) {
-        // Mobile flow - go to Notes view first
-        await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+        await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
     }
-    // Select "All Notes" to ensure we can see all notes
-    await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click().catch(() => {});
+    // Select "All Notes" to ensure we can see all notes (this switches to Note List view on mobile)
+    await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click();
     await page.waitForTimeout(500);
 
     // 2. Create a note with specific content
@@ -212,7 +211,10 @@ test.describe('Notes Functionality', () => {
     // Trigger save
     await page.waitForTimeout(1000);
     
-    const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
+    const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
+    if (isMobile) {
+      await savedIndicator.scrollIntoViewIfNeeded();
+    }
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
     
     // Wait for update API to complete
@@ -363,11 +365,16 @@ test.describe('Notes Functionality', () => {
     // 1. First select "All Notes" to ensure we're in the right view
     console.log('[E2E] Creating note while online');
     if (isMobile) {
-      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+      await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
     }
     // Select "All Notes" to ensure we can see all notes after reload
-    await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click().catch(() => {});
-    await page.waitForTimeout(500);
+    if (isMobile) {
+      await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
+    }
+    await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click();
+    
+    // Wait for the note list to load
+    await page.waitForTimeout(1000);
     
     // Start listening for the note creation API call
     const createPromise = page.waitForResponse(
@@ -409,6 +416,9 @@ test.describe('Notes Functionality', () => {
     await page.waitForTimeout(1000);
     
     const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
+    if (isMobile) {
+      await savedIndicator.scrollIntoViewIfNeeded();
+    }
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
     
     // Wait for update API to complete
@@ -451,8 +461,11 @@ test.describe('Notes Functionality', () => {
     // 8. Verify save completed (check for "Saved" or "保存しました")
     console.log('[E2E] Verifying sync completed');
     const syncedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
+    if (isMobile) {
+      await syncedIndicator.scrollIntoViewIfNeeded();
+    }
     await expect(syncedIndicator).toBeVisible({ timeout: 30000 });
-
+    
     // 9. Reload page to verify data persisted
     console.log('[E2E] Reloading page to verify persistence');
     await page.reload();
@@ -462,11 +475,13 @@ test.describe('Notes Functionality', () => {
     await page.waitForTimeout(2000);
 
     // Verify the note content is still there
+    // Verify the note content is still there
+    // On mobile, to see "All Notes", we must be in Folders view
     if (isMobile) {
-      await page.getByRole('button', { name: /View Notes|ノートを表示/i }).click();
+      await page.getByRole('button', { name: /View Folders|フォルダを表示/i }).click();
     }
     // Select All Notes after reload to ensure we can see the note
-    await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click().catch(() => {});
+    await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click();
     await page.waitForTimeout(1000);
 
     // Look for the note in the list - use text search in the list container

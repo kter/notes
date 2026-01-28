@@ -414,7 +414,7 @@ export function EditorPanel({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">

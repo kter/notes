@@ -170,8 +170,23 @@ test.describe('Notes Functionality', () => {
     await page.waitForTimeout(500);
 
     // 2. Create a note with specific content
-    await page.getByRole('button', { name: /Add Note|新規ノート/i }).click();
     console.log('[E2E] Creating note for search');
+    
+    // Start listening for the note creation API call
+    const createPromise = page.waitForResponse(
+      resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 30000 }
+    );
+
+    await page.getByRole('button', { name: /Add Note|新規ノート/i }).click();
+    
+    // Wait for the note to be created on server
+    console.log('[E2E] Waiting for note creation on server');
+    await createPromise;
+    console.log('[E2E] Note created on server');
+    
+    // Small delay for UI to update with server note
+    await page.waitForTimeout(500);
 
     // Handle Title
     const layout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
@@ -182,12 +197,30 @@ test.describe('Notes Functionality', () => {
     // Handle Content
     const contentInput = layout.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).first();
     await contentInput.fill(searchNoteContent);
+    // Trigger blur to ensure content is registered
+    await contentInput.blur();
 
     // Wait for auto-save and list update (giving it ample time)
     console.log('[E2E] Waiting for auto-save and list update');
-    await page.waitForTimeout(3000);
+    
+    // Wait for the save API call (PUT or PATCH)
+    const updatePromise = page.waitForResponse(
+      resp => /\/api\/notes\/[^/]+$/.test(resp.url()) && (resp.request().method() === 'PUT' || resp.request().method() === 'PATCH') && resp.status() < 400,
+      { timeout: 30000 }
+    ).catch(e => console.log('[E2E] Update API response not detected:', e.message));
+    
+    // Trigger save
+    await page.waitForTimeout(1000);
+    
     const savedIndicator = page.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
+    
+    // Wait for update API to complete
+    console.log('[E2E] Waiting for content sync to server');
+    await updatePromise;
+    console.log('[E2E] Content synced');
+
+
 
     // Verify that we can generate a title (if applicable) or just check note creation
     // For this test, we care about the search functionality
@@ -335,7 +368,22 @@ test.describe('Notes Functionality', () => {
     // Select "All Notes" to ensure we can see all notes after reload
     await page.getByRole('button', { name: /All Notes|すべてのノート/i }).first().click().catch(() => {});
     await page.waitForTimeout(500);
+    
+    // Start listening for the note creation API call
+    const createPromise = page.waitForResponse(
+      resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 30000 }
+    );
+
     await page.getByRole('button', { name: /Add Note|新規ノート/i }).click();
+    
+    // Wait for the note to be created on server
+    console.log('[E2E] Waiting for note creation on server');
+    await createPromise;
+    console.log('[E2E] Note created on server');
+    
+    // Small delay for UI to update with server note
+    await page.waitForTimeout(500);
 
     const layout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
     const titleInput = layout.getByPlaceholder(/Note Title|ノートのタイトル/i).first();
@@ -346,13 +394,28 @@ test.describe('Notes Functionality', () => {
 
     const contentInput = layout.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).first();
     await contentInput.fill('Content created while online');
+    // Trigger blur
+    await contentInput.blur();
 
     // Wait for save
     console.log('[E2E] Waiting for online save');
-    console.log('[E2E] Waiting for online save');
-    await page.waitForTimeout(1500);
+    
+    // Wait for the save API call (PUT or PATCH)
+    const updatePromise = page.waitForResponse(
+      resp => /\/api\/notes\/[^/]+$/.test(resp.url()) && (resp.request().method() === 'PUT' || resp.request().method() === 'PATCH') && resp.status() < 400,
+      { timeout: 30000 }
+    ).catch(e => console.log('[E2E] Update API response not detected:', e.message));
+    
+    await page.waitForTimeout(1000);
+    
     const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
+    
+    // Wait for update API to complete
+    console.log('[E2E] Waiting for content sync to server');
+    await updatePromise;
+    console.log('[E2E] Content synced');
+
 
     // 2. Go offline
     console.log('[E2E] Going offline');

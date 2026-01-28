@@ -247,6 +247,7 @@ export function NoteList({
                     : "hover:bg-accent"
                 )}
                 onClick={() => onSelectNote(note.id)}
+                data-testid="note-list-item"
               >
                 <div className="flex items-start gap-2">
                   <FileTextIcon className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />

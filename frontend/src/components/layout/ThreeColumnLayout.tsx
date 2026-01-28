@@ -52,7 +52,7 @@ export function ThreeColumnLayout({
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">
       {/* Desktop: Resizable Layout */}
-      <div className="hidden md:flex w-full h-full">
+      <div className="hidden md:flex w-full h-full" data-testid="desktop-layout">
         {/* Left sidebar - Folders */}
         {isSidebarOpen ? (
           <>
@@ -130,6 +130,7 @@ export function ThreeColumnLayout({
           "md:hidden flex-shrink-0 border-r border-border/50 bg-sidebar h-full",
           mobileView === "folders" ? "block w-full pb-14" : "hidden"
         )}
+        data-testid="mobile-layout-folders"
       >
         <div className="h-full w-full">
           {sidebar}
@@ -140,7 +141,7 @@ export function ThreeColumnLayout({
       <div className={cn(
         "md:hidden flex-shrink-0 border-r border-border/50 bg-card/50 h-full flex flex-col",
         mobileView === "notes" ? "block w-full pb-14" : "hidden"
-      )}>
+      )} data-testid="mobile-layout-notes">
         {noteList}
       </div>
 
@@ -148,7 +149,7 @@ export function ThreeColumnLayout({
       <main className={cn(
         "md:hidden flex-1 min-w-0 flex flex-col bg-background h-full",
         (mobileView === "editor" || mobileView === "chat") ? "flex w-full pb-14" : "hidden"
-      )}>
+      )} data-testid="mobile-layout-editor">
         {editor}
       </main>
 

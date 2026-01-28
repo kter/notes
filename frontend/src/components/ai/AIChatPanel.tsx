@@ -231,7 +231,7 @@ export function AIChatPanel({
                       : "bg-muted rounded-tl-none border border-border/50"
                   )}
                 >
-                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  <p data-testid="ai-message-content" className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 </div>
               </div>
             ))
@@ -239,7 +239,7 @@ export function AIChatPanel({
           {isLoading && (
             <div className="flex justify-start">
               <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 border border-border/50 shadow-sm">
-                <div className="flex gap-1">
+                <div className="flex gap-1" data-testid="ai-loading">
                   <span className="w-1.5 h-1.5 bg-foreground/20 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-1.5 h-1.5 bg-foreground/20 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-1.5 h-1.5 bg-foreground/20 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />

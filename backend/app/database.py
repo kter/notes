@@ -163,8 +163,8 @@ def create_db_and_tables() -> None:
                                 logger.info(f"Current 'content' column type: {current_type}")
                                 
                                 if current_type.lower() != 'text':
-                                    logger.info("Migrating 'content' column to TEXT using add/copy/drop/rename dance...")
-                                    # DSQL workaround since ALTER COLUMN TYPE is not supported
+                                    logger.info("Migrating 'content' column to TEXT using batch add/copy/drop/rename dance...")
+                                    # DSQL workaround since ALTER COLUMN TYPE is not supported and 10s init limit exists
                                     try:
                                         with engine.connect() as conn:
                                             # 1. Check if content_new already exists
@@ -177,33 +177,38 @@ def create_db_and_tables() -> None:
                                                 conn.execute(text("ALTER TABLE notes ADD COLUMN content_new TEXT"))
                                                 conn.commit()
 
-                                            # 2. Copy data
-                                            logger.info("Step 2: Copying data to 'content_new'...")
-                                            conn.execute(text("UPDATE notes SET content_new = content WHERE content_new IS NULL"))
+                                            # 2. Copy data in small batches to stay under 10s init limit
+                                            # Each cold start will copy another batch
+                                            logger.info("Step 2: Copying data batch to 'content_new'...")
+                                            conn.execute(text(
+                                                "UPDATE notes SET content_new = content "
+                                                "WHERE id IN (SELECT id FROM notes WHERE content_new IS NULL LIMIT 500)"
+                                            ))
                                             conn.commit()
 
-                                            # 3. Drop old column
-                                            logger.info("Step 3: Dropping 'content' column...")
-                                            conn.execute(text("ALTER TABLE notes DROP COLUMN content"))
-                                            conn.commit()
-
-                                            # 4. Rename new column
-                                            logger.info("Step 4: Renaming 'content_new' to 'content'...")
-                                            conn.execute(text("ALTER TABLE notes RENAME COLUMN content_new TO content"))
-                                            conn.commit()
-
-                                            # 5. Restore NOT NULL if possible
-                                            try:
-                                                logger.info("Step 5: Setting NOT NULL constraint...")
-                                                conn.execute(text("ALTER TABLE notes ALTER COLUMN content SET NOT NULL"))
+                                            # 3. Check if all rows are copied
+                                            res = conn.execute(text("SELECT count(*) FROM notes WHERE content_new IS NULL"))
+                                            remaining = res.fetchone()[0]
+                                            
+                                            if remaining == 0:
+                                                logger.info("Step 3: Verification passed. Dropping 'content' and renaming 'content_new'...")
+                                                conn.execute(text("ALTER TABLE notes DROP COLUMN content"))
                                                 conn.commit()
-                                            except Exception as nn_e:
-                                                logger.warning(f"Could not set NOT NULL (ignoring): {nn_e}")
+                                                conn.execute(text("ALTER TABLE notes RENAME COLUMN content_new TO content"))
+                                                conn.commit()
 
-                                            logger.info("Successfully migrated 'content' column to TEXT")
+                                                try:
+                                                    conn.execute(text("ALTER TABLE notes ALTER COLUMN content SET NOT NULL"))
+                                                    conn.commit()
+                                                except Exception:
+                                                    pass # DSQL might not support SET NOT NULL
+
+                                                logger.info("Successfully migrated 'content' column to TEXT")
+                                            else:
+                                                logger.info(f"Step 2 incomplete: {remaining} rows left. Migration will continue on next start.")
                                     except Exception as migration_error:
-                                        logger.error(f"Migration dance failed: {migration_error}")
-                                        raise
+                                        # Log but don't re-raise to allow app to start using old column
+                                        logger.error(f"Migration dance step failed: {migration_error}")
                                 else:
                                      logger.info("'content' column is already TEXT. No migration needed.")
                             else:

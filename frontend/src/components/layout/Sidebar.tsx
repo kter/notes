@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import type { Folder } from "@/types";
 import { cn } from "@/lib/utils";
-import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon } from "lucide-react";
+import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon, CheckIcon, XIcon, Loader2Icon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/hooks";
 
@@ -13,7 +13,7 @@ interface SidebarProps {
   folders: Folder[];
   selectedFolderId: string | null;
   onSelectFolder: (id: string | null) => void;
-  onCreateFolder: (name: string) => void;
+  onCreateFolder: (name: string) => Promise<void>;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
   onToggleCollapse: () => void;
@@ -30,16 +30,29 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
 
-  const handleCreateFolder = () => {
+  const handleCreateFolder = async () => {
     if (newFolderName.trim()) {
-      onCreateFolder(newFolderName.trim());
-      setNewFolderName("");
-      setIsCreating(false);
+      setIsSubmitting(true);
+      try {
+        await onCreateFolder(newFolderName.trim());
+        setNewFolderName("");
+        setIsCreating(false);
+      } catch (error) {
+        console.error("Failed to create folder", error);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
+  };
+
+  const handleCancelCreate = () => {
+    setIsCreating(false);
+    setNewFolderName("");
   };
 
   const handleRenameFolder = (id: string) => {
@@ -100,22 +113,43 @@ export function Sidebar({
 
           {/* New folder input */}
           {isCreating && (
-            <div className="px-2 py-1">
+            <div className="px-2 py-1 flex items-center gap-1">
               <Input
                 autoFocus
+                disabled={isSubmitting}
                 placeholder={t("sidebar.folderName")}
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateFolder();
-                  if (e.key === "Escape") setIsCreating(false);
+                  if (e.key === "Enter" && !isSubmitting) handleCreateFolder();
+                  if (e.key === "Escape" && !isSubmitting) handleCancelCreate();
                 }}
-                onBlur={() => {
-                  if (newFolderName.trim()) handleCreateFolder();
-                  else setIsCreating(false);
-                }}
-                className="h-8"
+                className="h-8 text-sm flex-1 min-w-0"
               />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-green-600 hover:text-green-700 flex-shrink-0"
+                onClick={handleCreateFolder}
+                disabled={isSubmitting}
+                aria-label={t("sidebar.confirmCreate")}
+              >
+                {isSubmitting ? (
+                  <Loader2Icon className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckIcon className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground flex-shrink-0"
+                onClick={handleCancelCreate}
+                disabled={isSubmitting}
+                aria-label={t("sidebar.cancelCreate")}
+              >
+                <XIcon className="h-4 w-4" />
+              </Button>
             </div>
           )}
 

@@ -13,7 +13,8 @@ import {
   CheckIcon, 
   XIcon,
   SearchIcon,
-  PanelLeftCloseIcon 
+  PanelLeftCloseIcon,
+  Loader2Icon
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState, useEffect } from "react";
@@ -23,7 +24,7 @@ interface NoteListProps {
   notes: Note[];
   selectedNoteId: string | null;
   onSelectNote: (id: string) => void;
-  onCreateNote: () => void;
+  onCreateNote: () => Promise<void>;
   folderName?: string;
   folderId?: string | null;
   onRenameFolder?: (id: string, name: string) => void;
@@ -49,6 +50,18 @@ export function NoteList({
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editingName, setEditingName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleCreate = async () => {
+    setIsCreating(true);
+    try {
+      await onCreateNote();
+    } catch (error) {
+      console.error("Failed to create note:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   // Cancel editing when folder changes
   useEffect(() => {
@@ -181,10 +194,15 @@ export function NoteList({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 flex-shrink-0"
-                onClick={onCreateNote}
+                onClick={handleCreate}
+                disabled={isCreating}
                 aria-label={t("noteList.addNote")}
               >
-                <FilePlusIcon className="h-4 w-4" />
+                {isCreating ? (
+                  <Loader2Icon className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FilePlusIcon className="h-4 w-4" />
+                )}
               </Button>
             </>
           )}
@@ -228,9 +246,11 @@ export function NoteList({
                   {t("noteList.noNotes")}
                   <br />
                   <button
-                    className="text-primary hover:underline mt-2"
-                    onClick={onCreateNote}
+                    className="text-primary hover:underline mt-2 flex items-center gap-1 mx-auto"
+                    onClick={handleCreate}
+                    disabled={isCreating}
                   >
+                    {isCreating && <Loader2Icon className="h-3 w-3 animate-spin" />}
                     {t("noteList.createOne")}
                   </button>
                 </>

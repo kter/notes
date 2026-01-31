@@ -44,6 +44,8 @@ export const ja = {
     expandSidebar: "サイドバーを展開",
     folderName: "フォルダ名",
     addFolder: "フォルダを追加",
+    confirmCreate: "作成を確定",
+    cancelCreate: "作成をキャンセル",
   },
 
   // Note list
@@ -202,6 +204,8 @@ export type TranslationKeys = {
     expandSidebar: string;
     folderName: string;
     addFolder: string;
+    confirmCreate: string;
+    cancelCreate: string;
   };
   noteList: {
     notes: string;

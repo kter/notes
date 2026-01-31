@@ -46,6 +46,8 @@ export const en: TranslationKeys = {
     expandSidebar: "Expand sidebar",
     folderName: "Folder name",
     addFolder: "Add folder",
+    confirmCreate: "Confirm create",
+    cancelCreate: "Cancel create",
   },
 
   // Note list

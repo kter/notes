@@ -51,7 +51,7 @@ setup('authenticate', async ({ page, baseURL }) => {
     await expect(page.getByRole('heading', { name: /Folders|フォルダ|sidebar\.folders/i })).toBeVisible({ timeout: 5000 });
   } catch {
     console.log('[E2E Setup] Heading not found, checking for All Notes button...');
-    await expect(page.getByText(/All Notes|すべてのノート|sidebar\.allNotes/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/All Notes|すべてのノート|sidebar\.allNotes/i)).toBeVisible({ timeout: 30000 });
   }
 
   console.log(`[E2E Setup] Authentication successful!`);

@@ -11,6 +11,7 @@ import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkSourceLine } from "@/lib/remark-source-line";
 
 // Debounce helper
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,6 +78,9 @@ export function EditorPanel({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
   
   // Refs to track the last saved state to avoid loops with optimistic updates
   const lastSavedTitle = useRef(note?.title ?? "");
@@ -373,7 +377,81 @@ export function EditorPanel({
     }
   }, [handleTabKey, handleEnterKey]);
 
-  // Export handlers
+
+
+  // Scroll Sync Handlers
+  // Scroll Sync Handlers
+  const handleEditorScroll = useCallback(() => {
+    if (isScrollingRef.current || !isPreviewOpen || !textareaRef.current || !previewContainerRef.current) return;
+    
+    isScrollingRef.current = true;
+    
+    const editor = textareaRef.current;
+    const preview = previewContainerRef.current;
+    
+    // Calculate target line number based on scroll percentage of source
+    // This assumes roughly uniform line height in the source which is true for monospaced textarea
+    const contentLines = content.split("\n").length;
+    const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
+    const targetLine = Math.floor(contentLines * scrollPercentage);
+    
+    // Find the element in preview that corresponds to this line or the next closest one
+    const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+    let targetElement = null;
+    
+    for (const el of elements) {
+      const line = parseInt(el.getAttribute("data-source-line") || "0", 10);
+      if (line >= targetLine) {
+        targetElement = el;
+        break;
+      }
+    }
+    
+    if (targetElement) {
+       // Adjust for the element's position relative to the container
+       preview.scrollTop = targetElement.offsetTop - preview.offsetTop;
+    } else if (scrollPercentage > 0.99) {
+       // If roughly at the end, sync to bottom
+       preview.scrollTop = preview.scrollHeight;
+    }
+    
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 50);
+  }, [content, isPreviewOpen]);
+
+  const handlePreviewScroll = useCallback(() => {
+    if (isScrollingRef.current || !textareaRef.current || !previewContainerRef.current) return;
+    
+    isScrollingRef.current = true;
+    
+    const editor = textareaRef.current;
+    const preview = previewContainerRef.current;
+    const contentLines = content.split("\n").length;
+
+    // Find the first visible element in the preview
+    const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+    let visibleElement: HTMLElement | null = null;
+    
+    for (const el of elements) {
+      if (el.offsetTop - preview.offsetTop >= preview.scrollTop) {
+        visibleElement = el;
+        break;
+      }
+    }
+    
+    if (visibleElement) {
+      const line = parseInt(visibleElement.getAttribute("data-source-line") || "0", 10);
+      const targetScrollTop = (line / contentLines) * (editor.scrollHeight - editor.clientHeight);
+      editor.scrollTop = targetScrollTop;
+    }
+    
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 50);
+  }, [content]);
+
+  // JSON export handlers
   const downloadFile = (content: string, filename: string, mimeType: string) => {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -546,37 +624,43 @@ export function EditorPanel({
       </div>
 
       {/* Editor */}
-      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-auto" role="main">
-        <div className="relative mb-4">
-          <label htmlFor="note-title" className="sr-only">Note title</label>
-          <Input
-            id="note-title"
-            value={title}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder={t("editor.noteTitlePlaceholder")}
-            className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={handleGenerateTitle}
-            disabled={!content.trim() || isGeneratingTitle}
-            title={t("editor.generateTitleFromContent")}
-          >
-            {isGeneratingTitle ? (
-              <Loader2Icon className="h-4 w-4 animate-spin" />
-            ) : (
-              <SparklesIcon className="h-4 w-4" />
-            )}
-          </Button>
+      <div className="flex-1 flex flex-col overflow-hidden" role="main">
+        {/* Fixed Title Area */}
+        <div className="p-4 md:p-6 pb-0 flex-none bg-background z-10">
+          <div className="relative mb-4">
+            <label htmlFor="note-title" className="sr-only">Note title</label>
+            <Input
+              id="note-title"
+              value={title}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder={t("editor.noteTitlePlaceholder")}
+              className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={handleGenerateTitle}
+              disabled={!content.trim() || isGeneratingTitle}
+              title={t("editor.generateTitleFromContent")}
+            >
+              {isGeneratingTitle ? (
+                <Loader2Icon className="h-4 w-4 animate-spin" />
+              ) : (
+                <SparklesIcon className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <Separator className="mb-4" />
         </div>
-        <Separator className="mb-4" />
         
-        {/* Editor and Preview Area */}
-        <div className={`flex-1 flex ${isPreviewOpen ? "gap-4" : ""}`}>
-          {/* Markdown Editor */}
-          <div className={isPreviewOpen ? "flex-1 min-w-0" : "flex-1"}>
+        {/* Editor and Preview Layout */}
+        <div className={`flex-1 flex min-h-0 ${isPreviewOpen ? "gap-4" : ""} px-4 md:px-6 pb-4`}>
+          {/* Markdown Editor Column */}
+          <div 
+            className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""}`}
+            ref={editorContainerRef}
+          >
             <label htmlFor="note-content" className="sr-only">Note content</label>
             <Textarea
               id="note-content"
@@ -584,18 +668,25 @@ export function EditorPanel({
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
               onKeyDown={handleKeyDown}
+              onScroll={handleEditorScroll}
               placeholder={t("editor.noteContentPlaceholder")}
               className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
             />
           </div>
           
-          {/* Markdown Preview */}
+          {/* Markdown Preview Column */}
           {isPreviewOpen && (
             <>
               <Separator orientation="vertical" />
-              <div className="flex-1 min-w-0 overflow-auto">
+              <div 
+                className="flex-1 min-w-0 overflow-y-auto"
+                ref={previewContainerRef}
+                onScroll={handlePreviewScroll}
+              >
                 <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm, remarkSourceLine]}
+                  >
                     {content || `*${t("editor.previewPlaceholder")}*`}
                   </ReactMarkdown>
                 </div>

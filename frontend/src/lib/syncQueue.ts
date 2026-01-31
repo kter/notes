@@ -4,6 +4,7 @@
  */
 
 import { notesDB, type PendingChange, type SyncOperationType } from "./indexedDB";
+import { ApiError } from "./api"; // Import ApiError
 import type { Note, NoteCreate, NoteUpdate } from "@/types";
 
 export type SyncStatus = "idle" | "syncing" | "error" | "offline";
@@ -124,9 +125,37 @@ class SyncQueueManager {
           await notesDB.removePendingChange(change.id);
           result.syncedCount++;
         } catch (error) {
-          result.failedCount++;
-          result.errors.push(error instanceof Error ? error : new Error(String(error)));
-          result.success = false;
+          // Check if it's a permanent error (4xx client error, excluding 429 Too Many Requests)
+          // We also exclude 401/403 as they might be fixable with a fresh login/token refresh
+          // although typically 401s should trigger a logout.
+          let isPermanentError = false;
+
+          if (error instanceof ApiError) {
+             const status = error.status;
+             // 400-499 are client errors. 
+             // Exclude 429 (Too Many Requests) -> Retry
+             // Exclude 408 (Request Timeout) -> Retry
+             if (status >= 400 && status < 500 && status !== 429 && status !== 408) {
+               isPermanentError = true;
+             }
+          }
+
+          if (isPermanentError) {
+            console.error(`Permanent sync error for change ${change.id}. Removing from queue.`, error);
+            // Remove the "poisoned" item so it doesn't block the queue or cause persistent error state
+            await notesDB.removePendingChange(change.id);
+            
+            // We count this as "processed" but maybe with a warning? 
+            // For now, let's NOT increment failedCount so the UI doesn't show "Error" state perpetually
+            // for an item that is effectively gone.
+            // OR: We can increment syncedCount? No, that's misleading.
+            // We just don't add to failedCount.
+          } else {
+            console.error(`Transient sync error for change ${change.id}. Keeping in queue.`, error);
+            result.failedCount++;
+            result.errors.push(error instanceof Error ? error : new Error(String(error)));
+            result.success = false;
+          }
           // Continue processing other changes
         }
       }

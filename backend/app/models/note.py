@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from pydantic import field_validator
+from sqlalchemy import Column, Text
 from sqlmodel import Field, SQLModel
 
 
@@ -9,7 +10,7 @@ class NoteBase(SQLModel):
     """Base Note schema."""
 
     title: str = Field(max_length=255, default="")
-    content: str = Field(default="")
+    content: str = Field(default="", sa_column=Column(Text))
 
 
 class Note(NoteBase, table=True):

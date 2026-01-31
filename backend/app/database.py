@@ -144,6 +144,44 @@ def create_db_and_tables() -> None:
                         logger.warning(
                             f"Failed to migrate 'user_settings' table: {alter_error}"
                         )
+
+                # Self-healing migration: Change 'content' column to TEXT in 'notes' table
+                if table_name == "notes":
+                    logger.info("Checking 'content' column type in 'notes' table...")
+                    try:
+                        with engine.connect() as conn:
+                            # Check actual data type
+                            result = conn.execute(
+                                text(
+                                    "SELECT data_type FROM information_schema.columns "
+                                    "WHERE table_name = 'notes' AND column_name = 'content'"
+                                )
+                            )
+                            row = result.fetchone()
+                            if row:
+                                current_type = row[0]
+                                logger.info(f"Current 'content' column type: {current_type}")
+                                
+                                if current_type.lower() != 'text':
+                                    logger.info("Migrating properties 'content' to TEXT...")
+                                    # This command changes the type to TEXT.
+                                    # TEXT is compatible with VARCHAR, so data conversion should be automatic.
+                                    conn.execute(
+                                        text("ALTER TABLE notes ALTER COLUMN content TYPE TEXT")
+                                    )
+                                    conn.commit()
+                                    logger.info(
+                                        "Successfully changed 'content' column in 'notes' to TYPE TEXT"
+                                    )
+                                else:
+                                     logger.info("'content' column is already TEXT. No migration needed.")
+                            else:
+                                logger.warning("Could not find 'content' column in 'notes' table")
+                                
+                    except Exception as alter_error:
+                        logger.warning(
+                            f"Failed to migrate 'notes' table: {alter_error}"
+                        )
             except Exception as table_error:
                 # Log but continue if table already exists or other non-critical error
                 logger.warning(f"Table '{table_name}' creation: {table_error}")

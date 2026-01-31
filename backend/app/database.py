@@ -56,8 +56,8 @@ def get_dsql_engine():
                 database_url,
                 echo=settings.debug,
                 pool_pre_ping=True,
-                pool_size=1,
-                max_overflow=0,
+                pool_size=5,
+                max_overflow=10,
             )
             logger.info("DSQL engine created successfully")
         except Exception as e:
@@ -166,46 +166,46 @@ def create_db_and_tables() -> None:
                                     logger.info("Migrating 'content' column to TEXT using batch add/copy/drop/rename dance...")
                                     # DSQL workaround since ALTER COLUMN TYPE is not supported and 10s init limit exists
                                     try:
-                                        with engine.connect() as conn:
-                                            # 1. Check if content_new already exists
-                                            check_res = conn.execute(text(
-                                                "SELECT count(*) FROM information_schema.columns "
-                                                "WHERE table_name = 'notes' AND column_name = 'content_new'"
-                                            ))
-                                            if check_res.fetchone()[0] == 0:
-                                                logger.info("Step 1: Adding 'content_new' column...")
-                                                conn.execute(text("ALTER TABLE notes ADD COLUMN content_new TEXT"))
-                                                conn.commit()
-
-                                            # 2. Copy data in small batches to stay under 10s init limit
-                                            # Each cold start will copy another batch
-                                            logger.info("Step 2: Copying data batch to 'content_new'...")
-                                            conn.execute(text(
-                                                "UPDATE notes SET content_new = content "
-                                                "WHERE id IN (SELECT id FROM notes WHERE content_new IS NULL LIMIT 500)"
-                                            ))
+                                        # Use the existing 'conn' from line 152
+                                        # 1. Check if content_new already exists
+                                        check_res = conn.execute(text(
+                                            "SELECT count(*) FROM information_schema.columns "
+                                            "WHERE table_name = 'notes' AND column_name = 'content_new'"
+                                        ))
+                                        if check_res.fetchone()[0] == 0:
+                                            logger.info("Step 1: Adding 'content_new' column...")
+                                            conn.execute(text("ALTER TABLE notes ADD COLUMN content_new TEXT"))
                                             conn.commit()
 
-                                            # 3. Check if all rows are copied
-                                            res = conn.execute(text("SELECT count(*) FROM notes WHERE content_new IS NULL"))
-                                            remaining = res.fetchone()[0]
-                                            
-                                            if remaining == 0:
-                                                logger.info("Step 3: Verification passed. Dropping 'content' and renaming 'content_new'...")
-                                                conn.execute(text("ALTER TABLE notes DROP COLUMN content"))
-                                                conn.commit()
-                                                conn.execute(text("ALTER TABLE notes RENAME COLUMN content_new TO content"))
-                                                conn.commit()
+                                        # 2. Copy data in small batches to stay under 10s init limit
+                                        # Each cold start will copy another batch
+                                        logger.info("Step 2: Copying data batch to 'content_new'...")
+                                        conn.execute(text(
+                                            "UPDATE notes SET content_new = content "
+                                            "WHERE id IN (SELECT id FROM notes WHERE content_new IS NULL LIMIT 500)"
+                                        ))
+                                        conn.commit()
 
-                                                try:
-                                                    conn.execute(text("ALTER TABLE notes ALTER COLUMN content SET NOT NULL"))
-                                                    conn.commit()
-                                                except Exception:
-                                                    pass # DSQL might not support SET NOT NULL
+                                        # 3. Check if all rows are copied
+                                        res = conn.execute(text("SELECT count(*) FROM notes WHERE content_new IS NULL"))
+                                        remaining = res.fetchone()[0]
+                                        
+                                        if remaining == 0:
+                                            logger.info("Step 3: Verification passed. Dropping 'content' and renaming 'content_new'...")
+                                            conn.execute(text("ALTER TABLE notes DROP COLUMN content"))
+                                            conn.commit()
+                                            conn.execute(text("ALTER TABLE notes RENAME COLUMN content_new TO content"))
+                                            conn.commit()
 
-                                                logger.info("Successfully migrated 'content' column to TEXT")
-                                            else:
-                                                logger.info(f"Step 2 incomplete: {remaining} rows left. Migration will continue on next start.")
+                                            try:
+                                                conn.execute(text("ALTER TABLE notes ALTER COLUMN content SET NOT NULL"))
+                                                conn.commit()
+                                            except Exception:
+                                                pass # DSQL might not support SET NOT NULL
+
+                                            logger.info("Successfully migrated 'content' column to TEXT")
+                                        else:
+                                            logger.info(f"Step 2 incomplete: {remaining} rows left. Migration will continue on next start.")
                                     except Exception as migration_error:
                                         # Log but don't re-raise to allow app to start using old column
                                         logger.error(f"Migration dance step failed: {migration_error}")

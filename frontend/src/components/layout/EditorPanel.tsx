@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Clock } from "@/components/Clock";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
@@ -605,7 +606,7 @@ export function EditorPanel({
       </div>
 
       {/* Status bar */}
-      <div className="flex flex-wrap items-center justify-between px-4 md:px-6 py-2 border-t border-border/50 text-xs text-muted-foreground gap-y-2">
+      <div className="relative flex flex-wrap items-center justify-between px-4 md:px-6 py-2 border-t border-border/50 text-xs text-muted-foreground gap-y-2">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1">
             {saveError ? (
@@ -637,6 +638,12 @@ export function EditorPanel({
             </span>
           </div>
         </div>
+        
+        {/* Clock - Absolutely centered */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+           <Clock />
+        </div>
+        
         <div className="whitespace-nowrap">
           {t("editor.lastSaved")}: {new Date(note.updated_at).toLocaleString("ja-JP", {
             year: "numeric",

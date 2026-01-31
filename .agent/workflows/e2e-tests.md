@@ -15,3 +15,9 @@ description: Run E2E tests against dev or prd environment
    ```bash
    make test-e2e-prd
    ```
+
+3. Review the test results.
+
+4. If any tests fail, address the issues in the code.
+
+5. Repeat the process until all tests pass.

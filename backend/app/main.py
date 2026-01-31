@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -13,8 +13,7 @@ settings_app = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup: create database tables
-    create_db_and_tables()
+    # We move database initialization to the first request to avoid Lambda's 10s init timeout
     yield
     # Shutdown: cleanup
 
@@ -41,6 +40,19 @@ app.include_router(folders.router, prefix="/api/folders", tags=["folders"])
 app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
+
+
+_db_initialized = False
+
+
+@app.middleware("http")
+async def db_init_middleware(request: Request, call_next):
+    """Ensure database is initialized on the first request."""
+    global _db_initialized
+    if not _db_initialized and not request.url.path.endswith("/health"):
+        create_db_and_tables()
+        _db_initialized = True
+    return await call_next(request)
 
 
 @app.get("/health")

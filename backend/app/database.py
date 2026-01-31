@@ -163,16 +163,47 @@ def create_db_and_tables() -> None:
                                 logger.info(f"Current 'content' column type: {current_type}")
                                 
                                 if current_type.lower() != 'text':
-                                    logger.info("Migrating properties 'content' to TEXT...")
-                                    # This command changes the type to TEXT.
-                                    # TEXT is compatible with VARCHAR, so data conversion should be automatic.
-                                    conn.execute(
-                                        text("ALTER TABLE notes ALTER COLUMN content TYPE TEXT")
-                                    )
-                                    conn.commit()
-                                    logger.info(
-                                        "Successfully changed 'content' column in 'notes' to TYPE TEXT"
-                                    )
+                                    logger.info("Migrating 'content' column to TEXT using add/copy/drop/rename dance...")
+                                    # DSQL workaround since ALTER COLUMN TYPE is not supported
+                                    try:
+                                        with engine.connect() as conn:
+                                            # 1. Check if content_new already exists
+                                            check_res = conn.execute(text(
+                                                "SELECT count(*) FROM information_schema.columns "
+                                                "WHERE table_name = 'notes' AND column_name = 'content_new'"
+                                            ))
+                                            if check_res.fetchone()[0] == 0:
+                                                logger.info("Step 1: Adding 'content_new' column...")
+                                                conn.execute(text("ALTER TABLE notes ADD COLUMN content_new TEXT"))
+                                                conn.commit()
+
+                                            # 2. Copy data
+                                            logger.info("Step 2: Copying data to 'content_new'...")
+                                            conn.execute(text("UPDATE notes SET content_new = content WHERE content_new IS NULL"))
+                                            conn.commit()
+
+                                            # 3. Drop old column
+                                            logger.info("Step 3: Dropping 'content' column...")
+                                            conn.execute(text("ALTER TABLE notes DROP COLUMN content"))
+                                            conn.commit()
+
+                                            # 4. Rename new column
+                                            logger.info("Step 4: Renaming 'content_new' to 'content'...")
+                                            conn.execute(text("ALTER TABLE notes RENAME COLUMN content_new TO content"))
+                                            conn.commit()
+
+                                            # 5. Restore NOT NULL if possible
+                                            try:
+                                                logger.info("Step 5: Setting NOT NULL constraint...")
+                                                conn.execute(text("ALTER TABLE notes ALTER COLUMN content SET NOT NULL"))
+                                                conn.commit()
+                                            except Exception as nn_e:
+                                                logger.warning(f"Could not set NOT NULL (ignoring): {nn_e}")
+
+                                            logger.info("Successfully migrated 'content' column to TEXT")
+                                    except Exception as migration_error:
+                                        logger.error(f"Migration dance failed: {migration_error}")
+                                        raise
                                 else:
                                      logger.info("'content' column is already TEXT. No migration needed.")
                             else:

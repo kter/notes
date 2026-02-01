@@ -189,7 +189,7 @@ export function useNotes(
     try {
       await notesDB.saveNote(newNote);
       setLocalStatus('saved');
-    } catch (e) {
+    } catch {
       setLocalStatus('failed');
     }
 

@@ -78,6 +78,8 @@ export const en: TranslationKeys = {
     generating: "Generating...",
     lastSaved: "Last saved",
     unsaved: "Unsaved",
+    unsavedStrictMismatch: "Content does not match saved version",
+    unsavedLooseMismatch: "Changes not saved",
     characters: "Characters",
     noNoteSelected: "No note selected",
     selectNoteHint: "Select a note from the list or create a new one",

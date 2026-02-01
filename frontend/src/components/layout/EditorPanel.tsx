@@ -64,6 +64,19 @@ export function EditorPanel({
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
   
+  // Hash-based Verification Logic
+  const [currentHash, setCurrentHash] = useState("");
+  
+  // Calculate hash of current content whenever it changes (debounced slightly to avoid freezing typing)
+  useEffect(() => {
+    const calculate = async () => {
+        const hash = await calculateHash(content);
+        setCurrentHash(hash);
+    };
+    const timer = setTimeout(calculate, 200);
+    return () => clearTimeout(timer);
+  }, [content]);
+  
   // Refs to track the last saved state to avoid loops with optimistic updates
   const lastSavedTitle = useRef(note?.title ?? "");
   const lastSavedContent = useRef(note?.content ?? "");
@@ -505,17 +518,6 @@ export function EditorPanel({
   }
 
   // --- SAVE STATUS LOGIC START ---
-  const [currentHash, setCurrentHash] = useState("");
-  
-  // Calculate hash of current content whenever it changes (debounced slightly to avoid freezing typing)
-  useEffect(() => {
-    const calculate = async () => {
-        const hash = await calculateHash(content);
-        setCurrentHash(hash);
-    };
-    const timer = setTimeout(calculate, 200);
-    return () => clearTimeout(timer);
-  }, [content]);
 
   let statusIcon = null;
   let statusText = "";
@@ -526,7 +528,6 @@ export function EditorPanel({
   const { remote: remoteStatus, lastError, isSaving } = syncStatus;
   
   // Hash-based Verification Logic
-  const contentMatchesServer = savedHash && currentHash && savedHash === currentHash;
   // If no savedHash is available yet (initial load), fall back to remoteStatus checks temporarily
   // Strict mismatch: We have a server hash, and it differs from current.
   const isStrictlyMismatch = !!savedHash && !!currentHash && savedHash !== currentHash;
@@ -548,8 +549,8 @@ export function EditorPanel({
   } else if (isStrictlyMismatch || isLooselyMismatch) {
       // Unsaved state (Strict or Loose)
        statusIcon = <div className="h-2 w-2 rounded-full bg-orange-300" />;
-       statusText = "Unsaved";
-       statusTooltip = isStrictlyMismatch ? "保存された内容と一致しません" : "変更が保存されていません";
+       statusText = t("editor.unsaved");
+       statusTooltip = isStrictlyMismatch ? t("editor.unsavedStrictMismatch") : t("editor.unsavedLooseMismatch");
        statusColorClass = "text-muted-foreground";
   } else {
       // Default / Success / Verified

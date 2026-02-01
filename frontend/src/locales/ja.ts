@@ -76,6 +76,8 @@ export const ja = {
     generating: "生成中...",
     lastSaved: "最終保存",
     unsaved: "未保存",
+    unsavedStrictMismatch: "保存された内容と一致しません",
+    unsavedLooseMismatch: "変更が保存されていません",
     characters: "文字数",
     noNoteSelected: "ノートが選択されていません",
     selectNoteHint: "リストからノートを選択するか、新規作成してください",
@@ -232,6 +234,8 @@ export type TranslationKeys = {
     generating: string;
     lastSaved: string;
     unsaved: string;
+    unsavedStrictMismatch: string;
+    unsavedLooseMismatch: string;
     characters: string;
     noNoteSelected: string;
     selectNoteHint: string;

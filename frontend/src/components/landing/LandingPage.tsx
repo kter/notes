@@ -22,10 +22,10 @@ export function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link href="/login">
-              <Button variant="ghost">Sign In</Button>
+              <Button variant="ghost" data-testid="landing-header-login-button">Sign In</Button>
             </Link>
             <Link href="/register">
-              <Button>Get Started</Button>
+              <Button data-testid="landing-header-register-button">Get Started</Button>
             </Link>
           </div>
         </nav>
@@ -43,13 +43,13 @@ export function LandingPage() {
           </p>
           <div className="flex gap-4 justify-center">
             <Link href="/register">
-              <Button size="lg" className="gap-2">
+              <Button size="lg" className="gap-2" data-testid="landing-hero-register-button">
                 Start for Free
                 <ArrowRightIcon className="h-4 w-4" />
               </Button>
             </Link>
             <Link href="/login">
-              <Button size="lg" variant="outline">
+              <Button size="lg" variant="outline" data-testid="landing-hero-login-button">
                 Sign In
               </Button>
             </Link>

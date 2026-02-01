@@ -99,6 +99,7 @@ export default function RegisterPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={isLoading}
+                    data-testid="register-email-input"
                   />
                 </div>
 
@@ -114,6 +115,7 @@ export default function RegisterPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={isLoading}
+                    data-testid="register-password-input"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     At least 8 characters with uppercase, lowercase, number, and symbol
@@ -132,6 +134,7 @@ export default function RegisterPage() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     disabled={isLoading}
+                    data-testid="register-confirm-password-input"
                   />
                 </div>
 
@@ -141,7 +144,7 @@ export default function RegisterPage() {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full" disabled={isLoading} data-testid="register-submit-button">
                   {isLoading ? (
                     <>
                       <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
@@ -174,6 +177,7 @@ export default function RegisterPage() {
                     required
                     disabled={isLoading}
                     className="text-center text-2xl tracking-widest"
+                    data-testid="register-verification-code-input"
                   />
                 </div>
 
@@ -183,7 +187,7 @@ export default function RegisterPage() {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full" disabled={isLoading} data-testid="register-verify-button">
                   {isLoading ? (
                     <>
                       <Loader2Icon className="h-4 w-4 animate-spin mr-2" />

@@ -11,14 +11,14 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function navigateToLogin(page: Page): Promise<void> {
   await page.goto('/login/');
   
-  const emailInput = page.locator('#email');
+  const emailInput = page.getByTestId('login-email-input');
   
   try {
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });
   } catch {
     // Login form not found directly, try clicking Sign In button from home
     await page.goto('/');
-    await page.getByRole('link', { name: 'Sign In' }).first().click();
+    await page.getByTestId('landing-header-login-button').click();
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   }
 }
@@ -35,9 +35,9 @@ test.describe('Authentication', () => {
       return;
     }
 
-    await page.locator('#email').fill(email);
-    await page.locator('#password').fill(password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
+    await page.getByTestId('login-email-input').fill(email);
+    await page.getByTestId('login-password-input').fill(password);
+    await page.getByTestId('login-submit-button').click();
 
     await expect(page).toHaveURL(/\/$/, { timeout: 15000 });
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible();
@@ -46,9 +46,9 @@ test.describe('Authentication', () => {
   test('should show error on failed login', async ({ page }) => {
     await navigateToLogin(page);
 
-    await page.locator('#email').fill('wrong@example.com');
-    await page.locator('#password').fill('WrongPassword123!');
-    await page.getByRole('button', { name: 'Sign In' }).click();
+    await page.getByTestId('login-email-input').fill('wrong@example.com');
+    await page.getByTestId('login-password-input').fill('WrongPassword123!');
+    await page.getByTestId('login-submit-button').click();
 
     // Wait for either: error message div OR still on login page after timeout
     // The error div has class bg-destructive/10

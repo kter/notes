@@ -79,6 +79,7 @@ export function ThreeColumnLayout({
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
                 onClick={onToggleSidebar}
                 title={t("sidebar.expandSidebar")}
+                data-testid="sidebar-expand-button"
               >
                 <ChevronRightIcon className="h-4 w-4" />
               </Button>
@@ -110,6 +111,7 @@ export function ThreeColumnLayout({
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
                 onClick={onToggleNoteList}
                 title={t("noteList.expandNoteList")}
+                data-testid="note-list-expand-button"
               >
                 <ChevronRightIcon className="h-4 w-4" />
               </Button>
@@ -165,6 +167,7 @@ export function ThreeColumnLayout({
             )}
             onClick={() => onMobileViewChange("folders")}
             aria-label={t("nav.viewFolders")}
+            data-testid="mobile-nav-folders"
           >
             <FolderIcon className="h-5 w-5" />
             <span className="text-xs">{t("nav.folders")}</span>
@@ -178,6 +181,7 @@ export function ThreeColumnLayout({
             )}
             onClick={() => onMobileViewChange("notes")}
             aria-label={t("nav.viewNotes")}
+            data-testid="mobile-nav-notes"
           >
             <FileTextIcon className="h-5 w-5" />
             <span className="text-xs">{t("nav.notes")}</span>
@@ -191,6 +195,7 @@ export function ThreeColumnLayout({
             )}
             onClick={() => onMobileViewChange("editor")}
             aria-label={t("nav.viewEditor")}
+            data-testid="mobile-nav-editor"
           >
             <PenSquareIcon className="h-5 w-5" />
             <span className="text-xs">{t("nav.editor")}</span>
@@ -204,6 +209,7 @@ export function ThreeColumnLayout({
             )}
             onClick={() => onMobileViewChange("chat")}
             aria-label={t("nav.viewChat")}
+            data-testid="mobile-nav-chat"
           >
             <MessageSquareIcon className="h-5 w-5" />
             <span className="text-xs">{t("nav.chat")}</span>

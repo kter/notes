@@ -75,6 +75,7 @@ export function Sidebar({
               className="h-7 w-7 -ml-2 text-muted-foreground hover:text-foreground"
               onClick={onToggleCollapse}
               title={t("sidebar.collapseSidebar")}
+              data-testid="sidebar-collapse-button"
             >
               <PanelLeftCloseIcon className="h-4 w-4" />
             </Button>
@@ -88,6 +89,7 @@ export function Sidebar({
             className="h-7 w-7"
             onClick={() => setIsCreating(true)}
             aria-label={t("sidebar.addFolder")}
+            data-testid="sidebar-add-folder-button"
           >
             <FolderPlusIcon className="h-4 w-4" />
           </Button>
@@ -106,6 +108,7 @@ export function Sidebar({
                 : "text-foreground hover:bg-accent"
             )}
             onClick={() => onSelectFolder(null)}
+            data-testid="sidebar-nav-all-notes"
           >
             <FolderIcon className="h-4 w-4" />
             <span>{t("sidebar.allNotes")}</span>
@@ -125,6 +128,7 @@ export function Sidebar({
                   if (e.key === "Escape" && !isSubmitting) handleCancelCreate();
                 }}
                 className="h-8 text-sm flex-1 min-w-0"
+                data-testid="sidebar-new-folder-input"
               />
               <Button
                 variant="ghost"
@@ -133,6 +137,7 @@ export function Sidebar({
                 onClick={handleCreateFolder}
                 disabled={isSubmitting}
                 aria-label={t("sidebar.confirmCreate")}
+                data-testid="sidebar-new-folder-confirm"
               >
                 {isSubmitting ? (
                   <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -147,6 +152,7 @@ export function Sidebar({
                 onClick={handleCancelCreate}
                 disabled={isSubmitting}
                 aria-label={t("sidebar.cancelCreate")}
+                data-testid="sidebar-new-folder-cancel"
               >
                 <XIcon className="h-4 w-4" />
               </Button>
@@ -168,6 +174,7 @@ export function Sidebar({
                     }}
                     onBlur={() => handleRenameFolder(folder.id)}
                     className="h-8"
+                    data-testid="sidebar-folder-edit-input"
                   />
                 </div>
               ) : (
@@ -179,6 +186,7 @@ export function Sidebar({
                       : "text-foreground hover:bg-accent"
                   )}
                   onClick={() => onSelectFolder(folder.id)}
+                  data-testid={`sidebar-folder-item-${folder.id}`}
                 >
                   <FolderIcon className="h-4 w-4 flex-shrink-0" />
                   <span className="truncate flex-1 text-left">{folder.name}</span>
@@ -199,6 +207,7 @@ export function Sidebar({
                         setEditingId(folder.id);
                         setEditingName(folder.name);
                       }}
+                      data-testid="sidebar-folder-rename-button"
                     >
                       <PencilIcon className="h-3 w-3" />
                     </Button>
@@ -212,6 +221,7 @@ export function Sidebar({
                           onDeleteFolder(folder.id);
                         }
                       }}
+                      data-testid="sidebar-folder-delete-button"
                     >
                       <TrashIcon className="h-3 w-3" />
                     </Button>

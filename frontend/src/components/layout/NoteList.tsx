@@ -160,6 +160,7 @@ export function NoteList({
                     className="h-7 w-7 -ml-2 text-muted-foreground hover:text-foreground"
                     onClick={onToggleCollapse}
                     title={t("noteList.collapseNoteList")}
+                    data-testid="note-list-collapse-button"
                   >
                     <PanelLeftCloseIcon className="h-4 w-4" />
                   </Button>
@@ -174,6 +175,7 @@ export function NoteList({
                     className="h-6 w-6 flex-shrink-0"
                     onClick={handleStartEdit}
                     title={t("noteList.renameFolder")}
+                    data-testid="note-list-rename-folder-button"
                   >
                     <PencilIcon className="h-3 w-3" />
                   </Button>
@@ -185,6 +187,7 @@ export function NoteList({
                     className="h-6 w-6 flex-shrink-0 text-destructive hover:text-destructive"
                     onClick={handleDelete}
                     title={t("noteList.deleteFolder")}
+                    data-testid="note-list-delete-folder-button"
                   >
                     <TrashIcon className="h-3 w-3" />
                   </Button>
@@ -197,6 +200,7 @@ export function NoteList({
                 onClick={handleCreate}
                 disabled={isCreating}
                 aria-label={t("noteList.addNote")}
+                data-testid="note-list-add-note-button"
               >
                 {isCreating ? (
                   <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -216,6 +220,7 @@ export function NoteList({
             onChange={(e) => onSearchChange?.(e.target.value)}
             placeholder={t("noteList.searchPlaceholder")}
             className="h-8 pl-8 text-sm bg-muted/50 border-transparent focus:bg-background focus:border-input transition-colors"
+            data-testid="note-list-search-input"
           />
           {searchQuery && (
             <button
@@ -249,6 +254,7 @@ export function NoteList({
                     className="text-primary hover:underline mt-2 flex items-center gap-1 mx-auto"
                     onClick={handleCreate}
                     disabled={isCreating}
+                    data-testid="note-list-empty-create-button"
                   >
                     {isCreating && <Loader2Icon className="h-3 w-3 animate-spin" />}
                     {t("noteList.createOne")}
@@ -267,7 +273,7 @@ export function NoteList({
                     : "hover:bg-accent"
                 )}
                 onClick={() => onSelectNote(note.id)}
-                data-testid="note-list-item"
+                data-testid={`note-list-item-${note.id}`}
               >
                 <div className="flex items-start gap-2">
                   <FileTextIcon className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />

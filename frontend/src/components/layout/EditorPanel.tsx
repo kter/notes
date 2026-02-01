@@ -578,6 +578,7 @@ export function EditorPanel({
               size="sm"
               onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
               className="gap-1 md:gap-2"
+              data-testid="editor-folder-dropdown"
             >
               <FolderIcon className="h-4 w-4" />
               <span className="max-w-[80px] md:max-w-[120px] truncate hidden sm:inline">
@@ -626,6 +627,7 @@ export function EditorPanel({
             disabled={isSummarizing}
             className="gap-1 md:gap-2"
             aria-label={t("editor.summarizeNote")}
+            data-testid="editor-summarize-button"
           >
             {isSummarizing ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -640,6 +642,7 @@ export function EditorPanel({
               onClick={onOpenChat}
               className="gap-1 md:gap-2"
               aria-label={t("editor.toggleChat")}
+              data-testid="editor-chat-button"
             >
               <MessageSquareIcon className="h-4 w-4" />
               <span className="hidden md:inline">{t("editor.chat")}</span>
@@ -652,6 +655,7 @@ export function EditorPanel({
                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                 className="gap-1 md:gap-2"
                 aria-label={t("editor.exportNote")}
+                data-testid="editor-export-dropdown"
               >
                 <DownloadIcon className="h-4 w-4" />
                 <span className="hidden md:inline">{t("editor.export")}</span>
@@ -663,6 +667,7 @@ export function EditorPanel({
                   <button
                     className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
                     onClick={handleExportMarkdown}
+                    data-testid="editor-export-markdown"
                   >
                     {t("editor.markdown")}
                   </button>
@@ -682,6 +687,7 @@ export function EditorPanel({
             size="sm"
             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
             className="gap-1 md:gap-2"
+            data-testid="editor-preview-toggle"
           >
             {isPreviewOpen ? (
               <EyeOffIcon className="h-4 w-4" />
@@ -700,6 +706,7 @@ export function EditorPanel({
               onDeleteNote(note.id);
             }
           }}
+          data-testid="editor-delete-note-button"
         >
           <TrashIcon className="h-4 w-4" />
         </Button>
@@ -718,6 +725,7 @@ export function EditorPanel({
               onBlur={handleBlur}
               placeholder={t("editor.noteTitlePlaceholder")}
               className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
+              data-testid="editor-title-input"
             />
             <Button
               variant="ghost"
@@ -726,6 +734,7 @@ export function EditorPanel({
               onClick={handleGenerateTitle}
               disabled={!content.trim() || isGeneratingTitle}
               title={t("editor.generateTitleFromContent")}
+              data-testid="editor-generate-title-button"
             >
               {isGeneratingTitle ? (
                 <Loader2Icon className="h-4 w-4 animate-spin" />
@@ -755,6 +764,7 @@ export function EditorPanel({
               onBlur={handleBlur}
               placeholder={t("editor.noteContentPlaceholder")}
               className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
+              data-testid="editor-content-input"
             />
           </div>
           

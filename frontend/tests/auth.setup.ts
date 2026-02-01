@@ -15,7 +15,7 @@ setup('authenticate', async ({ page, baseURL }) => {
   await page.goto('/login/');
 
   // 3. Fallback: If we don't see the email field, try clicking the Sign In button from home
-  const emailInput = page.getByLabel('Email');
+  const emailInput = page.getByTestId('login-email-input');
   try {
     // Wait briefly for the login form
     await emailInput.waitFor({ state: 'visible', timeout: 5000 });
@@ -23,7 +23,7 @@ setup('authenticate', async ({ page, baseURL }) => {
     console.log(`[E2E Setup] Login form not found directly, trying to click 'Sign In' button...`);
     await page.goto('/');
     // There might be multiple Sign In buttons (header and hero), but any will do
-    await page.getByRole('link', { name: 'Sign In' }).first().click();
+    await page.getByTestId('landing-header-login-button').first().click();
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   }
 
@@ -37,8 +37,8 @@ setup('authenticate', async ({ page, baseURL }) => {
 
   console.log(`[E2E Setup] Filling credentials for ${email}`);
   await emailInput.fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.getByTestId('login-password-input').fill(password);
+  await page.getByTestId('login-submit-button').click();
 
   // 5. Wait for navigation to complete (logged in home page has no "Sign In" button or has specific headers)
   console.log(`[E2E Setup] Waiting for post-login navigation...`);
@@ -51,7 +51,7 @@ setup('authenticate', async ({ page, baseURL }) => {
     await expect(page.getByRole('heading', { name: /Folders|フォルダ|sidebar\.folders/i })).toBeVisible({ timeout: 5000 });
   } catch {
     console.log('[E2E Setup] Heading not found, checking for All Notes button...');
-    await expect(page.getByText(/All Notes|すべてのノート|sidebar\.allNotes/i)).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText(/All Notes|すべてのノート|sidebar\.allNotes/i).first()).toBeVisible({ timeout: 30000 });
   }
 
   console.log(`[E2E Setup] Authentication successful!`);

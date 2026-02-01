@@ -60,6 +60,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                data-testid="login-email-input"
               />
             </div>
 
@@ -75,6 +76,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                data-testid="login-password-input"
               />
             </div>
 
@@ -88,6 +90,7 @@ export default function LoginPage() {
               type="submit"
               className="w-full"
               disabled={isLoading}
+              data-testid="login-submit-button"
             >
               {isLoading ? (
                 <>
@@ -102,7 +105,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don&apos;t have an account? </span>
-            <Link href="/register" className="text-primary hover:underline">
+            <Link href="/register" className="text-primary hover:underline" data-testid="login-signup-link">
               Sign up
             </Link>
           </div>

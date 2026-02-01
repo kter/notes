@@ -7,37 +7,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
 import { useApi, useTranslation } from "@/hooks";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, AlertCircleIcon, HashIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, XIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { remarkSourceLine } from "@/lib/remark-source-line";
-
-// Debounce helper
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function useDebounce<T extends (...args: any[]) => void>(
-  callback: T,
-  delay: number
-): T {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const callbackRef = useRef(callback);
-
-  useEffect(() => {
-    callbackRef.current = callback;
-  }, [callback]);
-
-  return useCallback(
-    (...args: Parameters<T>) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        callbackRef.current(...args);
-      }, delay);
-    },
-    [delay]
-  ) as T;
-}
+import type { SyncStatus } from "@/hooks/useNotes";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface EditorPanelProps {
   note: Note | null;
@@ -48,9 +29,8 @@ interface EditorPanelProps {
   onOpenChat: () => void;
   isChatOpen: boolean;
   isSummarizing?: boolean;
-  isSaving?: boolean;
-  saveError?: string | null;
-  savedLocally?: boolean;
+  syncStatus: SyncStatus;
+  triggerServerSync?: (id: string) => void;
 }
 
 export function EditorPanel({
@@ -62,9 +42,8 @@ export function EditorPanel({
   onOpenChat,
   isChatOpen,
   isSummarizing = false,
-  isSaving = false,
-  saveError = null,
-  savedLocally = false,
+  syncStatus,
+  triggerServerSync,
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -85,16 +64,31 @@ export function EditorPanel({
   // Refs to track the last saved state to avoid loops with optimistic updates
   const lastSavedTitle = useRef(note?.title ?? "");
   const lastSavedContent = useRef(note?.content ?? "");
+  
+  // Refs to track current state for immediate access in callbacks
+  const currentTitleRef = useRef(title);
+  const currentContentRef = useRef(content);
 
   // Update refs when note changes to a different one (switched notes)
   useEffect(() => {
     lastSavedTitle.current = note?.title ?? "";
     lastSavedContent.current = note?.content ?? "";
+    currentTitleRef.current = note?.title ?? "";
+    currentContentRef.current = note?.content ?? "";
     // We also need to update local state if the note prop changes and it's NOT what we just saved.
     // However, the existing logic `useState(note?.title)` only runs on mount.
     // The key={note.id} in parent ensures re-mount on switch.
     // So we don't need to sync state here, just refs.
   }, [note?.id, note?.title, note?.content]);
+
+  // Trigger server sync on unmount or when switching notes
+  useEffect(() => {
+    return () => {
+      if (note && triggerServerSync) {
+        triggerServerSync(note.id);
+      }
+    };
+  }, [note?.id, triggerServerSync]);
 
   // Auto-save effect
   useEffect(() => {
@@ -135,10 +129,25 @@ export function EditorPanel({
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
+    currentTitleRef.current = value;
   };
 
   const handleContentChange = (value: string) => {
     setContent(value);
+    currentContentRef.current = value;
+  };
+  
+  const handleBlur = () => {
+    // Use refs to check for changes to ensure we have the latest values
+    if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
+       onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
+       lastSavedTitle.current = currentTitleRef.current;
+       lastSavedContent.current = currentContentRef.current;
+    }
+    
+    if (note && triggerServerSync) {
+      triggerServerSync(note.id);
+    }
   };
 
   const handleFolderChange = (folderId: string | null) => {
@@ -492,6 +501,47 @@ export function EditorPanel({
     );
   }
 
+  // --- SAVE STATUS LOGIC START ---
+  let statusIcon = null;
+  let statusText = "";
+  let statusTooltip = "";
+  let statusColorClass = "";
+
+  // Destructure syncStatus
+  const { remote: remoteStatus, lastError, isSaving } = syncStatus;
+
+  // Sync Logic Refinement per user feedback:
+  // 1. Saving API running -> Saving...
+  // 2. Previous Save API Success -> Saved (Green)
+  // 3. Previous Save API Failed -> Failed (Saved locally) (Orange)
+  // Note: "Saved locally" state (remote pending) is treated as "Saved" (Green) to hide internal state.
+
+  if (isSaving) {
+    statusIcon = <Loader2Icon className="h-3 w-3 animate-spin" />;
+    statusText = t("common.loading");
+    statusTooltip = "リモートに保存中...";
+    statusColorClass = "text-muted-foreground";
+  } else if (remoteStatus === 'failed') {
+      // Remote Failed
+      statusIcon = <CheckIcon className="h-3 w-3" />;
+      statusText = "Failed (Saved locally)";
+      statusTooltip = "ローカルには保存されましたが、リモートへの保存に失敗しました";
+      statusColorClass = "text-orange-500";
+  } else {
+      // Default / Success / Saved Locally (Pending)
+      // Treat as Success
+      statusIcon = <CheckIcon className="h-3 w-3" />;
+      statusText = t("common.saved");
+      statusTooltip = "保存済み"; // Simplified tooltip
+      statusColorClass = "text-green-500";
+  }
+
+  // Append error detail if present
+  if (lastError) {
+      statusTooltip += ` (${lastError})`;
+  }
+  // --- SAVE STATUS LOGIC END ---
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
@@ -540,7 +590,15 @@ export function EditorPanel({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onSummarize(note.id)}
+            onClick={() => {
+              // Ensure we save any pending changes before summarizing
+              if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
+                  onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
+                  lastSavedTitle.current = currentTitleRef.current;
+                  lastSavedContent.current = currentContentRef.current;
+              }
+              onSummarize(note.id);
+            }}
             disabled={isSummarizing}
             className="gap-1 md:gap-2"
             aria-label={t("editor.summarizeNote")}
@@ -633,6 +691,7 @@ export function EditorPanel({
               id="note-title"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
+              onBlur={handleBlur}
               placeholder={t("editor.noteTitlePlaceholder")}
               className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
             />
@@ -669,10 +728,12 @@ export function EditorPanel({
               onChange={(e) => handleContentChange(e.target.value)}
               onKeyDown={handleKeyDown}
               onScroll={handleEditorScroll}
+              onBlur={handleBlur}
               placeholder={t("editor.noteContentPlaceholder")}
               className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
             />
           </div>
+          
           
           {/* Markdown Preview Column */}
           {isPreviewOpen && (
@@ -699,28 +760,20 @@ export function EditorPanel({
       {/* Status bar */}
       <div className="relative flex flex-wrap items-center justify-between px-4 md:px-6 py-2 border-t border-border/50 text-xs text-muted-foreground gap-y-2">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            {saveError ? (
-              <>
-                <AlertCircleIcon className="h-3 w-3 text-destructive" />
-                <span className="text-destructive font-medium">{saveError}</span>
-              </>
-            ) : isSaving ? (
-              <>
-                <Loader2Icon className="h-3 w-3 animate-spin" />
-                <span>{t("common.loading")}</span>
-              </>
-            ) : savedLocally ? (
-              <>
-                <CheckIcon className="h-3 w-3 text-amber-500" />
-                <span className="text-amber-600">{t("sync.savedLocally")}</span>
-              </>
-            ) : (
-              <>
-                <CheckIcon className="h-3 w-3 text-green-500" />
-                <span>{t("common.saved")}</span>
-              </>
-            )}
+          <div className="flex items-center gap-1" data-testid="sync-status">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`flex items-center gap-1 cursor-help ${statusColorClass}`}>
+                    {statusIcon}
+                    <span className="font-medium">{statusText}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{statusTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <div className="flex items-center gap-1 border-l border-border/50 pl-4">
             <HashIcon className="h-3 w-3" />

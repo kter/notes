@@ -56,16 +56,15 @@ export default function Home() {
   };
 
   const {
-    isSaving,
-    saveError,
-    savedLocally,
+    syncStatus,
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
+    triggerServerSync,
   } = useNotes(notes, setNotes, selectedFolderId, selectedNoteId, handleSelectNote);
 
   // Offline sync
-  const { isOnline, syncStatus, pendingChangesCount } = useOfflineSync();
+  const { isOnline, syncStatus: offlineSyncStatus, pendingChangesCount } = useOfflineSync();
 
   const {
     chatMessages,
@@ -201,7 +200,8 @@ export default function Home() {
               folders={folders}
               onUpdateNote={handleUpdateNote}
               onDeleteNote={handleDeleteNote}
-              onSummarize={(id) => {
+              onSummarize={async (id) => {
+                await triggerServerSync(id);
                 handleSummarize(id);
                 setIsChatOpen(true);
                 setMobileView("chat");
@@ -209,9 +209,8 @@ export default function Home() {
               onOpenChat={() => setIsChatOpen(!isChatOpen)}
               isChatOpen={isChatOpen}
               isSummarizing={isAILoading}
-              isSaving={isSaving}
-              saveError={saveError}
-              savedLocally={savedLocally}
+              syncStatus={syncStatus}
+              triggerServerSync={triggerServerSync}
             />
             <AIChatPanel
               isOpen={isChatOpen}
@@ -232,10 +231,10 @@ export default function Home() {
     {/* Sync Status Indicator */}
     <SyncStatusIndicator
       isOnline={isOnline}
-      syncStatus={syncStatus}
+      syncStatus={offlineSyncStatus}
       pendingChangesCount={pendingChangesCount}
-      savedLocally={savedLocally}
-      className="fixed bottom-4 right-4 z-50"
+      savedLocally={false}
+      className="fixed bottom-20 md:bottom-4 right-4 z-50"
     />
     <SettingsDialog
       open={isSettingsOpen}

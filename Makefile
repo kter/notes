@@ -114,7 +114,8 @@ deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend
 tf-switch: ## Re-initialize backend and switch workspace based on ENV (dev/prd)
 	@echo "Switching to $(ENV) environment..."
 	cd terraform && \
-	AWS_PROFILE=$(AWS_PROFILE) terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
+	export AWS_PROFILE=$(AWS_PROFILE) && \
+	terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
 	(terraform workspace select $(ENV) || terraform workspace new $(ENV))
 
 .PHONY: tf-init

@@ -3,6 +3,7 @@ import { Folder, Note } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { useApi } from "./useApi";
 import { notesDB } from "@/lib/indexedDB";
+import { mergeNotes, mergeFolders } from "@/lib/merge";
 
 export function useHomeData(isAuthenticated: boolean) {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -46,15 +47,12 @@ export function useHomeData(isAuthenticated: boolean) {
             apiClient.listNotes(),
           ]);
 
-          // 3. Merge strategy: Server data takes precedence
-          // But keep local-only items (temp notes created offline)
-          const localOnlyNotes = localNotes.filter(
-            (ln) => ln.id.startsWith("temp-") && !serverNotes.some((sn) => sn.id === ln.id)
-          );
+          // 3. Merge strategy: Last Write Wins
+          // Use our merge utility to handle conflicts based on updated_at
+          const mergedFolders = mergeFolders(localFolders, serverFolders);
+          const mergedNotes = mergeNotes(localNotes, serverNotes);
           
-          const mergedNotes = [...serverNotes, ...localOnlyNotes];
-          
-          setFolders(serverFolders);
+          setFolders(mergedFolders);
           setNotes(mergedNotes);
 
           // 4. Update IndexedDB with server data

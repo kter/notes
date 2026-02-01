@@ -5,6 +5,7 @@ import { useApi } from "./useApi";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import type { Note } from "@/types";
+import { calculateHash } from "@/lib/utils";
 
 // Enhanced debounce helper that exposes cancellation and flushing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,6 +77,7 @@ interface UseNotesReturn {
   handleUpdateNote: (id: string, updates: { title?: string; content?: string; folder_id?: string | null }) => void;
   handleDeleteNote: (id: string) => Promise<void>;
   triggerServerSync: (id: string) => Promise<void> | void;
+  savedHashes: Record<string, string>;
 }
 
 export function useNotes(
@@ -95,6 +97,8 @@ export function useNotes(
 
   // Derived aggregate saving state
   const isSaving = remoteStatus === 'syncing';
+
+  const [savedHashes, setSavedHashes] = useState<Record<string, string>>({});
 
   // Separate function for server sync
   const syncNoteToServer = async (
@@ -121,6 +125,10 @@ export function useNotes(
             
             // Save the authoritative version to DB as well
             await notesDB.saveNote(serverNote);
+            
+            // Update saved hash for this note to confirm content integrity
+            const hash = await calculateHash(serverNote.content);
+            setSavedHashes(prev => ({ ...prev, [id]: hash }));
             
             setRemoteStatus('synced');
             // Local is implicitly saved if we just wrote the authoritative version
@@ -195,6 +203,10 @@ export function useNotes(
           folder_id: selectedFolderId,
         });
         
+        // Update saved hash for the new note
+        const hash = await calculateHash(serverNote.content);
+        setSavedHashes(prev => ({ ...prev, [serverNote.id]: hash }));
+        
         // Replace temp note with server note
         setNotes((prev) =>
           prev.map((n) => (n.id === tempId ? serverNote : n))
@@ -265,6 +277,13 @@ export function useNotes(
       if (selectedNoteId === id) {
         setSelectedNoteId(null);
       }
+      
+      // Clear hash on delete
+      setSavedHashes(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
 
       // Delete from IndexedDB
       await notesDB.deleteNote(id);
@@ -311,6 +330,7 @@ export function useNotes(
       lastError,
       isSaving
     },
+    savedHashes,
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,

@@ -61,6 +61,7 @@ export default function Home() {
     handleUpdateNote,
     handleDeleteNote,
     triggerServerSync,
+    savedHashes,
   } = useNotes(notes, setNotes, selectedFolderId, selectedNoteId, handleSelectNote);
 
   // Offline sync
@@ -211,6 +212,7 @@ export default function Home() {
               isSummarizing={isAILoading}
               syncStatus={syncStatus}
               triggerServerSync={triggerServerSync}
+              savedHash={selectedNote ? savedHashes[selectedNote.id] : undefined}
             />
             <AIChatPanel
               isOpen={isChatOpen}

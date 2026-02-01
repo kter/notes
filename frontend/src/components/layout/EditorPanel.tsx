@@ -13,6 +13,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { remarkSourceLine } from "@/lib/remark-source-line";
 import type { SyncStatus } from "@/hooks/useNotes";
+import { calculateHash } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -31,6 +32,7 @@ interface EditorPanelProps {
   isSummarizing?: boolean;
   syncStatus: SyncStatus;
   triggerServerSync?: (id: string) => void;
+  savedHash?: string;
 }
 
 export function EditorPanel({
@@ -44,6 +46,7 @@ export function EditorPanel({
   isSummarizing = false,
   syncStatus,
   triggerServerSync,
+  savedHash,
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -502,6 +505,18 @@ export function EditorPanel({
   }
 
   // --- SAVE STATUS LOGIC START ---
+  const [currentHash, setCurrentHash] = useState("");
+  
+  // Calculate hash of current content whenever it changes (debounced slightly to avoid freezing typing)
+  useEffect(() => {
+    const calculate = async () => {
+        const hash = await calculateHash(content);
+        setCurrentHash(hash);
+    };
+    const timer = setTimeout(calculate, 200);
+    return () => clearTimeout(timer);
+  }, [content]);
+
   let statusIcon = null;
   let statusText = "";
   let statusTooltip = "";
@@ -509,12 +524,15 @@ export function EditorPanel({
 
   // Destructure syncStatus
   const { remote: remoteStatus, lastError, isSaving } = syncStatus;
-
-  // Sync Logic Refinement per user feedback:
-  // 1. Saving API running -> Saving...
-  // 2. Previous Save API Success -> Saved (Green)
-  // 3. Previous Save API Failed -> Failed (Saved locally) (Orange)
-  // Note: "Saved locally" state (remote pending) is treated as "Saved" (Green) to hide internal state.
+  
+  // Hash-based Verification Logic
+  const contentMatchesServer = savedHash && currentHash && savedHash === currentHash;
+  // If no savedHash is available yet (initial load), fall back to remoteStatus checks temporarily
+  // Strict mismatch: We have a server hash, and it differs from current.
+  const isStrictlyMismatch = !!savedHash && !!currentHash && savedHash !== currentHash;
+  
+  // Loose mismatch: We don't have a hash yet (first edit), but the system knows it's unsynced.
+  const isLooselyMismatch = !savedHash && remoteStatus === 'unsynced';
 
   if (isSaving) {
     statusIcon = <Loader2Icon className="h-3 w-3 animate-spin" />;
@@ -527,12 +545,17 @@ export function EditorPanel({
       statusText = "Failed (Saved locally)";
       statusTooltip = "ローカルには保存されましたが、リモートへの保存に失敗しました";
       statusColorClass = "text-orange-500";
+  } else if (isStrictlyMismatch || isLooselyMismatch) {
+      // Unsaved state (Strict or Loose)
+       statusIcon = <div className="h-2 w-2 rounded-full bg-orange-300" />;
+       statusText = "Unsaved";
+       statusTooltip = isStrictlyMismatch ? "保存された内容と一致しません" : "変更が保存されていません";
+       statusColorClass = "text-muted-foreground";
   } else {
-      // Default / Success / Saved Locally (Pending)
-      // Treat as Success
+      // Default / Success / Verified
       statusIcon = <CheckIcon className="h-3 w-3" />;
       statusText = t("common.saved");
-      statusTooltip = "保存済み"; // Simplified tooltip
+      statusTooltip = "保存済み (検証完了)";
       statusColorClass = "text-green-500";
   }
 

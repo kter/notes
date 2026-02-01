@@ -79,7 +79,7 @@ export function EditorPanel({
     // However, the existing logic `useState(note?.title)` only runs on mount.
     // The key={note.id} in parent ensures re-mount on switch.
     // So we don't need to sync state here, just refs.
-  }, [note?.id, note?.title, note?.content]);
+  }, [note?.id]);
 
   // Trigger server sync on unmount or when switching notes
   useEffect(() => {

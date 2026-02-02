@@ -102,8 +102,10 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 # =============================================================================
 
 .PHONY: deploy
-deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend
-	@echo "Full deployment complete!"
+deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend, then run tests
+	$(MAKE) test-integration
+	$(MAKE) test-e2e
+	@echo "Full deployment and verification complete!"
 
 # =============================================================================
 # Terraform
@@ -173,6 +175,11 @@ test: test-backend test-lint ## Run all tests
 .PHONY: test-backend
 test-backend: ## Run backend tests
 	cd backend && uv run python -m pytest -v
+
+.PHONY: test-integration
+test-integration: tf-switch ## Run integration tests against the deployed environment
+	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
+	cd backend && API_URL=$(API_URL) uv run pytest tests/integration -v
 
 .PHONY: test-lint
 test-lint: lint-backend lint-frontend ## Run all linters

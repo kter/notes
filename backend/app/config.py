@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # Application settings
     app_name: str = "Notes API"
+    environment: str = "local"
     debug: bool = False
 
     # Database settings

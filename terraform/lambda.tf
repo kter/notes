@@ -18,6 +18,7 @@ resource "aws_lambda_function" "api" {
       BEDROCK_MODEL_ID       = "anthropic.claude-3-5-sonnet-20240620-v1:0"
       DSQL_CLUSTER_ENDPOINT  = aws_dsql_cluster.main.identifier
       CORS_ORIGINS           = jsonencode(["https://${local.current_env.domain_name}"])
+      ENVIRONMENT            = terraform.workspace
     }
   }
 

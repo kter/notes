@@ -52,6 +52,17 @@ class CognitoJWTVerifier:
         Raises:
             JWTError: If token verification fails
         """
+        # ----------------------------------------------------------------------
+        # BYPASS FOR INTEGRATION TESTING IN DEV ENVIRONMENT
+        # ----------------------------------------------------------------------
+        if settings.environment == "dev" and token == "dev-integration-test-token":
+            return {
+                "sub": "integration-test-user-id",
+                "username": "integration-test-user",
+                "token_use": "access",
+                "scope": "aws.cognito.signin.user.admin",
+            }
+
         jwks = await self._get_jwks()
         signing_key = self._get_signing_key(token, jwks)
 

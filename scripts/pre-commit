@@ -18,7 +18,7 @@ PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 
 # Backend tests
 echo ""
-echo "${YELLOW}[1/3] Running backend tests...${NC}"
+echo "${YELLOW}[1/4] Running backend tests...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 # Check if uv is available
@@ -35,7 +35,7 @@ fi
 
 # Frontend lint
 echo ""
-echo "${YELLOW}[2/3] Running frontend lint...${NC}"
+echo "${YELLOW}[2/4] Running frontend lint...${NC}"
 cd "$PROJECT_ROOT/frontend"
 
 if npm run lint --silent 2>/dev/null; then
@@ -45,9 +45,24 @@ else
     FAILED=1
 fi
 
+# Frontend unit tests
+echo ""
+echo "${YELLOW}[3/4] Running frontend unit tests...${NC}"
+# Use run to exclude watch mode if needed, though 'vitest run' is implicit in CI=true or just 'vitest run'. 
+# Standard 'npm run test' usually runs 'vitest' which is watch mode by default in dev.
+# We should ensure package.json script is 'vitest run' or pass argument here.
+# Let's check package.json "test": "vitest" -> this defaults to watch in dev.
+# Force single run with 'npm run test -- --run'
+if npm run test -- --run --silent 2>/dev/null; then
+    echo "${GREEN}✓ Frontend unit tests passed${NC}"
+else
+    echo "${RED}✗ Frontend unit tests failed${NC}"
+    FAILED=1
+fi
+
 # Backend lint (ruff)
 echo ""
-echo "${YELLOW}[3/3] Running backend lint (ruff)...${NC}"
+echo "${YELLOW}[4/4] Running backend lint (ruff)...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 if command -v uv &> /dev/null; then

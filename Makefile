@@ -170,11 +170,15 @@ clean: ## Clean build artifacts
 # =============================================================================
 
 .PHONY: test
-test: test-backend test-lint ## Run all tests
+test: test-backend test-frontend test-lint ## Run all tests
 
 .PHONY: test-backend
 test-backend: ## Run backend tests
 	cd backend && uv run python -m pytest -v
+
+.PHONY: test-frontend
+test-frontend: ## Run frontend unit tests
+	cd frontend && npm run test -- --run
 
 .PHONY: test-integration
 test-integration: tf-switch ## Run integration tests against the deployed environment

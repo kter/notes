@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
 import { useApi, useTranslation } from "@/hooks";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, XIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -95,7 +95,7 @@ export function EditorPanel({
     // However, the existing logic `useState(note?.title)` only runs on mount.
     // The key={note.id} in parent ensures re-mount on switch.
     // So we don't need to sync state here, just refs.
-  }, [note?.id]);
+  }, [note?.id, note?.title, note?.content]);
 
   // Trigger server sync on unmount or when switching notes
   useEffect(() => {
@@ -104,7 +104,7 @@ export function EditorPanel({
         triggerServerSync(note.id);
       }
     };
-  }, [note?.id, triggerServerSync]);
+  }, [note, triggerServerSync]);
 
   // Auto-save effect
   useEffect(() => {
@@ -127,7 +127,7 @@ export function EditorPanel({
 
     return () => clearTimeout(handler);
     // Remove `note` from dependencies, only depend on `note.id`
-  }, [title, content, note?.id, onUpdateNote]);
+  }, [title, content, note, onUpdateNote]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -328,7 +328,7 @@ export function EditorPanel({
       // Insert 2 spaces at current cursor position
       document.execCommand("insertText", false, "  ");
     }
-  }, [note, onUpdateNote]);
+  }, []);
 
   // Handle Enter key for list continuation
   const handleEnterKey = useCallback((
@@ -382,7 +382,7 @@ export function EditorPanel({
         textarea.focus();
       });
     }
-  }, [note, onUpdateNote, getListMarkerInfo]);
+  }, [getListMarkerInfo]);
 
   // Main keyboard event handler - delegates to specific handlers
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {

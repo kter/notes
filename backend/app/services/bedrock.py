@@ -5,6 +5,7 @@ import boto3
 
 from app.config import get_settings
 from app.core.prompts import get_prompt
+from app.services.cache import get_cache_service
 
 settings = get_settings()
 
@@ -89,6 +90,13 @@ class BedrockService(AIService):
     ) -> str:
         """Generate a summary of the note content."""
         resolved_lang = self._resolve_language(language)
+        
+        # Check cache
+        cache_service = get_cache_service()
+        cached_summary = cache_service.get_cached_summary(content, model_id)
+        if cached_summary:
+            return cached_summary
+
         system = get_prompt("summarize", resolved_lang)
 
         messages = [
@@ -98,7 +106,12 @@ class BedrockService(AIService):
             }
         ]
 
-        return self._invoke_model(messages, system, model_id=model_id)
+        summary = self._invoke_model(messages, system, model_id=model_id)
+        
+        # Save to cache
+        cache_service.save_summary(content, model_id, summary)
+        
+        return summary
 
     async def generate_title(
         self, content: str, model_id: str | None = None, language: str = "auto"

@@ -337,6 +337,7 @@ export function AIChatPanel({
             className="h-8 w-8 rounded-lg"
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
+            data-testid="ai-chat-send-button"
           >
             {isLoading ? (
               <Loader2Icon className="h-4 w-4 animate-spin" />

@@ -61,17 +61,23 @@ export function AIChatPanel({
   const [input, setInput] = useState("");
   const [scope, setScope] = useState<ChatScope>("note");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [prevNoteId, setPrevNoteId] = useState(selectedNote?.id);
+  const [prevFolderId, setPrevFolderId] = useState(selectedFolder?.id);
 
-  // Default scope to "note" if a note is selected, otherwise "all"
-  useEffect(() => {
-    if (selectedNote) {
+  const noteId = selectedNote?.id;
+  const folderId = selectedFolder?.id;
+
+  if (noteId !== prevNoteId || folderId !== prevFolderId) {
+    setPrevNoteId(noteId);
+    setPrevFolderId(folderId);
+    if (noteId) {
       setScope("note");
-    } else if (selectedFolder) {
+    } else if (folderId) {
       setScope("folder");
     } else {
       setScope("all");
     }
-  }, [selectedNote?.id, selectedFolder?.id]);
+  }
 
   useEffect(() => {
     if (scrollRef.current) {

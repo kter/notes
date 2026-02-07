@@ -44,7 +44,7 @@ test.describe('Sync Strategy', () => {
     const savedLocallyText = page.getByText(/Saved locally|ローカルに保存/i).first();
     try {
         await expect(savedLocallyText).toBeVisible({ timeout: 5000 });
-    } catch (e) {
+    } catch {
         console.log("Could not find Saved locally text, possibly skipped or transient");
     }
 
@@ -61,7 +61,7 @@ test.describe('Sync Strategy', () => {
     await expect(savedLocallyText).not.toBeVisible();
   });
 
-  test('should trigger immediate sync on blur', async ({ page, isMobile, browserName }) => {
+  test('should trigger immediate sync on blur', async ({ page, isMobile }) => {
     if (isMobile) test.skip(); // Flaky on mobile due to keyboard/viewport issues hiding status bar
     // Create new note
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
@@ -81,7 +81,7 @@ test.describe('Sync Strategy', () => {
     try {
         const savedLocallyText = page.getByText(/Saved locally|ローカルに保存/i).first();
         await expect(savedLocallyText).toBeVisible({ timeout: 2000 });
-    } catch (e) {
+    } catch {
         console.log("Could not find Saved locally text in blur test");
     }
 

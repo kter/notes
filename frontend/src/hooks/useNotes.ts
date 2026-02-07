@@ -41,7 +41,7 @@ function useDebounce<T extends (...args: any[]) => any>(
   }, []);
 
   const debounced = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     (...args: Parameters<T>) => {
       lastArgsRef.current = args;
       if (timeoutRef.current) {
@@ -310,7 +310,8 @@ export function useNotes(
     }
   };
 
-  const triggerServerSync = useCallback(async (id: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const triggerServerSync = useCallback(async (_id: string) => {
     const flushPromise = flushServerSync();
     if (flushPromise) {
         await flushPromise;

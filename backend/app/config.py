@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Database settings
     database_url: str = "postgresql://notes:notes@localhost:5432/notes"
 
+    # AWS settings
+    aws_region: str = "ap-northeast-1"
+
     # Cognito settings
     cognito_region: str = "ap-northeast-1"
     cognito_user_pool_id: str = ""
@@ -31,6 +34,9 @@ class Settings(BaseSettings):
 
     # CORS settings
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    # Cache settings
+    cache_bucket_name: str = "notes-app-cache-local"
 
 
 @lru_cache

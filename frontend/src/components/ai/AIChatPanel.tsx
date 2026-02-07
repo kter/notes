@@ -24,6 +24,8 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface AIChatPanelProps {
   isOpen: boolean;
@@ -231,13 +233,65 @@ export function AIChatPanel({
               >
                 <div
                   className={cn(
-                    "max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm",
+                    "max-w-[90%] rounded-2xl px-4 py-2 text-sm shadow-sm overflow-hidden",
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground rounded-tr-none"
                       : "bg-muted rounded-tl-none border border-border/50"
                   )}
                 >
-                  <p data-testid="ai-message-content" className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  {msg.role === "user" ? (
+                    <p data-testid="user-message-content" className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  ) : (
+                    <div data-testid="ai-message-content" className="prose prose-sm dark:prose-invert max-w-none break-words">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // Text styling
+                          p: ({...props}) => <p className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+                          a: ({...props}) => <a className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer" {...props} />,
+                          strong: ({...props}) => <strong className="font-semibold" {...props} />,
+                          em: ({...props}) => <em className="italic" {...props} />,
+                          
+                          // Headings
+                          h1: ({...props}) => <h1 className="text-lg font-bold mt-4 mb-2 first:mt-0" {...props} />,
+                          h2: ({...props}) => <h2 className="text-base font-bold mt-3 mb-2" {...props} />,
+                          h3: ({...props}) => <h3 className="text-sm font-semibold mt-3 mb-1" {...props} />,
+                          
+                          // Lists
+                          ul: ({...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                          ol: ({...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                          li: ({...props}) => <li className="pl-1" {...props} />,
+                          
+                          // Code blocks
+                          code: ({className, children, ...props}) => {
+                            const match = /language-(\w+)/.exec(className || '')
+                            const isInline = !match && !String(children).includes('\n')
+                            return isInline ? (
+                              <code className="bg-muted-foreground/20 rounded px-1 py-0.5 font-mono text-xs" {...props}>
+                                {children}
+                              </code>
+                            ) : (
+                              <div className="relative my-2 rounded-md bg-muted-foreground/10 p-2 overflow-x-auto">
+                                <code className={cn("font-mono text-xs block", className)} {...props}>
+                                  {children}
+                                </code>
+                              </div>
+                            )
+                          },
+                          pre: ({...props}) => <pre className="my-0 bg-transparent p-0 overflow-visible" {...props} />,
+                          
+                          // Other elements
+                          blockquote: ({...props}) => <blockquote className="border-l-2 border-primary/50 pl-4 italic text-muted-foreground my-2" {...props} />,
+                          hr: ({...props}) => <hr className="my-4 border-border" {...props} />,
+                          table: ({...props}) => <div className="overflow-x-auto my-2"><table className="w-full text-left text-xs border-collapse" {...props} /></div>,
+                          th: ({...props}) => <th className="border border-border px-2 py-1 font-semibold bg-muted/50" {...props} />,
+                          td: ({...props}) => <td className="border border-border px-2 py-1" {...props} />,
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             ))

@@ -156,7 +156,8 @@ test.describe('Notes Functionality', () => {
     console.log('[E2E] Sending chat message');
     const chatInput = layout.getByPlaceholder(/Ask about current note|現在のノートについて質問/i).first();
     await chatInput.fill('What is this note about?');
-    await page.keyboard.press('Enter');
+    // Click send button for more reliability across devices
+    await layout.getByTestId('ai-chat-send-button').click();
 
     // Verify chat response - use visible filter
     await expect(layout.locator('.bg-muted').last()).toContainText(/Playwright|note/i, { timeout: 30000 });

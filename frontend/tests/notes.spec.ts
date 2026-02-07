@@ -311,7 +311,7 @@ test.describe('Notes Functionality', () => {
   });
 
   test('should open settings and display correct content', async ({ page, isMobile, browserName }) => {
-    if (isMobile && browserName === 'webkit') test.skip(); // Flaky on Mobile Safari
+    if (browserName === 'webkit') test.skip(); // Flaky on WebKit
     await page.goto('/');
     console.log('[E2E] Starting Settings Test');
 

@@ -1,6 +1,6 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useOfflineSync } from './useOfflineSync'
 import { syncQueue } from '@/lib/syncQueue'
 

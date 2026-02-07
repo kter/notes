@@ -19,6 +19,7 @@ resource "aws_lambda_function" "api" {
       DSQL_CLUSTER_ENDPOINT  = aws_dsql_cluster.main.identifier
       CORS_ORIGINS           = jsonencode(["https://${local.current_env.domain_name}"])
       ENVIRONMENT            = terraform.workspace
+      CACHE_BUCKET_NAME      = aws_s3_bucket.cache.bucket
     }
   }
 

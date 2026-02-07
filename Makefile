@@ -117,6 +117,7 @@ tf-switch: ## Re-initialize backend and switch workspace based on ENV (dev/prd)
 	@echo "Switching to $(ENV) environment..."
 	cd terraform && \
 	export AWS_PROFILE=$(AWS_PROFILE) && \
+	rm -f .terraform/environment && \
 	terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
 	(terraform workspace select $(ENV) || terraform workspace new $(ENV))
 

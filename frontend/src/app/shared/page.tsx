@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSharedNote, ApiError } from "@/lib/api";
 import type { SharedNote } from "@/types";
@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2Icon } from "lucide-react";
 
-export default function SharedNotePage() {
+function SharedNoteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   
@@ -105,5 +105,17 @@ export default function SharedNotePage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function SharedNotePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <SharedNoteContent />
+    </Suspense>
   );
 }

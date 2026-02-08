@@ -94,6 +94,30 @@ resource "aws_cloudfront_origin_access_control" "main" {
   signing_protocol                  = "sigv4"
 }
 
+# CloudFront Function for URL rewriting (handles Next.js static export)
+resource "aws_cloudfront_function" "url_rewrite" {
+  name    = "${var.project_name}-url-rewrite-${terraform.workspace}"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite URLs for Next.js static export"
+  publish = true
+  code    = <<-EOF
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  
+  // If URI ends with / or has no extension, append /index.html
+  if (uri.endsWith('/')) {
+    request.uri += 'index.html';
+  } else if (!uri.includes('.')) {
+    // No file extension - check if this is a page route
+    request.uri += '/index.html';
+  }
+  
+  return request;
+}
+EOF
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
@@ -125,6 +149,11 @@ resource "aws_cloudfront_distribution" "main" {
     default_ttl            = 3600
     max_ttl                = 86400
     compress               = true
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.url_rewrite.arn
+    }
   }
 
   # Custom error response for SPA routing

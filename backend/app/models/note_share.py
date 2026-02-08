@@ -20,7 +20,7 @@ class NoteShare(NoteShareBase, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     note_id: UUID = Field()  # Reference to the note being shared
-    share_token: UUID = Field(default_factory=uuid4, unique=True, index=True)
+    share_token: UUID = Field(default_factory=uuid4)  # UUID is practically unique, no index for DSQL compat
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: datetime | None = Field(default=None)  # Optional expiration
 

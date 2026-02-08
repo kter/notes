@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
 import { useApi, useTranslation } from "@/hooks";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,6 +20,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ShareDialog } from "@/components/ui/ShareDialog";
+import type { NoteShare } from "@/types";
 
 interface EditorPanelProps {
   note: Note | null;
@@ -57,6 +59,9 @@ export function EditorPanel({
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isShareLoading, setIsShareLoading] = useState(false);
+  const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -696,6 +701,30 @@ export function EditorPanel({
             )}
             <span className="hidden md:inline">{t("editor.preview")}</span>
           </Button>
+          {/* Share Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              setIsShareDialogOpen(true);
+              setIsShareLoading(true);
+              try {
+                const api = await getApi();
+                const share = await api.getNoteShare(note.id);
+                setCurrentShare(share);
+              } catch {
+                setCurrentShare(null);
+              } finally {
+                setIsShareLoading(false);
+              }
+            }}
+            className="gap-1 md:gap-2"
+            aria-label={t("editor.shareNote")}
+            data-testid="editor-share-button"
+          >
+            <Share2Icon className="h-4 w-4" />
+            <span className="hidden md:inline">{t("editor.share")}</span>
+          </Button>
         </div>
         <Button
           variant="ghost"
@@ -832,6 +861,34 @@ export function EditorPanel({
           })}
         </div>
       </div>
+      
+      {/* Share Dialog */}
+      <ShareDialog
+        isOpen={isShareDialogOpen}
+        onClose={() => setIsShareDialogOpen(false)}
+        shareUrl={currentShare ? `${window.location.origin}/shared?token=${currentShare.share_token}` : null}
+        isLoading={isShareLoading}
+        onCreateShare={async () => {
+          setIsShareLoading(true);
+          try {
+            const api = await getApi();
+            const share = await api.createNoteShare(note.id);
+            setCurrentShare(share);
+          } finally {
+            setIsShareLoading(false);
+          }
+        }}
+        onRevokeShare={async () => {
+          setIsShareLoading(true);
+          try {
+            const api = await getApi();
+            await api.deleteNoteShare(note.id);
+            setCurrentShare(null);
+          } finally {
+            setIsShareLoading(false);
+          }
+        }}
+      />
     </div>
   );
 }

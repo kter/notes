@@ -97,6 +97,8 @@ export const en: TranslationKeys = {
     summarizeNote: "Summarize note",
     toggleChat: "Toggle chat",
     exportNote: "Export note",
+    share: "Share",
+    shareNote: "Share note",
   },
 
   // AI Panel
@@ -164,5 +166,18 @@ export const en: TranslationKeys = {
     syncComplete: "Sync complete",
     syncError: "Sync error",
     savedLocally: "Saved locally",
+  },
+
+  // Share
+  share: {
+    title: "Share Note",
+    description: "Anyone with this link can view this note",
+    copyLink: "Copy Link",
+    copied: "Copied!",
+    revokeShare: "Revoke Share",
+    revokeConfirm: "Revoke access to this shared note?",
+    createShare: "Create Share Link",
+    noShare: "This note is not shared",
+    viewOnlyNotice: "Read-only view",
   },
 } as const;

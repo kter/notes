@@ -95,6 +95,8 @@ export const ja = {
     summarizeNote: "ノートを要約",
     toggleChat: "チャットを切り替え",
     exportNote: "ノートをエクスポート",
+    share: "共有",
+    shareNote: "ノートを共有",
   },
 
   // AI Panel
@@ -162,6 +164,19 @@ export const ja = {
     syncComplete: "同期完了",
     syncError: "同期エラー",
     savedLocally: "ローカルに保存",
+  },
+
+  // Share
+  share: {
+    title: "ノートを共有",
+    description: "このリンクを知っている人は誰でもこのノートを閲覧できます",
+    copyLink: "リンクをコピー",
+    copied: "コピーしました！",
+    revokeShare: "共有を解除",
+    revokeConfirm: "このノートの共有を解除しますか？",
+    createShare: "共有リンクを作成",
+    noShare: "このノートは共有されていません",
+    viewOnlyNotice: "読み取り専用",
   },
 } as const;
 
@@ -253,6 +268,8 @@ export type TranslationKeys = {
     summarizeNote: string;
     toggleChat: string;
     exportNote: string;
+    share: string;
+    shareNote: string;
   };
   ai: {
     title: string;
@@ -310,6 +327,17 @@ export type TranslationKeys = {
     syncComplete: string;
     syncError: string;
     savedLocally: string;
+  };
+  share: {
+    title: string;
+    description: string;
+    copyLink: string;
+    copied: string;
+    revokeShare: string;
+    revokeConfirm: string;
+    createShare: string;
+    noShare: string;
+    viewOnlyNotice: string;
   };
 };
 

@@ -8,8 +8,10 @@ import type {
   GenerateTitleResponse,
   Note,
   NoteCreate,
+  NoteShare,
   NoteUpdate,
   SettingsResponse,
+  SharedNote,
   SummarizeRequest,
   SummarizeResponse,
   UserSettings,
@@ -178,9 +180,38 @@ class ApiClient {
 
     return response.blob();
   }
+
+  // Share API
+  async createNoteShare(noteId: string): Promise<NoteShare> {
+    return this.request<NoteShare>(`/api/notes/${noteId}/share`, {
+      method: "POST",
+    });
+  }
+
+  async getNoteShare(noteId: string): Promise<NoteShare | null> {
+    return this.request<NoteShare | null>(`/api/notes/${noteId}/share`);
+  }
+
+  async deleteNoteShare(noteId: string): Promise<void> {
+    return this.request<void>(`/api/notes/${noteId}/share`, {
+      method: "DELETE",
+    });
+  }
 }
 
 export function createApiClient(token: string | null): ApiClient {
   return new ApiClient(token);
 }
 
+// Public API (no auth required)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export async function getSharedNote(token: string): Promise<SharedNote> {
+  const response = await fetch(`${API_BASE}/api/shared/${token}`);
+  
+  if (!response.ok) {
+    throw new ApiError(response.status, response.statusText, await response.json().catch(() => ({})));
+  }
+  
+  return response.json();
+}

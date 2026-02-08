@@ -125,11 +125,6 @@ def create_db_and_tables() -> None:
 
                 # Note: 'content' column in 'notes' table needs to be migrated to TEXT manually in DSQL
                 # because ALTER COLUMN TYPE is not supported and it may timeout in Lambda.
-                                
-                    except Exception as alter_error:
-                        logger.warning(
-                            f"Failed to migrate 'notes' table: {alter_error}"
-                        )
             except Exception as table_error:
                 # Log but continue if table already exists or other non-critical error
                 logger.warning(f"Table '{table_name}' creation: {table_error}")

@@ -103,3 +103,18 @@ export interface UserSettingsUpdate {
   llm_model_id?: string;
   language?: string;
 }
+
+// Share types
+export interface NoteShare {
+  id: string;
+  note_id: string;
+  share_token: string;
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface SharedNote {
+  title: string;
+  content: string;
+  updated_at: string;
+}

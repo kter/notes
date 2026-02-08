@@ -89,7 +89,7 @@ def create_db_and_tables() -> None:
 
     try:
         # Import models to register them with SQLModel.metadata
-        from app.models import Folder, Note, UserSettings  # noqa: F401
+        from app.models import Folder, Note, NoteShare, UserSettings  # noqa: F401
 
         logger.info(f"Models loaded: {list(SQLModel.metadata.tables.keys())}")
 

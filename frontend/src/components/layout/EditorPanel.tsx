@@ -132,7 +132,8 @@ export function EditorPanel({
 
     return () => clearTimeout(handler);
     // Remove `note` from dependencies, only depend on `note.id`
-  }, [title, content, note, onUpdateNote]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, note?.id, onUpdateNote]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

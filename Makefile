@@ -103,7 +103,11 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 
 .PHONY: deploy
 deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend, then run tests
+ifeq ($(ENV),prd)
+	@echo "Skipping integration tests in prd (backdoor auth not available)"
+else
 	$(MAKE) test-integration
+endif
 	$(MAKE) test-e2e
 	@echo "Full deployment and verification complete!"
 

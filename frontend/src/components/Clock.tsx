@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 
-export function Clock() {
+export const Clock = memo(function Clock() {
   const [time, setTime] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,4 +31,5 @@ export function Clock() {
       {time}
     </div>
   );
-}
+});
+

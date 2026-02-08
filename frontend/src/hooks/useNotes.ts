@@ -242,16 +242,17 @@ export function useNotes(
     id: string,
     updates: { title?: string; content?: string; folder_id?: string | null }
   ) => {
-    // 1. Optimistic Update (React State)
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, ...updates } : n))
-    );
+    // 1. Optimistic Update (React State) and get the note for local save
+    let noteForLocalSave: Note | undefined;
+    setNotes((prev) => {
+      noteForLocalSave = prev.find((n) => n.id === id);
+      return prev.map((n) => (n.id === id ? { ...n, ...updates } : n));
+    });
 
     // 2. Local Save (IndexedDB) - Almost immediate
     try {
-      const note = notes.find((n) => n.id === id);
-      if (note) {
-        const updatedNote = { ...note, ...updates, updated_at: new Date().toISOString() };
+      if (noteForLocalSave) {
+        const updatedNote = { ...noteForLocalSave, ...updates, updated_at: new Date().toISOString() };
         await notesDB.saveNote(updatedNote);
         setLocalStatus('saved');
       }
@@ -265,7 +266,8 @@ export function useNotes(
     // Mark as unsynced/pending until the debounce fires
     setRemoteStatus('unsynced');
     debouncedServerSync(id, updates);
-  }, [setNotes, notes, debouncedServerSync]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setNotes, debouncedServerSync]);
 
   const handleDeleteNote = async (id: string) => {
     try {

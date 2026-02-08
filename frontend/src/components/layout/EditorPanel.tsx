@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import type { Note, Folder } from "@/types";
 import { useApi, useTranslation } from "@/hooks";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon } from "lucide-react";
-import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
+import { useEffect, useState, useRef, useCallback, KeyboardEvent, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { remarkSourceLine } from "@/lib/remark-source-line";
@@ -55,6 +55,8 @@ export function EditorPanel({
   // Initialize state from props - reliance on key={note.id} in parent to reset state on switch
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
+  // Use deferred content for preview to prevent input lag during heavy markdown rendering
+  const deferredContent = useDeferredValue(content);
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -103,13 +105,20 @@ export function EditorPanel({
   }, [note?.id, note?.title, note?.content]);
 
   // Trigger server sync on unmount or when switching notes
+  // Store note.id in a ref so cleanup function has access to the current value
+  const noteIdRef = useRef(note?.id);
+  useEffect(() => {
+    noteIdRef.current = note?.id;
+  }, [note?.id]);
+  
   useEffect(() => {
     return () => {
-      if (note && triggerServerSync) {
-        triggerServerSync(note.id);
+      if (noteIdRef.current && triggerServerSync) {
+        triggerServerSync(noteIdRef.current);
       }
     };
-  }, [note, triggerServerSync]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-save effect
   useEffect(() => {
@@ -812,7 +821,7 @@ export function EditorPanel({
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm, remarkSourceLine]}
                   >
-                    {content || `*${t("editor.previewPlaceholder")}*`}
+                    {deferredContent || `*${t("editor.previewPlaceholder")}*`}
                   </ReactMarkdown>
                 </div>
               </div>

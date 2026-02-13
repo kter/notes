@@ -2,9 +2,11 @@
 
 import logging
 import os
+import time
 from collections.abc import Generator
 
 import boto3
+import psycopg2
 from sqlalchemy import text
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -36,28 +38,63 @@ def get_dsql_engine():
             f"Initializing DSQL engine: endpoint={dsql_endpoint}, region={region}"
         )
 
+        def get_connection():
+            
+            max_retries = 3
+            base_delay = 0.5
+            
+            for attempt in range(max_retries):
+                try:
+                    # Log system time to diagnose clock skew issues
+                    import datetime
+                    now = datetime.datetime.now()
+                    logger.info(f"Attempt {attempt+1}/{max_retries}: Generating auth token at {now} (timestamp: {now.timestamp()})")
+                    
+                    # Generate IAM auth token
+                    client = boto3.client("dsql", region_name=region)
+                    token = client.generate_db_connect_admin_auth_token(
+                        Hostname=f"{dsql_endpoint}.dsql.{region}.on.aws",
+                        Region=region,
+                    )
+                    
+                    # Connect using psycopg2
+                    conn = psycopg2.connect(
+                        host=f"{dsql_endpoint}.dsql.{region}.on.aws",
+                        port=5432,
+                        database="postgres",
+                        user="admin",
+                        password=token,
+                        sslmode="require",
+                        connect_timeout=5
+                    )
+                    return conn
+                except psycopg2.OperationalError as e:
+                    error_msg = str(e)
+                    # Check for signature expired error which indicates clock skew
+                    if "Signature expired" in error_msg or "Signature not yet current" in error_msg:
+                        logger.warning(f"DSQL connection failed with signature error (likely clock skew): {e}")
+                        if attempt < max_retries - 1:
+                            sleep_time = base_delay * (attempt + 1)
+                            logger.info(f"Sleeping for {sleep_time}s to allow clock synchronization...")
+                            time.sleep(sleep_time)
+                            continue
+                    
+                    # For other errors or if retries exhausted
+                    logger.error(f"Failed to create DSQL connection: {e}")
+                    raise
+                except Exception as e:
+                    logger.error(f"Unexpected error connecting to DSQL: {e}")
+                    raise
+
         try:
-            # Generate IAM auth token
-            client = boto3.client("dsql", region_name=region)
-            token = client.generate_db_connect_admin_auth_token(
-                Hostname=f"{dsql_endpoint}.dsql.{region}.on.aws",
-                Region=region,
-            )
-            logger.info("Successfully generated DSQL auth token")
-
-            # DSQL connection URL
-            database_url = (
-                f"postgresql://admin:{token}@"
-                f"{dsql_endpoint}.dsql.{region}.on.aws:5432/postgres"
-                f"?sslmode=require"
-            )
-
             _engine = create_engine(
-                database_url,
+                "postgresql+psycopg2://",
+                creator=get_connection,
                 echo=settings.debug,
                 pool_pre_ping=True,
                 pool_size=5,
                 max_overflow=10,
+                pool_recycle=300,  # Recycle connections every 5 minutes
             )
             logger.info("DSQL engine created successfully")
         except Exception as e:

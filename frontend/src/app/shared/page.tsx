@@ -11,7 +11,7 @@ import { Loader2Icon } from "lucide-react";
 function SharedNoteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
-  
+
   const [note, setNote] = useState<SharedNote | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,11 +93,11 @@ function SharedNoteContent() {
         </header>
 
         {/* Content */}
-        <article className="prose prose-slate dark:prose-invert max-w-none">
+        <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {note.content || "*No content*"}
           </ReactMarkdown>
-        </article>
+        </div>
 
         {/* Footer */}
         <footer className="mt-12 pt-6 border-t text-center text-sm text-muted-foreground">

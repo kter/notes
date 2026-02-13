@@ -70,24 +70,24 @@ export function EditorPanel({
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
-  
+
   // Hash-based Verification Logic
   const [currentHash, setCurrentHash] = useState("");
-  
+
   // Calculate hash of current content whenever it changes (debounced slightly to avoid freezing typing)
   useEffect(() => {
     const calculate = async () => {
-        const hash = await calculateHash(content);
-        setCurrentHash(hash);
+      const hash = await calculateHash(content);
+      setCurrentHash(hash);
     };
     const timer = setTimeout(calculate, 200);
     return () => clearTimeout(timer);
   }, [content]);
-  
+
   // Refs to track the last saved state to avoid loops with optimistic updates
   const lastSavedTitle = useRef(note?.title ?? "");
   const lastSavedContent = useRef(note?.content ?? "");
-  
+
   // Refs to track current state for immediate access in callbacks
   const currentTitleRef = useRef(title);
   const currentContentRef = useRef(content);
@@ -110,14 +110,14 @@ export function EditorPanel({
   useEffect(() => {
     noteIdRef.current = note?.id;
   }, [note?.id]);
-  
+
   useEffect(() => {
     return () => {
       if (noteIdRef.current && triggerServerSync) {
         triggerServerSync(noteIdRef.current);
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-save effect
@@ -141,7 +141,7 @@ export function EditorPanel({
 
     return () => clearTimeout(handler);
     // Remove `note` from dependencies, only depend on `note.id`
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, note?.id, onUpdateNote]);
 
   // Close dropdown when clicking outside
@@ -167,15 +167,15 @@ export function EditorPanel({
     setContent(value);
     currentContentRef.current = value;
   };
-  
+
   const handleBlur = () => {
     // Use refs to check for changes to ensure we have the latest values
     if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
-       onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
-       lastSavedTitle.current = currentTitleRef.current;
-       lastSavedContent.current = currentContentRef.current;
+      onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
+      lastSavedTitle.current = currentTitleRef.current;
+      lastSavedContent.current = currentContentRef.current;
     }
-    
+
     if (note && triggerServerSync) {
       triggerServerSync(note.id);
     }
@@ -190,7 +190,7 @@ export function EditorPanel({
 
   const handleGenerateTitle = async () => {
     if (!note || !content.trim() || isGeneratingTitle) return;
-    
+
     setIsGeneratingTitle(true);
     try {
       const apiClient = await getApi();
@@ -256,12 +256,12 @@ export function EditorPanel({
           .map((line, index) => {
             const indentMatch = line.match(/^(\s{1,2})/);
             const spacesToRemove = indentMatch ? indentMatch[1].length : 0;
-            
+
             if (index === 0) {
               totalOffsetStart -= Math.min(spacesToRemove, Math.max(0, selectionStart - startPos));
             }
             totalOffsetEnd -= spacesToRemove;
-            
+
             return line.slice(spacesToRemove);
           })
           .join("\n");
@@ -303,7 +303,7 @@ export function EditorPanel({
 
         if (indentMatch) {
           const spacesToRemove = indentMatch[1].length;
-          
+
           // Use document.execCommand to preserve undo history
           textarea.setSelectionRange(lineStart, lineStart + spacesToRemove);
           document.execCommand("delete");
@@ -329,7 +329,7 @@ export function EditorPanel({
         const indentMatch = lineContent.match(/^(\s{1,2})/);
         if (indentMatch) {
           const spacesToRemove = indentMatch[1].length;
-          
+
           // Use document.execCommand to preserve undo history
           textarea.setSelectionRange(lineStart, lineStart + spacesToRemove);
           document.execCommand("delete");
@@ -365,7 +365,7 @@ export function EditorPanel({
     if (marker && contentAfterMarker.trim() === "") {
       // Empty list item - remove the marker and indent on Enter
       e.preventDefault();
-      
+
       // Use document.execCommand to preserve undo history
       textarea.setSelectionRange(lineStart, selectionStart);
       document.execCommand("insertText", false, "\n");
@@ -387,10 +387,10 @@ export function EditorPanel({
     // Only intercept if there's something to continue
     if (continuation) {
       e.preventDefault();
-      
+
       // Use document.execCommand to preserve undo history
       document.execCommand("insertText", false, "\n" + continuation);
-      
+
       // Scroll to keep cursor visible
       requestAnimationFrame(() => {
         textarea.blur();
@@ -423,22 +423,22 @@ export function EditorPanel({
   // Scroll Sync Handlers
   const handleEditorScroll = useCallback(() => {
     if (isScrollingRef.current || !isPreviewOpen || !textareaRef.current || !previewContainerRef.current) return;
-    
+
     isScrollingRef.current = true;
-    
+
     const editor = textareaRef.current;
     const preview = previewContainerRef.current;
-    
+
     // Calculate target line number based on scroll percentage of source
     // This assumes roughly uniform line height in the source which is true for monospaced textarea
     const contentLines = content.split("\n").length;
     const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
     const targetLine = Math.floor(contentLines * scrollPercentage);
-    
+
     // Find the element in preview that corresponds to this line or the next closest one
     const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
     let targetElement = null;
-    
+
     for (const el of elements) {
       const line = parseInt(el.getAttribute("data-source-line") || "0", 10);
       if (line >= targetLine) {
@@ -446,15 +446,15 @@ export function EditorPanel({
         break;
       }
     }
-    
+
     if (targetElement) {
-       // Adjust for the element's position relative to the container
-       preview.scrollTop = targetElement.offsetTop - preview.offsetTop;
+      // Adjust for the element's position relative to the container
+      preview.scrollTop = targetElement.offsetTop - preview.offsetTop;
     } else if (scrollPercentage > 0.99) {
-       // If roughly at the end, sync to bottom
-       preview.scrollTop = preview.scrollHeight;
+      // If roughly at the end, sync to bottom
+      preview.scrollTop = preview.scrollHeight;
     }
-    
+
     setTimeout(() => {
       isScrollingRef.current = false;
     }, 50);
@@ -462,9 +462,9 @@ export function EditorPanel({
 
   const handlePreviewScroll = useCallback(() => {
     if (isScrollingRef.current || !textareaRef.current || !previewContainerRef.current) return;
-    
+
     isScrollingRef.current = true;
-    
+
     const editor = textareaRef.current;
     const preview = previewContainerRef.current;
     const contentLines = content.split("\n").length;
@@ -472,20 +472,20 @@ export function EditorPanel({
     // Find the first visible element in the preview
     const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
     let visibleElement: HTMLElement | null = null;
-    
+
     for (const el of elements) {
       if (el.offsetTop - preview.offsetTop >= preview.scrollTop) {
         visibleElement = el;
         break;
       }
     }
-    
+
     if (visibleElement) {
       const line = parseInt(visibleElement.getAttribute("data-source-line") || "0", 10);
       const targetScrollTop = (line / contentLines) * (editor.scrollHeight - editor.clientHeight);
       editor.scrollTop = targetScrollTop;
     }
-    
+
     setTimeout(() => {
       isScrollingRef.current = false;
     }, 50);
@@ -541,12 +541,12 @@ export function EditorPanel({
 
   // Destructure syncStatus
   const { remote: remoteStatus, lastError, isSaving } = syncStatus;
-  
+
   // Hash-based Verification Logic
   // If no savedHash is available yet (initial load), fall back to remoteStatus checks temporarily
   // Strict mismatch: We have a server hash, and it differs from current.
   const isStrictlyMismatch = !!savedHash && !!currentHash && savedHash !== currentHash;
-  
+
   // Loose mismatch: We don't have a hash yet (first edit), but the system knows it's unsynced.
   const isLooselyMismatch = !savedHash && remoteStatus === 'unsynced';
 
@@ -556,28 +556,28 @@ export function EditorPanel({
     statusTooltip = "リモートに保存中...";
     statusColorClass = "text-muted-foreground";
   } else if (remoteStatus === 'failed') {
-      // Remote Failed
-      statusIcon = <CheckIcon className="h-3 w-3" />;
-      statusText = "Failed (Saved locally)";
-      statusTooltip = "ローカルには保存されましたが、リモートへの保存に失敗しました";
-      statusColorClass = "text-orange-500";
+    // Remote Failed
+    statusIcon = <CheckIcon className="h-3 w-3" />;
+    statusText = "Failed (Saved locally)";
+    statusTooltip = "ローカルには保存されましたが、リモートへの保存に失敗しました";
+    statusColorClass = "text-orange-500";
   } else if (isStrictlyMismatch || isLooselyMismatch) {
-      // Unsaved state (Strict or Loose)
-       statusIcon = <div className="h-2 w-2 rounded-full bg-orange-300" />;
-       statusText = t("editor.unsaved");
-       statusTooltip = isStrictlyMismatch ? t("editor.unsavedStrictMismatch") : t("editor.unsavedLooseMismatch");
-       statusColorClass = "text-muted-foreground";
+    // Unsaved state (Strict or Loose)
+    statusIcon = <div className="h-2 w-2 rounded-full bg-orange-300" />;
+    statusText = t("editor.unsaved");
+    statusTooltip = isStrictlyMismatch ? t("editor.unsavedStrictMismatch") : t("editor.unsavedLooseMismatch");
+    statusColorClass = "text-muted-foreground";
   } else {
-      // Default / Success / Verified
-      statusIcon = <CheckIcon className="h-3 w-3" />;
-      statusText = t("common.saved");
-      statusTooltip = "保存済み (検証完了)";
-      statusColorClass = "text-green-500";
+    // Default / Success / Verified
+    statusIcon = <CheckIcon className="h-3 w-3" />;
+    statusText = t("common.saved");
+    statusTooltip = "保存済み (検証完了)";
+    statusColorClass = "text-green-500";
   }
 
   // Append error detail if present
   if (lastError) {
-      statusTooltip += ` (${lastError})`;
+    statusTooltip += ` (${lastError})`;
   }
   // --- SAVE STATUS LOGIC END ---
 
@@ -605,9 +605,8 @@ export function EditorPanel({
               <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
                 <div className="py-1">
                   <button
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
-                      !note.folder_id ? "bg-accent" : ""
-                    }`}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${!note.folder_id ? "bg-accent" : ""
+                      }`}
                     onClick={() => handleFolderChange(null)}
                   >
                     {t("sidebar.allNotes")}
@@ -615,9 +614,8 @@ export function EditorPanel({
                   {folders.map((folder) => (
                     <button
                       key={folder.id}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
-                        note.folder_id === folder.id ? "bg-accent" : ""
-                      }`}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${note.folder_id === folder.id ? "bg-accent" : ""
+                        }`}
                       onClick={() => handleFolderChange(folder.id)}
                     >
                       {folder.name}
@@ -633,9 +631,9 @@ export function EditorPanel({
             onClick={() => {
               // Ensure we save any pending changes before summarizing
               if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
-                  onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
-                  lastSavedTitle.current = currentTitleRef.current;
-                  lastSavedContent.current = currentContentRef.current;
+                onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
+                lastSavedTitle.current = currentTitleRef.current;
+                lastSavedContent.current = currentContentRef.current;
               }
               onSummarize(note.id);
             }}
@@ -651,31 +649,31 @@ export function EditorPanel({
             )}
             <span className="hidden md:inline">{isSummarizing ? t("editor.summarizing") : t("editor.summarize")}</span>
           </Button>
+          <Button
+            variant={isChatOpen ? "secondary" : "ghost"}
+            size="sm"
+            onClick={onOpenChat}
+            className="gap-1 md:gap-2"
+            aria-label={t("editor.toggleChat")}
+            data-testid="editor-chat-button"
+          >
+            <MessageSquareIcon className="h-4 w-4" />
+            <span className="hidden md:inline">{t("editor.chat")}</span>
+          </Button>
+          {/* Export Button */}
+          <div className="relative" ref={exportDropdownRef}>
             <Button
-              variant={isChatOpen ? "secondary" : "ghost"}
+              variant="ghost"
               size="sm"
-              onClick={onOpenChat}
+              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
               className="gap-1 md:gap-2"
-              aria-label={t("editor.toggleChat")}
-              data-testid="editor-chat-button"
+              aria-label={t("editor.exportNote")}
+              data-testid="editor-export-dropdown"
             >
-              <MessageSquareIcon className="h-4 w-4" />
-              <span className="hidden md:inline">{t("editor.chat")}</span>
+              <DownloadIcon className="h-4 w-4" />
+              <span className="hidden md:inline">{t("editor.export")}</span>
+              <ChevronDownIcon className="h-3 w-3" />
             </Button>
-            {/* Export Button */}
-            <div className="relative" ref={exportDropdownRef}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                className="gap-1 md:gap-2"
-                aria-label={t("editor.exportNote")}
-                data-testid="editor-export-dropdown"
-              >
-                <DownloadIcon className="h-4 w-4" />
-                <span className="hidden md:inline">{t("editor.export")}</span>
-                <ChevronDownIcon className="h-3 w-3" />
-              </Button>
             {isExportDropdownOpen && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
                 <div className="py-1">
@@ -784,11 +782,11 @@ export function EditorPanel({
           </div>
           <Separator className="mb-4" />
         </div>
-        
+
         {/* Editor and Preview Layout */}
         <div className={`flex-1 flex min-h-0 ${isPreviewOpen ? "gap-4" : ""} px-4 md:px-6 pb-4`}>
           {/* Markdown Editor Column */}
-          <div 
+          <div
             className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""}`}
             ref={editorContainerRef}
           >
@@ -806,20 +804,20 @@ export function EditorPanel({
               data-testid="editor-content-input"
             />
           </div>
-          
-          
+
+
           {/* Markdown Preview Column */}
           {isPreviewOpen && (
             <>
               <Separator orientation="vertical" />
-              <div 
+              <div
                 className="flex-1 min-w-0 overflow-y-auto"
                 ref={previewContainerRef}
                 onScroll={handlePreviewScroll}
               >
                 <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm, remarkSourceLine]}
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                   >
                     {deferredContent || `*${t("editor.previewPlaceholder")}*`}
                   </ReactMarkdown>
@@ -855,12 +853,12 @@ export function EditorPanel({
             </span>
           </div>
         </div>
-        
+
         {/* Clock - Absolutely centered */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-           <Clock />
+          <Clock />
         </div>
-        
+
         <div className="whitespace-nowrap">
           {t("editor.lastSaved")}: {new Date(note.updated_at).toLocaleString("ja-JP", {
             year: "numeric",
@@ -871,7 +869,7 @@ export function EditorPanel({
           })}
         </div>
       </div>
-      
+
       {/* Share Dialog */}
       <ShareDialog
         isOpen={isShareDialogOpen}

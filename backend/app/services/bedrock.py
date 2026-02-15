@@ -32,12 +32,7 @@ class AIService(ABC):
         """Answer a question based on the given content context."""
         pass
 
-    @abstractmethod
-    async def generate_title(
-        self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> str:
-        """Generate a concise title for the given content."""
-        pass
+
 
 
 class BedrockService(AIService):
@@ -113,21 +108,7 @@ class BedrockService(AIService):
         
         return summary
 
-    async def generate_title(
-        self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> str:
-        """Generate a concise title for the note content."""
-        resolved_lang = self._resolve_language(language)
-        system = get_prompt("generate_title", resolved_lang)
 
-        messages = [
-            {
-                "role": "user",
-                "content": f"Generate a concise title for this note:\n\n{content}",
-            }
-        ]
-
-        return self._invoke_model(messages, system, model_id=model_id).strip()
 
     async def chat(
         self,

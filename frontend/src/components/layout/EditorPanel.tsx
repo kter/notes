@@ -60,7 +60,7 @@ export function EditorPanel({
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
@@ -188,21 +188,7 @@ export function EditorPanel({
     setIsFolderDropdownOpen(false);
   };
 
-  const handleGenerateTitle = async () => {
-    if (!note || !content.trim() || isGeneratingTitle) return;
 
-    setIsGeneratingTitle(true);
-    try {
-      const apiClient = await getApi();
-      const response = await apiClient.generateTitle({ note_id: note.id });
-      setTitle(response.title);
-      onUpdateNote(note.id, { title: response.title });
-    } catch (error) {
-      console.error("Failed to generate title:", error);
-    } finally {
-      setIsGeneratingTitle(false);
-    }
-  };
 
   // Helper: Get list marker information from current line
   interface ListMarkerInfo {
@@ -761,24 +747,10 @@ export function EditorPanel({
               onChange={(e) => handleTitleChange(e.target.value)}
               onBlur={handleBlur}
               placeholder={t("editor.noteTitlePlaceholder")}
-              className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 pr-10 h-auto"
+              className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto"
               data-testid="editor-title-input"
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={handleGenerateTitle}
-              disabled={!content.trim() || isGeneratingTitle}
-              title={t("editor.generateTitleFromContent")}
-              data-testid="editor-generate-title-button"
-            >
-              {isGeneratingTitle ? (
-                <Loader2Icon className="h-4 w-4 animate-spin" />
-              ) : (
-                <SparklesIcon className="h-4 w-4" />
-              )}
-            </Button>
+
           </div>
           <Separator className="mb-4" />
         </div>

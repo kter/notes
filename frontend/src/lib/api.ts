@@ -4,8 +4,7 @@ import type {
   Folder,
   FolderCreate,
   FolderUpdate,
-  GenerateTitleRequest,
-  GenerateTitleResponse,
+
   Note,
   NoteCreate,
   NoteShare,
@@ -148,12 +147,7 @@ class ApiClient {
     });
   }
 
-  async generateTitle(data: GenerateTitleRequest): Promise<GenerateTitleResponse> {
-    return this.request<GenerateTitleResponse>("/api/ai/generate-title", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
+
 
   // Settings API
   async getSettings(): Promise<SettingsResponse> {

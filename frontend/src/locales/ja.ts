@@ -18,7 +18,7 @@ export const ja = {
     title: "設定",
     description: "アプリケーションの設定を変更します",
     aiModel: "AIモデル",
-    aiModelDescription: "タイトル生成、要約、チャットで使用するAIモデルを選択します",
+    aiModelDescription: "要約、チャットで使用するAIモデルを選択します",
     selectModel: "モデルを選択",
     language: "言語",
     languageDescription: "アプリケーションとAI出力の言語を設定します",
@@ -72,8 +72,6 @@ export const ja = {
     title: "タイトル",
     titlePlaceholder: "タイトルを入力...",
     contentPlaceholder: "ノートを入力...",
-    generateTitle: "タイトルを生成",
-    generating: "生成中...",
     lastSaved: "最終保存",
     unsaved: "未保存",
     unsavedStrictMismatch: "保存された内容と一致しません",
@@ -91,7 +89,6 @@ export const ja = {
     previewPlaceholder: "プレビューを見るには書き始めてください...",
     noteTitlePlaceholder: "ノートのタイトル",
     noteContentPlaceholder: "Markdownでノートを書き始めましょう...",
-    generateTitleFromContent: "内容からタイトルを生成",
     summarizeNote: "ノートを要約",
     toggleChat: "チャットを切り替え",
     exportNote: "ノートをエクスポート",
@@ -245,8 +242,6 @@ export type TranslationKeys = {
     title: string;
     titlePlaceholder: string;
     contentPlaceholder: string;
-    generateTitle: string;
-    generating: string;
     lastSaved: string;
     unsaved: string;
     unsavedStrictMismatch: string;
@@ -264,7 +259,6 @@ export type TranslationKeys = {
     previewPlaceholder: string;
     noteTitlePlaceholder: string;
     noteContentPlaceholder: string;
-    generateTitleFromContent: string;
     summarizeNote: string;
     toggleChat: string;
     exportNote: string;

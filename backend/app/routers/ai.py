@@ -71,16 +71,7 @@ class ChatResponse(BaseModel):
     answer: str
 
 
-class GenerateTitleRequest(BaseModel):
-    """Request schema for title generation."""
 
-    note_id: UUID
-
-
-class GenerateTitleResponse(BaseModel):
-    """Response schema for title generation."""
-
-    title: str
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
@@ -133,24 +124,4 @@ async def chat_with_context(
     return ChatResponse(answer=answer)
 
 
-@router.post("/generate-title", response_model=GenerateTitleResponse)
-async def generate_title(
-    request: GenerateTitleRequest,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
-    ai_service: Annotated[AIService, Depends(get_ai_service)],
-):
-    """Generate a title for a note's content using AI."""
-    note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
 
-    if not note.content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Note content is empty",
-        )
-
-    model_id, language = get_user_settings(session, user_id)
-    title = await ai_service.generate_title(
-        note.content, model_id=model_id, language=language
-    )
-    return GenerateTitleResponse(title=title)

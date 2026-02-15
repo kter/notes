@@ -64,13 +64,6 @@ export interface ChatResponse {
   answer: string;
 }
 
-export interface GenerateTitleRequest {
-  note_id: string;
-}
-
-export interface GenerateTitleResponse {
-  title: string;
-}
 
 // Settings types
 export interface UserSettings {

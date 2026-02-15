@@ -24,11 +24,6 @@ class MockAIService(AIService):
     ) -> str:
         return f"Answer for '{question}' based on {len(content)} chars"
 
-    async def generate_title(
-        self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> str:
-        return "Generated Title"
-
 
 @pytest.fixture
 def mock_ai_service():
@@ -132,14 +127,4 @@ def test_chat_all_scope(client: TestClient, session: Session, mock_ai_service):
     assert response.status_code == 200
 
 
-def test_generate_title(client: TestClient, session: Session, mock_ai_service):
-    user_id = "test-user-123"
-    note = Note(
-        title="Untitled", content="Long content that needs a title", user_id=user_id
-    )
-    session.add(note)
-    session.commit()
 
-    response = client.post("/api/ai/generate-title", json={"note_id": str(note.id)})
-    assert response.status_code == 200
-    assert response.json()["title"] == "Generated Title"

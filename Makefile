@@ -213,6 +213,10 @@ test-e2e-dev: ## Run E2E tests against dev environment
 test-e2e-prd: ## Run E2E tests against prd environment
 	cd frontend && E2E_TARGET=prd npx playwright test
 
+.PHONY: install-playwright-deps
+install-playwright-deps: ## Install Playwright browser dependencies (dnf)
+	dnf install -y libicu libjpeg-turbo gstreamer1-plugins-base
+
 .PHONY: install-hooks
 install-hooks: ## Install git pre-commit hooks
 	chmod +x scripts/pre-commit

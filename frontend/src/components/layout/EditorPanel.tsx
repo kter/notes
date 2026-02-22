@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Clock } from "@/components/Clock";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import type { Note, Folder } from "@/types";
+import type { Note, Folder, TokenUsageRead } from "@/types";
 import { useApi, useTranslation } from "@/hooks";
+import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, KeyboardEvent, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { remarkSourceLine } from "@/lib/remark-source-line";
 import type { SyncStatus } from "@/hooks/useNotes";
 import { calculateHash } from "@/lib/utils";
 import {
@@ -35,6 +35,7 @@ interface EditorPanelProps {
   syncStatus: SyncStatus;
   triggerServerSync?: (id: string) => void;
   savedHash?: string;
+  tokenUsage?: TokenUsageRead | null;
 }
 
 export function EditorPanel({
@@ -49,6 +50,7 @@ export function EditorPanel({
   syncStatus,
   triggerServerSync,
   savedHash,
+  tokenUsage,
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -826,9 +828,16 @@ export function EditorPanel({
           </div>
         </div>
 
-        {/* Clock - Absolutely centered */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        {/* Clock and Token Usage - Absolutely centered */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-4">
           <Clock />
+          {tokenUsage && (
+            <TokenUsageIndicator
+              tokensUsed={tokenUsage.tokens_used}
+              tokenLimit={tokenUsage.token_limit}
+              resetDate={tokenUsage.period_end}
+            />
+          )}
         </div>
 
         <div className="whitespace-nowrap">

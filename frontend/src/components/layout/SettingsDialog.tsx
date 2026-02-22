@@ -19,16 +19,18 @@ import {
 import { Label } from "@/components/ui/label";
 import { Loader2Icon, CheckIcon } from "lucide-react";
 import { useApi, useTranslation } from "@/hooks";
-import type { AvailableModel, AvailableLanguage } from "@/types";
+import type { AvailableModel, AvailableLanguage, TokenUsageRead } from "@/types";
 
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  tokenUsage?: TokenUsageRead | null;
 }
 
 export function SettingsDialog({
   open,
   onOpenChange,
+  tokenUsage,
 }: SettingsDialogProps) {
   const { getApi } = useApi();
   const { t, language, setLanguage } = useTranslation();
@@ -60,11 +62,11 @@ export function SettingsDialog({
           setSelectedModelId(response.settings.llm_model_id);
           setSelectedLanguage(response.settings.language);
         }
-        
+
         if (response?.available_models) {
           setAvailableModels(response.available_models);
         }
-        
+
         if (response?.available_languages) {
           setAvailableLanguages(response.available_languages);
         }
@@ -86,7 +88,7 @@ export function SettingsDialog({
 
     try {
       const apiClient = await getApi();
-      await apiClient.updateSettings({ 
+      await apiClient.updateSettings({
         llm_model_id: selectedModelId,
         language: selectedLanguage,
       });
@@ -109,7 +111,7 @@ export function SettingsDialog({
     try {
       const apiClient = await getApi();
       const blob = await apiClient.exportNotes();
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -117,7 +119,7 @@ export function SettingsDialog({
       link.setAttribute("download", `notes_export_${new Date().toISOString().split('T')[0]}.zip`);
       document.body.appendChild(link);
       link.click();
-      
+
       // Cleanup
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
@@ -202,6 +204,27 @@ export function SettingsDialog({
                 {t("settings.aiModelDescription")}
               </p>
             </div>
+
+            {/* Token Usage Section */}
+            {tokenUsage && (
+              <div className="border-t pt-6 space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium leading-none">
+                    {t("tokenUsage.title")}
+                  </h4>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{new Intl.NumberFormat().format(tokenUsage.tokens_used)} / {new Intl.NumberFormat().format(tokenUsage.token_limit)} {t("tokenUsage.used").split(' ')[0]}</span>
+                    <span>{t("tokenUsage.resetDate")}: {new Date(tokenUsage.period_end).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${tokenUsage.tokens_used / tokenUsage.token_limit > 0.9 ? 'bg-red-500' : tokenUsage.tokens_used / tokenUsage.token_limit > 0.7 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                    style={{ width: `${Math.min(100, (tokenUsage.token_limit > 0 ? (tokenUsage.tokens_used / tokenUsage.token_limit) * 100 : 0))}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="border-t pt-6 space-y-4">
               <div className="space-y-1">

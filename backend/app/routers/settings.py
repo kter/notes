@@ -14,11 +14,13 @@ from app.models import (
     DEFAULT_LLM_MODEL_ID,
     AvailableLanguage,
     AvailableModel,
+    TokenUsageRead,
     UserSettings,
     UserSettingsRead,
     UserSettingsUpdate,
 )
 from app.routers.db_exceptions import commit_with_error_handling
+from app.services.token_usage import get_usage_info
 
 router = APIRouter()
 
@@ -29,6 +31,7 @@ class SettingsResponse(BaseModel):
     settings: UserSettingsRead
     available_models: list[AvailableModel]
     available_languages: list[AvailableLanguage]
+    token_usage: TokenUsageRead
 
 
 @router.get("", response_model=SettingsResponse)
@@ -49,6 +52,9 @@ async def get_settings(
         commit_with_error_handling(session, "UserSettings")
         session.refresh(settings)
 
+    # Get token usage info
+    token_usage = get_usage_info(session, user_id)
+
     return SettingsResponse(
         settings=UserSettingsRead(
             user_id=settings.user_id,
@@ -59,10 +65,11 @@ async def get_settings(
         ),
         available_models=[AvailableModel(**m) for m in AVAILABLE_MODELS],
         available_languages=[AvailableLanguage(**lang) for lang in AVAILABLE_LANGUAGES],
+        token_usage=token_usage,
     )
 
 
-@router.put("", response_model=UserSettingsRead)
+@router.put("", response_model=SettingsResponse)
 async def update_settings(
     settings_in: UserSettingsUpdate,
     user_id: UserId,
@@ -108,10 +115,18 @@ async def update_settings(
     commit_with_error_handling(session, "UserSettings")
     session.refresh(settings)
 
-    return UserSettingsRead(
-        user_id=settings.user_id,
-        llm_model_id=settings.llm_model_id,
-        language=settings.language,
-        created_at=settings.created_at,
-        updated_at=settings.updated_at,
+    # Get token usage info
+    token_usage = get_usage_info(session, user_id)
+
+    return SettingsResponse(
+        settings=UserSettingsRead(
+            user_id=settings.user_id,
+            llm_model_id=settings.llm_model_id,
+            language=settings.language,
+            created_at=settings.created_at,
+            updated_at=settings.updated_at,
+        ),
+        available_models=[AvailableModel(**m) for m in AVAILABLE_MODELS],
+        available_languages=[AvailableLanguage(**lang) for lang in AVAILABLE_LANGUAGES],
+        token_usage=token_usage,
     )

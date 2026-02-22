@@ -12,6 +12,7 @@ from app.models import DEFAULT_LLM_MODEL_ID, Note, UserSettings
 from app.models.enums import ChatScope
 from app.services import AIService, get_ai_service
 from app.services.context import ContextService
+from app.services.token_usage import check_limit, record_usage
 
 router = APIRouter()
 
@@ -53,6 +54,7 @@ class SummarizeResponse(BaseModel):
     """Response schema for summarization."""
 
     summary: str
+    tokens_used: int = 0
 
 
 class ChatRequest(BaseModel):
@@ -69,9 +71,16 @@ class ChatResponse(BaseModel):
     """Response schema for chat."""
 
     answer: str
+    tokens_used: int = 0
 
 
-
+def _check_token_limit(session: Session, user_id: str) -> None:
+    """Check if user has exceeded token limit. Raises 429 if exceeded."""
+    if not check_limit(session, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Monthly token limit exceeded. Your usage will reset at the beginning of next month.",
+        )
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
@@ -90,11 +99,19 @@ async def summarize_note(
             detail="Note content is empty",
         )
 
+    # Check token limit before making AI call
+    _check_token_limit(session, user_id)
+
     model_id, language = get_user_settings(session, user_id)
-    summary = await ai_service.summarize(
+    summary, tokens_used = await ai_service.summarize(
         note.content, model_id=model_id, language=language
     )
-    return SummarizeResponse(summary=summary)
+
+    # Record token usage (only if tokens were actually used, not cached)
+    if tokens_used > 0:
+        record_usage(session, user_id, tokens_used)
+
+    return SummarizeResponse(summary=summary, tokens_used=tokens_used)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -106,7 +123,10 @@ async def chat_with_context(
     context_service: Annotated[ContextService, Depends(get_context_service)],
 ):
     """Chat with AI about notes' content."""
-    
+
+    # Check token limit before making AI call
+    _check_token_limit(session, user_id)
+
     content = context_service.get_context(
         scope=request.scope,
         note_id=request.note_id,
@@ -114,14 +134,16 @@ async def chat_with_context(
     )
 
     model_id, language = get_user_settings(session, user_id)
-    answer = await ai_service.chat(
+    answer, tokens_used = await ai_service.chat(
         content=content,
         question=request.question,
         history=request.history,
         model_id=model_id,
         language=language,
     )
-    return ChatResponse(answer=answer)
 
+    # Record token usage
+    if tokens_used > 0:
+        record_usage(session, user_id, tokens_used)
 
-
+    return ChatResponse(answer=answer, tokens_used=tokens_used)

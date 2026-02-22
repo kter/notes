@@ -13,14 +13,14 @@ import { AIChatPanel } from "@/components/ai";
 import { LandingPage } from "@/components/landing";
 import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
 import { useAuth } from "@/lib/auth-context";
-import { useFolders, useNotes, useAIChat, useResizable, useHomeData, useNoteFilter, useOfflineSync } from "@/hooks";
+import { useFolders, useNotes, useAIChat, useResizable, useHomeData, useNoteFilter, useOfflineSync, useTokenUsage } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { LogOutIcon, Loader2Icon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
   const { user, isLoading: authLoading, isAuthenticated, signOut } = useAuth();
-  
+
   // UI State
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -67,13 +67,15 @@ export default function Home() {
   // Offline sync
   const { isOnline, syncStatus: offlineSyncStatus, pendingChangesCount } = useOfflineSync();
 
+  const { tokenUsage, recordUsage } = useTokenUsage(isAuthenticated);
+
   const {
     chatMessages,
     isAILoading,
     handleSummarize,
     handleSendMessage,
     clearChat,
-  } = useAIChat();
+  } = useAIChat(recordUsage);
 
   // Chat panel resize
   const chatPanelResize = useResizable({
@@ -120,7 +122,7 @@ export default function Home() {
 
   return (
     <>
-    <ThreeColumnLayout
+      <ThreeColumnLayout
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isNoteListOpen={isNoteListOpen}
@@ -213,6 +215,7 @@ export default function Home() {
               syncStatus={syncStatus}
               triggerServerSync={triggerServerSync}
               savedHash={selectedNote ? savedHashes[selectedNote.id] : undefined}
+              tokenUsage={tokenUsage}
             />
             <AIChatPanel
               isOpen={isChatOpen}
@@ -229,19 +232,20 @@ export default function Home() {
             />
           </div>
         }
-    />
-    {/* Sync Status Indicator */}
-    <SyncStatusIndicator
-      isOnline={isOnline}
-      syncStatus={offlineSyncStatus}
-      pendingChangesCount={pendingChangesCount}
-      savedLocally={false}
-      className="fixed bottom-20 md:bottom-4 right-4 z-50"
-    />
-    <SettingsDialog
-      open={isSettingsOpen}
-      onOpenChange={setIsSettingsOpen}
-    />
+      />
+      {/* Sync Status Indicator */}
+      <SyncStatusIndicator
+        isOnline={isOnline}
+        syncStatus={offlineSyncStatus}
+        pendingChangesCount={pendingChangesCount}
+        savedLocally={false}
+        className="fixed bottom-20 md:bottom-4 right-4 z-50"
+      />
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        tokenUsage={tokenUsage}
+      />
     </>
   );
 }

@@ -15,7 +15,12 @@ export interface FolderUpdate {
   name?: string;
 }
 
-// Note types
+export interface MCPTokenResponse {
+  token: string;
+  expires_in: number;
+}
+
+// Token usage types
 export interface Note {
   id: string;
   title: string;

@@ -2,11 +2,10 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, Request, Response
 
 from app.auth import get_current_user
-from app.models.mcp import MCPTokenRequest, MCPTokenResponse, MCPSettingsResponse
+from app.models.mcp import MCPSettingsResponse, MCPTokenResponse
 
 logger = logging.getLogger(__name__)
 

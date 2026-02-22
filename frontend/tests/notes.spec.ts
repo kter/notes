@@ -7,7 +7,7 @@ test.describe('Notes Functionality', () => {
   test('should perform a full cycle: folder -> note -> summary -> chat', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip(); // Flaky on WebKit
     test.setTimeout(120000); // AI summary can be slow
-    
+
     // Capture console errors and network failures
     const consoleErrors: string[] = [];
     page.on('console', msg => {
@@ -23,18 +23,18 @@ test.describe('Notes Functionality', () => {
         consoleErrors.push(`HTTP ${response.status()}: ${response.url()}`);
       }
     });
-    
+
     await page.goto('/');
     console.log('[E2E] Creating folder');
     // Scope to active layout to avoid duplicates
     const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
     // Ensure we are in folder view if mobile
     if (isMobile) {
-        await page.getByTestId('mobile-layout-folders').waitFor({ state: 'attached' });
-        // If folders are not visible (we might be in another tab), we need to switch?
-        // But the test starts at / which defaults to folders on mobile usually?
-        // Actually earlier code handled this. Let's assume we are in the right place or use the tab bar.
-        // For safe measure, ensure visibility if needed, but start simple.
+      await page.getByTestId('mobile-layout-folders').waitFor({ state: 'attached' });
+      // If folders are not visible (we might be in another tab), we need to switch?
+      // But the test starts at / which defaults to folders on mobile usually?
+      // Actually earlier code handled this. Let's assume we are in the right place or use the tab bar.
+      // For safe measure, ensure visibility if needed, but start simple.
     }
     await sidebar.getByTestId('sidebar-add-folder-button').click();
     const folderName = `Test Folder ${Date.now()}`;
@@ -52,28 +52,28 @@ test.describe('Notes Functionality', () => {
 
     // 2. Create a Note - wait for POST to complete before filling content
     console.log('[E2E] Creating note');
-    
+
     // Start listening for the note creation API call
     const createPromise = page.waitForResponse(
       resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
       { timeout: 30000 }
     );
-    
-    
+
+
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
     await noteList.getByTestId('note-list-add-note-button').click();
-    
+
     // Wait for the note to be created on server (this gives it a real ID)
     console.log('[E2E] Waiting for note creation on server');
     await createPromise;
     console.log('[E2E] Note created on server');
-    
+
     // Small delay for UI to update with server note
     await page.waitForTimeout(500);
-    
+
     const noteTitle = 'E2E Test Note';
     const noteContent = 'This is a test note created by Playwright.\n\nIt contains some content for summarizing markers:\n- Item 1\n- Item 2';
-    
+
     // Use placeholder patterns matching both EN and JA
     // On mobile, need to wait for editor view; on desktop elements may be duplicated
     // Use locator that filters for visible elements
@@ -81,37 +81,37 @@ test.describe('Notes Functionality', () => {
     const titleInput = layout.getByTestId('editor-title-input');
     await expect(titleInput).toBeVisible({ timeout: 20000 });
     await titleInput.fill(noteTitle);
-    
+
     const contentInput = layout.getByTestId('editor-content-input');
     await expect(contentInput).toBeVisible({ timeout: 10000 });
     await contentInput.fill(noteContent);
-    
+
     // Trigger blur to ensure content is registered
     await contentInput.blur();
 
     // 3. Wait for auto-save to complete
     // Debounce is 500ms - wait a bit longer then check for PUT/PATCH response
     console.log('[E2E] Waiting for auto-save');
-    
+
     // Wait for the save API call (PUT or PATCH to /api/notes/{id})
     const updatePromise = page.waitForResponse(
       resp => /\/api\/notes\/[^/]+$/.test(resp.url()) && (resp.request().method() === 'PUT' || resp.request().method() === 'PATCH') && resp.status() < 400,
       { timeout: 30000 }
     ).catch(e => console.log('[E2E] Update API response not detected:', e.message));
 
-    
+
     // Use waitForTimeout to trigger the debounced save
     await page.waitForTimeout(1000);
-    
+
     // Wait for save indicator
     const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
-    
+
     // Wait for update API to complete
     console.log('[E2E] Waiting for content sync to server');
     await updatePromise;
     console.log('[E2E] Content synced');
-    
+
     // Extra wait for backend consistency
     await page.waitForTimeout(1000);
 
@@ -119,19 +119,19 @@ test.describe('Notes Functionality', () => {
     // Known issue: Chromium fails with 400 Bad Request (Note content empty) despite content being synced.
     // Firefox passes. Marking as fixme for Chromium to unblock CI.
     if (browserName === 'chromium') {
-        test.fixme();
+      test.fixme();
     }
     console.log('[E2E] Requesting summary');
     // layout is already defined above as mobile-layout-editor or desktop-layout
     await layout.getByTestId('editor-summarize-button').click();
-    
+
     // Wait for AI chat panel to open (visible on desktop)
     console.log('[E2E] Waiting for AI chat panel');
     await page.waitForTimeout(1000); // Give time for panel to open
-    
+
     // Wait for AI summary response - try multiple selectors
     console.log('[E2E] Waiting for AI loading/response');
-    
+
     // First try to wait for loading indicator, but don't fail if it's too fast
     try {
       await expect(layout.getByTestId('ai-loading')).toBeVisible({ timeout: 5000 });
@@ -141,12 +141,12 @@ test.describe('Notes Functionality', () => {
     } catch {
       console.log('[E2E] AI loading indicator not found or already done - continuing');
     }
-    
+
     // Look for any assistant message content
     console.log('[E2E] Looking for AI message content');
     console.log('[E2E] Captured errors so far:', consoleErrors);
     // Use :visible filter on mobile to avoid matching hidden desktop element
-    const aiResponse = isMobile 
+    const aiResponse = isMobile
       ? page.locator('[data-testid="ai-message-content"]:visible').first()
       : page.getByTestId('ai-message-content').first();
     await expect(aiResponse).toBeVisible({ timeout: 100000 });
@@ -181,10 +181,10 @@ test.describe('Notes Functionality', () => {
     // 1. First click on "All Notes" to ensure we're in the right view
     // On mobile, ensure we are in Folders view first so we can click "All Notes" in the sidebar
     if (isMobile) {
-        // Switch to Folders view first
-        await page.getByTestId('mobile-nav-folders').click();
-        // Now mobile-layout-folders should be visible
-        await expect(page.getByTestId('mobile-layout-folders')).toBeVisible();
+      // Switch to Folders view first
+      await page.getByTestId('mobile-nav-folders').click();
+      // Now mobile-layout-folders should be visible
+      await expect(page.getByTestId('mobile-layout-folders')).toBeVisible();
     }
     // Select "All Notes"
     const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
@@ -193,7 +193,7 @@ test.describe('Notes Functionality', () => {
 
     // 2. Create a note with specific content
     console.log('[E2E] Creating note for search');
-    
+
     // Start listening for the note creation API call
     const createPromise = page.waitForResponse(
       resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
@@ -202,12 +202,12 @@ test.describe('Notes Functionality', () => {
 
     const noteListContainer = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
     await noteListContainer.getByTestId('note-list-add-note-button').click();
-    
+
     // Wait for the note to be created on server
     console.log('[E2E] Waiting for note creation on server');
     await createPromise;
     console.log('[E2E] Note created on server');
-    
+
     // Small delay for UI to update with server note
     await page.waitForTimeout(500);
 
@@ -225,22 +225,22 @@ test.describe('Notes Functionality', () => {
 
     // Wait for auto-save and list update (giving it ample time)
     console.log('[E2E] Waiting for auto-save and list update');
-    
+
     // Wait for the save API call (PUT or PATCH)
     const updatePromise = page.waitForResponse(
       resp => /\/api\/notes\/[^/]+$/.test(resp.url()) && (resp.request().method() === 'PUT' || resp.request().method() === 'PATCH') && resp.status() < 400,
       { timeout: 30000 }
     ).catch(e => console.log('[E2E] Update API response not detected:', e.message));
-    
+
     // Trigger save
     await page.waitForTimeout(1000);
-    
+
     const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
     if (isMobile) {
       await savedIndicator.scrollIntoViewIfNeeded();
     }
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
-    
+
     // Wait for update API to complete
     console.log('[E2E] Waiting for content sync to server');
     await updatePromise;
@@ -250,7 +250,7 @@ test.describe('Notes Functionality', () => {
 
     // Verify that we can generate a title (if applicable) or just check note creation
     // For this test, we care about the search functionality
-    
+
     // 2. Go to Note List to search (Mobile check)
     // On Desktop, Note List is always visible, but good to ensure we check it.
     if (isMobile) {
@@ -263,13 +263,13 @@ test.describe('Notes Functionality', () => {
 
     // 2.5 Verify Note Title Update in List BEFORE Search
     console.log('[E2E] Verifying note title updated in list before search');
-    
+
 
     // Note list should update after save - wait for it to appear
     // On desktop, note list is always visible on the left side
     // Give more time for the list to update after creation and save
     await page.waitForTimeout(3000);
-    
+
     // First check if the note appears in the list (may take time for API sync)
     const listLayout = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
     const noteInList = listLayout.locator('[data-testid^="note-list-item-"]').filter({ hasText: searchNoteTitle }).first();
@@ -282,11 +282,11 @@ test.describe('Notes Functionality', () => {
       await page.waitForLoadState('networkidle');
       // Click All Notes again after reload
       const sidebarContainer = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
-      await sidebarContainer.getByTestId('sidebar-nav-all-notes').click().catch(() => {});
+      await sidebarContainer.getByTestId('sidebar-nav-all-notes').click().catch(() => { });
       await page.waitForTimeout(1000);
       await expect(noteInList).toBeVisible({ timeout: 60000 });
     }
-    
+
     // 3. Perform Search
     console.log(`[E2E] Searching for: ${searchNoteTitle}`);
     const searchInput = listLayout.getByTestId('note-list-search-input');
@@ -305,7 +305,7 @@ test.describe('Notes Functionality', () => {
     console.log('[E2E] Negative search test');
     await searchInput.fill(`Non-existent ${Date.now()}`);
     await expect(listLayout.getByText(/No results found|ノートがありません/i).first()).toBeVisible({ timeout: 10000 });
-    
+
     // Clear search
     await searchInput.fill('');
   });
@@ -330,21 +330,24 @@ test.describe('Notes Functionality', () => {
     // 2. Verify Dialog Content
     console.log('[E2E] Verifying Settings content');
     // Title
-    await expect(page.getByRole('heading', { name: /Settings|設定/i })).toBeVisible({ timeout: 10000 });
-    
+    await expect(page.getByRole('heading', { name: /^Settings$|^設定$/i })).toBeVisible({ timeout: 10000 });
+
     // Language Selection
     await expect(page.getByLabel(/Language|言語/i)).toBeVisible();
-    
-    // Model Selection
+
+    // AI Model Selection
     await expect(page.getByLabel(/AI Model|AIモデル/i)).toBeVisible();
+
+    // Export button
+    await expect(page.getByRole('button', { name: /Download ZIP|ZIPをダウンロード/i })).toBeVisible();
 
     // 3. Close Settings
     console.log('[E2E] Closing Settings');
-    // Click Cancel or outside, or hit Escape. The dialog has a Cancel button.
-    await page.getByRole('button', { name: /Cancel|キャンセル/i }).click();
-    
+    // Hit Escape to reliably close the dialog without scroll/viewport issues
+    await page.keyboard.press('Escape');
+
     // Verify dialog is gone
-    await expect(page.getByRole('heading', { name: /Settings|設定/i })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Settings$|^設定$/i })).not.toBeVisible({ timeout: 10000 });
   });
 
   test('should be able to collapse and expand note list panel', async ({ page, isMobile }) => {
@@ -403,10 +406,10 @@ test.describe('Notes Functionality', () => {
     }
     const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
     await sidebar.getByTestId('sidebar-nav-all-notes').click();
-    
+
     // Wait for the note list to load
     await page.waitForTimeout(1000);
-    
+
     // Start listening for the note creation API call
     const createPromise = page.waitForResponse(
       resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
@@ -415,19 +418,19 @@ test.describe('Notes Functionality', () => {
 
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
     await noteList.getByTestId('note-list-add-note-button').click();
-    
+
     // Wait for the note to be created on server
     console.log('[E2E] Waiting for note creation on server');
     await createPromise;
     console.log('[E2E] Note created on server');
-    
+
     // Small delay for UI to update with server note
     await page.waitForTimeout(500);
 
     const layout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
     const titleInput = layout.getByTestId('editor-title-input');
     await expect(titleInput).toBeVisible({ timeout: 20000 });
-    
+
     const onlineNoteTitle = `Online Note ${Date.now()}`;
     await titleInput.fill(onlineNoteTitle);
 
@@ -438,21 +441,21 @@ test.describe('Notes Functionality', () => {
 
     // Wait for save
     console.log('[E2E] Waiting for online save');
-    
+
     // Wait for the save API call (PUT or PATCH)
     const updatePromise = page.waitForResponse(
       resp => /\/api\/notes\/[^/]+$/.test(resp.url()) && (resp.request().method() === 'PUT' || resp.request().method() === 'PATCH') && resp.status() < 400,
       { timeout: 30000 }
     ).catch(e => console.log('[E2E] Update API response not detected:', e.message));
-    
+
     await page.waitForTimeout(1000);
-    
+
     const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
     if (isMobile) {
       await savedIndicator.scrollIntoViewIfNeeded();
     }
     await expect(savedIndicator).toBeVisible({ timeout: 30000 });
-    
+
     // Wait for update API to complete
     console.log('[E2E] Waiting for content sync to server');
     await updatePromise;
@@ -483,7 +486,7 @@ test.describe('Notes Functionality', () => {
     // On desktop, verify text to ensure we are truly in offline/unsaved state
     // On mobile the text is hidden so we skip text verification or would need to check class/color
     if (!isMobile) {
-        await expect(statusContainer).toHaveText(/Offline|オフライン|Saved locally|ローカルに保存|Unsaved|未保存/i, { timeout: 10000 });
+      await expect(statusContainer).toHaveText(/Offline|オフライン|Saved locally|ローカルに保存|Unsaved|未保存/i, { timeout: 10000 });
     }
 
     // 6. Go back online
@@ -503,7 +506,7 @@ test.describe('Notes Functionality', () => {
       await syncedIndicator.scrollIntoViewIfNeeded();
     }
     await expect(syncedIndicator).toBeVisible({ timeout: 30000 });
-    
+
     // 9. Reload page to verify data persisted
     console.log('[E2E] Reloading page to verify persistence');
     await page.reload();
@@ -527,20 +530,20 @@ test.describe('Notes Functionality', () => {
     console.log(`[E2E] Looking for note: ${onlineNoteTitle}`);
     const listLayout = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
     const noteItem = listLayout.locator('[data-testid^="note-list-item-"]').filter({ hasText: onlineNoteTitle }).first();
-    
+
     try {
       await expect(noteItem).toBeVisible({ timeout: 40000 });
     } catch {
-       console.log('[E2E] Note not found after reload, retrying reload...');
-       await page.reload();
-       await page.waitForLoadState('networkidle');
-       await page.waitForTimeout(2000);
-       if (isMobile) {
-         await page.getByTestId('mobile-nav-notes').click();
-       }
-       const sidebarRetry = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
-       await sidebarRetry.getByTestId('sidebar-nav-all-notes').click().catch(() => {});
-       await expect(noteItem).toBeVisible({ timeout: 40000 });
+      console.log('[E2E] Note not found after reload, retrying reload...');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+      if (isMobile) {
+        await page.getByTestId('mobile-nav-notes').click();
+      }
+      const sidebarRetry = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
+      await sidebarRetry.getByTestId('sidebar-nav-all-notes').click().catch(() => { });
+      await expect(noteItem).toBeVisible({ timeout: 40000 });
     }
   });
 });

@@ -39,7 +39,7 @@ app.add_middleware(
 app.include_router(folders.router, prefix="/api/folders", tags=["folders"])
 app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
-app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
+app.include_router(mcp.router)
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(share.router, prefix="/api", tags=["share"])
 

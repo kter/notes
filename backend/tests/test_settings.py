@@ -96,7 +96,8 @@ class TestUpdateSettings:
         )
 
         assert response.status_code == 200
-        settings = response.json()
+        data = response.json()
+        settings = data["settings"]
         assert settings["llm_model_id"] == valid_model_id
         assert settings["user_id"] == TEST_USER_ID
 
@@ -124,7 +125,8 @@ class TestUpdateSettings:
         )
 
         assert response.status_code == 200
-        settings = response.json()
+        data = response.json()
+        settings = data["settings"]
         assert settings["llm_model_id"] == valid_model_id
 
 
@@ -139,7 +141,8 @@ class TestUpdateLanguageSettings:
         )
 
         assert response.status_code == 200
-        settings = response.json()
+        data = response.json()
+        settings = data["settings"]
         assert settings["language"] == "ja"
 
     def test_update_language_to_english(self, client: TestClient):
@@ -150,7 +153,8 @@ class TestUpdateLanguageSettings:
         )
 
         assert response.status_code == 200
-        settings = response.json()
+        data = response.json()
+        settings = data["settings"]
         assert settings["language"] == "en"
 
     def test_update_language_to_auto(self, client: TestClient):
@@ -165,7 +169,8 @@ class TestUpdateLanguageSettings:
         )
 
         assert response.status_code == 200
-        settings = response.json()
+        data = response.json()
+        settings = data["settings"]
         assert settings["language"] == "auto"
 
     def test_update_invalid_language_rejected(self, client: TestClient):
@@ -191,7 +196,8 @@ class TestUpdateLanguageSettings:
         )
 
         assert response.status_code == 200
-        settings = response.json()
+        data = response.json()
+        settings = data["settings"]
         assert settings["llm_model_id"] == valid_model_id
         assert settings["language"] == "ja"
 
@@ -228,10 +234,10 @@ class TestSettingsUserIsolation:
         client1 = make_client("user-1")
         response1 = client1.put("/api/settings", json={"language": "ja"})
         assert response1.status_code == 200
-        assert response1.json()["language"] == "ja"
+        assert response1.json()["settings"]["language"] == "ja"
 
         # User 2 sets English
         client2 = make_client("user-2")
         response2 = client2.put("/api/settings", json={"language": "en"})
         assert response2.status_code == 200
-        assert response2.json()["language"] == "en"
+        assert response2.json()["settings"]["language"] == "en"

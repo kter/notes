@@ -175,6 +175,15 @@ export const ja = {
     noShare: "このノートは共有されていません",
     viewOnlyNotice: "読み取り専用",
   },
+
+  // Token Usage
+  tokenUsage: {
+    title: "言語モデルトークン使用量",
+    used: "使用済みトークン",
+    limit: "月間上限",
+    resetDate: "リセット日",
+    exceeded: "月間のトークン上限に達しました。使用量は来月の初めにリセットされます。",
+  },
 } as const;
 
 // Structural type for translations (allows different string values)
@@ -332,6 +341,13 @@ export type TranslationKeys = {
     createShare: string;
     noShare: string;
     viewOnlyNotice: string;
+  };
+  tokenUsage: {
+    title: string;
+    used: string;
+    limit: string;
+    resetDate: string;
+    exceeded: string;
   };
 };
 

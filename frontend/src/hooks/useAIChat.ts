@@ -19,7 +19,7 @@ interface UseAIChatReturn {
   clearChat: () => void;
 }
 
-export function useAIChat(): UseAIChatReturn {
+export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatReturn {
   const { getApi } = useApi();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAILoading, setIsAILoading] = useState(false);
@@ -32,14 +32,22 @@ export function useAIChat(): UseAIChatReturn {
     try {
       const apiClient = await getApi();
       const result = await apiClient.summarizeNote({ note_id: noteId });
+
+      if (result.tokens_used && onTokenUsage) {
+        onTokenUsage(result.tokens_used);
+      }
+
       // Add summary as a chat message
       const summaryMessage: ChatMessage = {
         role: "assistant",
         content: result.summary,
       };
       setChatMessages((prev) => [...prev, summaryMessage]);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to summarize:", error);
+      if ((error as { status?: number })?.status === 429) {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings." }]);
+      }
     } finally {
       setIsAILoading(false);
     }
@@ -64,13 +72,21 @@ export function useAIChat(): UseAIChatReturn {
         question: message,
         history: chatMessages,
       });
+
+      if (result.tokens_used && onTokenUsage) {
+        onTokenUsage(result.tokens_used);
+      }
+
       const assistantMessage: ChatMessage = {
         role: "assistant",
         content: result.answer,
       };
       setChatMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to chat:", error);
+      if ((error as { status?: number })?.status === 429) {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings." }]);
+      }
     } finally {
       setIsAILoading(false);
     }

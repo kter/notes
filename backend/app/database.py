@@ -126,7 +126,7 @@ def create_db_and_tables() -> None:
 
     try:
         # Import models to register them with SQLModel.metadata
-        from app.models import Folder, Note, NoteShare, UserSettings  # noqa: F401
+        from app.models import Folder, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
 
         logger.info(f"Models loaded: {list(SQLModel.metadata.tables.keys())}")
 
@@ -139,6 +139,18 @@ def create_db_and_tables() -> None:
             try:
                 table.create(engine, checkfirst=True)
                 logger.info(f"Table '{table_name}' created or already exists")
+            except Exception as e:
+                logger.warning(f"Failed to create table '{table_name}': {e}")
+                
+        # Force explicit creation of missing tables
+        try:
+            from app.models.token_usage import TokenUsage
+            TokenUsage.__table__.create(engine, checkfirst=True)
+        except Exception as e:
+            logger.warning(f"Failed to create TokenUsage table: {e}")
+        
+        for table_name, table in SQLModel.metadata.tables.items():
+            try:
 
                 # Self-healing migration: Add 'language' column to 'user_settings' if missing
                 if table_name == "user_settings":

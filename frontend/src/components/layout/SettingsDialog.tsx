@@ -19,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Loader2Icon, CheckIcon } from "lucide-react";
 import { useApi, useTranslation } from "@/hooks";
-import type { AvailableModel, AvailableLanguage, TokenUsageRead } from "@/types";
+import type { AvailableModel, AvailableLanguage, TokenUsageRead, MCPTokenInfo } from "@/types";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -32,7 +32,7 @@ export function SettingsDialog({
   onOpenChange,
   tokenUsage,
 }: SettingsDialogProps) {
-  const { getApi } = useApi();
+  const { getApi, generateMcpToken, revokeMcpToken } = useApi();
   const { t, language, setLanguage } = useTranslation();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language);
@@ -43,6 +43,11 @@ export function SettingsDialog({
   const [isExporting, setIsExporting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // MCP token management states
+  const [mcpTokenInfo, setMcpTokenInfo] = useState<MCPTokenInfo | null>(null);
+  const [isGeneratingMcpToken, setIsGeneratingMcpToken] = useState(false);
+  const [isRevokingMcpToken, setIsRevokingMcpToken] = useState(false);
 
   // Load settings when dialog opens
   useEffect(() => {
@@ -245,6 +250,83 @@ export function SettingsDialog({
                   <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
                 ) : null}
                 {t("settings.exportButton")}
+              </Button>
+            </div>
+
+            {/* MCP Token Management Section */}
+            <div className="border-t pt-6 space-y-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium leading-none">
+                  {t("settings.mcpSection")}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.mcpDescription")}
+                </p>
+              </div>
+
+              {/* Token Status */}
+              {mcpTokenInfo ? (
+                <div className="rounded-md bg-secondary p-4 space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium">
+                      {t("settings.mcpTokenStatus")}:
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {t("settings.mcpTokenActive")}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">
+                      {t("settings.mcpTokenExpires")}:
+                    </span>
+                    <span className="text-sm font-medium">
+                      {new Date(mcpTokenInfo.expiresAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRevokeMcpToken}
+                      disabled={isRevokingMcpToken}
+                    >
+                      {isRevokingMcpToken ? (
+                        <Loader2Icon className="h-3 w-3 animate-spin" />
+                      ) : t("settings.mcpRevokeToken")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(mcpTokenInfo.token);
+                      }}
+                    >
+                      {t("common.copy")}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md bg-secondary p-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.mcpNoToken")}
+                  </p>
+                </div>
+              )}
+
+              {/* Generate/Regenerate Token Button */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleGenerateMcpToken}
+                disabled={isGeneratingMcpToken}
+              >
+                {isGeneratingMcpToken ? (
+                  <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <>
+                    {mcpTokenInfo ? t("settings.mcpRegenerateToken") : t("settings.mcpGenerateToken")}
+                  </>
+                )}
               </Button>
             </div>
 

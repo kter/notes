@@ -121,3 +121,21 @@ export interface SharedNote {
   content: string;
   updated_at: string;
 }
+
+// MCP Token Management types
+export interface MCPTokenInfo {
+  token: string;
+  expiresAt: Date;
+  expires_in: number;
+}
+
+export interface MCPTokenRequest {
+  url: string;
+  token: string;
+  expires_in: number;
+}
+
+export interface MCPSettingsResponse {
+  server_url: string;
+  token_expires_in: number;
+}

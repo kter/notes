@@ -161,6 +161,39 @@ class ApiClient {
     });
   }
 
+  // MCP Token Management API
+  async generateMcpToken(token: string | null): Promise<MCPTokenRequest> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    };
+    const response = await fetch(`${API_BASE_URL}/api/mcp/token`, {
+      method: "POST",
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new ApiError(response.status, response.statusText, await response.json().catch(() => ({})));
+    }
+
+    return response.json();
+  }
+
+  async revokeMcpToken(token: string | null): Promise<void> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    };
+    const response = await fetch(`${API_BASE_URL}/api/mcp/revoke`, {
+      method: "POST",
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new ApiError(response.status, response.statusText, await response.json().catch(() => ({})));
+    }
+  }
+
   async exportNotes(): Promise<Blob> {
     const response = await fetch(`${API_BASE_URL}/api/notes/export/all`, {
       headers: {

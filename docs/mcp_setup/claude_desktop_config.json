@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "notes-app": {
+      "command": "python",
+      "args": [
+        "/path/to/mcp_client.py"
+      ],
+      "env": {
+        "MCP_SERVER_URL": "https://your-mcp-server-url.lambda-url.ap-northeast-1.on.aws",
+        "COGNITO_USER_POOL_ID": "ap-northeast-1_XXXXX",
+        "COGNITO_CLIENT_ID": "your-client-id",
+        "COGNITO_REGION": "ap-northeast-1"
+      }
+    },
+    "notes-app-sse": {
+      "transport": {
+        "type": "sse",
+        "url": "https://your-mcp-server-url.lambda-url.ap-northeast-1.on.aws"
+      },
+      "authorization": {
+        "type": "bearer",
+        "token": "your-cognito-access-token"
+      }
+    }
+  }
+}

@@ -12,6 +12,8 @@ AWS_REGION ?= ap-northeast-1
 # Use deferred evaluation (=) so these are evaluated when used, picked up after profile/env is set
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
+MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
+MCP_AUTH_MANAGER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-auth-manager-$(ENV)
 
 .PHONY: help
 help: ## Show this help
@@ -222,4 +224,80 @@ install-hooks: ## Install git pre-commit hooks
 	chmod +x scripts/pre-commit
 	cp scripts/pre-commit .git/hooks/pre-commit
 	@echo "Pre-commit hook installed!"
+
+# =============================================================================
+# MCP Server Deployment
+# =============================================================================
+
+.PHONY: mcp-login
+mcp-login: ## Login to ECR for MCP images
+	aws ecr get-login-password --region $(AWS_REGION) --profile $(AWS_PROFILE) | \
+		docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+
+.PHONY: build-mcp-server
+build-mcp-server: ## Build MCP server Docker image
+	cd lambda/mcp_server && docker build --platform linux/amd64 -t $(MCP_SERVER_REPO):latest .
+
+.PHONY: build-mcp-auth-manager
+build-mcp-auth-manager: ## Build MCP auth manager Docker image
+	cd lambda/auth_manager && docker build --platform linux/amd64 -t $(MCP_AUTH_MANAGER_REPO):latest .
+
+.PHONY: push-mcp-server
+push-mcp-server: mcp-login build-mcp-server ## Build and push MCP server Docker image to ECR
+	docker push $(MCP_SERVER_REPO):latest
+	@echo "MCP Server image pushed: $(MCP_SERVER_REPO):latest"
+
+.PHONY: push-mcp-auth-manager
+push-mcp-auth-manager: mcp-login build-mcp-auth-manager ## Build and push MCP auth manager Docker image to ECR
+	docker push $(MCP_AUTH_MANAGER_REPO):latest
+	@echo "MCP Auth Manager image pushed: $(MCP_AUTH_MANAGER_REPO):latest"
+
+.PHONY: get-mcp-server-digest
+get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
+	@aws ecr describe-images --repository-name notes-mcp-server-$(ENV) \
+		--image-ids imageTag=latest \
+		--profile $(AWS_PROFILE) \
+		--query 'imageDetails[0].imageDigest' \
+		--output text
+
+.PHONY: get-mcp-auth-manager-digest
+get-mcp-auth-manager-digest: ## Get the latest MCP auth manager image digest from ECR
+	@aws ecr describe-images --repository-name notes-mcp-auth-manager-$(ENV) \
+		--image-ids imageTag=latest \
+		--profile $(AWS_PROFILE) \
+		--query 'imageDetails[0].imageDigest' \
+		--output text
+
+.PHONY: deploy-mcp
+deploy-mcp: tf-switch push-mcp-server push-mcp-auth-manager ## Deploy MCP infrastructure
+	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	$(eval MCP_AUTH_DIGEST := $(shell $(MAKE) get-mcp-auth-manager-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply \
+		-var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" \
+		-var="mcp_auth_manager_image_tag=$(MCP_AUTH_DIGEST)" \
+		-auto-approve
+	@echo "MCP infrastructure deployed!"
+
+.PHONY: mcp-logs
+mcp-logs: ## Tail MCP server logs
+	aws logs tail /aws/lambda/notes-mcp-server-$(ENV) --follow --profile $(AWS_PROFILE)
+
+.PHONY: mcp-auth-logs
+mcp-auth-logs: ## Tail MCP auth manager logs
+	aws logs tail /aws/lambda/notes-mcp-auth-manager-$(ENV) --follow --profile $(AWS_PROFILE)
+
+.PHONY: test-mcp-server
+test-mcp-server: ## Test MCP server connection
+	$(eval MCP_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw mcp_server_api_url))
+	@echo "MCP Server URL: $(MCP_URL)"
+	@echo ""
+	@echo "Health check:"
+	@curl -s $(MCP_URL)/health | jq .
+	@echo ""
+	@echo "To test the MCP protocol, use a valid Cognito token:"
+	@echo "curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer <TOKEN>' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/list\",\"params\":{}}' $(MCP_URL)/"
+	@echo ""
+	@echo "To configure Claude Desktop, add the following to your MCP config:"
+	@echo '{"mcpServers": {"notes-app": {"url": "$(MCP_URL)/", "headers": {"Authorization": "Bearer <YOUR_COGNITO_TOKEN>"}}}}'
+
 

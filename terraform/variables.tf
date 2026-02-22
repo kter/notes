@@ -46,3 +46,10 @@ variable "lambda_image_tag" {
   type        = string
   default     = "latest"
 }
+
+# MCP Server Lambda image tag
+variable "mcp_server_image_tag" {
+  description = "Docker image tag for MCP Server Lambda function (e.g., 'latest' or sha256 digest)"
+  type        = string
+  default     = "latest"
+}

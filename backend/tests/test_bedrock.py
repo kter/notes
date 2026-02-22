@@ -26,15 +26,17 @@ async def test_summarize_success(mock_boto_client, mock_settings):
     
     # Mock response from Bedrock
     mock_response_body = json.dumps({
-        "content": [{"text": "This is a summary."}]
+        "content": [{"text": "This is a summary."}],
+        "usage": {"inputTokens": 10, "outputTokens": 10}
     })
     mock_boto_client.invoke_model.return_value = {
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
     
-    summary = await service.summarize("Original content")
+    summary, total_tokens = await service.summarize("Original content")
     
     assert summary == "This is a summary."
+    assert isinstance(total_tokens, int)
     mock_boto_client.invoke_model.assert_called_once()
     
     # Verify call args
@@ -54,18 +56,20 @@ async def test_chat_success(mock_boto_client, mock_settings):
     service = BedrockService()
     
     mock_response_body = json.dumps({
-        "content": [{"text": "Chat answer."}]
+        "content": [{"text": "Chat answer."}],
+        "usage": {"inputTokens": 10, "outputTokens": 10}
     })
     mock_boto_client.invoke_model.return_value = {
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
     
-    answer = await service.chat(
+    answer, total_tokens = await service.chat(
         content="Context info",
         question="User question",
     )
     
     assert answer == "Chat answer."
+    assert isinstance(total_tokens, int)
     
     # Verify context and question are in the prompt
     call_args = mock_boto_client.invoke_model.call_args[1]

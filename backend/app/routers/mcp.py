@@ -2,7 +2,7 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.auth import get_current_user
 from app.models.mcp import MCPSettingsResponse, MCPTokenResponse
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
 @router.post("/token", response_model=MCPTokenResponse)
 async def generate_mcp_token(
+    request: Request,
     current_user: Annotated[dict, Depends(get_current_user)]
 ) -> MCPTokenResponse:
     """
@@ -24,15 +25,24 @@ async def generate_mcp_token(
     """
     # Use the same ID token that Notes App uses
     # The get_current_user dependency already validates the JWT and extracts user info
-    user_id = current_user.get("user_id")
-    id_token = current_user.get("id_token")
+    user_id = current_user.get("sub")
+    
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    id_token = auth_header.split(" ")[1]
+
+    # Calculate remaining time for the token
+    import time
+    exp = current_user.get("exp")
+    expires_in = int(exp - time.time()) if exp else 3600
 
     logger.info(f"Generating MCP token for user {user_id}")
 
     return MCPTokenResponse(
         url="https://5gcqmlela7.execute-api.ap-northeast-1.amazonaws.com/",
         token=id_token,
-        expires_in=3600  # 1 hour in seconds
+        expires_in=expires_in
     )
 
 
@@ -44,7 +54,7 @@ async def get_mcp_settings(
     """
     Get current MCP settings for the user.
     """
-    user_id = current_user.get("user_id")
+    user_id = current_user.get("sub")
 
     # In the future, we can store per-user MCP settings in the database
     # For now, return the server URL
@@ -73,7 +83,7 @@ async def revoke_mcp_token(
     The actual token revocation would require the MCP server to implement
     token blacklisting or similar mechanism.
     """
-    user_id = current_user.get("user_id")
+    user_id = current_user.get("sub")
     logger.info(f"Revoking MCP token for user {user_id}")
 
     return Response(

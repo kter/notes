@@ -16,8 +16,12 @@ class AIService(ABC):
     @abstractmethod
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> str:
-        """Generate a summary of the given content."""
+    ) -> tuple[str, int]:
+        """Generate a summary of the given content.
+
+        Returns:
+            Tuple of (summary_text, total_tokens_used)
+        """
         pass
 
     @abstractmethod
@@ -28,8 +32,12 @@ class AIService(ABC):
         history: list[dict] | None = None,
         model_id: str | None = None,
         language: str = "auto",
-    ) -> str:
-        """Answer a question based on the given content context."""
+    ) -> tuple[str, int]:
+        """Answer a question based on the given content context.
+
+        Returns:
+            Tuple of (answer_text, total_tokens_used)
+        """
         pass
 
 
@@ -50,8 +58,12 @@ class BedrockService(AIService):
         messages: list[dict],
         system: str | None = None,
         model_id: str | None = None,
-    ) -> str:
-        """Invoke the Bedrock model and return the response text."""
+    ) -> tuple[str, int]:
+        """Invoke the Bedrock model and return the response text and token usage.
+
+        Returns:
+            Tuple of (response_text, total_tokens_used)
+        """
         body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 4096,
@@ -72,7 +84,13 @@ class BedrockService(AIService):
         )
 
         response_body = json.loads(response["body"].read())
-        return response_body["content"][0]["text"]
+        text = response_body["content"][0]["text"]
+
+        # Extract token usage from response
+        usage = response_body.get("usage", {})
+        total_tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+
+        return text, total_tokens
 
     def _resolve_language(self, language: str) -> str:
         """Resolve 'auto' language to default 'en'."""
@@ -82,15 +100,19 @@ class BedrockService(AIService):
 
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> str:
-        """Generate a summary of the note content."""
+    ) -> tuple[str, int]:
+        """Generate a summary of the note content.
+
+        Returns:
+            Tuple of (summary_text, total_tokens_used)
+        """
         resolved_lang = self._resolve_language(language)
         
         # Check cache
         cache_service = get_cache_service()
         cached_summary = cache_service.get_cached_summary(content, model_id)
         if cached_summary:
-            return cached_summary
+            return cached_summary, 0
 
         system = get_prompt("summarize", resolved_lang)
 
@@ -101,12 +123,12 @@ class BedrockService(AIService):
             }
         ]
 
-        summary = self._invoke_model(messages, system, model_id=model_id)
+        summary, total_tokens = self._invoke_model(messages, system, model_id=model_id)
         
         # Save to cache
         cache_service.save_summary(content, model_id, summary)
         
-        return summary
+        return summary, total_tokens
 
 
 
@@ -117,8 +139,12 @@ class BedrockService(AIService):
         history: list[dict] | None = None,
         model_id: str | None = None,
         language: str = "auto",
-    ) -> str:
-        """Answer a question about the note content."""
+    ) -> tuple[str, int]:
+        """Answer a question about the note content.
+
+        Returns:
+            Tuple of (answer_text, total_tokens_used)
+        """
         resolved_lang = self._resolve_language(language)
         system = get_prompt("chat", resolved_lang)
 

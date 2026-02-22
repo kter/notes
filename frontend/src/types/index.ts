@@ -45,6 +45,7 @@ export interface SummarizeRequest {
 
 export interface SummarizeResponse {
   summary: string;
+  tokens_used: number;
 }
 
 export interface ChatMessage {
@@ -62,6 +63,7 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   answer: string;
+  tokens_used: number;
 }
 
 
@@ -86,10 +88,18 @@ export interface AvailableLanguage {
   description: string;
 }
 
+export interface TokenUsageRead {
+  tokens_used: number;
+  token_limit: number;
+  period_start: string;
+  period_end: string;
+}
+
 export interface SettingsResponse {
   settings: UserSettings;
   available_models: AvailableModel[];
   available_languages: AvailableLanguage[];
+  token_usage: TokenUsageRead;
 }
 
 export interface UserSettingsUpdate {

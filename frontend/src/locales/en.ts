@@ -177,4 +177,13 @@ export const en: TranslationKeys = {
     noShare: "This note is not shared",
     viewOnlyNotice: "Read-only view",
   },
+
+  // Token Usage
+  tokenUsage: {
+    title: "Language Model Token Usage",
+    used: "Tokens Used",
+    limit: "Monthly Limit",
+    resetDate: "Reset Date",
+    exceeded: "Monthly token limit exceeded. Your usage will reset at the beginning of next month.",
+  },
 } as const;

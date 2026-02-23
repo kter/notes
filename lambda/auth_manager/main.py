@@ -14,6 +14,7 @@ import boto3
 from fastapi import FastAPI, Header, HTTPException
 from jose import jwk, jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
+from mangum import Mangum
 from pydantic import BaseModel
 
 # Configure logging

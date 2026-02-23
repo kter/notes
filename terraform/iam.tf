@@ -101,6 +101,30 @@ resource "aws_iam_role_policy" "logs" {
   })
 }
 
+# Cognito access policy for MCP Auth Manager
+resource "aws_iam_role_policy" "cognito_access" {
+  name = "cognito-access"
+  role = aws_iam_role.backend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:InitiateAuth",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminGetUser"
+        ]
+        Resource = aws_cognito_user_pool.main.arn
+      }
+    ]
+  })
+}
+
 # Attach AWS managed policy for Lambda execution
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.backend.name

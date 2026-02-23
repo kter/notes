@@ -11,6 +11,7 @@ export const ja = {
     error: "エラー",
     success: "成功",
     saved: "保存しました",
+    copy: "コピー",
   },
 
   // Settings
@@ -30,6 +31,17 @@ export const ja = {
     exportButton: "ZIPをダウンロード",
     supportTitle: "開発者をサポート",
     supportDescription: "このアプリが気に入ったら、Ko-fiでサポートをご検討ください。",
+    mcpSection: "MCP設定",
+    mcpDescription: "MCPサーバーへのアクセス用トークンを管理します。トークンはNotes Appにログイン中のIDトークンと同じものを使用します。",
+    mcpTokenStatus: "トークンステータス",
+    mcpTokenActive: "有効",
+    mcpTokenExpires: "有効期限",
+    mcpNoToken: "トークンがありません",
+    mcpGenerateToken: "トークンを生成",
+    mcpRegenerateToken: "トークンを再生成",
+    mcpRevokeToken: "トークンを無効化",
+    mcpTokenGenerationError: "トークンの生成に失敗しました",
+    mcpTokenRevokeError: "トークンの無効化に失敗しました",
   },
 
   // Sidebar
@@ -185,25 +197,6 @@ export const ja = {
     exceeded: "月間のトークン上限に達しました。使用量は来月の初めにリセットされます。",
   },
 
-  // MCP Token Management
-  mcp: {
-    section: "MCPトークン管理",
-    description: "Claude Desktopや他のMCPクライアントからNotes Appの記録を参照するためのトークンを管理します",
-    tokenStatus: "トークンステータス",
-    tokenActive: "有効",
-    tokenExpires: "有効期限",
-    noToken: "トークンがありません",
-    generateToken: "トークンを生成",
-    regenerateToken: "トークンを再生成",
-    revokeToken: "トークンを無効化",
-    copy: "コピー",
-  },
-  settings: {
-    mcpSection: "MCP設定",
-    mcpDescription: "MCPサーバーへのアクセス用トークンを管理します。トークンはNotes Appにログイン中のIDトークンと同じものを使用します。",
-    mcpTokenGenerationError: "トークンの生成に失敗しました",
-    mcpTokenRevokeError: "トークンの無効化に失敗しました",
-  },
 } as const;
 
 // Structural type for translations (allows different string values)
@@ -218,6 +211,7 @@ export type TranslationKeys = {
     error: string;
     success: string;
     saved: string;
+    copy: string;
   };
   settings: {
     title: string;
@@ -235,6 +229,17 @@ export type TranslationKeys = {
     exportButton: string;
     supportTitle: string;
     supportDescription: string;
+    mcpSection: string;
+    mcpDescription: string;
+    mcpTokenStatus: string;
+    mcpTokenActive: string;
+    mcpTokenExpires: string;
+    mcpNoToken: string;
+    mcpGenerateToken: string;
+    mcpRegenerateToken: string;
+    mcpRevokeToken: string;
+    mcpTokenGenerationError: string;
+    mcpTokenRevokeError: string;
   };
   sidebar: {
     folders: string;

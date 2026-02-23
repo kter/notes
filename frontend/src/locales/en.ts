@@ -13,6 +13,7 @@ export const en: TranslationKeys = {
     error: "Error",
     success: "Success",
     saved: "Saved",
+    copy: "Copy",
   },
 
   // Settings
@@ -32,6 +33,17 @@ export const en: TranslationKeys = {
     exportButton: "Download ZIP",
     supportTitle: "Support the Developer",
     supportDescription: "If you like this app, consider supporting on Ko-fi.",
+    mcpSection: "MCP Settings",
+    mcpDescription: "Manage tokens for accessing your notes from Claude Desktop and other MCP clients. The token uses the same ID token as your active logged in session.",
+    mcpTokenStatus: "Token Status",
+    mcpTokenActive: "Active",
+    mcpTokenExpires: "Expires at",
+    mcpNoToken: "No token",
+    mcpGenerateToken: "Generate Token",
+    mcpRegenerateToken: "Regenerate Token",
+    mcpRevokeToken: "Revoke Token",
+    mcpTokenGenerationError: "Failed to generate token",
+    mcpTokenRevokeError: "Failed to revoke token",
   },
 
   // Sidebar

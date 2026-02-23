@@ -1,11 +1,15 @@
-"""MCP token management router."""
+import hashlib
 import logging
+import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
+from sqlmodel import Session
 
 from app.auth import get_current_user
+from app.database import get_session
 from app.models.mcp import MCPSettingsResponse, MCPTokenResponse
+from app.models.mcp_token import MCPToken
 
 logger = logging.getLogger(__name__)
 
@@ -15,34 +19,47 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 @router.post("/token", response_model=MCPTokenResponse)
 async def generate_mcp_token(
     request: Request,
-    current_user: Annotated[dict, Depends(get_current_user)]
+    current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
 ) -> MCPTokenResponse:
     """
-    Generate an MCP token for the current authenticated user.
-
-    This endpoint allows users to generate an MCP token from within Notes App,
-    which can then be used to configure Claude Desktop or other MCP clients.
+    Generate a short, persistent MCP token for the current authenticated user.
     """
-    # Use the same ID token that Notes App uses
-    # The get_current_user dependency already validates the JWT and extracts user info
     user_id = current_user.get("sub")
     
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    id_token = auth_header.split(" ")[1]
+    # Generate a random short token
+    # 32 bytes of randomness results in ~43 chars URL-safe
+    token_plain = f"mcp_{secrets.token_urlsafe(32)}"
+    token_hash = hashlib.sha256(token_plain.encode()).hexdigest()
 
-    # Calculate remaining time for the token
-    import time
-    exp = current_user.get("exp")
-    expires_in = int(exp - time.time()) if exp else 3600
+    # Store the token in the database
+    # We revoke old tokens for this user for now to keep it simple (one token per user)
+    from sqlmodel import select
+    old_tokens = session.exec(
+        select(MCPToken).where(MCPToken.user_id == user_id, MCPToken.revoked_at.is_(None))
+    ).all()
+    
+    import datetime
+    now = datetime.datetime.now(datetime.UTC)
+    for old_token in old_tokens:
+        old_token.revoked_at = now
+        session.add(old_token)
 
-    logger.info(f"Generating MCP token for user {user_id}")
+    new_token = MCPToken(
+        user_id=user_id,
+        token_hash=token_hash,
+        name="Default",
+        created_at=now
+    )
+    session.add(new_token)
+    session.commit()
+
+    logger.info(f"Generated short MCP token for user {user_id}")
 
     return MCPTokenResponse(
         url="https://5gcqmlela7.execute-api.ap-northeast-1.amazonaws.com/",
-        token=id_token,
-        expires_in=expires_in
+        token=token_plain,
+        expires_in=365 * 24 * 3600  # 1 year
     )
 
 

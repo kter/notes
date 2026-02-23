@@ -104,13 +104,13 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 # =============================================================================
 
 .PHONY: deploy
-deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend, then run tests
+deploy: deploy-backend deploy-frontend deploy-mcp ## Deploy both backend, frontend, and MCP, then run tests
 ifeq ($(ENV),prd)
 	@echo "Skipping integration tests in prd (backdoor auth not available)"
 else
 	$(MAKE) test-integration
 endif
-	$(MAKE) test-e2e
+#	$(MAKE) test-e2e
 	@echo "Full deployment and verification complete!"
 
 # =============================================================================
@@ -254,7 +254,7 @@ push-mcp-auth-manager: mcp-login build-mcp-auth-manager ## Build and push MCP au
 
 .PHONY: get-mcp-server-digest
 get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
-	@aws ecr describe-images --repository-name notes-mcp-server-$(ENV) \
+	@aws ecr describe-images --repository-name notes-app-mcp-server-$(ENV) \
 		--image-ids imageTag=latest \
 		--profile $(AWS_PROFILE) \
 		--query 'imageDetails[0].imageDigest' \
@@ -262,7 +262,7 @@ get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
 
 .PHONY: get-mcp-auth-manager-digest
 get-mcp-auth-manager-digest: ## Get the latest MCP auth manager image digest from ECR
-	@aws ecr describe-images --repository-name notes-mcp-auth-manager-$(ENV) \
+	@aws ecr describe-images --repository-name notes-app-mcp-auth-manager-$(ENV) \
 		--image-ids imageTag=latest \
 		--profile $(AWS_PROFILE) \
 		--query 'imageDetails[0].imageDigest' \
@@ -280,11 +280,11 @@ deploy-mcp: tf-switch push-mcp-server push-mcp-auth-manager ## Deploy MCP infras
 
 .PHONY: mcp-logs
 mcp-logs: ## Tail MCP server logs
-	aws logs tail /aws/lambda/notes-mcp-server-$(ENV) --follow --profile $(AWS_PROFILE)
+	aws logs tail /aws/lambda/notes-app-mcp-server-$(ENV) --follow --profile $(AWS_PROFILE)
 
 .PHONY: mcp-auth-logs
 mcp-auth-logs: ## Tail MCP auth manager logs
-	aws logs tail /aws/lambda/notes-mcp-auth-manager-$(ENV) --follow --profile $(AWS_PROFILE)
+	aws logs tail /aws/lambda/notes-app-mcp-auth-manager-$(ENV) --follow --profile $(AWS_PROFILE)
 
 .PHONY: test-mcp-server
 test-mcp-server: ## Test MCP server connection

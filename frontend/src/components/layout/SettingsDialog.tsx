@@ -329,7 +329,7 @@ export function SettingsDialog({
                         ) : t("settings.mcpRevokeToken")}
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => {
                           navigator.clipboard.writeText(mcpTokenInfo.token);

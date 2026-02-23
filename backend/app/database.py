@@ -126,7 +126,7 @@ def create_db_and_tables() -> None:
 
     try:
         # Import models to register them with SQLModel.metadata
-        from app.models import Folder, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
+        from app.models import Folder, Note, NoteShare, TokenUsage, UserSettings, MCPToken  # noqa: E401, I001, F401
 
         logger.info(f"Models loaded: {list(SQLModel.metadata.tables.keys())}")
 
@@ -146,8 +146,17 @@ def create_db_and_tables() -> None:
         try:
             from app.models.token_usage import TokenUsage
             TokenUsage.__table__.create(engine, checkfirst=True)
+            logger.info("TokenUsage table initialized")
         except Exception as e:
             logger.warning(f"Failed to create TokenUsage table: {e}")
+
+        try:
+            from app.models.mcp_token import MCPToken
+            # Match the class name to the table name
+            MCPToken.__table__.create(engine, checkfirst=True)
+            logger.info("MCPToken table initialized")
+        except Exception as e:
+            logger.warning(f"Failed to create MCPToken table: {e}")
         
         for table_name, table in SQLModel.metadata.tables.items():
             try:

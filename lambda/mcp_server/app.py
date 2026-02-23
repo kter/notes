@@ -3,6 +3,8 @@ import logging
 import os
 import time
 import json
+import hashlib
+from datetime import datetime, timezone
 from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -112,6 +114,50 @@ def verify_jwt_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Token verification failed")
 
 
+def verify_mcp_token(token: str) -> str:
+    """Verify a short MCP token against the database using raw SQL."""
+    if not token.startswith("mcp_"):
+        raise ValueError("Invalid token format")
+
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    # Use raw SQL to avoid SQLModel mapper conflicts
+    try:
+        with get_db_engine("system").connect() as conn:
+            # Use text() for raw SQL query
+            from sqlalchemy import text
+            query = text("""
+                SELECT user_id, expires_at
+                FROM mcp_tokens
+                WHERE token_hash = :token_hash
+                AND revoked_at IS NULL
+                LIMIT 1
+            """)
+            result = conn.execute(query, {"token_hash": token_hash}).fetchone()
+
+            if not result:
+                logger.warning("MCP token not found or revoked")
+                raise HTTPException(status_code=401, detail="Invalid token")
+
+            user_id, expires_at = result
+
+            # Check expiration - handle timezone-aware or naive datetime
+            now = datetime.now(timezone.utc)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+            if expires_at < now:
+                logger.warning("MCP token expired")
+                raise HTTPException(status_code=401, detail="Token expired")
+
+            return user_id
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying MCP token: {e}")
+        raise HTTPException(status_code=500, detail="Error verifying token")
+
+
 def get_db_engine(user_id: str):
     """Create database engine for DSQL with IAM authentication."""
     global _engine
@@ -178,6 +224,7 @@ def get_db_engine(user_id: str):
                 pool_recycle=300,
             )
             logger.info(f"Created DSQL engine for user {user_id}")
+            return _engine
         except Exception as e:
             logger.error(f"Failed to initialize DSQL engine: {e}")
             raise
@@ -188,8 +235,8 @@ def get_db_engine(user_id: str):
 def get_db_session(user_id: str):
     """Get database session for user."""
     engine = get_db_engine(user_id)
-    with Session(engine) as session:
-        yield session
+    from sqlmodel import Session
+    return Session(engine)
 
 
 # Define Note model (matching backend)
@@ -206,7 +253,6 @@ class Note(SQLModel, table=True):
     folder_id: str | None = None
     created_at: str
     updated_at: str
-    deleted_at: str | None = None
 
 
 # MCP Server instance
@@ -226,24 +272,23 @@ async def list_resources(params: ListResourcesRequest) -> list[Resource]:
 
     # Query notes for user
     try:
-        with get_db_session(user_id) as session:
-            statement = select(Note).where(
-                Note.user_id == user_id, Note.deleted_at.is_(None)
+        session = get_db_session(user_id)
+        statement = select(Note).where(Note.user_id == user_id)
+        results = session.exec(statement).all()
+        session.close()
+
+        resources = [
+            Resource(
+                uri=f"notes://{note.id}",
+                name=note.title or "Untitled Note",
+                description=f"Note created at {note.created_at}",
+                mimeType="text/markdown",
             )
-            results = session.exec(statement).all()
+            for note in results
+        ]
 
-            resources = [
-                Resource(
-                    uri=f"notes://{note.id}",
-                    name=note.title or "Untitled Note",
-                    description=f"Note created at {note.created_at}",
-                    mimeType="text/markdown",
-                )
-                for note in results
-            ]
-
-            logger.info(f"Found {len(resources)} notes for user {user_id}")
-            return resources
+        logger.info(f"Found {len(resources)} notes for user {user_id}")
+        return resources
     except Exception as e:
         logger.error(f"Error listing resources for user {user_id}: {e}")
         return []
@@ -267,25 +312,25 @@ async def read_resource(params: ReadResourceRequest) -> ReadResourceResult:
 
     # Query note
     try:
-        with get_db_session(user_id) as session:
-            statement = select(Note).where(
-                Note.id == note_id, Note.user_id == user_id, Note.deleted_at.is_(None)
-            )
-            note = session.exec(statement).first()
+        session = get_db_session(user_id)
+        statement = select(Note).where(Note.id == note_id, Note.user_id == user_id)
+        note = session.exec(statement).first()
 
-            if not note:
-                raise ValueError(f"Note not found: {note_id}")
+        if not note:
+            session.close()
+            raise ValueError(f"Note not found: {note_id}")
 
-            # Return the note content
-            return ReadResourceResult(
-                contents=[
-                    ResourceContents(
-                        uri=uri,
-                        mimeType="text/markdown",
-                        text=note.content,
-                    )
-                ]
-            )
+        session.close()
+        # Return the note content
+        return ReadResourceResult(
+            contents=[
+                ResourceContents(
+                    uri=uri,
+                    mimeType="text/markdown",
+                    text=note.content,
+                )
+            ]
+        )
     except ValueError:
         raise
     except Exception as e:
@@ -350,19 +395,187 @@ async def health_check():
     return {"status": "ok", "environment": ENVIRONMENT}
 
 
-@app.post("/")
-async def sse_endpoint(request: Request, authorization: str = Header(...)):
-    """SSE endpoint for MCP protocol."""
+def build_jsonrpc_response(request_id: str | int, result: Any = None, error: dict | None = None) -> dict:
+    """Build a JSON-RPC 2.0 response."""
+    response = {"jsonrpc": "2.0", "id": request_id}
+    if result is not None:
+        response["result"] = result
+    if error is not None:
+        response["error"] = error
+    return response
+
+
+def build_jsonrpc_error(code: int, message: str, request_id: str | int = None) -> dict:
+    """Build a JSON-RPC 2.0 error response."""
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "error": {"code": code, "message": message},
+    }
+
+
+async def handle_streamable_http_request(request_data: dict, user_id: str) -> dict:
+    """Handle an MCP request via Streamable HTTP Transport."""
+    # Set user_id in server context
+    server._current_user_id = user_id
+
+    method = request_data.get("method")
+    request_id = request_data.get("id")
+
+    if not method:
+        return build_jsonrpc_error(
+            -32600, "Invalid Request: missing 'method'", request_id
+        )
+
+    logger.info(f"Handling MCP method '{method}' for user {user_id}")
+
+    try:
+        if method == "initialize":
+            # MCP initialization handshake
+            params = request_data.get("params", {})
+            client_info = params.get("clientInfo", {})
+            logger.info(
+                f"Initialize request from client: {client_info.get('name', 'unknown')}"
+            )
+            return build_jsonrpc_response(
+                request_id,
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "resources": {},
+                    },
+                    "serverInfo": {
+                        "name": "notes-app-mcp",
+                        "version": "1.0.0",
+                    },
+                },
+            )
+
+        elif method == "notifications/initialized":
+            # Client notification that initialization is complete
+            return build_jsonrpc_response(request_id, {})
+
+        elif method == "resources/list":
+            params = ListResourcesRequest(**(request_data.get("params", {})))
+            resources = await list_resources(params)
+            return build_jsonrpc_response(
+                request_id,
+                {
+                    "resources": [
+                        {
+                            "uri": r.uri,
+                            "name": r.name,
+                            "description": r.description,
+                            "mimeType": r.mimeType,
+                        }
+                        for r in resources
+                    ]
+                },
+            )
+
+        elif method == "resources/read":
+            # Extract URI directly from params
+            params_data = request_data.get("params", {})
+            uri = params_data.get("uri")
+            if not uri:
+                return build_jsonrpc_error(-32602, "Missing required field 'uri'", request_id)
+
+            # Create a ReadResourceRequest-like object with just the uri
+            class SimpleReadRequest:
+                def __init__(self, uri: str):
+                    self.uri = uri
+
+            params = SimpleReadRequest(uri)
+            result = await read_resource(params)
+            return build_jsonrpc_response(
+                request_id,
+                {
+                    "contents": [
+                        {
+                            "uri": c.uri,
+                            "mimeType": c.mimeType,
+                            "text": c.text,
+                        }
+                        for c in result.contents
+                    ]
+                },
+            )
+
+        elif method == "ping":
+            # Simple ping/pong
+            return build_jsonrpc_response(request_id, {})
+
+        else:
+            return build_jsonrpc_error(
+                -32601, f"Method not found: {method}", request_id
+            )
+
+    except ValueError as e:
+        logger.error(f"Invalid parameters for method '{method}': {e}")
+        return build_jsonrpc_error(-32602, str(e), request_id)
+    except Exception as e:
+        logger.error(f"Error handling method '{method}': {e}", exc_info=True)
+        return build_jsonrpc_error(-32603, f"Internal error: {e}", request_id)
+
+
+@app.post("/mcp")
+async def mcp_streamable_http_endpoint(
+    request: Request, authorization: str = Header(...)
+):
+    """MCP Streamable HTTP Transport endpoint for MCP protocol.
+
+    This endpoint implements the standard MCP Streamable HTTP Transport
+    (https://modelcontextprotocol.io/docs/concepts/transports#streamable-http-transport)
+    which returns JSON-RPC responses instead of SSE streams.
+    """
     # Verify JWT token
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = authorization[7:]  # Remove "Bearer " prefix
     try:
-        payload = verify_jwt_token(token)
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="No user_id in token")
+        if token.startswith("mcp_"):
+            # Use short token verification
+            user_id = verify_mcp_token(token)
+        else:
+            # Use Cognito JWT verification
+            payload = verify_jwt_token(token)
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="No user_id in token")
+
+        # Handle request
+        request_data = await request.json()
+        response = await handle_streamable_http_request(request_data, user_id)
+
+        # Return as JSON (not SSE)
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"MCP endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/")
+async def sse_endpoint(request: Request, authorization: str = Header(...)):
+    """SSE endpoint for MCP protocol (deprecated, use /mcp instead)."""
+    # Verify JWT token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization[7:]  # Remove "Bearer " prefix
+    try:
+        if token.startswith("mcp_"):
+            # Use short token verification
+            user_id = verify_mcp_token(token)
+        else:
+            # Use Cognito JWT verification
+            payload = verify_jwt_token(token)
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="No user_id in token")
 
         # Handle request
         import json

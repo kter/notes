@@ -16,9 +16,25 @@ FAILED=0
 # Get the root directory of the project
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 
+# MCP Lambda unit tests
+echo ""
+echo "${YELLOW}[1/5] Running MCP Lambda unit tests...${NC}"
+cd "$PROJECT_ROOT/lambda/mcp_server"
+
+if command -v uv > /dev/null; then
+    if uv run --extra dev pytest tests/test_app_unit.py -q --tb=short; then
+        echo "${GREEN}✓ MCP Lambda unit tests passed${NC}"
+    else
+        echo "${RED}✗ MCP Lambda unit tests failed${NC}"
+        FAILED=1
+    fi
+else
+    echo "${YELLOW}⚠ uv not found, skipping MCP Lambda tests${NC}"
+fi
+
 # Backend tests
 echo ""
-echo "${YELLOW}[1/4] Running backend tests...${NC}"
+echo "${YELLOW}[2/5] Running backend tests...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 # Check if uv is available
@@ -35,7 +51,7 @@ fi
 
 # Frontend lint
 echo ""
-echo "${YELLOW}[2/4] Running frontend lint...${NC}"
+echo "${YELLOW}[3/5] Running frontend lint...${NC}"
 cd "$PROJECT_ROOT/frontend"
 
 if npm run lint --silent 2>/dev/null; then
@@ -47,7 +63,7 @@ fi
 
 # Frontend unit tests
 echo ""
-echo "${YELLOW}[3/4] Running frontend unit tests...${NC}"
+echo "${YELLOW}[4/5] Running frontend unit tests...${NC}"
 # Use run to exclude watch mode if needed, though 'vitest run' is implicit in CI=true or just 'vitest run'. 
 # Standard 'npm run test' usually runs 'vitest' which is watch mode by default in dev.
 # We should ensure package.json script is 'vitest run' or pass argument here.
@@ -62,7 +78,7 @@ fi
 
 # Backend lint (ruff)
 echo ""
-echo "${YELLOW}[4/4] Running backend lint (ruff)...${NC}"
+echo "${YELLOW}[5/5] Running backend lint (ruff)...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 if command -v uv &> /dev/null; then

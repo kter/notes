@@ -1,0 +1,238 @@
+---
+# This OpenAPI template defines the MCP OAuth-compliant REST API Gateway
+# It includes:
+# - RFC 8414: Authorization Server Metadata (/.well-known/oauth-authorization-server)
+# - RFC 9728: Protected Resource Server Metadata (/.well-known/oauth-protected-resource)
+# - RFC 7591: Dynamic Client Registration (/register)
+# - MCP endpoint with Lambda integration (/mcp)
+# - Gateway responses for WWW-Authenticate header
+
+openapi: 3.0.1
+info:
+  title: ${var.project_name} MCP Server - ${terraform.workspace}
+  version: 1.0.0
+  description: MCP Server with OAuth 2.1 support
+
+servers:
+  - url: ${API_GW_REST_BASE_URL}
+    description: REST API Gateway (backend)
+
+x-amazon-apigateway-request-validators:
+  all:
+    validateRequestBody: true
+    validateRequestParameters: true
+
+x-amazon-apigateway-gateway-responses:
+  UNAUTHORIZED:
+    statusCode: 401
+    responseParameters:
+      gatewayresponse.header.WWW-Authenticate: "'Bearer resource_metadata=\"${API_GW_FRONT_BASE_URL}/.well-known/oauth-protected-resource\"'"
+    responseTemplates:
+      application/json: |
+        {
+          "error": "unauthorized",
+          "error_description": "Authentication required"
+        }
+
+paths:
+  # OAuth Authorization Server Metadata (RFC 8414)
+  /.well-known/oauth-authorization-server:
+    get:
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: |
+            {
+              "statusCode": 200
+            }
+        responses:
+          default:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                {
+                  "issuer": "${COGNITO_ISSUER}",
+                  "authorization_endpoint": "${COGNITO_HOST}/oauth2/authorize",
+                  "token_endpoint": "${COGNITO_HOST}/oauth2/token",
+                  "jwks_uri": "${COGNITO_ISSUER}/.well-known/jwks.json",
+                  "registration_endpoint": "${API_GW_REST_BASE_URL}/register",
+                  "response_types_supported": ["code"],
+                  "grant_types_supported": ["authorization_code", "refresh_token"],
+                  "token_endpoint_auth_methods_supported": ["none", "client_secret_basic"],
+                  "scopes_supported": ["openid", "email", "profile"],
+                  "code_challenge_methods_supported": ["S256"]
+                }
+      responses:
+        '200':
+          description: OAuth authorization server metadata
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Protected Resource Server Metadata (RFC 9728)
+  /.well-known/oauth-protected-resource:
+    get:
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: |
+            {
+              "statusCode": 200
+            }
+        responses:
+          default:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                {
+                  "resource": "${API_GW_REST_BASE_URL}/mcp",
+                  "authorization_servers": [
+                    "${API_GW_FRONT_BASE_URL}/.well-known/oauth-authorization-server"
+                  ],
+                  "scopes_supported": ["openid", "email", "profile"]
+                }
+      responses:
+        '200':
+          description: OAuth protected resource metadata
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Dynamic Client Registration (RFC 7591)
+  /register:
+    post:
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri: "arn:aws:apigateway:${COGNITO_REGION}:cognito-idp:path/${COGNITO_USER_POOL_ID}"
+        credentials: "${API_GW_IAM_ROLE_ARN}"
+        requestParameters:
+          integration.request.header.Content-Type: "'application/x-amz-json-1.1'"
+          integration.request.header.X-Amz-Target: "'AWSCognitoIdentityProviderService.CreateUserPoolClient'"
+        requestTemplates:
+          application/json: |
+            #set($inputObj = $input.json('$'))
+            #set($redirectUris = [])
+            #if($inputObj.redirect_uris)
+              #foreach($uri in $inputObj.redirect_uris)
+                #set($void = $redirectUris.add($uri))
+              #end
+            #end
+            #set($clientName = $inputObj.client_name)
+            #if(!$clientName)
+              #set($clientName = "MCP Dynamic Client")
+            #end
+            {
+              "UserPoolId": "${COGNITO_USER_POOL_ID}",
+              "ClientName": "$clientName",
+              "GenerateSecret": false,
+              "AllowedOAuthFlows": ["code"],
+              "AllowedOAuthFlowsUserPoolClient": true,
+              "AllowedOAuthScopes": ["email", "openid", "profile"],
+              "SupportedIdentityProviders": ["COGNITO"],
+              "CallbackURLs": $redirectUris,
+              "ExplicitAuthFlows": ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_SRP_AUTH"],
+              "TokenValidityUnits": {
+                "AccessToken": "hours",
+                "IdToken": "hours",
+                "RefreshToken": "days"
+              },
+              "AccessTokenValidity": 1,
+              "IdTokenValidity": 1,
+              "RefreshTokenValidity": 30
+            }
+        responses:
+          default:
+            statusCode: 201
+            responseTemplates:
+              application/json: |
+                #set($responseObj = $util.parseJson($input.path('$')))
+                #set($cognitoClientId = $responseObj.Client.ClientId)
+                #set($redirectUris = [])
+                #foreach($uri in $responseObj.Client.CallbackURLs)
+                  #set($void = $redirectUris.add($uri))
+                #end
+                {
+                  "client_id": "$cognitoClientId",
+                  "client_name": "$responseObj.Client.ClientName",
+                  "redirect_uris": $redirectUris,
+                  "response_types": ["code"],
+                  "grant_types": ["authorization_code", "refresh_token"],
+                  "token_endpoint_auth_method": "none",
+                  "scope": "openid email profile"
+                }
+      responses:
+        '201':
+          description: Client registration successful
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Health check endpoint
+  /health:
+    get:
+      x-amazon-apigateway-integration:
+        type: mock
+        requestTemplates:
+          application/json: |
+            {
+              "statusCode": 200
+            }
+        responses:
+          default:
+            statusCode: 200
+            responseTemplates:
+              application/json: |
+                {
+                  "status": "ok",
+                  "environment": "${terraform.workspace}"
+                }
+      responses:
+        '200':
+          description: Health check response
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # MCP Streamable HTTP endpoint
+  /mcp:
+    post:
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: ${MCP_LAMBDA_URI}
+        responses: {}
+      x-amazon-apigateway-request-validator: all
+      responses:
+        '200':
+          description: MCP JSON-RPC response
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

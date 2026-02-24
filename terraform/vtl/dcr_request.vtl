@@ -1,0 +1,30 @@
+#set($inputObj = $util.parseJson($input.json('$')))
+#set($redirectUris = [])
+#if($inputObj.redirect_uris)
+  #foreach($uri in $inputObj.redirect_uris)
+    #set($void = $redirectUris.add($uri))
+  #end
+#end
+#set($clientName = $inputObj.client_name)
+#if(!$clientName)
+  #set($clientName = "MCP Dynamic Client")
+#end
+{
+  "UserPoolId": "${COGNITO_USER_POOL_ID}",
+  "ClientName": "$clientName",
+  "GenerateSecret": false,
+  "AllowedOAuthFlows": ["code"],
+  "AllowedOAuthFlowsUserPoolClient": true,
+  "AllowedOAuthScopes": ["email", "openid", "profile"],
+  "SupportedIdentityProviders": ["COGNITO"],
+  "CallbackURLs": $redirectUris,
+  "ExplicitAuthFlows": ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_SRP_AUTH"],
+  "TokenValidityUnits": {
+    "AccessToken": "hours",
+    "IdToken": "hours",
+    "RefreshToken": "days"
+  },
+  "AccessTokenValidity": 1,
+  "IdTokenValidity": 1,
+  "RefreshTokenValidity": 30
+}

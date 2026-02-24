@@ -1,3 +1,45 @@
+# ============================================================================
+# MCP OAuth Support - REST API Gateway IAM Role
+# ============================================================================
+
+# IAM role for REST API Gateway to call Cognito DCR
+resource "aws_iam_role" "mcp_rest_api_cognito" {
+  name = "${var.project_name}-mcp-rest-api-cognito-${terraform.workspace}"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# IAM policy for REST API Gateway to access Cognito
+resource "aws_iam_role_policy" "mcp_rest_api_cognito" {
+  name = "cognito-dcr-access"
+  role = aws_iam_role.mcp_rest_api_cognito.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:DescribeUserPoolClient"
+        ]
+        Resource = aws_cognito_user_pool.main.arn
+      }
+    ]
+  })
+}
+
+# ============================================================================
 # MCP Server ECR Repository
 resource "aws_ecr_repository" "mcp_server" {
   name                 = "${var.project_name}-mcp-server-${terraform.workspace}"
@@ -227,6 +269,68 @@ resource "aws_lambda_permission" "mcp_auth_manager_api_gateway" {
   source_arn    = "${aws_apigatewayv2_api.mcp_auth_manager.execution_arn}/*"
 }
 
+# ============================================================================
+# MCP OAuth Support - HTTP API Gateway (front)
+# ============================================================================
+
+# HTTP API Gateway (front) for .well-known endpoints at root level
+# This acts as the front-facing API that proxies to the REST API Gateway
+resource "aws_apigatewayv2_api" "mcp_oauth_front" {
+  name          = "${var.project_name}-mcp-oauth-front-${terraform.workspace}"
+  protocol_type = "HTTP"
+  description   = "HTTP API Gateway (front) for MCP OAuth - serves .well-known endpoints at root"
+
+  cors_configuration {
+    allow_origins = ["*", "https://modelcontextprotocol.io"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["*"]
+  }
+}
+
+# HTTP API Gateway stage
+resource "aws_apigatewayv2_stage" "mcp_oauth_front" {
+  api_id      = aws_apigatewayv2_api.mcp_oauth_front.id
+  name        = "$default"
+  auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.mcp_oauth_front_api_gateway.arn
+    format         = jsonencode({
+      requestId               = "$context.requestId"
+      ip                      = "$context.identity.sourceIp"
+      requestTime             = "$context.requestTime"
+      httpMethod              = "$context.httpMethod"
+      routeKey                = "$context.routeKey"
+      status                  = "$context.status"
+      protocol                = "$context.protocol"
+      integrationLatency      = "$context.integrationLatency"
+      integrationErrorMessage = "$context.integrationErrorMessage"
+    })
+  }
+}
+
+# CloudWatch log group for HTTP API Gateway (front)
+resource "aws_cloudwatch_log_group" "mcp_oauth_front_api_gateway" {
+  name              = "/aws/api-gateway/${aws_apigatewayv2_api.mcp_oauth_front.name}"
+  retention_in_days = 7
+}
+
+# Default route - proxies everything to REST API Gateway
+resource "aws_apigatewayv2_route" "mcp_oauth_front_default" {
+  api_id    = aws_apigatewayv2_api.mcp_oauth_front.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.mcp_oauth_front_rest.id}"
+}
+
+# Integration with REST API Gateway (HTTP proxy)
+resource "aws_apigatewayv2_integration" "mcp_oauth_front_rest" {
+  api_id                    = aws_apigatewayv2_api.mcp_oauth_front.id
+  integration_type           = "HTTP_PROXY"
+  integration_uri            = "https://${aws_api_gateway_rest_api.mcp_oauth.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.mcp_oauth.stage_name}"
+  integration_method         = "ANY"
+}
+
+# ============================================================================
 # Output API Gateway URL
 output "mcp_server_api_url" {
   description = "API Gateway URL for MCP Server"

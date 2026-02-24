@@ -1,0 +1,13 @@
+{
+  "issuer": "https://cognito-idp.$${aws_region}.amazonaws.com/$${user_pool_id}",
+  "authorization_endpoint": "https://$${user_pool_domain}.auth.$${aws_region}.amazoncognito.com/oauth2/authorize",
+  "token_endpoint": "https://$${user_pool_domain}.auth.$${aws_region}.amazoncognito.com/oauth2/token",
+  "jwks_uri": "https://cognito-idp.$${aws_region}.amazonaws.com/$${user_pool_id}/.well-known/jwks.json",
+  "registration_endpoint": "https://$${rest_api_id}.execute-api.$${aws_region}.amazonaws.com/$${stage_name}/register",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "token_endpoint_auth_methods_supported": ["none", "client_secret_basic"],
+  "scopes_supported": ["openid", "email", "profile"],
+  "code_challenge_methods_supported": ["S256"],
+  "authorization_servers": ["https://$${rest_api_id}.execute-api.$${aws_region}.amazonaws.com/$${stage_name}/.well-known/oauth-authorization-server"]
+}

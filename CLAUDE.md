@@ -133,3 +133,22 @@ E2E_TEST_USER_PASSWORD=YourTestPassword123!
 - **Token tracking**: All AI calls track token usage for rate limiting and cost management
 - **Pydantic v2**: Backend uses Pydantic v2 - be aware of syntax differences from v1
 - **Async testing**: Backend tests use `pytest-asyncio` with `asyncio_mode=auto`
+
+## Deployment Rules
+
+**CRITICAL**: All deployment operations MUST use make commands exclusively. Never execute deployment commands directly.
+
+**IMPORTANT**: When executing deployment commands with the Makefile, you must be in the repository root directory. The Makefile is located at the project root and deployment commands will fail from subdirectories.
+
+### Allowed Commands (make only)
+- `make deploy ENV=dev` or `make deploy ENV=prd` - Full deployment
+- `make update-lambda ENV=dev` - Lambda-only code update
+- `make tf-init ENV=dev`, `make tf-plan ENV=dev`, `make tf-apply ENV=dev` - Terraform operations
+
+### Prohibited Commands (never use directly)
+- Direct `aws` CLI commands (e.g., `aws lambda update-function-code`)
+- Direct `terraform` CLI commands (e.g., `terraform apply`)
+- Direct `docker build` or `docker push` commands
+- Any direct deployment API calls or scripts
+
+**When asked to deploy, always respond with the appropriate make command and ask for confirmation before executing.**

@@ -46,6 +46,9 @@ make lint-frontend # ESLint
 ```
 
 ### Deployment
+
+**IMPORTANT: All deployment commands MUST be run from the project root directory.**
+
 ```bash
 # Quick Lambda update (no Terraform, just function code)
 make update-lambda ENV=dev

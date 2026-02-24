@@ -54,14 +54,9 @@ output "backend_role_arn" {
 }
 
 # MCP OAuth API Gateway outputs
-output "mcp_rest_api_gateway_url" {
-  description = "REST API Gateway URL for MCP OAuth (backend) - use this for MCP Inspector"
-  value       = "https://${aws_api_gateway_rest_api.mcp_oauth.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.mcp_oauth.stage_name}"
-}
-
-output "mcp_http_api_gateway_url" {
-  description = "HTTP API Gateway URL for MCP OAuth (front - for .well-known endpoints)"
-  value       = "https://${aws_apigatewayv2_api.mcp_oauth_front.id}.execute-api.${var.aws_region}.amazonaws.com"
+output "mcp_oauth_api_url" {
+  description = "HTTP API Gateway URL for MCP OAuth - use this for MCP Inspector"
+  value       = aws_apigatewayv2_api.mcp_oauth_main.api_endpoint
 }
 
 # Environment info

@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from jose import jwk, jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -395,6 +395,47 @@ async def health_check():
     return {"status": "ok", "environment": ENVIRONMENT}
 
 
+# OAuth Authorization Server Metadata endpoint (RFC 8414)
+@app.get("/.well-known/oauth-authorization-server")
+async def oauth_authorization_server_metadata():
+    """OAuth 2.1 Authorization Server Metadata endpoint."""
+    return {
+        "issuer": JWT_ISSUER,
+        "authorization_endpoint": f"https://{os.environ['COGNITO_USER_POOL_DOMAIN']}.auth.{COGNITO_REGION}.amazoncognito.com/oauth2/authorize",
+        "token_endpoint": f"https://{os.environ['COGNITO_USER_POOL_DOMAIN']}.auth.{COGNITO_REGION}.amazoncognito.com/oauth2/token",
+        "jwks_uri": f"{JWT_ISSUER}/.well-known/jwks.json",
+        "registration_endpoint": f"https://{os.environ['API_GATEWAY_REQUEST_ID']}.execute-api.{COGNITO_REGION}.amazonaws.com/{os.environ['STAGE_NAME']}/register",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "token_endpoint_auth_methods_supported": ["none", "client_secret_basic"],
+        "scopes_supported": ["openid", "email", "profile"],
+        "code_challenge_methods_supported": ["S256"]
+    }
+
+
+# Protected Resource Server Metadata endpoint (RFC 9728)
+@app.get("/.well-known/oauth-protected-resource")
+async def oauth_protected_resource_metadata():
+    """OAuth 2.1 Protected Resource Server Metadata endpoint."""
+    return {
+        "resource": f"https://{os.environ['API_GATEWAY_REQUEST_ID']}.execute-api.{COGNITO_REGION}.amazonaws.com/{os.environ['STAGE_NAME']}/mcp",
+        "authorization_servers": [f"https://{os.environ['API_GATEWAY_REQUEST_ID']}.execute-api.{COGNITO_REGION}.amazonaws.com/{os.environ['STAGE_NAME']}/.well-known/oauth-authorization-server"],
+        "scopes_supported": ["openid", "email", "profile"]
+    }
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    """Handle 404 errors by returning OAuth-compatible error format."""
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "invalid_request",
+            "error_description": f"Path not found: {request.url.path}"
+        }
+    )
+
+
 def build_jsonrpc_response(request_id: str | int, result: Any = None, error: dict | None = None) -> dict:
     """Build a JSON-RPC 2.0 response."""
     response = {"jsonrpc": "2.0", "id": request_id}
@@ -520,7 +561,7 @@ async def handle_streamable_http_request(request_data: dict, user_id: str) -> di
 
 @app.post("/mcp")
 async def mcp_streamable_http_endpoint(
-    request: Request, authorization: str = Header(...)
+    request: Request, authorization: str | None = Header(None)
 ):
     """MCP Streamable HTTP Transport endpoint for MCP protocol.
 
@@ -529,8 +570,14 @@ async def mcp_streamable_http_endpoint(
     which returns JSON-RPC responses instead of SSE streams.
     """
     # Verify JWT token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    if not authorization or not authorization.startswith("Bearer "):
+        return Response(
+            status_code=401,
+            headers={
+                "WWW-Authenticate": 'Bearer resource_metadata="/.well-known/oauth-protected-resource"'
+            },
+            content='{"error": "unauthorized", "error_description": "Authentication required"}'
+        )
 
     token = authorization[7:]  # Remove "Bearer " prefix
     try:
@@ -559,11 +606,17 @@ async def mcp_streamable_http_endpoint(
 
 
 @app.post("/")
-async def sse_endpoint(request: Request, authorization: str = Header(...)):
+async def sse_endpoint(request: Request, authorization: str | None = Header(None)):
     """SSE endpoint for MCP protocol (deprecated, use /mcp instead)."""
     # Verify JWT token
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    if not authorization or not authorization.startswith("Bearer "):
+        return Response(
+            status_code=401,
+            headers={
+                "WWW-Authenticate": 'Bearer resource_metadata="/.well-known/oauth-protected-resource"'
+            },
+            content='{"error": "unauthorized", "error_description": "Authentication required"}'
+        )
 
     token = authorization[7:]  # Remove "Bearer " prefix
     try:

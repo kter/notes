@@ -255,13 +255,27 @@ class Note(SQLModel, table=True):
     updated_at: str
 
 
+# Define Folder model (matching backend)
+class Folder(SQLModel, table=True):
+    """Folder model for MCP server."""
+
+    __tablename__ = "folders"
+    __table_args__ = {"extend_existing": True}
+
+    id: str = Field(primary_key=True)
+    name: str
+    user_id: str
+    created_at: str
+    updated_at: str
+
+
 # MCP Server instance
 server = Server("notes-app-mcp")
 
 
 @server.list_resources()
 async def list_resources(params: ListResourcesRequest) -> list[Resource]:
-    """List all notes as MCP resources for the authenticated user."""
+    """List all notes and folders as MCP resources for the authenticated user."""
     # Get user_id from context (set by authentication middleware)
     user_id = getattr(server, "_current_user_id", None)
     if not user_id:
@@ -270,24 +284,52 @@ async def list_resources(params: ListResourcesRequest) -> list[Resource]:
 
     logger.info(f"Listing resources for user {user_id}")
 
-    # Query notes for user
+    resources = []
+
+    # Query notes and folders for user
     try:
         session = get_db_session(user_id)
-        statement = select(Note).where(Note.user_id == user_id)
-        results = session.exec(statement).all()
+
+        # Get all notes for user
+        note_statement = select(Note).where(Note.user_id == user_id)
+        notes = session.exec(note_statement).all()
+
+        # Get all folders for user
+        folder_statement = select(Folder).where(Folder.user_id == user_id)
+        folders = session.exec(folder_statement).all()
+
         session.close()
 
-        resources = [
-            Resource(
-                uri=f"notes://{note.id}",
-                name=note.title or "Untitled Note",
-                description=f"Note created at {note.created_at}",
-                mimeType="text/markdown",
+        # Add note resources
+        for note in notes:
+            resources.append(
+                Resource(
+                    uri=f"notes://note/{note.id}",
+                    name=note.title or "Untitled Note",
+                    description=f"Note created at {note.created_at}",
+                    mimeType="text/markdown",
+                )
             )
-            for note in results
-        ]
 
-        logger.info(f"Found {len(resources)} notes for user {user_id}")
+        # Add folder resources with note count
+        from sqlalchemy import func
+        # Re-open session for counting query
+        session = get_db_session(user_id)
+        for folder in folders:
+            # Count notes in this folder
+            count_stmt = select(func.count(Note.id)).where(Note.folder_id == str(folder.id))
+            note_count = session.exec(count_stmt).one()
+            resources.append(
+                Resource(
+                    uri=f"notes://folder/{folder.id}",
+                    name=folder.name,
+                    description=f"Folder with {note_count} notes",
+                    mimeType="application/json",
+                )
+            )
+        session.close()
+
+        logger.info(f"Found {len(notes)} notes and {len(folders)} folders for user {user_id}")
         return resources
     except Exception as e:
         logger.error(f"Error listing resources for user {user_id}: {e}")
@@ -296,46 +338,102 @@ async def list_resources(params: ListResourcesRequest) -> list[Resource]:
 
 @server.read_resource()
 async def read_resource(params: ReadResourceRequest) -> ReadResourceResult:
-    """Read the content of a specific note."""
+    """Read the content of a specific note or folder."""
     # Get user_id from context
     user_id = getattr(server, "_current_user_id", None)
     if not user_id:
         raise ValueError("User not authenticated")
 
-    # Parse note ID from URI
+    # Parse URI
     uri = params.uri
     if not uri.startswith("notes://"):
         raise ValueError(f"Invalid URI: {uri}")
 
-    note_id = uri[len("notes://") :]
-    logger.info(f"Reading note {note_id} for user {user_id}")
+    # Parse resource type and ID
+    # Format: notes://note/{id} or notes://folder/{id}
+    parts = uri[len("notes://") :].split("/")
+    if len(parts) < 2:
+        raise ValueError(f"Invalid URI format: {uri}")
 
-    # Query note
+    resource_type = parts[0]
+    resource_id = parts[1]
+
+    logger.info(f"Reading {resource_type} {resource_id} for user {user_id}")
+
     try:
         session = get_db_session(user_id)
-        statement = select(Note).where(Note.id == note_id, Note.user_id == user_id)
-        note = session.exec(statement).first()
 
-        if not note:
+        if resource_type == "note":
+            # Query note
+            statement = select(Note).where(Note.id == resource_id, Note.user_id == user_id)
+            note = session.exec(statement).first()
+
+            if not note:
+                session.close()
+                raise ValueError(f"Note not found: {resource_id}")
+
             session.close()
-            raise ValueError(f"Note not found: {note_id}")
+            # Return the note content
+            return ReadResourceResult(
+                contents=[
+                    ResourceContents(
+                        uri=uri,
+                        mimeType="text/markdown",
+                        text=note.content,
+                    )
+                ]
+            )
+        elif resource_type == "folder":
+            # Query folder and its notes
+            folder_statement = select(Folder).where(Folder.id == resource_id, Folder.user_id == user_id)
+            folder = session.exec(folder_statement).first()
 
-        session.close()
-        # Return the note content
-        return ReadResourceResult(
-            contents=[
-                ResourceContents(
-                    uri=uri,
-                    mimeType="text/markdown",
-                    text=note.content,
-                )
-            ]
-        )
+            if not folder:
+                session.close()
+                raise ValueError(f"Folder not found: {resource_id}")
+
+            # Get all notes in this folder
+            note_statement = select(Note).where(Note.folder_id == resource_id, Note.user_id == user_id)
+            notes = session.exec(note_statement).all()
+
+            session.close()
+
+            # Return folder information as JSON
+            import json
+            folder_data = {
+                "id": folder.id,
+                "name": folder.name,
+                "created_at": folder.created_at,
+                "updated_at": folder.updated_at,
+                "notes": [
+                    {
+                        "id": note.id,
+                        "title": note.title,
+                        "created_at": note.created_at,
+                        "updated_at": note.updated_at,
+                    }
+                    for note in notes
+                ]
+            }
+
+            return ReadResourceResult(
+                contents=[
+                    ResourceContents(
+                        uri=uri,
+                        mimeType="application/json",
+                        text=json.dumps(folder_data, indent=2),
+                    )
+                ]
+            )
+        else:
+            session.close()
+            raise ValueError(f"Unsupported resource type: {resource_type}")
+
     except ValueError:
         raise
     except Exception as e:
-        logger.error(f"Error reading note {note_id} for user {user_id}: {e}")
-        raise ValueError(f"Failed to read note: {e}")
+        logger.error(f"Error reading resource {uri} for user {user_id}: {e}")
+        raise ValueError(f"Failed to read resource: {e}")
 
 
 # Request/Response models for SSE transport
@@ -393,6 +491,91 @@ async def handle_sse_request(request: dict, user_id: str) -> dict:
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "environment": ENVIRONMENT}
+
+
+@app.get("/resources")
+async def get_resources(authorization: str | None = Header(None)):
+    """GET /resources endpoint for MCP resource listing (REST-style).
+
+    Returns a JSON response with all notes and folders for the authenticated user.
+    Compatible with MCP protocol resource format.
+    """
+    # Verify JWT token
+    if not authorization or not authorization.startswith("Bearer "):
+        return Response(
+            status_code=401,
+            headers={
+                "WWW-Authenticate": 'Bearer resource_metadata="/.well-known/oauth-protected-resource"'
+            },
+            content='{"error": "unauthorized", "error_description": "Authentication required"}'
+        )
+
+    token = authorization[7:]  # Remove "Bearer " prefix
+    user_id: str | None = None
+
+    try:
+        if token.startswith("mcp_"):
+            # Use short token verification
+            user_id = verify_mcp_token(token)
+        else:
+            # Use Cognito JWT verification
+            payload = verify_jwt_token(token)
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="No user_id in token")
+
+        logger.info(f"GET /resources request from user {user_id}")
+
+        # Query notes and folders for user
+        session = get_db_session(user_id)
+
+        # Get all notes for user
+        note_statement = select(Note).where(Note.user_id == user_id)
+        notes = session.exec(note_statement).all()
+
+        # Get all folders for user
+        folder_statement = select(Folder).where(Folder.user_id == user_id)
+        folders = session.exec(folder_statement).all()
+
+        session.close()
+
+        # Build resources list
+        resources = []
+
+        # Add note resources
+        for note in notes:
+            resources.append({
+                "uri": f"notes://note/{note.id}",
+                "name": note.title or "Untitled Note",
+                "description": f"Note created at {note.created_at}",
+                "mimeType": "text/markdown"
+            })
+
+        # Add folder resources with note count
+        from sqlalchemy import func
+        # Re-open session for counting query
+        session = get_db_session(user_id)
+        for folder in folders:
+            # Count notes in this folder
+            count_stmt = select(func.count(Note.id)).where(Note.folder_id == str(folder.id))
+            note_count = session.exec(count_stmt).one()
+            resources.append({
+                "uri": f"notes://folder/{folder.id}",
+                "name": folder.name,
+                "description": f"Folder with {note_count} notes",
+                "mimeType": "application/json"
+            })
+        session.close()
+
+        logger.info(f"Returning {len(notes)} notes and {len(folders)} folders for user {user_id}")
+
+        return {"resources": resources}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in GET /resources: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 # OAuth Authorization Server Metadata endpoint (RFC 8414)
@@ -502,15 +685,7 @@ async def handle_streamable_http_request(request_data: dict, user_id: str) -> di
             return build_jsonrpc_response(
                 request_id,
                 {
-                    "resources": [
-                        {
-                            "uri": r.uri,
-                            "name": r.name,
-                            "description": r.description,
-                            "mimeType": r.mimeType,
-                        }
-                        for r in resources
-                    ]
+                    "resources": resources
                 },
             )
 

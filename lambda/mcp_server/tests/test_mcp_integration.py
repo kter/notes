@@ -289,6 +289,71 @@ class TestMCPServer:
         assert "status" in data
         assert data["status"] == "ok"
 
+    def test_get_resources(self, auth_token: str) -> None:
+        """Test GET /resources endpoint."""
+        if not MCP_SERVER_URL:
+            pytest.skip("MCP_SERVER_URL not configured")
+
+        response = requests.get(
+            f"{MCP_SERVER_URL}/resources",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            timeout=10,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "resources" in data
+        resources = data["resources"]
+        assert isinstance(resources, list)
+
+        # If resources exist, verify structure
+        if resources:
+            # Check notes
+            note_resources = [r for r in resources if r["uri"].startswith("notes://note/")]
+            for note in note_resources:
+                assert "uri" in note
+                assert "name" in note
+                assert "description" in note
+                assert "mimeType" in note
+                assert note["mimeType"] == "text/markdown"
+                assert note["uri"].startswith("notes://note/")
+
+            # Check folders
+            folder_resources = [r for r in resources if r["uri"].startswith("notes://folder/")]
+            for folder in folder_resources:
+                assert "uri" in folder
+                assert "name" in folder
+                assert "description" in folder
+                assert "mimeType" in folder
+                assert folder["mimeType"] == "application/json"
+                assert folder["uri"].startswith("notes://folder/")
+
+    def test_get_resources_unauthorized(self) -> None:
+        """Test that unauthorized requests to /resources are rejected."""
+        if not MCP_SERVER_URL:
+            pytest.skip("MCP_SERVER_URL not configured")
+
+        response = requests.get(
+            f"{MCP_SERVER_URL}/resources",
+            headers={"Authorization": "Bearer invalid-token"},
+            timeout=10,
+        )
+
+        assert response.status_code == 401
+
+    def test_get_resources_no_auth_header(self) -> None:
+        """Test that requests without auth header are rejected."""
+        if not MCP_SERVER_URL:
+            pytest.skip("MCP_SERVER_URL not configured")
+
+        response = requests.get(
+            f"{MCP_SERVER_URL}/resources",
+            timeout=10,
+        )
+
+        assert response.status_code == 401
+
     def test_unauthorized_request(self) -> None:
         """Test that unauthorized requests are rejected."""
         if not MCP_SERVER_URL:

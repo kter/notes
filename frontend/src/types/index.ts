@@ -17,6 +17,7 @@ export interface FolderUpdate {
 
 export interface MCPTokenCreateRequest {
   name: string;
+  expires_in_days: 30 | 60 | 90 | 365 | null;
 }
 
 export interface MCPTokenResponse {
@@ -24,18 +25,20 @@ export interface MCPTokenResponse {
   name: string;
   token: string;
   created_at: string;
-  expires_at: string;
+  expires_at: string | null;
   expires_in: number;
+  expires_in_days: number | null;
 }
 
 export interface MCPTokenListItem {
   id: string;
   name: string;
   created_at: string;
-  expires_at: string;
+  expires_at: string | null;
   revoked_at: string | null;
   is_active: boolean;
   last_used_at: string | null;
+  expires_in_days: number | null;
 }
 
 export interface MCPTokensListResponse {
@@ -165,4 +168,5 @@ export interface MCPTokenRequest {
 export interface MCPSettingsResponse {
   server_url: string;
   token_expires_in: number;
+  token_expiration_options: number[];
 }

@@ -3,6 +3,7 @@ import logging
 import secrets
 from datetime import UTC, datetime
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlmodel import Session, select
@@ -60,6 +61,7 @@ async def generate_mcp_token(
         name=request.name,
         created_at=datetime.now(UTC)
     )
+
     session.add(new_token)
     session.commit()
     session.refresh(new_token)
@@ -104,6 +106,7 @@ async def list_mcp_tokens(
                 "expires_at": token.expires_at.isoformat(),
                 "revoked_at": token.revoked_at.isoformat() if token.revoked_at else None,
                 "is_active": token.is_active,
+                "last_used_at": token.last_used_at.isoformat() if token.last_used_at else None,
             }
             for token in tokens
         ]
@@ -125,9 +128,14 @@ async def revoke_mcp_token(
     """
     user_id = current_user.get("sub")
 
+    try:
+        token_uuid = UUID(token_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="API key not found")
+
     token = session.exec(
         select(MCPToken).where(
-            MCPToken.id == token_id,
+            MCPToken.id == token_uuid,
             MCPToken.user_id == user_id
         )
     ).first()
@@ -143,10 +151,53 @@ async def revoke_mcp_token(
     session.commit()
 
     logger.info(f"Revoked MCP API key {token_id} for user {user_id}")
-
     return Response(
         status_code=200,
         content='{"message":"API key revoked successfully"}'
+    )
+
+
+@router.post("/tokens/{token_id}/restore")
+async def restore_mcp_token(
+    token_id: str,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+) -> Response:
+    """
+    Restore (reactivate) a revoked MCP API key.
+    """
+    user_id = current_user.get("sub")
+
+    try:
+        token_uuid = UUID(token_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    token = session.exec(
+        select(MCPToken).where(
+            MCPToken.id == token_uuid,
+            MCPToken.user_id == user_id
+        )
+    ).first()
+
+    if not token:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    # Only allow restoring revoked tokens
+    if not token.revoked_at:
+        raise HTTPException(
+            status_code=400,
+            detail="Can only restore revoked API keys"
+        )
+
+    token.revoked_at = None
+    session.add(token)
+    session.commit()
+
+    logger.info(f"Restored MCP API key {token_id} for user {user_id}")
+    return Response(
+        status_code=200,
+        content='{"message":"API key restored successfully"}'
     )
 
 
@@ -161,9 +212,14 @@ async def delete_mcp_token(
     """
     user_id = current_user.get("sub")
 
+    try:
+        token_uuid = UUID(token_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="API key not found")
+
     token = session.exec(
         select(MCPToken).where(
-            MCPToken.id == token_id,
+            MCPToken.id == token_uuid,
             MCPToken.user_id == user_id
         )
     ).first()
@@ -175,7 +231,6 @@ async def delete_mcp_token(
     session.commit()
 
     logger.info(f"Deleted MCP API key {token_id} for user {user_id}")
-
     return Response(
         status_code=200,
         content='{"message":"API key deleted successfully"}'

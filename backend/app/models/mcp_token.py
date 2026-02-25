@@ -26,6 +26,7 @@ class MCPToken(SQLModel, table=True):
         default_factory=lambda: datetime.now(UTC) + timedelta(days=365)
     )
     revoked_at: datetime | None = Field(default=None)
+    last_used_at: datetime | None = Field(default=None)
 
     @property
     def is_active(self) -> bool:

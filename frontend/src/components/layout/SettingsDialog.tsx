@@ -46,7 +46,6 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
       setError(t("settings.apiKeyNameRequired"));
       return;
     }
-
     setIsCreating(true);
     setError(null);
     try {
@@ -173,6 +172,7 @@ export function SettingsDialog({
   const [isApiKeysLoading, setIsApiKeysLoading] = useState(false);
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState<string | null>(null);
   const [isNewTokenDialogOpen, setIsNewTokenDialogOpen] = useState(false);
 
   const loadApiKeys = async () => {
@@ -190,19 +190,33 @@ export function SettingsDialog({
     }
   };
 
-  const handleRevokeToken = async (tokenId: string) => {
-    setIsRevoking(tokenId);
-    setError(null);
-    try {
-      const apiClient = await getApi();
-      await apiClient.revokeMcpToken(tokenId);
-      // Reload the list
-      await loadApiKeys();
-    } catch (err) {
-      console.error("Failed to revoke API key:", err);
-      setError(t("common.error"));
-    } finally {
-      setIsRevoking(null);
+  const handleRevokeOrRestoreToken = async (tokenId: string) => {
+    if (token.is_revoked) {
+      setIsRestoring(tokenId);
+      setError(null);
+      try {
+        const apiClient = await getApi();
+        await apiClient.restoreMcpToken(tokenId);
+        await loadApiKeys();
+      } catch (err) {
+        console.error("Failed to restore API key:", err);
+        setError(t("common.error"));
+      } finally {
+        setIsRestoring(null);
+      }
+    } else {
+      setIsRevoking(tokenId);
+      setError(null);
+      try {
+        const apiClient = await getApi();
+        await apiClient.revokeMcpToken(tokenId);
+        await loadApiKeys();
+      } catch (err) {
+        console.error("Failed to revoke API key:", err);
+        setError(t("common.error"));
+      } finally {
+        setIsRevoking(null);
+      }
     }
   };
 
@@ -215,7 +229,6 @@ export function SettingsDialog({
     try {
       const apiClient = await getApi();
       await apiClient.deleteMcpToken(tokenId);
-      // Reload the list
       await loadApiKeys();
     } catch (err) {
       console.error("Failed to delete API key:", err);
@@ -229,7 +242,6 @@ export function SettingsDialog({
   useEffect(() => {
     async function loadSettings() {
       if (!open) return;
-
       setIsLoading(true);
       setError(null);
       setSaveSuccess(false);
@@ -252,7 +264,6 @@ export function SettingsDialog({
           setAvailableLanguages(response.available_languages);
         }
 
-        // Load API keys
         await loadApiKeys();
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -261,15 +272,13 @@ export function SettingsDialog({
         setIsLoading(false);
       }
     }
-
     loadSettings();
-  }, [open, getApi, t]);
+  }, [open, getApi]);
 
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
     setSaveSuccess(false);
-
     try {
       const apiClient = await getApi();
       await apiClient.updateSettings({
@@ -291,19 +300,15 @@ export function SettingsDialog({
   const handleExport = async () => {
     setIsExporting(true);
     setError(null);
-
     try {
       const apiClient = await getApi();
       const blob = await apiClient.exportNotes();
-
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `notes_export_${new Date().toISOString().split('T')[0]}.zip`);
       document.body.appendChild(link);
       link.click();
-
       // Cleanup
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
@@ -407,14 +412,12 @@ export function SettingsDialog({
                       </div>
                     </div>
                     <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${tokenUsage.tokens_used / tokenUsage.token_limit > 0.9 ? 'bg-red-500' : tokenUsage.tokens_used / tokenUsage.token_limit > 0.7 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                        style={{ width: `${Math.min(100, (tokenUsage.token_limit > 0 ? (tokenUsage.tokens_used / tokenUsage.token_limit) * 100 : 0))}%` }}
-                      />
+                      <div style={{ width: `${Math.min(100, (tokenUsage.token_limit > 0 ? (tokenUsage.tokens_used / tokenUsage.token_limit) * 100 : 0))}%` }} />
                     </div>
                   </div>
                 )}
 
+                {/* Data Export Section */}
                 <div className="border-t pt-6 space-y-4">
                   <div className="space-y-1">
                     <h4 className="text-sm font-medium leading-none">
@@ -450,7 +453,7 @@ export function SettingsDialog({
                       {t("settings.mcpDescription")}
                     </p>
                   </div>
-
+                  </div>
                   {/* API Keys List */}
                   {isApiKeysLoading ? (
                     <div className="flex items-center justify-center py-4">
@@ -485,48 +488,67 @@ export function SettingsDialog({
                               <p className="text-xs text-muted-foreground">
                                 {t("settings.mcpTokenExpires")}: {new Date(token.expires_at).toLocaleDateString()}
                               </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t("settings.mcpTokenLastUsed")}: {token.last_used_at ? new Date(token.last_used_at).toLocaleDateString() : t("settings.mcpTokenNeverUsed")}
+                              </p>
                             </div>
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                            {token.is_active && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRevokeToken(token.id)}
-                                disabled={isRevoking === token.id || isDeleting === token.id}
-                              >
-                                {isRevoking === token.id ? (
-                                  <Loader2Icon className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <>
-                                    <RefreshCwIcon className="h-3 w-3 mr-1" />
-                                    {t("settings.mcpRevokeToken")}
-                                  </>
+                            <div className="flex gap-2 justify-end">
+                              {token.is_active && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRevokeOrRestoreToken(token.id)}
+                                  disabled={isRevoking === token.id || isDeleting === token.id || isRestoring === token.id}
+                                >
+                                  {isRevoking === token.id ? (
+                                    <Loader2Icon className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <RefreshCwIcon className="h-3 w-3 mr-1" />
+                                      {t("settings.mcpRevokeToken")}
+                                    </>
+                                  )}
+                                </Button>
+                                ) : token.is_revoked && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRevokeOrRestoreToken(token.id)}
+                                  disabled={isRevoking === token.id || isDeleting === token.id || isRestoring === token.id}
+                                >
+                                  {isRestoring === token.id ? (
+                                    <Loader2Icon className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <RefreshCwIcon className="h-3 w-3 mr-1" />
+                                      {t("settings.mcpRestoreKey")}
+                                    </>
+                                  )}
+                                </Button>
                                 )}
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteToken(token.id)}
-                              disabled={isRevoking === token.id || isDeleting === token.id}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              {isDeleting === token.id ? (
-                                <Loader2Icon className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <>
-                                  <Trash2Icon className="h-3 w-3 mr-1" />
-                                  {t("settings.mcpDeleteToken")}
-                                </>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteToken(token.id)}
+                                  disabled={isDeleting === token.id}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  {isDeleting === token.id ? (
+                                    <Loader2Icon className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2Icon className="h-3 w-3 mr-1" />
+                                    {t("settings.mcpDeleteToken")}
+                                  </>
+                                  )}
+                                </Button>
                               )}
-                            </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-
+                  </div>
                   {/* Create New Token Button */}
                   <Button
                     variant="outline"
@@ -566,23 +588,24 @@ export function SettingsDialog({
                     />
                   </a>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t mt-auto">
-                <Button
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? (
-                    <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
-                  ) : saveSuccess ? (
-                    <CheckIcon className="h-4 w-4 mr-2" />
-                  ) : null}
-                  {saveSuccess ? t("common.saved") : t("common.save")}
-                </Button>
+                {/* Cancel Button */}
+                <div className="flex justify-end gap-2 pt-4 border-t mt-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? (
+                      <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
+                    ) : saveSuccess ? (
+                      <CheckIcon className="h-4 w-4 mr-2" />
+                    ) : null}
+                    {saveSuccess ? t("common.saved") : t("common.save")}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

@@ -1,6 +1,5 @@
 """Integration tests for MCP token API endpoints."""
 
-import pytest
 
 
 class TestGenerateMcpToken:
@@ -50,8 +49,6 @@ class TestGenerateMcpToken:
 
     def test_generate_token_expiration(self, client):
         """Test that token has proper expiration."""
-        import time
-        before = time.time()
         response = client.post(
             "/api/mcp/tokens", json={"name": "Test Expiration"}
         )

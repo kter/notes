@@ -1,6 +1,7 @@
 """Tests for MCP token API endpoints."""
 
-from datetime import UTC, datetime
+from uuid import UUID
+
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -153,3 +154,129 @@ class TestGetMcpSettings:
 
         assert "server_url" in data
         assert "token_expires_in" in data
+
+
+class TestRevokeMcpToken:
+    """Tests for POST /api/mcp/tokens/{token_id}/revoke"""
+
+    def test_revoke_token_success(self, client: TestClient, session: Session):
+        """Test successful token revocation."""
+        # Create a token
+        create_response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token"},
+        )
+        token_id = create_response.json()["id"]
+
+        # Revoke the token
+        revoke_response = client.post(f"/api/mcp/tokens/{token_id}/revoke")
+
+        assert revoke_response.status_code == 200
+
+        # Verify token is revoked in database
+        token = session.exec(select(MCPToken).where(MCPToken.id == UUID(token_id))).first()
+        assert token is not None
+        assert token.revoked_at is not None
+
+    def test_revoke_token_not_found(self, client: TestClient):
+        """Test revoking non-existent token."""
+        response = client.post("/api/mcp/tokens/non-existent-id/revoke")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+    def test_revoke_token_already_revoked(self, client: TestClient, session: Session):
+        """Test revoking an already revoked token."""
+        # Create a token
+        create_response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token"},
+        )
+        token_id = create_response.json()["id"]
+
+        # Revoke the token once
+        client.post(f"/api/mcp/tokens/{token_id}/revoke")
+
+        # Try to revoke again
+        response = client.post(f"/api/mcp/tokens/{token_id}/revoke")
+
+        assert response.status_code == 400
+        assert "already revoked" in response.json()["detail"]
+
+
+class TestRestoreMcpToken:
+    """Tests for POST /api/mcp/tokens/{token_id}/restore"""
+
+    def test_restore_token_success(self, client: TestClient, session: Session):
+        """Test successful token restoration."""
+        # Create a token
+        create_response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token"},
+        )
+        token_id = create_response.json()["id"]
+
+        # Revoke the token
+        client.post(f"/api/mcp/tokens/{token_id}/revoke")
+
+        # Restore the token
+        restore_response = client.post(f"/api/mcp/tokens/{token_id}/restore")
+
+        assert restore_response.status_code == 200
+
+        # Verify token is restored in database
+        token = session.exec(select(MCPToken).where(MCPToken.id == UUID(token_id))).first()
+        assert token is not None
+        assert token.revoked_at is None
+
+    def test_restore_token_not_found(self, client: TestClient):
+        """Test restoring non-existent token."""
+        response = client.post("/api/mcp/tokens/non-existent-id/restore")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+    def test_restore_token_not_revoked(self, client: TestClient):
+        """Test restoring an active (non-revoked) token."""
+        # Create a token
+        create_response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token"},
+        )
+        token_id = create_response.json()["id"]
+
+        # Try to restore without revoking first
+        response = client.post(f"/api/mcp/tokens/{token_id}/restore")
+
+        assert response.status_code == 400
+        assert "Can only restore revoked" in response.json()["detail"]
+
+
+class TestDeleteMcpToken:
+    """Tests for DELETE /api/mcp/tokens/{token_id}"""
+
+    def test_delete_token_success(self, client: TestClient, session: Session):
+        """Test successful token deletion."""
+        # Create a token
+        create_response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token"},
+        )
+        token_id = create_response.json()["id"]
+
+        # Delete the token
+        delete_response = client.delete(f"/api/mcp/tokens/{token_id}")
+
+        assert delete_response.status_code == 200
+
+        # Verify token is deleted from database
+        token = session.exec(select(MCPToken).where(MCPToken.id == UUID(token_id))).first()
+        assert token is None
+
+    def test_delete_token_not_found(self, client: TestClient):
+        """Test deleting non-existent token."""
+        response = client.delete("/api/mcp/tokens/non-existent-id")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+

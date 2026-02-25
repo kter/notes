@@ -40,6 +40,7 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
   const [isCreating, setIsCreating] = useState(false);
   const [createdToken, setCreatedToken] = useState<{ id: string; name: string; token: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleCreateToken = async () => {
     if (!tokenName.trim()) {
@@ -70,7 +71,14 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
     setTokenName("");
     setCreatedToken(null);
     setError(null);
+    setIsCopied(false);
     onOpenChange(false);
+  };
+
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(createdToken.token);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 1000);
   };
 
   return (
@@ -130,9 +138,10 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigator.clipboard.writeText(createdToken.token)}
+                    onClick={handleCopyToken}
+                    disabled={isCopied}
                   >
-                    {t("common.copy")}
+                    {isCopied ? t("common.copied") : t("common.copy")}
                   </Button>
                 </div>
               </div>
@@ -453,7 +462,6 @@ export function SettingsDialog({
                       {t("settings.mcpDescription")}
                     </p>
                   </div>
-                  </div>
                   {/* API Keys List */}
                   {isApiKeysLoading ? (
                     <div className="flex items-center justify-center py-4">
@@ -509,7 +517,8 @@ export function SettingsDialog({
                                     </>
                                   )}
                                 </Button>
-                                ) : token.is_revoked && (
+                              )}
+                              {token.is_revoked && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -536,19 +545,18 @@ export function SettingsDialog({
                                   {isDeleting === token.id ? (
                                     <Loader2Icon className="h-3 w-3 animate-spin" />
                                   ) : (
-                                    <Trash2Icon className="h-3 w-3 mr-1" />
-                                    {t("settings.mcpDeleteToken")}
-                                  </>
+                                    <>
+                                      <Trash2Icon className="h-3 w-3 mr-1" />
+                                      {t("settings.mcpDeleteToken")}
+                                    </>
                                   )}
                                 </Button>
-                              )}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-                  </div>
                   {/* Create New Token Button */}
                   <Button
                     variant="outline"

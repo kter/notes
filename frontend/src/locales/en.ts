@@ -1,7 +1,6 @@
 // English translations
-import type { TranslationKeys } from "./ja";
 
-export const en: TranslationKeys = {
+export const en = {
   // Common
   common: {
     save: "Save",
@@ -14,6 +13,7 @@ export const en: TranslationKeys = {
     success: "Success",
     saved: "Saved",
     copy: "Copy",
+    done: "Done",
   },
 
   // Settings
@@ -24,26 +24,33 @@ export const en: TranslationKeys = {
     aiModelDescription: "Select the AI model used for summarization and chat",
     selectModel: "Select model",
     language: "Language",
-    languageDescription: "Set the language for the application and AI output",
+    languageDescription: "Set language for application and AI output",
     selectLanguage: "Select language",
     loadError: "Failed to load settings",
     saveError: "Failed to save settings",
     exportTitle: "Data Export",
     exportDescription: "Export all notes as a ZIP file.",
     exportButton: "Download ZIP",
-    supportTitle: "Support the Developer",
+    supportTitle: "Support Developer",
     supportDescription: "If you like this app, consider supporting on Ko-fi.",
-    mcpSection: "MCP Settings",
-    mcpDescription: "Manage tokens for accessing your notes from Claude Desktop and other MCP clients. The token uses the same ID token as your active logged in session.",
-    mcpTokenStatus: "Token Status",
+    mcpSection: "MCP API Keys",
+    mcpDescription: "Manage API keys for accessing your notes from Claude Desktop and other MCP clients. Maximum 2 active API keys per user.",
+    mcpNoTokens: "No API keys",
+    mcpCreateToken: "Create API Key",
+    mcpMaxTokensReached: "Maximum 2 active API keys allowed",
     mcpTokenActive: "Active",
+    mcpTokenRevoked: "Revoked",
     mcpTokenExpires: "Expires at",
-    mcpNoToken: "No token",
-    mcpGenerateToken: "Generate Token",
-    mcpRegenerateToken: "Regenerate Token",
-    mcpRevokeToken: "Revoke Token",
-    mcpTokenGenerationError: "Failed to generate token",
-    mcpTokenRevokeError: "Failed to revoke token",
+    mcpRevokeToken: "Revoke",
+    mcpDeleteToken: "Delete",
+    createApiKey: "Create API Key",
+    createApiKeyDescription: "Create a new API key for MCP access. Please specify the purpose.",
+    apiKeyNameRequired: "Purpose is required",
+    apiKeyName: "Purpose",
+    apiKeyNamePlaceholder: "e.g., VSCode, Inspector",
+    apiKey: "API Key",
+    apiKeyCreated: "API key created",
+    apiKeyWarning: "This API key will only be shown once. Save it securely.",
   },
 
   // Sidebar
@@ -198,4 +205,189 @@ export const en: TranslationKeys = {
     resetDate: "Reset Date",
     exceeded: "Monthly token limit exceeded. Your usage will reset at the beginning of next month.",
   },
-} as const;
+};
+
+// Export type
+export type TranslationKeys = {
+  common: {
+    save: string;
+    cancel: string;
+    delete: string;
+    edit: string;
+    create: string;
+    loading: string;
+    error: string;
+    success: string;
+    saved: string;
+    copy: string;
+    done: string;
+  };
+  settings: {
+    title: string;
+    description: string;
+    aiModel: string;
+    aiModelDescription: string;
+    selectModel: string;
+    language: string;
+    languageDescription: string;
+    selectLanguage: string;
+    loadError: string;
+    saveError: string;
+    exportTitle: string;
+    exportDescription: string;
+    exportButton: string;
+    supportTitle: string;
+    supportDescription: string;
+    mcpSection: string;
+    mcpDescription: string;
+    mcpNoTokens: string;
+    mcpCreateToken: string;
+    mcpMaxTokensReached: string;
+    mcpTokenActive: string;
+    mcpTokenRevoked: string;
+    mcpTokenExpires: string;
+    mcpRevokeToken: string;
+    mcpDeleteToken: string;
+    createApiKey: string;
+    createApiKeyDescription: string;
+    apiKeyNameRequired: string;
+    apiKeyName: string;
+    apiKeyNamePlaceholder: string;
+    apiKey: string;
+    apiKeyCreated: string;
+    apiKeyWarning: string;
+  };
+  sidebar: {
+    folders: string;
+    allNotes: string;
+    newFolder: string;
+    settings: string;
+    logout: string;
+    deleteConfirm: string;
+    collapseSidebar: string;
+    expandSidebar: string;
+    folderName: string;
+    addFolder: string;
+    confirmCreate: string;
+    cancelCreate: string;
+  };
+  noteList: {
+    notes: string;
+    newNote: string;
+    noNotes: string;
+    searchPlaceholder: string;
+    untitled: string;
+    deleteConfirm: string;
+    noContent: string;
+    createOne: string;
+    renameFolder: string;
+    deleteFolder: string;
+    noteCount: string;
+    noteCountSingular: string;
+    addNote: string;
+    collapseNoteList: string;
+    expandNoteList: string;
+  };
+  editor: {
+    title: string;
+    titlePlaceholder: string;
+    contentPlaceholder: string;
+    lastSaved: string;
+    unsaved: string;
+    unsavedStrictMismatch: string;
+    unsavedLooseMismatch: string;
+    characters: string;
+    noNoteSelected: string;
+    selectNoteHint: string;
+    summarize: string;
+    summarizing: string;
+    chat: string;
+    export: string;
+    preview: string;
+    markdown: string;
+    plainText: string;
+    previewPlaceholder: string;
+    noteTitlePlaceholder: string;
+    noteContentPlaceholder: string;
+    summarizeNote: string;
+    toggleChat: string;
+    exportNote: string;
+    share: string;
+    shareNote: string;
+  };
+  ai: {
+    title: string;
+    summarize: string;
+    summarizing: string;
+    chat: string;
+    chatPlaceholder: string;
+    send: string;
+    clearChat: string;
+    summary: string;
+    emptyNote: string;
+    chatContext: string;
+    currentNote: string;
+    currentFolder: string;
+    allNotes: string;
+    noNoteSelected: string;
+    noFolderSelected: string;
+    allNotesAndFolders: string;
+    untitled: string;
+    howCanIHelp: string;
+    askAboutNote: string;
+    askAboutFolder: string;
+    askAboutNotes: string;
+    askAboutCurrentNote: string;
+    askAboutThisFolder: string;
+    askAboutAllNotes: string;
+    openAIChat: string;
+  };
+  auth: {
+    login: string;
+    register: string;
+    email: string;
+    password: string;
+  };
+  languages: {
+    auto: string;
+    ja: string;
+    en: string;
+  };
+  nav: {
+    folders: string;
+    notes: string;
+    editor: string;
+    chat: string;
+    viewFolders: string;
+    viewNotes: string;
+    viewEditor: string;
+    viewChat: string;
+  };
+  sync: {
+    online: string;
+    offline: string;
+    syncing: string;
+    pendingChanges: string;
+    syncComplete: string;
+    syncError: string;
+    savedLocally: string;
+  };
+  share: {
+    title: string;
+    description: string;
+    copyLink: string;
+    copied: string;
+    revokeShare: string;
+    revokeConfirm: string;
+    createShare: string;
+    noShare: string;
+    viewOnlyNotice: string;
+  };
+  tokenUsage: {
+    title: string;
+    used: string;
+    limit: string;
+    resetDate: string;
+    exceeded: string;
+  };
+};

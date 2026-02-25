@@ -31,4 +31,11 @@ class MCPToken(SQLModel, table=True):
     def is_active(self) -> bool:
         """Check if the token is active and not expired or revoked."""
         now = datetime.now(UTC)
-        return self.revoked_at is None and self.expires_at > now
+
+        # Handle both offset-naive and offset-aware datetimes from database
+        if self.expires_at.tzinfo is None:
+            expires_at = self.expires_at.replace(tzinfo=UTC)
+        else:
+            expires_at = self.expires_at
+
+        return self.revoked_at is None and expires_at > now

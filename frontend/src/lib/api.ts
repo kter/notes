@@ -15,7 +15,10 @@ import type {
   SummarizeResponse,
   UserSettings,
   UserSettingsUpdate,
+  MCPTokenCreateRequest,
   MCPTokenResponse,
+  MCPTokenListItem,
+  MCPTokensListResponse,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -163,15 +166,26 @@ class ApiClient {
   }
 
   // MCP Token Management API
-  async generateMcpToken(): Promise<MCPTokenResponse> {
-    return this.request<MCPTokenResponse>("/api/mcp/token", {
+  async createMcpToken(data: MCPTokenCreateRequest): Promise<MCPTokenResponse> {
+    return this.request<MCPTokenResponse>("/api/mcp/tokens", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async listMcpTokens(): Promise<MCPTokensListResponse> {
+    return this.request<MCPTokensListResponse>("/api/mcp/tokens");
+  }
+
+  async revokeMcpToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/api/mcp/tokens/${tokenId}/revoke`, {
       method: "POST",
     });
   }
 
-  async revokeMcpToken(): Promise<void> {
-    return this.request<void>("/api/mcp/revoke", {
-      method: "POST",
+  async deleteMcpToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/api/mcp/tokens/${tokenId}`, {
+      method: "DELETE",
     });
   }
 

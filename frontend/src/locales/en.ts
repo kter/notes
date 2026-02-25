@@ -51,6 +51,7 @@ export const en = {
     apiKey: "API Key",
     apiKeyCreated: "API key created",
     apiKeyWarning: "This API key will only be shown once. Save it securely.",
+    mcpDeleteConfirm: "Delete this API key? This action cannot be undone.",
   },
 
   // Sidebar
@@ -256,6 +257,7 @@ export type TranslationKeys = {
     apiKey: string;
     apiKeyCreated: string;
     apiKeyWarning: string;
+    mcpDeleteConfirm: string;
   };
   sidebar: {
     folders: string;

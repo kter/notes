@@ -189,6 +189,12 @@ class ApiClient {
     });
   }
 
+  async restoreMcpToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/api/mcp/tokens/${tokenId}/restore`, {
+      method: "POST",
+    });
+  }
+
   async exportNotes(): Promise<Blob> {
     const response = await fetch(`${API_BASE_URL}/api/notes/export/all`, {
       headers: {

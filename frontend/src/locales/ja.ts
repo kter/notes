@@ -52,6 +52,11 @@ export const ja = {
     apiKeyCreated: "APIキーを作成しました",
     apiKeyWarning: "このAPIキーは一度しか表示されません。安全に保存してください。",
     mcpDeleteConfirm: "このAPIキーを削除しますか？削除されたAPIキーは復元できません。",
+    mcpTokenLastUsed: "最終利用",
+    mcpTokenNeverUsed: "未使用",
+    mcpRestoreKey: "有効化",
+    mcpRestoreConfirm: "このAPIキーを有効化しますか？",
+    mcpRestored: "有効化済み",
   },
 
   // Sidebar
@@ -258,6 +263,11 @@ export type TranslationKeys = {
     apiKeyCreated: string;
     apiKeyWarning: string;
     mcpDeleteConfirm: string;
+    mcpTokenLastUsed: string;
+    mcpTokenNeverUsed: string;
+    mcpRestoreKey: string;
+    mcpRestoreConfirm: string;
+    mcpRestored: string;
   };
   sidebar: {
     folders: string;

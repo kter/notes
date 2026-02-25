@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from app.auth.dependencies import get_user_id, get_current_user
+from app.auth.dependencies import get_current_user, get_user_id
 from app.database import get_session
 from app.main import app
 

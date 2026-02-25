@@ -52,6 +52,11 @@ export const en = {
     apiKeyCreated: "API key created",
     apiKeyWarning: "This API key will only be shown once. Save it securely.",
     mcpDeleteConfirm: "Delete this API key? This action cannot be undone.",
+    mcpTokenLastUsed: "Last used",
+    mcpTokenNeverUsed: "Never",
+    mcpRestoreKey: "Reactivate",
+    mcpRestoreConfirm: "Reactivate this API key?",
+    mcpRestored: "Reactived",
   },
 
   // Sidebar
@@ -258,6 +263,11 @@ export type TranslationKeys = {
     apiKeyCreated: string;
     apiKeyWarning: string;
     mcpDeleteConfirm: string;
+    mcpTokenLastUsed: string;
+    mcpTokenNeverUsed: string;
+    mcpRestoreKey: string;
+    mcpRestoreConfirm: string;
+    mcpRestored: string;
   };
   sidebar: {
     folders: string;

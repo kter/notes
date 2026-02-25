@@ -1,5 +1,6 @@
 """Tests for MCP token API endpoints."""
 
+import datetime as dt_module
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -44,25 +45,25 @@ class TestGenerateMcpToken:
         assert response.status_code == 422
 
     def test_generate_token_limit_2_active(self, client: TestClient):
-        """Test that maximum 2 active tokens are allowed."""
+        """Test that maximum 2 active expiring tokens are allowed."""
         # Create first token
         response1 = client.post(
             "/api/mcp/tokens",
-            json={"name": "Token 1"},
+            json={"name": "Token 1", "expires_in_days": 30},
         )
         assert response1.status_code == 200
 
         # Create second token
         response2 = client.post(
             "/api/mcp/tokens",
-            json={"name": "Token 2"},
+            json={"name": "Token 2", "expires_in_days": 30},
         )
         assert response2.status_code == 200
 
         # Try to create third token - should fail
         response3 = client.post(
             "/api/mcp/tokens",
-            json={"name": "Token 3"},
+            json={"name": "Token 3", "expires_in_days": 30},
         )
         assert response3.status_code == 400
         assert "Maximum of 2 active API keys" in response3.json()["detail"]
@@ -81,6 +82,108 @@ class TestGenerateMcpToken:
         assert "token_hash" not in data
         # Plain token should be returned
         assert "token" in data
+
+    def test_generate_token_with_30_day_expiration(self, client: TestClient):
+        """Test token generation with 30 day expiration."""
+        response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token", "expires_in_days": 30},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "expires_in_days" in data
+        assert data["expires_in_days"] == 30
+
+        # Verify token expires approximately 30 days from now
+        token = list(session.exec(select(MCPToken)).all())[0]
+        import datetime
+        days_until_expiration = (token.expires_at - dt_module.datetime.now(dt_module.UTC)).days
+        assert 29 <= days_until_expiration <= 31  # Allow for test timing
+
+    def test_generate_token_with_90_day_expiration(self, client: TestClient):
+        """Test token generation with 90 day expiration."""
+        response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token", "expires_in_days": 90},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "expires_in_days" in data
+        assert data["expires_in_days"] == 90
+
+    def test_generate_token_no_expiration(self, client: TestClient, session: Session):
+        """Test token generation with no expiration."""
+        response = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Test Token", "expires_in_days": None},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "expires_in_days" in data
+        assert data["expires_in_days"] is None
+        assert data["expires_at"] is None
+
+        # Verify token has no expiration
+        token = session.exec(select(MCPToken)).all()[0]
+        assert token.expires_at is None
+
+    def test_generate_token_no_expiration_limit_1(self, client: TestClient, session: Session):
+        """Test maximum 1 non-expiring token per user."""
+        # Clean up any existing tokens first
+        tokens = session.exec(select(MCPToken).where(MCPToken.user_id == "test-user-123")).all()
+        for token in tokens:
+            session.delete(token)
+        session.commit()
+
+        # Create first non-expiring token
+        response1 = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Token 1", "expires_in_days": None},
+        )
+        assert response1.status_code == 200
+
+        # Try to create second non-expiring token - should fail
+        response2 = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Token 2", "expires_in_days": None},
+        )
+
+        assert response2.status_code == 400
+        assert "Maximum of 1 non-expiring" in response2.json()["detail"]
+
+    def test_generate_token_expired_does_not_count_towards_limit(self, client: TestClient, session: Session):
+        """Test that expired tokens don't count towards active token limit."""
+        # Clean up any existing tokens first
+        tokens = session.exec(select(MCPToken).where(MCPToken.user_id == "test-user-123")).all()
+        for token in tokens:
+            session.delete(token)
+        session.commit()
+
+        # Create first token
+        response1 = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Token 1", "expires_in_days": 30},
+        )
+        assert response1.status_code == 200
+
+        # Manually expire the first token
+        token = session.exec(select(MCPToken)).all()[0]
+        token.expires_at = dt_module.datetime.now(dt_module.UTC) - dt_module.timedelta(days=1)
+        session.add(token)
+        session.commit()
+
+        # Create second token - should succeed (first is expired)
+        response2 = client.post(
+            "/api/mcp/tokens",
+            json={"name": "Token 2", "expires_in_days": 30},
+        )
+        assert response2.status_code == 200
 
 
 class TestListMcpTokens:
@@ -140,6 +243,9 @@ class TestListMcpTokens:
         assert response.status_code == 200
         data = response.json()
         assert len(data["tokens"]) == 1
+        # Token should have expires_at and expires_in_days
+        assert data["tokens"][0]["expires_at"] is not None
+        assert data["tokens"][0]["expires_in_days"] is not None
 
 
 class TestGetMcpSettings:

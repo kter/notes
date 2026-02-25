@@ -15,6 +15,8 @@ export const ja = {
     copy: "コピー",
     copied: "コピーしました",
     done: "完了",
+    days: "日",
+    year: "年",
   },
 
   // Settings
@@ -58,6 +60,10 @@ export const ja = {
     mcpRestoreKey: "有効化",
     mcpRestoreConfirm: "このAPIキーを有効化しますか？",
     mcpRestored: "有効化済み",
+    mcpTokenExpiration: "有効期限",
+    mcpSelectExpiration: "有効期限を選択",
+    mcpNoExpiration: "無期限",
+    mcpExpirationNote: "期限なしのキーはユーザーあたり1つまで作成できます。",
   },
 
   // Sidebar

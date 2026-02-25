@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -35,20 +35,43 @@ async def generate_mcp_token(
     """
     user_id = current_user.get("sub")
 
-    # Check token limit (max 2 active tokens)
-    active_tokens = session.exec(
-        select(MCPToken).where(
-            MCPToken.user_id == user_id,
-            MCPToken.revoked_at.is_(None),
-            MCPToken.expires_at > datetime.now(UTC)
-        )
-    ).all()
+    # Calculate expiration based on selected option
+    if request.expires_in_days is None:
+        # No expiration - limit to 1 token
+        active_tokens = session.exec(
+            select(MCPToken).where(
+                MCPToken.user_id == user_id,
+                MCPToken.revoked_at.is_(None),
+                MCPToken.expires_at.is_(None),
+            )
+        ).all()
+        if len(active_tokens) >= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum of 1 non-expiring API key per user. Revoke an existing key first."
+            )
+        expires_at = None
+        expires_in = None
+        expires_in_days = None
+    else:
+        expires_at = datetime.now(UTC) + timedelta(days=request.expires_in_days)
+        expires_in = request.expires_in_days * 24 * 3600
+        expires_in_days = request.expires_in_days
 
-    if len(active_tokens) >= 2:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum of 2 active API keys per user. Revoke an existing key first."
-        )
+        # Check token limit (max 2 active tokens for expiring tokens)
+        active_tokens = session.exec(
+            select(MCPToken).where(
+                MCPToken.user_id == user_id,
+                MCPToken.revoked_at.is_(None),
+                MCPToken.expires_at > datetime.now(UTC)
+            )
+        ).all()
+
+        if len(active_tokens) >= 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Maximum of 2 active API keys per user. Revoke an existing key first."
+            )
 
     # Generate a random short token
     token_plain = f"mcp_{secrets.token_urlsafe(32)}"
@@ -59,14 +82,15 @@ async def generate_mcp_token(
         user_id=user_id,
         token_hash=token_hash,
         name=request.name,
-        created_at=datetime.now(UTC)
+        created_at=datetime.now(UTC),
+        expires_at=expires_at
     )
 
     session.add(new_token)
     session.commit()
     session.refresh(new_token)
 
-    logger.info(f"Generated MCP API key for user {user_id}: {new_token.name}")
+    logger.info(f"Generated MCP API key for user {user_id}: {new_token.name}, expires_in_days={expires_in_days}")
 
     # Return response with full plain token (only shown once)
     return MCPTokenResponse(
@@ -74,8 +98,9 @@ async def generate_mcp_token(
         name=new_token.name,
         token=token_plain,
         created_at=new_token.created_at.isoformat(),
-        expires_at=new_token.expires_at.isoformat(),
-        expires_in=365 * 24 * 3600  # 1 year
+        expires_at=new_token.expires_at.isoformat() if new_token.expires_at else None,
+        expires_in=expires_in if expires_in else 365 * 24 * 3600,
+        expires_in_days=expires_in_days
     )
 
 
@@ -103,10 +128,11 @@ async def list_mcp_tokens(
                 "id": str(token.id),
                 "name": token.name,
                 "created_at": token.created_at.isoformat(),
-                "expires_at": token.expires_at.isoformat(),
+                "expires_at": token.expires_at.isoformat() if token.expires_at else None,
                 "revoked_at": token.revoked_at.isoformat() if token.revoked_at else None,
                 "is_active": token.is_active,
                 "last_used_at": token.last_used_at.isoformat() if token.last_used_at else None,
+                "expires_in_days": (token.expires_at - token.created_at).days if token.expires_at else None,
             }
             for token in tokens
         ]
@@ -251,5 +277,6 @@ async def get_mcp_settings(
 
     return MCPSettingsResponse(
         server_url="https://5gcqmlela7.execute-api.ap-northeast-1.amazonaws.com/",
-        token_expires_in=3600
+        token_expires_in=3600,
+        token_expiration_options=[30, 60, 90, 365]
     )

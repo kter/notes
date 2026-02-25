@@ -22,7 +22,7 @@ class MCPToken(SQLModel, table=True):
     
     # Metadata
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    expires_at: datetime = Field(
+    expires_at: datetime | None = Field(
         default_factory=lambda: datetime.now(UTC) + timedelta(days=365)
     )
     revoked_at: datetime | None = Field(default=None)
@@ -32,6 +32,10 @@ class MCPToken(SQLModel, table=True):
     def is_active(self) -> bool:
         """Check if the token is active and not expired or revoked."""
         now = datetime.now(UTC)
+
+        # If expires_at is None, token never expires
+        if self.expires_at is None:
+            return self.revoked_at is None
 
         # Handle both offset-naive and offset-aware datetimes from database
         if self.expires_at.tzinfo is None:

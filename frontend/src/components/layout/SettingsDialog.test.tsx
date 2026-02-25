@@ -124,7 +124,7 @@ describe("SettingsDialog", () => {
     mockConfirm.mockReturnValue(true);
     // Update the mock to return mockApi when createApiClient is called
     const { createApiClient } = await import("@/lib/api");
-    vi.mocked(createApiClient).mockReturnValue(mockApi as any);
+    vi.mocked(createApiClient).mockReturnValue(mockApi as unknown);
   });
 
   const renderWithAuth = (ui: React.ReactNode) => {

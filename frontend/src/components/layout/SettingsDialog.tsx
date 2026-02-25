@@ -37,8 +37,9 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
   const { t } = useTranslation();
   const { getApi } = useApi();
   const [tokenName, setTokenName] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState<30 | 60 | 90 | 365 | null>(365);
   const [isCreating, setIsCreating] = useState(false);
-  const [createdToken, setCreatedToken] = useState<{ id: string; name: string; token: string } | null>(null);
+  const [createdToken, setCreatedToken] = useState<{ id: string; name: string; token: string; expires_at: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
@@ -51,11 +52,12 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
     setError(null);
     try {
       const apiClient = await getApi();
-      const response = await apiClient.createMcpToken({ name: tokenName });
+      const response = await apiClient.createMcpToken({ name: tokenName, expires_in_days: expiresInDays });
       setCreatedToken({
         id: response.id,
         name: response.name,
         token: response.token,
+        expires_at: response.expires_at,
       });
       onTokenCreated();
     } catch (err) {
@@ -69,6 +71,7 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
 
   const handleClose = () => {
     setTokenName("");
+    setExpiresInDays(365);
     setCreatedToken(null);
     setError(null);
     setIsCopied(false);
@@ -102,8 +105,29 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
                 onChange={(e) => setTokenName(e.target.value)}
                 disabled={isCreating}
               />
-              {error && <p className="text-sm text-red-500">{error}</p>}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="token-expiration">{t("settings.mcpTokenExpiration")}</Label>
+              <Select
+                value={expiresInDays?.toString()}
+                onValueChange={(value) => setExpiresInDays(value === "null" ? null : parseInt(value) as any)}
+              >
+                <SelectTrigger id="token-expiration">
+                  <SelectValue placeholder={t("settings.mcpSelectExpiration")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 {t("common.days")}</SelectItem>
+                  <SelectItem value="60">60 {t("common.days")}</SelectItem>
+                  <SelectItem value="90">90 {t("common.days")}</SelectItem>
+                  <SelectItem value="365">1 {t("common.year")}</SelectItem>
+                  <SelectItem value="null">{t("settings.mcpNoExpiration")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.mcpExpirationNote")}
+              </p>
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
             <Button
               onClick={handleCreateToken}
               disabled={isCreating}
@@ -126,6 +150,15 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
               <div className="space-y-1">
                 <Label className="text-xs">{t("settings.apiKeyName")}</Label>
                 <p className="text-sm font-medium">{createdToken.name}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("settings.mcpTokenExpiration")}</Label>
+                <p className="text-sm font-medium">
+                  {createdToken.expires_at
+                    ? new Date(createdToken.expires_at).toLocaleDateString()
+                    : t("settings.mcpNoExpiration")
+                  }
+                </p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("settings.apiKey")}</Label>
@@ -494,7 +527,11 @@ export function SettingsDialog({
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground">
-                                {t("settings.mcpTokenExpires")}: {new Date(token.expires_at).toLocaleDateString()}
+                                {t("settings.mcpTokenExpires")}: {
+                                  token.expires_at
+                                    ? new Date(token.expires_at).toLocaleDateString()
+                                    : t("settings.mcpNoExpiration")
+                                }
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {t("settings.mcpTokenLastUsed")}: {token.last_used_at ? new Date(token.last_used_at).toLocaleDateString() : t("settings.mcpTokenNeverUsed")}

@@ -15,6 +15,8 @@ export const en = {
     copy: "Copy",
     copied: "Copied!",
     done: "Done",
+    days: "days",
+    year: "year",
   },
 
   // Settings
@@ -57,7 +59,11 @@ export const en = {
     mcpTokenNeverUsed: "Never",
     mcpRestoreKey: "Reactivate",
     mcpRestoreConfirm: "Reactivate this API key?",
-    mcpRestored: "Reactived",
+    mcpRestored: "Reactivated",
+    mcpTokenExpiration: "Expiration",
+    mcpSelectExpiration: "Select expiration",
+    mcpNoExpiration: "No expiration",
+    mcpExpirationNote: "You can only create 1 non-expiring key per user.",
   },
 
   // Sidebar

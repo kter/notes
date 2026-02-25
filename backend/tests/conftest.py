@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from app.auth.dependencies import get_user_id
+from app.auth.dependencies import get_user_id, get_current_user
 from app.database import get_session
 from app.main import app
 
@@ -38,7 +38,7 @@ def session_fixture(engine) -> Generator[Session, None, None]:
 
 @pytest.fixture(name="client")
 def client_fixture(session: Session) -> Generator[TestClient, None, None]:
-    """Create a test client with mocked dependencies for the default test user."""
+    """Create a test client with mocked dependencies for default test user."""
 
     def get_session_override():
         yield session
@@ -46,8 +46,12 @@ def client_fixture(session: Session) -> Generator[TestClient, None, None]:
     def get_user_id_override() -> str:
         return TEST_USER_ID
 
+    def get_current_user_override() -> dict:
+        return {"sub": TEST_USER_ID}
+
     app.dependency_overrides[get_session] = get_session_override
     app.dependency_overrides[get_user_id] = get_user_id_override
+    app.dependency_overrides[get_current_user] = get_current_user_override
 
     with TestClient(app) as client:
         yield client
@@ -75,8 +79,12 @@ def make_client_fixture(
         def get_user_id_override() -> str:
             return user_id
 
+        def get_current_user_override() -> dict:
+            return {"sub": user_id}
+
         app.dependency_overrides[get_session] = get_session_override
         app.dependency_overrides[get_user_id] = get_user_id_override
+        app.dependency_overrides[get_current_user] = get_current_user_override
 
         client = TestClient(app)
         clients.append(client)

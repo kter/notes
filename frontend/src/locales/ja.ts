@@ -64,6 +64,10 @@ export const ja = {
     mcpSelectExpiration: "有効期限を選択",
     mcpNoExpiration: "無期限",
     mcpExpirationNote: "期限なしのキーはユーザーあたり1つまで作成できます。",
+    mcpServerConfig: "MCPサーバーの設定",
+    mcpServerUrl: "MCPサーバーURL",
+    mcpServerDescription: "Claude DesktopなどのMCPクライアントから接続するためのサーバーURLです。",
+    mcpCopyUrl: "URLをコピー",
   },
 
   // Sidebar

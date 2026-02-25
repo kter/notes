@@ -64,6 +64,10 @@ export const en = {
     mcpSelectExpiration: "Select expiration",
     mcpNoExpiration: "No expiration",
     mcpExpirationNote: "You can only create 1 non-expiring key per user.",
+    mcpServerConfig: "MCP Server Configuration",
+    mcpServerUrl: "MCP Server URL",
+    mcpServerDescription: "Server URL for connecting to MCP clients like Claude Desktop.",
+    mcpCopyUrl: "Copy URL",
   },
 
   // Sidebar

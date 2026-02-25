@@ -177,6 +177,10 @@ class ApiClient {
     return this.request<MCPTokensListResponse>("/api/mcp/tokens");
   }
 
+  async getMcpSettings(): Promise<MCPSettingsResponse> {
+    return this.request<MCPSettingsResponse>("/api/mcp/settings");
+  }
+
   async revokeMcpToken(tokenId: string): Promise<void> {
     return this.request<void>(`/api/mcp/tokens/${tokenId}/revoke`, {
       method: "POST",

@@ -1,14 +1,20 @@
 import hashlib
 import logging
 import secrets
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlmodel import Session, select
 
 from app.auth import get_current_user
 from app.database import get_session
-from app.models.mcp import MCPSettingsResponse, MCPTokenResponse
+from app.models.mcp import (
+    MCPSettingsResponse,
+    MCPTokenCreateRequest,
+    MCPTokenResponse,
+    MCPTokensListResponse,
+)
 from app.models.mcp_token import MCPToken
 
 logger = logging.getLogger(__name__)
@@ -16,50 +22,163 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
 
-@router.post("/token", response_model=MCPTokenResponse)
+@router.post("/tokens", response_model=MCPTokenResponse)
 async def generate_mcp_token(
-    request: Request,
+    request: MCPTokenCreateRequest,
     current_user: Annotated[dict, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)]
 ) -> MCPTokenResponse:
     """
-    Generate a short, persistent MCP token for the current authenticated user.
+    Generate a new MCP API key for current user.
+    Maximum 2 active tokens per user.
     """
     user_id = current_user.get("sub")
-    
+
+    # Check token limit (max 2 active tokens)
+    active_tokens = session.exec(
+        select(MCPToken).where(
+            MCPToken.user_id == user_id,
+            MCPToken.revoked_at.is_(None),
+            MCPToken.expires_at > datetime.now(UTC)
+        )
+    ).all()
+
+    if len(active_tokens) >= 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum of 2 active API keys per user. Revoke an existing key first."
+        )
+
     # Generate a random short token
-    # 32 bytes of randomness results in ~43 chars URL-safe
     token_plain = f"mcp_{secrets.token_urlsafe(32)}"
     token_hash = hashlib.sha256(token_plain.encode()).hexdigest()
 
-    # Store the token in the database
-    # We revoke old tokens for this user for now to keep it simple (one token per user)
-    from sqlmodel import select
-    old_tokens = session.exec(
-        select(MCPToken).where(MCPToken.user_id == user_id, MCPToken.revoked_at.is_(None))
-    ).all()
-    
-    import datetime
-    now = datetime.datetime.now(datetime.UTC)
-    for old_token in old_tokens:
-        old_token.revoked_at = now
-        session.add(old_token)
-
+    # Store token in database
     new_token = MCPToken(
         user_id=user_id,
         token_hash=token_hash,
-        name="Default",
-        created_at=now
+        name=request.name,
+        created_at=datetime.now(UTC)
     )
     session.add(new_token)
     session.commit()
+    session.refresh(new_token)
 
-    logger.info(f"Generated short MCP token for user {user_id}")
+    logger.info(f"Generated MCP API key for user {user_id}: {new_token.name}")
 
+    # Return response with full plain token (only shown once)
     return MCPTokenResponse(
-        url="https://5gcqmlela7.execute-api.ap-northeast-1.amazonaws.com/",
+        id=str(new_token.id),
+        name=new_token.name,
         token=token_plain,
+        created_at=new_token.created_at.isoformat(),
+        expires_at=new_token.expires_at.isoformat(),
         expires_in=365 * 24 * 3600  # 1 year
+    )
+
+
+@router.get("/tokens", response_model=MCPTokensListResponse)
+async def list_mcp_tokens(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+) -> MCPTokensListResponse:
+    """
+    List all MCP API keys for the current user.
+    Does not return the actual token value.
+    """
+    try:
+        user_id = current_user.get("sub")
+        logger.info(f"Listing MCP tokens for user_id: {user_id}")
+
+        tokens = session.exec(
+            select(MCPToken).where(MCPToken.user_id == user_id)
+        ).all()
+
+        logger.info(f"Found {len(tokens)} MCP tokens for user {user_id}")
+
+        token_list = [
+            {
+                "id": str(token.id),
+                "name": token.name,
+                "created_at": token.created_at.isoformat(),
+                "expires_at": token.expires_at.isoformat(),
+                "revoked_at": token.revoked_at.isoformat() if token.revoked_at else None,
+                "is_active": token.is_active,
+            }
+            for token in tokens
+        ]
+
+        return MCPTokensListResponse(tokens=token_list)
+    except Exception as e:
+        logger.error(f"Error listing MCP tokens: {e}", exc_info=True)
+        raise
+
+
+@router.post("/tokens/{token_id}/revoke")
+async def revoke_mcp_token(
+    token_id: str,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+) -> Response:
+    """
+    Revoke (deactivate) a specific MCP API key.
+    """
+    user_id = current_user.get("sub")
+
+    token = session.exec(
+        select(MCPToken).where(
+            MCPToken.id == token_id,
+            MCPToken.user_id == user_id
+        )
+    ).first()
+
+    if not token:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    if token.revoked_at:
+        raise HTTPException(status_code=400, detail="API key already revoked")
+
+    token.revoked_at = datetime.now(UTC)
+    session.add(token)
+    session.commit()
+
+    logger.info(f"Revoked MCP API key {token_id} for user {user_id}")
+
+    return Response(
+        status_code=200,
+        content='{"message":"API key revoked successfully"}'
+    )
+
+
+@router.delete("/tokens/{token_id}")
+async def delete_mcp_token(
+    token_id: str,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)]
+) -> Response:
+    """
+    Delete a specific MCP API key permanently.
+    """
+    user_id = current_user.get("sub")
+
+    token = session.exec(
+        select(MCPToken).where(
+            MCPToken.id == token_id,
+            MCPToken.user_id == user_id
+        )
+    ).first()
+
+    if not token:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    session.delete(token)
+    session.commit()
+
+    logger.info(f"Deleted MCP API key {token_id} for user {user_id}")
+
+    return Response(
+        status_code=200,
+        content='{"message":"API key deleted successfully"}'
     )
 
 
@@ -69,41 +188,13 @@ async def get_mcp_settings(
     current_user: Annotated[dict, Depends(get_current_user)]
 ) -> MCPSettingsResponse:
     """
-    Get current MCP settings for the user.
+    Get current MCP settings for user.
     """
     user_id = current_user.get("sub")
 
-    # In the future, we can store per-user MCP settings in the database
-    # For now, return the server URL
     logger.info(f"Fetching MCP settings for user {user_id}")
 
     return MCPSettingsResponse(
         server_url="https://5gcqmlela7.execute-api.ap-northeast-1.amazonaws.com/",
         token_expires_in=3600
-    )
-
-
-@router.post("/revoke")
-async def revoke_mcp_token(
-    request: Request,
-    current_user: Annotated[dict, Depends(get_current_user)]
-) -> Response:
-    """
-    Revoke the current MCP token.
-
-    In a real implementation, this would:
-    1. Store a token identifier in the database
-    2. Allow users to revoke specific tokens
-    3. Generate a new token that invalidates old ones
-
-    For now, this is a placeholder that always succeeds.
-    The actual token revocation would require the MCP server to implement
-    token blacklisting or similar mechanism.
-    """
-    user_id = current_user.get("sub")
-    logger.info(f"Revoking MCP token for user {user_id}")
-
-    return Response(
-        status_code=200,
-        content='{"message":"Token revoked successfully"}'
     )

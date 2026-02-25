@@ -15,9 +15,30 @@ export interface FolderUpdate {
   name?: string;
 }
 
+export interface MCPTokenCreateRequest {
+  name: string;
+}
+
 export interface MCPTokenResponse {
+  id: string;
+  name: string;
   token: string;
+  created_at: string;
+  expires_at: string;
   expires_in: number;
+}
+
+export interface MCPTokenListItem {
+  id: string;
+  name: string;
+  created_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  is_active: boolean;
+}
+
+export interface MCPTokensListResponse {
+  tokens: MCPTokenListItem[];
 }
 
 // Token usage types

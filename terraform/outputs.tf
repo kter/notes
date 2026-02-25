@@ -53,10 +53,10 @@ output "backend_role_arn" {
   value       = aws_iam_role.backend.arn
 }
 
-# MCP OAuth API Gateway outputs
-output "mcp_oauth_api_url" {
-  description = "HTTP API Gateway URL for MCP OAuth - use this for MCP Inspector"
-  value       = aws_apigatewayv2_api.mcp_oauth_main.api_endpoint
+# MCP Server API Gateway outputs
+output "mcp_server_api_url" {
+  description = "HTTP API Gateway URL for MCP Server"
+  value       = aws_apigatewayv2_api.mcp_server.api_endpoint
 }
 
 # Environment info

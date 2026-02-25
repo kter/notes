@@ -207,7 +207,7 @@ export function SettingsDialog({
   };
 
   const handleDeleteToken = async (tokenId: string) => {
-    if (!window.confirm(t("sidebar.deleteConfirm"))) {
+    if (!window.confirm(t("settings.mcpDeleteConfirm"))) {
       return;
     }
     setIsDeleting(tokenId);

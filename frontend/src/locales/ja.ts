@@ -13,6 +13,7 @@ export const ja = {
     success: "成功",
     saved: "保存しました",
     copy: "コピー",
+    copied: "コピーしました",
     done: "完了",
   },
 

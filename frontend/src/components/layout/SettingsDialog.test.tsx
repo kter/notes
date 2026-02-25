@@ -5,7 +5,19 @@ import { AuthProvider } from "@/lib/auth-context";
 
 // Mock api.ts
 vi.mock("@/lib/api", () => ({
-  getApi: vi.fn(),
+  ApiError: class extends Error {
+    constructor(status: number, statusText: string, data: unknown) {
+      super(statusText);
+      this.status = status;
+      this.statusText = statusText;
+      this.data = data;
+    }
+    status: number;
+    statusText: string;
+    data: unknown;
+  },
+  createApiClient: vi.fn(() => ({})),
+  getSharedNote: vi.fn(),
 }));
 
 // Mock useTranslation
@@ -107,14 +119,12 @@ describe("SettingsDialog", () => {
     },
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockConfirm.mockReturnValue(true);
-    vi.doMock("@/lib/api").mockImplementation(() => {
-      return {
-        getApi: vi.fn().mockResolvedValue(mockApi),
-      };
-    });
+    // Update the mock to return mockApi when createApiClient is called
+    const { createApiClient } = await import("@/lib/api");
+    vi.mocked(createApiClient).mockReturnValue(mockApi as any);
   });
 
   const renderWithAuth = (ui: React.ReactNode) => {
@@ -129,7 +139,7 @@ describe("SettingsDialog", () => {
     it("shows 'No API keys' message when there are no tokens", async () => {
       mockApi.listMcpTokens.mockResolvedValue({ tokens: [] });
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         expect(screen.getByText("No API keys")).toBeInTheDocument();
@@ -149,7 +159,7 @@ describe("SettingsDialog", () => {
       ];
       mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         expect(screen.getByText("VSCode")).toBeInTheDocument();
@@ -170,7 +180,7 @@ describe("SettingsDialog", () => {
       ];
       mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         expect(screen.getByText("Create API Key")).toBeInTheDocument();
@@ -198,7 +208,7 @@ describe("SettingsDialog", () => {
       ];
       mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         expect(screen.getByText("Maximum 2 active API keys allowed")).toBeInTheDocument();
@@ -220,7 +230,7 @@ describe("SettingsDialog", () => {
       ];
       mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         const deleteButton = screen.getAllByText("Delete").find(
@@ -248,7 +258,7 @@ describe("SettingsDialog", () => {
       ];
       mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         const deleteButton = screen.getAllByText("Delete").find(
@@ -276,7 +286,7 @@ describe("SettingsDialog", () => {
       mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
       mockApi.deleteMcpToken.mockResolvedValue({});
 
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         const deleteButton = screen.getAllByText("Delete").find(
@@ -293,7 +303,7 @@ describe("SettingsDialog", () => {
 
   describe("Dialog Structure", () => {
     it("renders dialog title and description", async () => {
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         expect(screen.getByText("Settings")).toBeInTheDocument();
@@ -302,7 +312,7 @@ describe("SettingsDialog", () => {
     });
 
     it("has save and cancel buttons", async () => {
-      renderWithAuth(<SettingsDialog {...defaultProps} getApi={vi.fn().mockResolvedValue(mockApi)} />);
+      renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
         expect(screen.getByText("Save")).toBeInTheDocument();

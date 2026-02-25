@@ -13,6 +13,7 @@ export const en = {
     success: "Success",
     saved: "Saved",
     copy: "Copy",
+    copied: "Copied!",
     done: "Done",
   },
 

@@ -13,7 +13,6 @@ AWS_REGION ?= ap-northeast-1
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
 MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
-MCP_AUTH_MANAGER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-auth-manager-$(ENV)
 
 .PHONY: help
 help: ## Show this help
@@ -250,19 +249,10 @@ mcp-login: ## Login to ECR for MCP images
 build-mcp-server: ## Build MCP server Docker image
 	cd lambda/mcp_server && docker build --platform linux/amd64 -t $(MCP_SERVER_REPO):latest .
 
-.PHONY: build-mcp-auth-manager
-build-mcp-auth-manager: ## Build MCP auth manager Docker image
-	cd lambda/auth_manager && docker build --platform linux/amd64 -t $(MCP_AUTH_MANAGER_REPO):latest .
-
 .PHONY: push-mcp-server
 push-mcp-server: mcp-login build-mcp-server ## Build and push MCP server Docker image to ECR
 	docker push $(MCP_SERVER_REPO):latest
 	@echo "MCP Server image pushed: $(MCP_SERVER_REPO):latest"
-
-.PHONY: push-mcp-auth-manager
-push-mcp-auth-manager: mcp-login build-mcp-auth-manager ## Build and push MCP auth manager Docker image to ECR
-	docker push $(MCP_AUTH_MANAGER_REPO):latest
-	@echo "MCP Auth Manager image pushed: $(MCP_AUTH_MANAGER_REPO):latest"
 
 .PHONY: get-mcp-server-digest
 get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
@@ -272,31 +262,17 @@ get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
 		--query 'imageDetails[0].imageDigest' \
 		--output text
 
-.PHONY: get-mcp-auth-manager-digest
-get-mcp-auth-manager-digest: ## Get the latest MCP auth manager image digest from ECR
-	@aws ecr describe-images --repository-name notes-app-mcp-auth-manager-$(ENV) \
-		--image-ids imageTag=latest \
-		--profile $(AWS_PROFILE) \
-		--query 'imageDetails[0].imageDigest' \
-		--output text
-
 .PHONY: deploy-mcp
-deploy-mcp: tf-switch push-mcp-server push-mcp-auth-manager ## Deploy MCP infrastructure
+deploy-mcp: tf-switch push-mcp-server ## Deploy MCP infrastructure
 	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
-	$(eval MCP_AUTH_DIGEST := $(shell $(MAKE) get-mcp-auth-manager-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply \
 		-var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" \
-		-var="mcp_auth_manager_image_tag=$(MCP_AUTH_DIGEST)" \
 		-auto-approve
 	@echo "MCP infrastructure deployed!"
 
 .PHONY: mcp-logs
 mcp-logs: ## Tail MCP server logs
 	aws logs tail /aws/lambda/notes-app-mcp-server-$(ENV) --follow --profile $(AWS_PROFILE)
-
-.PHONY: mcp-auth-logs
-mcp-auth-logs: ## Tail MCP auth manager logs
-	aws logs tail /aws/lambda/notes-app-mcp-auth-manager-$(ENV) --follow --profile $(AWS_PROFILE)
 
 .PHONY: test-mcp-server
 test-mcp-server: ## Test MCP server connection

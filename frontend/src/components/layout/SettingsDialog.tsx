@@ -79,9 +79,11 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
   };
 
   const handleCopyToken = () => {
-    navigator.clipboard.writeText(createdToken.token);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 1000);
+    if (createdToken?.token) {
+      navigator.clipboard.writeText(createdToken.token);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 1000);
+    }
   };
 
   return (
@@ -236,7 +238,10 @@ export function SettingsDialog({
   };
 
   const handleRevokeOrRestoreToken = async (tokenId: string) => {
-    if (token.is_revoked) {
+    const token = apiKeys.find((k) => k.id === tokenId);
+    if (!token) return;
+
+    if (token.revoked_at !== null) {
       setIsRestoring(tokenId);
       setError(null);
       try {
@@ -562,7 +567,7 @@ export function SettingsDialog({
                                   )}
                                 </Button>
                               )}
-                              {token.is_revoked && (
+                              {token.revoked_at !== null && (
                                 <Button
                                   variant="outline"
                                   size="sm"

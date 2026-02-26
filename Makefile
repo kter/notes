@@ -91,13 +91,25 @@ build-frontend: tf-switch ## Build frontend for production
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
 
 
+.PHONY: invalidate-cloudfront
+invalidate-cloudfront: ## Create CloudFront cache invalidation
+	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	$(eval INVALIDATION_ID := $(shell aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE) --query 'Id' --output text))
+	@echo "CloudFront invalidation created: $(INVALIDATION_ID)"
+	@echo "Waiting for invalidation to complete..."
+	@aws cloudfront wait invalidation-completed --id $(INVALIDATION_ID) --distribution-id $(CF_DIST) --profile $(AWS_PROFILE)
+	@echo "CloudFront invalidation completed!"
+
 .PHONY: deploy-frontend
 deploy-frontend: build-frontend ## Build and deploy frontend to S3
 	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	@echo "Syncing frontend files to S3..."
 	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
+	@echo "Creating CloudFront cache invalidation..."
 	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
 	@echo "Frontend deployed to $(BUCKET)"
+	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
 
 # =============================================================================
 # Full Deployment

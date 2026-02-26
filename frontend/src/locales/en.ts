@@ -237,7 +237,10 @@ export type TranslationKeys = {
     success: string;
     saved: string;
     copy: string;
+    copied: string;
     done: string;
+    days: string;
+    year: string;
   };
   settings: {
     title: string;
@@ -279,6 +282,14 @@ export type TranslationKeys = {
     mcpRestoreKey: string;
     mcpRestoreConfirm: string;
     mcpRestored: string;
+    mcpTokenExpiration: string;
+    mcpSelectExpiration: string;
+    mcpNoExpiration: string;
+    mcpExpirationNote: string;
+    mcpServerConfig: string;
+    mcpServerUrl: string;
+    mcpServerDescription: string;
+    mcpCopyUrl: string;
   };
   sidebar: {
     folders: string;

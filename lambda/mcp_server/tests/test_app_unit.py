@@ -270,7 +270,8 @@ class TestHandleStreamableHttp:
         mock_note.created_at = "2024-01-01T00:00:00Z"
 
         mock_session = MagicMock()
-        mock_session.exec.return_value.all.return_value = [mock_note]
+        # First call for notes returns [mock_note], second call for folders returns []
+        mock_session.exec.return_value.all.side_effect = [[mock_note], []]
         mock_session.close = MagicMock()
 
         with patch.object(_app_module, "get_db_session", return_value=mock_session):
@@ -282,7 +283,7 @@ class TestHandleStreamableHttp:
         assert resp["id"] == 6
         resources = resp["result"]["resources"]
         assert len(resources) == 1
-        assert resources[0]["uri"] == "notes://note-1"
+        assert resources[0]["uri"] == "notes://note/note-1"
         assert resources[0]["name"] == "Test Note"
         assert resources[0]["mimeType"] == "text/markdown"
 
@@ -309,14 +310,15 @@ class TestHandleStreamableHttp:
         with patch.object(_app_module, "get_db_session", return_value=mock_session):
             resp = await _app_module.handle_streamable_http_request(
                 {"jsonrpc": "2.0", "id": 8, "method": "resources/read",
-                 "params": {"uri": "notes://note-1"}},
+                 # Correct URI format is notes://note/{id}
+                 "params": {"uri": "notes://note/note-1"}},
                 user_id="user-123",
             )
 
         assert resp["id"] == 8
         contents = resp["result"]["contents"]
         assert len(contents) == 1
-        assert contents[0]["uri"] == "notes://note-1"
+        assert contents[0]["uri"] == "notes://note/note-1"
         assert contents[0]["text"] == "# Hello"
 
 
@@ -337,7 +339,8 @@ class TestMCPEndpointAuth:
     def test_missing_authorization_returns_422(self):
         client = _fresh_client()
         resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"})
-        assert resp.status_code == 422
+        # app.py explicitly returns 401 if header is missing
+        assert resp.status_code == 401
 
     def test_invalid_jwt_returns_401(self):
         from fastapi import HTTPException

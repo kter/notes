@@ -685,7 +685,15 @@ async def handle_streamable_http_request(request_data: dict, user_id: str) -> di
             return build_jsonrpc_response(
                 request_id,
                 {
-                    "resources": resources
+                    "resources": [
+                        {
+                            "uri": r.uri,
+                            "name": r.name,
+                            "description": r.description,
+                            "mimeType": r.mimeType,
+                        }
+                        for r in resources
+                    ]
                 },
             )
 

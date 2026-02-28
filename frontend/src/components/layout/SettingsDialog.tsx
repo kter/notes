@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -112,7 +112,7 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
               <Label htmlFor="token-expiration">{t("settings.mcpTokenExpiration")}</Label>
               <Select
                 value={expiresInDays?.toString()}
-                onValueChange={(value) => setExpiresInDays(value === "null" ? null : parseInt(value) as any)}
+                onValueChange={(value) => setExpiresInDays(value === "null" ? null : parseInt(value) as 30 | 60 | 90 | 365)}
               >
                 <SelectTrigger id="token-expiration">
                   <SelectValue placeholder={t("settings.mcpSelectExpiration")} />
@@ -222,7 +222,7 @@ export function SettingsDialog({
   const [isRestoring, setIsRestoring] = useState<string | null>(null);
   const [isNewTokenDialogOpen, setIsNewTokenDialogOpen] = useState(false);
 
-  const loadApiKeys = async () => {
+  const loadApiKeys = useCallback(async () => {
     setIsApiKeysLoading(true);
     setError(null);
     try {
@@ -235,7 +235,7 @@ export function SettingsDialog({
     } finally {
       setIsApiKeysLoading(false);
     }
-  };
+  }, [getApi, t]);
 
   const handleRevokeOrRestoreToken = async (tokenId: string) => {
     const token = apiKeys.find((k) => k.id === tokenId);
@@ -327,7 +327,7 @@ export function SettingsDialog({
       }
     }
     loadSettings();
-  }, [open, getApi]);
+  }, [open, getApi, loadApiKeys, t]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -556,6 +556,7 @@ export function SettingsDialog({
                                   size="sm"
                                   onClick={() => handleRevokeOrRestoreToken(token.id)}
                                   disabled={isRevoking === token.id || isDeleting === token.id || isRestoring === token.id}
+                                  data-testid={`mcp-token-revoke-restore-${token.id}`}
                                 >
                                   {isRevoking === token.id ? (
                                     <Loader2Icon className="h-3 w-3 animate-spin" />
@@ -573,6 +574,7 @@ export function SettingsDialog({
                                   size="sm"
                                   onClick={() => handleRevokeOrRestoreToken(token.id)}
                                   disabled={isRevoking === token.id || isDeleting === token.id || isRestoring === token.id}
+                                  data-testid={`mcp-token-revoke-restore-${token.id}`}
                                 >
                                   {isRestoring === token.id ? (
                                     <Loader2Icon className="h-3 w-3 animate-spin" />
@@ -583,23 +585,24 @@ export function SettingsDialog({
                                     </>
                                   )}
                                 </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteToken(token.id)}
+                                disabled={isDeleting === token.id}
+                                className="text-red-600 hover:text-red-700"
+                                data-testid={`mcp-token-delete-${token.id}`}
+                              >
+                                {isDeleting === token.id ? (
+                                  <Loader2Icon className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Trash2Icon className="h-3 w-3 mr-1" />
+                                    {t("settings.mcpDeleteToken")}
+                                  </>
                                 )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteToken(token.id)}
-                                  disabled={isDeleting === token.id}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  {isDeleting === token.id ? (
-                                    <Loader2Icon className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Trash2Icon className="h-3 w-3 mr-1" />
-                                      {t("settings.mcpDeleteToken")}
-                                    </>
-                                  )}
-                                </Button>
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -612,6 +615,7 @@ export function SettingsDialog({
                     className="w-full"
                     onClick={() => setIsNewTokenDialogOpen(true)}
                     disabled={!canCreateMore || isNewTokenDialogOpen}
+                    data-testid="mcp-token-create-button"
                   >
                     <KeyIcon className="h-4 w-4 mr-2" />
                     {canCreateMore

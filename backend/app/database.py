@@ -181,6 +181,23 @@ def create_db_and_tables() -> None:
                     except Exception as alter_error:
                         logger.warning(f"Failed to migrate user_settings: {alter_error}")
 
+                # Self-healing migration: Add 'last_used_at' column to 'mcp_tokens' if missing
+                if table_name == "mcp_tokens":
+                    logger.info("Checking for 'last_used_at' column in 'mcp_tokens'...")
+                    try:
+                        with engine.connect() as conn:
+                            try:
+                                conn.execute(text("ALTER TABLE mcp_tokens ADD COLUMN last_used_at TIMESTAMP WITH TIME ZONE"))
+                                conn.commit()
+                                logger.info("Added 'last_used_at' column to 'mcp_tokens' table")
+                            except Exception as add_error:
+                                if "already exists" in str(add_error).lower() or "duplicate column" in str(add_error).lower():
+                                    pass
+                                else:
+                                    logger.warning(f"Failed to add last_used_at column: {add_error}")
+                    except Exception as alter_error:
+                        logger.warning(f"Failed to migrate mcp_tokens: {alter_error}")
+
                 # Note: 'content' column in 'notes' table needs to be migrated to TEXT manually in DSQL
                 # because ALTER COLUMN TYPE is not supported and it may timeout in Lambda.
             except Exception as table_error:

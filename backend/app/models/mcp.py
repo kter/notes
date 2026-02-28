@@ -1,5 +1,6 @@
 """MCP token management models."""
 from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -17,7 +18,7 @@ class MCPTokenResponse(BaseModel):
     name: str = Field(..., description="Purpose/usage of the API key")
     token: str = Field(..., description="API key token (only shown once)")
     created_at: str = Field(..., description="ISO format creation timestamp")
-    expires_at: str = Field(..., description="ISO format expiration timestamp")
+    expires_at: str | None = Field(None, description="ISO format expiration timestamp")
     expires_in: int = Field(default=3600, description="Token expiration time in seconds")
     expires_in_days: int | None = Field(..., description="Token expiration period in days (null for no expiration)")
 

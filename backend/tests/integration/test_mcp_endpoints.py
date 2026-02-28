@@ -1,5 +1,15 @@
 """Integration tests for MCP token API endpoints."""
+import pytest
 
+
+@pytest.fixture(autouse=True)
+def cleanup_tokens(client):
+    """Delete all tokens for the test user before each test."""
+    response = client.get("/api/mcp/tokens")
+    if response.status_code == 200:
+        tokens = response.json().get("tokens", [])
+        for token in tokens:
+            client.delete(f"/api/mcp/tokens/{token['id']}")
 
 
 class TestGenerateMcpToken:

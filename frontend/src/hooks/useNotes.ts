@@ -17,7 +17,7 @@ function useDebounce<T extends (...args: any[]) => any>(
   const callbackRef = useRef(callback);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lastArgsRef = useRef<any[] | null>(null);
-  
+
   // Keep callback ref updated
   useEffect(() => {
     callbackRef.current = callback;
@@ -88,7 +88,7 @@ export function useNotes(
   setSelectedNoteId: (id: string | null) => void
 ): UseNotesReturn {
   const { getApi } = useApi();
-  
+
   // Granular status state
   const [localStatus, setLocalStatus] = useState<LocalSyncStatus>('saved');
   const [remoteStatus, setRemoteStatus] = useState<RemoteSyncStatus>('synced');
@@ -107,48 +107,48 @@ export function useNotes(
   ) => {
     // Check if online
     if (navigator.onLine) {
-       const task = async () => {
-          setRemoteStatus('syncing');
-          setLastError(undefined);
-          try {
-            const apiClient = await getApi();
-            const serverNote = await apiClient.updateNote(id, updates);
-            
-            // Update with server response (has authoritative updated_at)
-            setNotes((prev) =>
-              prev.map((n) =>
-                n.id === id
-                  ? { ...n, updated_at: serverNote.updated_at }
-                  : n
-              )
-            );
-            
-            // Save the authoritative version to DB as well
-            await notesDB.saveNote(serverNote);
-            
-            // Update saved hash for this note to confirm content integrity
-            const hash = await calculateHash(serverNote.content);
-            setSavedHashes(prev => ({ ...prev, [id]: hash }));
-            
-            setRemoteStatus('synced');
-            // Local is implicitly saved if we just wrote the authoritative version
-            setLocalStatus('saved');
-          } catch (error) {
-            console.error("Failed to sync note to server:", error);
-            // Queue for later sync
-            await syncQueue.addChange("update", "note", id, updates);
-            setRemoteStatus('failed');
-            setLastError("サーバー同期に失敗しました");
-          } finally {
-            if (activeSavePromiseRef.current === thisPromise) {
-               activeSavePromiseRef.current = null;
-            }
+      const task = async () => {
+        setRemoteStatus('syncing');
+        setLastError(undefined);
+        try {
+          const apiClient = await getApi();
+          const serverNote = await apiClient.updateNote(id, updates);
+
+          // Update with server response (has authoritative updated_at)
+          setNotes((prev) =>
+            prev.map((n) =>
+              n.id === id
+                ? { ...n, updated_at: serverNote.updated_at }
+                : n
+            )
+          );
+
+          // Save the authoritative version to DB as well
+          await notesDB.saveNote(serverNote);
+
+          // Update saved hash for this note to confirm content integrity
+          const hash = await calculateHash(serverNote.content);
+          setSavedHashes(prev => ({ ...prev, [id]: hash }));
+
+          setRemoteStatus('synced');
+          // Local is implicitly saved if we just wrote the authoritative version
+          setLocalStatus('saved');
+        } catch (error) {
+          console.error("Failed to sync note to server:", error);
+          // Queue for later sync
+          await syncQueue.addChange("update", "note", id, updates);
+          setRemoteStatus('failed');
+          setLastError("サーバー同期に失敗しました");
+        } finally {
+          if (activeSavePromiseRef.current === thisPromise) {
+            activeSavePromiseRef.current = null;
           }
-       };
-       const thisPromise = task();
-       
-       activeSavePromiseRef.current = thisPromise;
-       await thisPromise;
+        }
+      };
+      const thisPromise = task();
+
+      activeSavePromiseRef.current = thisPromise;
+      await thisPromise;
     } else {
       // Offline: queue for later sync
       await syncQueue.addChange("update", "note", id, updates);
@@ -163,14 +163,14 @@ export function useNotes(
   // 5 seconds delay for server sync
   const { debounced: debouncedServerSync, flush: flushServerSync, cancel: cancelServerSync } = useDebounce(
     syncNoteToServer,
-    5000 
+    5000
   );
 
   const handleCreateNote = async () => {
     // Generate a temporary ID for offline-created notes
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date().toISOString();
-    
+
     const newNote: Note = {
       id: tempId,
       title: "",
@@ -202,17 +202,17 @@ export function useNotes(
           content: "",
           folder_id: selectedFolderId,
         });
-        
+
         // Update saved hash for the new note
         const hash = await calculateHash(serverNote.content);
         setSavedHashes(prev => ({ ...prev, [serverNote.id]: hash }));
-        
+
         // Replace temp note with server note
         setNotes((prev) =>
           prev.map((n) => (n.id === tempId ? serverNote : n))
         );
         setSelectedNoteId(serverNote.id);
-        
+
         // Update IndexedDB with server note
         await notesDB.deleteNote(tempId);
         await notesDB.saveNote(serverNote);
@@ -266,7 +266,6 @@ export function useNotes(
     // Mark as unsynced/pending until the debounce fires
     setRemoteStatus('unsynced');
     debouncedServerSync(id, updates);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setNotes, debouncedServerSync]);
 
   const handleDeleteNote = async (id: string) => {
@@ -279,7 +278,7 @@ export function useNotes(
       if (selectedNoteId === id) {
         setSelectedNoteId(null);
       }
-      
+
       // Clear hash on delete
       setSavedHashes(prev => {
         const next = { ...prev };
@@ -316,11 +315,11 @@ export function useNotes(
   const triggerServerSync = useCallback(async (_id: string) => {
     const flushPromise = flushServerSync();
     if (flushPromise) {
-        await flushPromise;
+      await flushPromise;
     }
     // Also wait for any active save promise (in case flush didn't trigger a new one but one was running)
     if (activeSavePromiseRef.current) {
-        await activeSavePromiseRef.current;
+      await activeSavePromiseRef.current;
     }
   }, [flushServerSync]);
 

@@ -56,6 +56,59 @@ notes/
 ### Prerequisites
 - Docker and VS Code with DevContainers extension
 - AWS account with dev/prd profiles configured
+- [mise](https://mise.jdx.dev/) and [direnv](https://direnv.net/) (recommended for local development)
+
+### Local Environment Setup (mise + direnv)
+
+This project uses **mise** for managing tool versions (Node.js, Python, Go) and **direnv** for automatically loading the environment. This ensures all developers use the same tool versions and environment variables.
+
+For detailed installation and concepts, refer to [this article](https://qiita.com/kter/items/8d3113ac3b83dc7abb8c).
+
+#### 1. Installation
+
+If you haven't installed them yet:
+
+```bash
+# Install mise
+curl https://mise.run | sh
+
+# Install direnv (example for macOS)
+brew install direnv
+```
+
+**シェルへのフック設定:**
+お使いのシェル（Bash or Zsh）の設定ファイルに以下を追記してください。
+
+**Bash (`~/.bashrc`)の場合:**
+```bash
+echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+```
+
+**Zsh (`~/.zshrc`)の場合:**
+```zsh
+echo 'eval "$(~/.local/bin/mise activate zsh)"' >> ~/.zshrc
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+```
+
+設定を反映させるために、ターミナルを再起動するか `source ~/.bashrc` (または `~/.zshrc`) を実行してください。
+
+#### 2. Project Setup
+
+Run the following commands in the project root:
+
+```bash
+# Trust the local mise configuration
+mise trust
+
+# Install required tool versions specified in mise.toml
+mise install
+
+# Allow direnv to load the .envrc and mise environment
+direnv allow
+```
+
+Once set up, the correct versions of `node`, `python`, and `go` will be automatically activated whenever you enter the project directory.
 
 ### Quick Start
 

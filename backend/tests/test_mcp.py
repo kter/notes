@@ -83,7 +83,7 @@ class TestGenerateMcpToken:
         # Plain token should be returned
         assert "token" in data
 
-    def test_generate_token_with_30_day_expiration(self, client: TestClient):
+    def test_generate_token_with_30_day_expiration(self, client: TestClient, session: Session):
         """Test token generation with 30 day expiration."""
         response = client.post(
             "/api/mcp/tokens",
@@ -98,8 +98,10 @@ class TestGenerateMcpToken:
 
         # Verify token expires approximately 30 days from now
         token = list(session.exec(select(MCPToken)).all())[0]
-        import datetime
-        days_until_expiration = (token.expires_at - dt_module.datetime.now(dt_module.UTC)).days
+        expires_at = token.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=dt_module.UTC)
+        days_until_expiration = (expires_at - dt_module.datetime.now(dt_module.UTC)).days
         assert 29 <= days_until_expiration <= 31  # Allow for test timing
 
     def test_generate_token_with_90_day_expiration(self, client: TestClient):

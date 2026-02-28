@@ -17,7 +17,6 @@ import type {
   UserSettingsUpdate,
   MCPTokenCreateRequest,
   MCPTokenResponse,
-  MCPTokenListItem,
   MCPTokensListResponse,
   MCPSettingsResponse,
 } from "@/types";

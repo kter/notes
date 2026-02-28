@@ -1,5 +1,5 @@
 """MCP Token model for persistent API keys."""
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
@@ -22,9 +22,7 @@ class MCPToken(SQLModel, table=True):
     
     # Metadata
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    expires_at: datetime | None = Field(
-        default_factory=lambda: datetime.now(UTC) + timedelta(days=365)
-    )
+    expires_at: datetime | None = Field(default=None)
     revoked_at: datetime | None = Field(default=None)
     last_used_at: datetime | None = Field(default=None)
 

@@ -155,3 +155,9 @@ E2E_TEST_USER_PASSWORD=YourTestPassword123!
 - Any direct deployment API calls or scripts
 
 **When asked to deploy, always respond with the appropriate make command and ask for confirmation before executing.**
+
+## Coding Rules
+
+- Internationalization (i18n): Implement i18n for all user-facing text to ensure multi-language support.
+- Testing Standards: Comprehensive unit and integration tests are required for all new features and bug fixes.
+- Command Shortcuts: Define relevant command shortcuts in the root Makefile to streamline the development workflow.

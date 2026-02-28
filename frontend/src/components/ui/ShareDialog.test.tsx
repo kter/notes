@@ -3,21 +3,23 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ShareDialog } from "./ShareDialog";
 
 // Mock useTranslation
+const mockT = vi.fn((key: string) => {
+  const translations: Record<string, string> = {
+    "share.title": "Share Note",
+    "share.description": "Anyone with the link can view this note",
+    "share.copied": "Link copied to clipboard!",
+    "share.viewOnlyNotice": "This link provides read-only access",
+    "share.revokeShare": "Revoke",
+    "share.noShare": "This note is not shared yet",
+    "share.createShare": "Create Share Link",
+    "share.revokeConfirm": "Are you sure you want to revoke this share link?",
+  };
+  return translations[key] || key;
+});
+
 vi.mock("@/hooks/useTranslation", () => ({
   useTranslation: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        "share.title": "Share Note",
-        "share.description": "Anyone with the link can view this note",
-        "share.copied": "Link copied to clipboard!",
-        "share.viewOnlyNotice": "This link provides read-only access",
-        "share.revokeShare": "Revoke",
-        "share.noShare": "This note is not shared yet",
-        "share.createShare": "Create Share Link",
-        "share.revokeConfirm": "Are you sure you want to revoke this share link?",
-      };
-      return translations[key] || key;
-    },
+    t: mockT,
   }),
 }));
 
@@ -25,7 +27,11 @@ vi.mock("@/hooks/useTranslation", () => ({
 const mockClipboard = {
   writeText: vi.fn().mockResolvedValue(undefined),
 };
-Object.assign(navigator, { clipboard: mockClipboard });
+Object.defineProperty(navigator, "clipboard", {
+  value: mockClipboard,
+  configurable: true,
+  writable: true,
+});
 
 // Mock window.confirm
 const mockConfirm = vi.fn();

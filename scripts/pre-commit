@@ -39,7 +39,7 @@ cd "$PROJECT_ROOT/backend"
 
 # Check if uv is available
 if command -v uv &> /dev/null; then
-    if uv run python -m pytest -q --tb=no; then
+    if uv run --extra dev pytest -q --tb=no; then
         echo "${GREEN}✓ Backend tests passed${NC}"
     else
         echo "${RED}✗ Backend tests failed${NC}"
@@ -54,7 +54,7 @@ echo ""
 echo "${YELLOW}[3/5] Running frontend lint...${NC}"
 cd "$PROJECT_ROOT/frontend"
 
-if npm run lint --silent 2>/dev/null; then
+if npm run lint; then
     echo "${GREEN}✓ Frontend lint passed${NC}"
 else
     echo "${RED}✗ Frontend lint failed${NC}"
@@ -64,12 +64,7 @@ fi
 # Frontend unit tests
 echo ""
 echo "${YELLOW}[4/5] Running frontend unit tests...${NC}"
-# Use run to exclude watch mode if needed, though 'vitest run' is implicit in CI=true or just 'vitest run'. 
-# Standard 'npm run test' usually runs 'vitest' which is watch mode by default in dev.
-# We should ensure package.json script is 'vitest run' or pass argument here.
-# Let's check package.json "test": "vitest" -> this defaults to watch in dev.
-# Force single run with 'npm run test -- --run'
-if npm run test -- --run --silent 2>/dev/null; then
+if npm run test -- --run; then
     echo "${GREEN}✓ Frontend unit tests passed${NC}"
 else
     echo "${RED}✗ Frontend unit tests failed${NC}"
@@ -82,7 +77,7 @@ echo "${YELLOW}[5/5] Running backend lint (ruff)...${NC}"
 cd "$PROJECT_ROOT/backend"
 
 if command -v uv &> /dev/null; then
-    if uv run ruff check --quiet .; then
+    if uv run --extra dev ruff check --quiet .; then
         echo "${GREEN}✓ Backend lint passed${NC}"
     else
         echo "${RED}✗ Backend lint failed${NC}"

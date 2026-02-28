@@ -21,53 +21,57 @@ vi.mock("@/lib/api", () => ({
 }));
 
 // Mock useTranslation
+const mockT = vi.fn((key: string) => {
+  const translations: Record<string, string> = {
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.error": "Error",
+    "common.loading": "Loading...",
+    "common.copy": "Copy",
+    "settings.title": "Settings",
+    "settings.description": "Manage your settings",
+    "settings.aiModel": "AI Model",
+    "settings.aiModelDescription": "Select the AI model",
+    "settings.selectModel": "Select model",
+    "settings.language": "Language",
+    "settings.languageDescription": "Set language",
+    "settings.selectLanguage": "Select language",
+    "settings.loadError": "Failed to load settings",
+    "settings.saveError": "Failed to save settings",
+    "settings.exportTitle": "Data Export",
+    "settings.exportDescription": "Export all notes",
+    "settings.exportButton": "Download ZIP",
+    "settings.supportTitle": "Support Developer",
+    "settings.supportDescription": "Support on Ko-fi",
+    "settings.mcpSection": "MCP API Keys",
+    "settings.mcpDescription": "Manage API keys",
+    "settings.mcpNoTokens": "No API keys",
+    "settings.mcpCreateToken": "Create API Key",
+    "settings.mcpMaxTokensReached": "Maximum 2 active API keys allowed",
+    "settings.mcpTokenActive": "Active",
+    "settings.mcpTokenRevoked": "Revoked",
+    "settings.mcpTokenExpires": "Expires at",
+    "settings.mcpRevokeToken": "Revoke",
+    "settings.mcpDeleteToken": "Delete",
+    "settings.mcpDeleteConfirm": "Delete this API key? This action cannot be undone.",
+    "settings.createApiKey": "Create API Key",
+    "settings.createApiKeyDescription": "Create a new API key",
+    "settings.apiKeyNameRequired": "Purpose is required",
+    "settings.apiKeyName": "Purpose",
+    "settings.apiKeyNamePlaceholder": "e.g., VSCode, Inspector",
+    "settings.apiKey": "API Key",
+    "settings.apiKeyCreated": "API key created",
+    "settings.apiKeyWarning": "This API key will only be shown once.",
+    "tokenUsage.title": "Token Usage",
+  };
+  return translations[key] || key;
+});
+
 vi.mock("@/hooks/useTranslation", () => ({
   useTranslation: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        "common.save": "Save",
-        "common.cancel": "Cancel",
-        "common.error": "Error",
-        "common.loading": "Loading...",
-        "common.copy": "Copy",
-        "settings.title": "Settings",
-        "settings.description": "Manage your settings",
-        "settings.aiModel": "AI Model",
-        "settings.aiModelDescription": "Select the AI model",
-        "settings.selectModel": "Select model",
-        "settings.language": "Language",
-        "settings.languageDescription": "Set language",
-        "settings.selectLanguage": "Select language",
-        "settings.loadError": "Failed to load settings",
-        "settings.saveError": "Failed to save settings",
-        "settings.exportTitle": "Data Export",
-        "settings.exportDescription": "Export all notes",
-        "settings.exportButton": "Download ZIP",
-        "settings.supportTitle": "Support Developer",
-        "settings.supportDescription": "Support on Ko-fi",
-        "settings.mcpSection": "MCP API Keys",
-        "settings.mcpDescription": "Manage API keys",
-        "settings.mcpNoTokens": "No API keys",
-        "settings.mcpCreateToken": "Create API Key",
-        "settings.mcpMaxTokensReached": "Maximum 2 active API keys allowed",
-        "settings.mcpTokenActive": "Active",
-        "settings.mcpTokenRevoked": "Revoked",
-        "settings.mcpTokenExpires": "Expires at",
-        "settings.mcpRevokeToken": "Revoke",
-        "settings.mcpDeleteToken": "Delete",
-        "settings.mcpDeleteConfirm": "Delete this API key? This action cannot be undone.",
-        "settings.createApiKey": "Create API Key",
-        "settings.createApiKeyDescription": "Create a new API key",
-        "settings.apiKeyNameRequired": "Purpose is required",
-        "settings.apiKeyName": "Purpose",
-        "settings.apiKeyNamePlaceholder": "e.g., VSCode, Inspector",
-        "settings.apiKey": "API Key",
-        "settings.apiKeyCreated": "API key created",
-        "settings.apiKeyWarning": "This API key will only be shown once.",
-        "tokenUsage.title": "Token Usage",
-      };
-      return translations[key] || key;
-    },
+    t: mockT,
+    language: "en",
+    setLanguage: vi.fn(),
   }),
 }));
 
@@ -75,7 +79,11 @@ vi.mock("@/hooks/useTranslation", () => ({
 const mockClipboard = {
   writeText: vi.fn().mockResolvedValue(undefined),
 };
-Object.assign(navigator, { clipboard: mockClipboard });
+Object.defineProperty(navigator, "clipboard", {
+  value: mockClipboard,
+  configurable: true,
+  writable: true,
+});
 
 // Mock window.confirm
 const mockConfirm = vi.fn();
@@ -106,6 +114,11 @@ describe("SettingsDialog", () => {
     listMcpTokens: vi.fn(),
     createMcpToken: vi.fn(),
     revokeMcpToken: vi.fn(),
+    getMcpSettings: vi.fn().mockResolvedValue({
+      server_url: "https://example.com/api/mcp",
+      token_expires_in: 3600,
+      token_expiration_options: [30, 60, 90, 365],
+    }),
     deleteMcpToken: vi.fn(),
   };
 
@@ -115,6 +128,7 @@ describe("SettingsDialog", () => {
     tokenUsage: {
       tokens_used: 1000,
       token_limit: 10000,
+      period_start: new Date().toISOString(),
       period_end: new Date(Date.now() + 86400000).toISOString(),
     },
   };
@@ -124,7 +138,7 @@ describe("SettingsDialog", () => {
     mockConfirm.mockReturnValue(true);
     // Update the mock to return mockApi when createApiClient is called
     const { createApiClient } = await import("@/lib/api");
-    vi.mocked(createApiClient).mockReturnValue(mockApi as unknown);
+    vi.mocked(createApiClient).mockReturnValue(mockApi as unknown as ReturnType<typeof createApiClient>);
   });
 
   const renderWithAuth = (ui: React.ReactNode) => {
@@ -233,9 +247,7 @@ describe("SettingsDialog", () => {
       renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
-        const deleteButton = screen.getAllByText("Delete").find(
-          btn => btn.textContent === "Delete"
-        );
+        const deleteButton = screen.getByTestId("mcp-token-delete-token-1");
         fireEvent.click(deleteButton);
       });
 
@@ -261,9 +273,7 @@ describe("SettingsDialog", () => {
       renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
-        const deleteButton = screen.getAllByText("Delete").find(
-          btn => btn.textContent === "Delete"
-        );
+        const deleteButton = screen.getByTestId("mcp-token-delete-token-1");
         fireEvent.click(deleteButton);
       });
 
@@ -289,9 +299,7 @@ describe("SettingsDialog", () => {
       renderWithAuth(<SettingsDialog {...defaultProps} />);
 
       await waitFor(() => {
-        const deleteButton = screen.getAllByText("Delete").find(
-          btn => btn.textContent === "Delete"
-        );
+        const deleteButton = screen.getByTestId("mcp-token-delete-token-1");
         fireEvent.click(deleteButton);
       });
 

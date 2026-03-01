@@ -2,7 +2,7 @@
 name = "notes-mcp-auth-manager"
 version = "0.1.0"
 description = "MCP Auth Manager Lambda for Notes App"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",

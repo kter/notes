@@ -237,7 +237,7 @@ test: test-backend test-frontend test-lint ## Run all tests
 
 .PHONY: test-backend
 test-backend: ## Run backend tests
-	cd backend && uv run python -m pytest -v
+	cd backend && uv run --extra dev python -m pytest -v
 
 .PHONY: test-frontend
 test-frontend: ## Run frontend unit tests
@@ -246,7 +246,7 @@ test-frontend: ## Run frontend unit tests
 .PHONY: test-integration
 test-integration: tf-switch ## Run integration tests against the deployed environment
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
-	cd backend && API_URL=$(API_URL) uv run pytest tests/integration -v
+	cd backend && API_URL=$(API_URL) uv run --extra dev pytest tests/integration -v
 
 .PHONY: test-lint
 test-lint: lint-backend lint-frontend ## Run all linters

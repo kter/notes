@@ -47,12 +47,14 @@ ecr-login: ## Login to ECR
 
 .PHONY: build-backend
 build-backend: ## Build backend Docker image
-	cd backend && docker buildx build --output type=docker -t $(ECR_REPO):latest .
+	cd backend && docker buildx build --provenance=false --load -t $(ECR_REPO):latest .
 
 .PHONY: push-backend
 push-backend: ecr-login build-backend ## Build and push backend Docker image to ECR
 	docker push $(ECR_REPO):latest
 	@echo "Image pushed: $(ECR_REPO):latest"
+	$(eval DIGEST := $(shell docker inspect --format='{{.Id}}' $(ECR_REPO):latest | awk -F ':' '{print $$2}'))
+	@echo "Backend digest: $(DIGEST)"
 
 .PHONY: get-image-digest
 get-image-digest: ## Get the latest image digest from ECR
@@ -115,7 +117,7 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 # =============================================================================
 
 .PHONY: deploy
-deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-mcp _deploy-test ## Deploy both backend, frontend, and MCP, then run tests (optimized)
+deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-test ## Deploy both backend, frontend, and MCP, then run tests (optimized)
 	@echo "Full deployment and verification complete!"
 
 # =============================================================================
@@ -127,10 +129,11 @@ _deploy-setup: ## One-time setup (terraform init + workspace switch)
 	@$(MAKE) tf-switch
 
 .PHONY: _deploy-backend
-_deploy-backend: _deploy-setup push-backend ## Build, push, and deploy backend via Terraform (optimized)
+_deploy-backend: _deploy-setup push-backend push-mcp-server ## Build, push, and deploy all Lambda functions via Terraform (optimized)
 	$(eval DIGEST := $(shell $(MAKE) get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$(DIGEST)" -auto-approve
-	@echo "Backend deployed!"
+	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$(DIGEST)" -var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" -auto-approve
+	@echo "Backend and MCP server deployed!"
 
 .PHONY: _deploy-frontend
 _deploy-frontend: _deploy-setup ## Build and deploy frontend to S3 (optimized)
@@ -148,11 +151,7 @@ _deploy-frontend: _deploy-setup ## Build and deploy frontend to S3 (optimized)
 	@echo "Frontend deployed to $(BUCKET)"
 	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
 
-.PHONY: _deploy-mcp
-_deploy-mcp: _deploy-setup push-mcp-server ## Deploy MCP infrastructure (optimized)
-	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" -auto-approve
-	@echo "MCP infrastructure deployed!"
+# _deploy-mcp is now merged into _deploy-backend above
 
 .PHONY: _deploy-test
 _deploy-test:
@@ -288,12 +287,14 @@ install-hooks: ## Install git pre-commit hooks
 
 .PHONY: build-mcp-server
 build-mcp-server: ## Build MCP server Docker image
-	cd lambda/mcp_server && docker buildx build --output type=docker -t $(MCP_SERVER_REPO):latest .
+	cd lambda/mcp_server && docker buildx build --provenance=false --load -t $(MCP_SERVER_REPO):latest .
 
 .PHONY: push-mcp-server
 push-mcp-server: ecr-login build-mcp-server ## Build and push MCP server Docker image to ECR
 	docker push $(MCP_SERVER_REPO):latest
 	@echo "MCP Server image pushed: $(MCP_SERVER_REPO):latest"
+	$(eval MCP_SERVER_DIGEST := $(shell docker inspect --format='{{.Id}}' $(MCP_SERVER_REPO):latest | awk -F ':' '{print $$2}'))
+	@echo "MCP Server digest: $(MCP_SERVER_DIGEST)"
 
 .PHONY: get-mcp-server-digest
 get-mcp-server-digest: ## Get the latest MCP server image digest from ECR

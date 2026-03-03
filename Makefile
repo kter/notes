@@ -47,7 +47,7 @@ ecr-login: ## Login to ECR
 
 .PHONY: build-backend
 build-backend: ## Build backend Docker image
-	cd backend && docker build --platform linux/amd64 -t $(ECR_REPO):latest .
+	cd backend && docker buildx build --output type=docker -t $(ECR_REPO):latest .
 
 .PHONY: push-backend
 push-backend: ecr-login build-backend ## Build and push backend Docker image to ECR
@@ -115,14 +115,52 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 # =============================================================================
 
 .PHONY: deploy
-deploy: deploy-backend deploy-frontend deploy-mcp ## Deploy both backend, frontend, and MCP, then run tests
+deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-mcp _deploy-test ## Deploy both backend, frontend, and MCP, then run tests (optimized)
+	@echo "Full deployment and verification complete!"
+
+# =============================================================================
+# Optimized Full Deployment Targets
+# =============================================================================
+
+.PHONY: _deploy-setup
+_deploy-setup: ## One-time setup (terraform init + workspace switch)
+	@$(MAKE) tf-switch
+
+.PHONY: _deploy-backend
+_deploy-backend: _deploy-setup push-backend ## Build, push, and deploy backend via Terraform (optimized)
+	$(eval DIGEST := $(shell $(MAKE) get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$(DIGEST)" -auto-approve
+	@echo "Backend deployed!"
+
+.PHONY: _deploy-frontend
+_deploy-frontend: _deploy-setup ## Build and deploy frontend to S3 (optimized)
+	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
+	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
+	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
+	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
+	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	@echo "Building frontend..."
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
+	@echo "Syncing frontend files to S3..."
+	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
+	@echo "Creating CloudFront cache invalidation..."
+	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
+	@echo "Frontend deployed to $(BUCKET)"
+	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
+
+.PHONY: _deploy-mcp
+_deploy-mcp: _deploy-setup push-mcp-server ## Deploy MCP infrastructure (optimized)
+	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" -auto-approve
+	@echo "MCP infrastructure deployed!"
+
+.PHONY: _deploy-test
+_deploy-test:
 ifeq ($(ENV),prd)
 	@echo "Skipping integration tests in prd (backdoor auth not available)"
 else
 	$(MAKE) test-integration
 endif
-#	$(MAKE) test-e2e
-	@echo "Full deployment and verification complete!"
 
 # =============================================================================
 # Terraform
@@ -152,6 +190,14 @@ tf-apply: tf-switch ## Run Terraform apply
 .PHONY: tf-output
 tf-output: tf-switch ## Show Terraform outputs
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output
+
+.PHONY: tf-fmt
+tf-fmt: ## Format Terraform configuration
+	cd terraform && terraform fmt -recursive
+
+.PHONY: tf-validate
+tf-validate: ## Validate Terraform configuration
+	cd terraform && terraform validate
 
 # =============================================================================
 # Utilities
@@ -240,17 +286,12 @@ install-hooks: ## Install git pre-commit hooks
 # MCP Server Deployment
 # =============================================================================
 
-.PHONY: mcp-login
-mcp-login: ## Login to ECR for MCP images
-	aws ecr get-login-password --region $(AWS_REGION) --profile $(AWS_PROFILE) | \
-		docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-
 .PHONY: build-mcp-server
 build-mcp-server: ## Build MCP server Docker image
-	cd lambda/mcp_server && docker build --platform linux/amd64 -t $(MCP_SERVER_REPO):latest .
+	cd lambda/mcp_server && docker buildx build --output type=docker -t $(MCP_SERVER_REPO):latest .
 
 .PHONY: push-mcp-server
-push-mcp-server: mcp-login build-mcp-server ## Build and push MCP server Docker image to ECR
+push-mcp-server: ecr-login build-mcp-server ## Build and push MCP server Docker image to ECR
 	docker push $(MCP_SERVER_REPO):latest
 	@echo "MCP Server image pushed: $(MCP_SERVER_REPO):latest"
 

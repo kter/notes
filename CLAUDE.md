@@ -60,6 +60,8 @@ make deploy ENV=prd
 make tf-init ENV=dev
 make tf-plan ENV=dev
 make tf-apply ENV=dev
+make tf-fmt     # Format Terraform files
+make tf-validate # Validate Terraform configuration
 
 # View Lambda logs
 make logs ENV=dev
@@ -128,8 +130,24 @@ E2E_TEST_USER_EMAIL=your-test-user@example.com
 E2E_TEST_USER_PASSWORD=YourTestPassword123!
 ```
 
+## Runtime Management
+
+This project uses **mise** for runtime version management. All tool versions (Python, Node.js, etc.) are defined in the project root `mise.toml` file.
+
+### mise Setup
+```bash
+# Install mise (if not already installed)
+curl https://mise.run | sh
+
+# Activate mise in your shell
+eval "$(mise activate bash)"  # or zsh/fish
+```
+
+The required runtimes will be automatically installed when you enter the project directory.
+
 ## Important Patterns
 
+- **mise runtime management**: Tool versions are managed via mise.toml at the project root
 - **Terraform workspace switching**: The `tf-switch` Make target handles both backend config re-initialization and workspace selection
 - **Container platform**: Backend Docker images must be built with `--platform linux/amd64` for Lambda compatibility
 - **AI caching**: Responses are cached in S3 by hash to reduce Bedrock costs

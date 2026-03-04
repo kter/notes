@@ -24,11 +24,8 @@ certifi==2026.2.25
     # via
     #   httpcore
     #   httpx
-    #   requests
 cffi==2.0.0
     # via cryptography
-charset-normalizer==3.4.4
-    # via requests
 click==8.3.1
     # via uvicorn
 cryptography==46.0.5
@@ -55,7 +52,6 @@ idna==3.11
     # via
     #   anyio
     #   httpx
-    #   requests
 jmespath==1.1.0
     # via
     #   boto3
@@ -78,7 +74,6 @@ pycparser==3.0
     # via cffi
 pydantic==2.12.5
     # via
-    #   notes-mcp-server (pyproject.toml)
     #   fastapi
     #   mcp
     #   pydantic-settings
@@ -103,8 +98,6 @@ referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.32.5
-    # via notes-mcp-server (pyproject.toml)
 rpds-py==0.30.0
     # via
     #   jsonschema
@@ -147,9 +140,7 @@ typing-inspection==0.4.2
     #   pydantic
     #   pydantic-settings
 urllib3==2.6.3
-    # via
-    #   botocore
-    #   requests
+    # via botocore
 uvicorn==0.41.0
     # via
     #   notes-mcp-server (pyproject.toml)

@@ -4,6 +4,9 @@
 # Configuration
 ENV ?= dev
 
+# Disable AWS CLI pager to prevent interactive pager from launching
+export AWS_PAGER=
+
 # Use ENV as the default profile, but allow override from command line
 # Using '=' instead of '?=' to override environment variables like 'export AWS_PROFILE=dev'
 AWS_PROFILE = $(ENV)

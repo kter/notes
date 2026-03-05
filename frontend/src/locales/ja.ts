@@ -67,6 +67,7 @@ export const ja = {
     mcpServerConfig: "MCPサーバーの設定",
     mcpServerUrl: "MCPサーバーURL",
     mcpServerDescription: "Claude DesktopなどのMCPクライアントから接続するためのサーバーURLです。",
+    mcpConnectionDescription: "Claude DesktopなどのMCPクライアントの接続に必要なサーバーURLとAPIキーを管理します。ユーザーあたり最大2つのアクティブなAPIキーを使用できます。",
     mcpCopyUrl: "URLをコピー",
   },
 

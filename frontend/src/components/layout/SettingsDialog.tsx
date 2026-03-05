@@ -494,18 +494,37 @@ export function SettingsDialog({
                   </Button>
                 </div>
 
-                {/* MCP API Keys Management Section */}
+                {/* MCP Server Connection Settings */}
                 <div className="border-t pt-6 space-y-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <KeyIcon className="h-4 w-4" />
                       <h4 className="text-sm font-medium leading-none">
-                        {t("settings.mcpSection")}
+                        {t("settings.mcpServerConfig")}
                       </h4>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {t("settings.mcpDescription")}
+                      {t("settings.mcpConnectionDescription")}
                     </p>
+                  </div>
+                  {/* Server URL */}
+                  <div className="space-y-2">
+                    <Label htmlFor="mcp-server-url">{t("settings.mcpServerUrl")}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="mcp-server-url"
+                        value={mcpSettings?.server_url || ""}
+                        readOnly
+                        className="font-mono text-xs"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigator.clipboard.writeText(mcpSettings?.server_url || "")}
+                      >
+                        {t("common.copy")}
+                      </Button>
+                    </div>
                   </div>
                   {/* API Keys List */}
                   {isApiKeysLoading ? (
@@ -622,39 +641,6 @@ export function SettingsDialog({
                       ? t("settings.mcpCreateToken")
                       : t("settings.mcpMaxTokensReached")}
                   </Button>
-                </div>
-
-                {/* MCP Server Configuration */}
-                <div className="border-t pt-6 space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <KeyIcon className="h-4 w-4" />
-                      <h4 className="text-sm font-medium leading-none">
-                        {t("settings.mcpServerConfig")}
-                      </h4>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings.mcpServerDescription")}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="mcp-server-url">{t("settings.mcpServerUrl")}</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="mcp-server-url"
-                        value={mcpSettings?.server_url || ""}
-                        readOnly
-                        className="font-mono text-xs"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigator.clipboard.writeText(mcpSettings?.server_url || "")}
-                      >
-                        {t("common.copy")}
-                      </Button>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Ko-fi Support Button */}

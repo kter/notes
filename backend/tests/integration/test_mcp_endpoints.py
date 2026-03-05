@@ -212,3 +212,48 @@ class TestGetMcpSettings:
         assert data["server_url"].startswith("https://")
         assert "token_expires_in" in data
         assert data["token_expires_in"] == 3600
+
+
+class TestRestoreMcpToken:
+    """Integration tests for POST /api/mcp/tokens/{id}/restore"""
+
+    def test_restore_token(self, client):
+        """Test restoring a revoked token."""
+        # Create a token
+        create_response = client.post(
+            "/api/mcp/tokens", json={"name": "Restore Test"}
+        )
+        token_id = create_response.json()["id"]
+
+        # Revoke the token
+        revoke_response = client.post(f"/api/mcp/tokens/{token_id}/revoke")
+        assert revoke_response.status_code == 200
+
+        # Verify token is revoked
+        list_response = client.get("/api/mcp/tokens")
+        tokens = list_response.json()["tokens"]
+        token = next((t for t in tokens if t["id"] == token_id), None)
+        assert token is not None
+        assert token["is_active"] is False
+
+        # Restore the token
+        restore_response = client.post(f"/api/mcp/tokens/{token_id}/restore")
+
+        assert restore_response.status_code == 200
+        assert "restored successfully" in restore_response.json()["message"]
+
+        # Verify token is active again and revoked_at is None
+        list_response = client.get("/api/mcp/tokens")
+        tokens = list_response.json()["tokens"]
+        token = next((t for t in tokens if t["id"] == token_id), None)
+        assert token is not None
+        assert token["is_active"] is True
+        assert token["revoked_at"] is None
+
+    def test_restore_nonexistent(self, client):
+        """Test restoring a non-existent token."""
+        response = client.post(
+            "/api/mcp/tokens/00000000-0000-0000-0000-000000000000/restore"
+        )
+
+        assert response.status_code == 404

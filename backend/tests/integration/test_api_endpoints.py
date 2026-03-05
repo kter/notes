@@ -1,4 +1,6 @@
 import datetime
+import io
+import zipfile
 
 import pytest
 
@@ -7,6 +9,15 @@ TEST_PREFIX = "[IntegrationTest]"
 
 def generate_title(base):
     return f"{TEST_PREFIX} {base} {datetime.datetime.now().isoformat()}"
+
+
+class TestHealthCheck:
+    def test_health_check(self, client):
+        response = client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+
 
 class TestFoldersIntegration:
     @pytest.fixture
@@ -151,11 +162,85 @@ class TestSettingsIntegration:
         assert response.status_code == 200
         
     def test_update_settings(self, client):
-        # Assuming there is a settings endpoint
-        # The router is `routers/settings.py`
-        
-        # Get current
+        # Get current settings
         resp = client.get("/api/settings")
         assert resp.status_code == 200
-        # Check model. 
-        # Update something if possible.
+        data = resp.json()
+        original_model_id = data["settings"]["llm_model_id"]
+        original_language = data["settings"]["language"]
+
+        # Pick a valid model_id different from the current one if possible
+        available_models = data["available_models"]
+        assert len(available_models) > 0
+        new_model_id = next(
+            (m["id"] for m in available_models if m["id"] != original_model_id),
+            available_models[0]["id"],
+        )
+        new_language = "en" if original_language != "en" else "ja"
+
+        # Update settings
+        update_resp = client.put(
+            "/api/settings",
+            json={"llm_model_id": new_model_id, "language": new_language},
+        )
+        assert update_resp.status_code == 200
+        updated = update_resp.json()
+        assert updated["settings"]["llm_model_id"] == new_model_id
+        assert updated["settings"]["language"] == new_language
+
+        # Restore original settings
+        restore_resp = client.put(
+            "/api/settings",
+            json={"llm_model_id": original_model_id, "language": original_language},
+        )
+        assert restore_resp.status_code == 200
+        restored = restore_resp.json()
+        assert restored["settings"]["llm_model_id"] == original_model_id
+        assert restored["settings"]["language"] == original_language
+
+
+class TestNotesExport:
+    def test_export_all_notes(self, client):
+        # Create a folder
+        folder_title = generate_title("Export Folder")
+        folder_resp = client.post("/api/folders", json={"name": folder_title})
+        assert folder_resp.status_code == 201
+        folder_id = folder_resp.json()["id"]
+
+        # Create a note inside the folder
+        note1_title = generate_title("Export Note In Folder")
+        note1_resp = client.post(
+            "/api/notes",
+            json={"title": note1_title, "content": "Content in folder", "folder_id": folder_id},
+        )
+        assert note1_resp.status_code == 201
+        note1_id = note1_resp.json()["id"]
+
+        # Create a note without a folder
+        note2_title = generate_title("Export Note No Folder")
+        note2_resp = client.post(
+            "/api/notes",
+            json={"title": note2_title, "content": "Content no folder"},
+        )
+        assert note2_resp.status_code == 201
+        note2_id = note2_resp.json()["id"]
+
+        try:
+            # Call the export endpoint
+            response = client.get("/api/notes/export/all")
+            assert response.status_code == 200
+
+            # Verify Content-Type contains zip
+            content_type = response.headers.get("content-type", "")
+            assert "zip" in content_type
+
+            # Verify response body is non-empty bytes and a valid ZIP
+            assert len(response.content) > 0
+            zip_buffer = io.BytesIO(response.content)
+            assert zipfile.is_zipfile(zip_buffer)
+
+        finally:
+            # Cleanup notes and folder
+            client.delete(f"/api/notes/{note1_id}")
+            client.delete(f"/api/notes/{note2_id}")
+            client.delete(f"/api/folders/{folder_id}")

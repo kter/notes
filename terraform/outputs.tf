@@ -55,8 +55,8 @@ output "backend_role_arn" {
 
 # MCP Server API Gateway outputs
 output "mcp_server_api_url" {
-  description = "HTTP API Gateway URL for MCP Server"
-  value       = aws_apigatewayv2_api.mcp_server.api_endpoint
+  description = "MCP Server URL (custom domain)"
+  value       = "https://${local.current_env.mcp_domain_name}"
 }
 
 # Environment info

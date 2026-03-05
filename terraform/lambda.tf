@@ -20,6 +20,7 @@ resource "aws_lambda_function" "api" {
       CORS_ORIGINS           = jsonencode(["https://${local.current_env.domain_name}"])
       ENVIRONMENT            = terraform.workspace
       CACHE_BUCKET_NAME      = aws_s3_bucket.cache.bucket
+      MCP_SERVER_URL         = "https://${local.current_env.mcp_domain_name}"
     }
   }
 

@@ -125,8 +125,7 @@ deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-test ## Deploy bo
 # =============================================================================
 
 .PHONY: _deploy-setup
-_deploy-setup: ## One-time setup (terraform init + workspace switch)
-	@$(MAKE) tf-switch
+_deploy-setup: tf-switch ## One-time setup (terraform init + workspace switch)
 
 .PHONY: _deploy-backend
 _deploy-backend: _deploy-setup push-backend push-mcp-server ## Build, push, and deploy all Lambda functions via Terraform (optimized)
@@ -154,26 +153,39 @@ _deploy-frontend: _deploy-setup ## Build and deploy frontend to S3 (optimized)
 # _deploy-mcp is now merged into _deploy-backend above
 
 .PHONY: _deploy-test
-_deploy-test:
+_deploy-test: ## Run post-deployment integration tests (dev only, uses already-initialized Terraform state)
 ifeq ($(ENV),prd)
 	@echo "Skipping integration tests in prd (backdoor auth not available)"
 else
-	$(MAKE) test-integration
+	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
+	cd backend && API_URL=$(API_URL) uv run --extra dev python -m pytest tests/integration -v
 endif
 
 # =============================================================================
 # Terraform
 # =============================================================================
 
-# Internal target to ensure terraform is initialized and workspace is selected for the correct environment
+# Sentinel file tracking the last initialized Terraform environment (stored inside .terraform/ which is gitignored)
+TF_SENTINEL := terraform/.terraform/.initialized_env
+
+# Internal target to ensure terraform is initialized and workspace is selected for the correct environment.
+# Skips `terraform init -reconfigure` if already initialized for the target ENV to speed up repeated calls.
 .PHONY: tf-switch
-tf-switch: ## Re-initialize backend and switch workspace based on ENV (dev/prd)
-	@echo "Switching to $(ENV) environment..."
-	cd terraform && \
-	export AWS_PROFILE=$(AWS_PROFILE) && \
-	rm -f .terraform/environment && \
-	terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
-	(terraform workspace select $(ENV) || terraform workspace new $(ENV))
+tf-switch: ## Initialize backend and switch workspace based on ENV (dev/prd); skips re-init if already done
+	@CURRENT=$$(cat $(TF_SENTINEL) 2>/dev/null || echo ""); \
+	if [ "$$CURRENT" != "$(ENV)" ]; then \
+		echo "Switching to $(ENV) environment (re-initializing Terraform backend)..."; \
+		cd terraform && \
+		export AWS_PROFILE=$(AWS_PROFILE) && \
+		rm -f .terraform/environment && \
+		terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
+		(terraform workspace select $(ENV) || terraform workspace new $(ENV)) && \
+		echo "$(ENV)" > .terraform/.initialized_env; \
+	else \
+		echo "Already initialized for $(ENV) environment, selecting workspace..."; \
+		cd terraform && export AWS_PROFILE=$(AWS_PROFILE) && \
+		(terraform workspace select $(ENV) || terraform workspace new $(ENV)); \
+	fi
 
 .PHONY: tf-init
 tf-init: tf-switch ## Initialize Terraform for the current environment
@@ -226,6 +238,7 @@ test-cost-report: tf-switch ## Manually invoke cost report Lambda
 .PHONY: clean
 clean: ## Clean build artifacts
 	rm -rf frontend/out frontend/.next
+	rm -f $(TF_SENTINEL)
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # =============================================================================

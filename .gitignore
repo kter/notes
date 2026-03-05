@@ -57,5 +57,8 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/playwright/.auth/
 
+# Playwright CLI
+.playwright-cli/
+
 terraform/cost_report.zip
 *.zip

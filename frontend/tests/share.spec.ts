@@ -1,10 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Note Sharing', () => {
-  // Authentication is handled by auth.setup.ts
-
-  // TODO: Fix this test - flaky on chromium and Mobile Chrome due to shared page navigation issues
-  test.skip('should create a share link and access the shared note', async ({ page, isMobile, browserName }) => {
+test.describe('Sharing Functionality', () => {
+  test('should perform full share cycle', async ({ page, context, isMobile }) => {
     // Temporarily skipped - share feature works but E2E test is unstable
     test.setTimeout(90000);
 
@@ -15,12 +12,12 @@ test.describe('Note Sharing', () => {
     // Create a folder first
     const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
     await sidebar.getByTestId('sidebar-add-folder-button').click();
-    const folderName = `Share Test Folder ${Date.now()}`;
+    const folderName = `Share Test Folder ${Date.now()} `;
     await sidebar.getByTestId('sidebar-new-folder-input').fill(folderName);
     await page.keyboard.press('Enter');
 
     // Select the folder
-    console.log(`[Share E2E] Created folder: ${folderName}`);
+    console.log(`[Share E2E] Created folder: ${folderName} `);
     const folderButton = page.getByRole('button', { name: folderName });
     await expect(folderButton).toBeVisible({ timeout: 15000 });
     await folderButton.click();
@@ -45,7 +42,7 @@ test.describe('Note Sharing', () => {
     const titleInput = layout.getByLabel(/title/i);
     const contentTextarea = layout.getByRole('textbox', { name: /content/i });
 
-    const noteTitle = `Shared Note ${Date.now()}`;
+    const noteTitle = `Shared Note ${Date.now()} `;
     const noteContent = '# Hello World\n\nThis is a shared note for E2E testing.\n\n- Item 1\n- Item 2';
 
     await titleInput.fill(noteTitle);
@@ -92,7 +89,7 @@ test.describe('Note Sharing', () => {
 
     // Get the share URL
     const shareUrl = await urlInput.inputValue();
-    console.log(`[Share E2E] Share URL: ${shareUrl}`);
+    console.log(`[Share E2E] Share URL: ${shareUrl} `);
     expect(shareUrl).toContain('/shared?token=');
 
     // Copy button should work
@@ -104,7 +101,6 @@ test.describe('Note Sharing', () => {
 
     // Open a new page to test the shared link (simulating unauthenticated access)
     console.log('[Share E2E] Testing shared link access');
-    const context = page.context();
     const sharedPage = await context.newPage();
 
     // Clear auth state for the new page to simulate unauthenticated user

@@ -1,4 +1,5 @@
 // Japanese translations
+
 export const ja = {
   // Common
   common: {
@@ -11,6 +12,11 @@ export const ja = {
     error: "エラー",
     success: "成功",
     saved: "保存しました",
+    copy: "コピー",
+    copied: "コピーしました",
+    done: "完了",
+    days: "日",
+    year: "年",
   },
 
   // Settings
@@ -30,6 +36,38 @@ export const ja = {
     exportButton: "ZIPをダウンロード",
     supportTitle: "開発者をサポート",
     supportDescription: "このアプリが気に入ったら、Ko-fiでサポートをご検討ください。",
+    mcpSection: "MCP APIキー",
+    mcpDescription: "Claude Desktopや他のMCPクライアントからノートにアクセスするためのAPIキーを管理します。ユーザーあたり最大2つのアクティブなAPIキーを使用できます。",
+    mcpNoTokens: "APIキーがありません",
+    mcpCreateToken: "APIキーを作成",
+    mcpMaxTokensReached: "アクティブなAPIキーは最大2つまでです",
+    mcpTokenActive: "有効",
+    mcpTokenRevoked: "取り消し済み",
+    mcpTokenExpires: "有効期限",
+    mcpRevokeToken: "取り消し",
+    mcpDeleteToken: "削除",
+    createApiKey: "APIキーを作成",
+    createApiKeyDescription: "MCPアクセス用の新しいAPIキーを作成します。用途を指定してください。",
+    apiKeyNameRequired: "用途は必須です",
+    apiKeyName: "用途",
+    apiKeyNamePlaceholder: "例: VSCode, Inspector",
+    apiKey: "APIキー",
+    apiKeyCreated: "APIキーを作成しました",
+    apiKeyWarning: "このAPIキーは一度しか表示されません。安全に保存してください。",
+    mcpDeleteConfirm: "このAPIキーを削除しますか？削除されたAPIキーは復元できません。",
+    mcpTokenLastUsed: "最終利用",
+    mcpTokenNeverUsed: "未使用",
+    mcpRestoreKey: "有効化",
+    mcpRestoreConfirm: "このAPIキーを有効化しますか？",
+    mcpRestored: "有効化済み",
+    mcpTokenExpiration: "有効期限",
+    mcpSelectExpiration: "有効期限を選択",
+    mcpNoExpiration: "無期限",
+    mcpExpirationNote: "期限なしのキーはユーザーあたり1つまで作成できます。",
+    mcpServerConfig: "MCPサーバーの設定",
+    mcpServerUrl: "MCPサーバーURL",
+    mcpServerDescription: "Claude DesktopなどのMCPクライアントから接続するためのサーバーURLです。",
+    mcpCopyUrl: "URLをコピー",
   },
 
   // Sidebar
@@ -198,6 +236,11 @@ export type TranslationKeys = {
     error: string;
     success: string;
     saved: string;
+    copy: string;
+    copied: string;
+    done: string;
+    days: string;
+    year: string;
   };
   settings: {
     title: string;
@@ -215,6 +258,38 @@ export type TranslationKeys = {
     exportButton: string;
     supportTitle: string;
     supportDescription: string;
+    mcpSection: string;
+    mcpDescription: string;
+    mcpNoTokens: string;
+    mcpCreateToken: string;
+    mcpMaxTokensReached: string;
+    mcpTokenActive: string;
+    mcpTokenRevoked: string;
+    mcpTokenExpires: string;
+    mcpRevokeToken: string;
+    mcpDeleteToken: string;
+    createApiKey: string;
+    createApiKeyDescription: string;
+    apiKeyNameRequired: string;
+    apiKeyName: string;
+    apiKeyNamePlaceholder: string;
+    apiKey: string;
+    apiKeyCreated: string;
+    apiKeyWarning: string;
+    mcpDeleteConfirm: string;
+    mcpTokenLastUsed: string;
+    mcpTokenNeverUsed: string;
+    mcpRestoreKey: string;
+    mcpRestoreConfirm: string;
+    mcpRestored: string;
+    mcpTokenExpiration: string;
+    mcpSelectExpiration: string;
+    mcpNoExpiration: string;
+    mcpExpirationNote: string;
+    mcpServerConfig: string;
+    mcpServerUrl: string;
+    mcpServerDescription: string;
+    mcpCopyUrl: string;
   };
   sidebar: {
     folders: string;
@@ -350,4 +425,3 @@ export type TranslationKeys = {
     exceeded: string;
   };
 };
-

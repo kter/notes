@@ -1,0 +1,34 @@
+# Build artifacts and dependencies
+frontend/node_modules/
+frontend/out/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+frontend/package-lock.json
+backend/.venv/
+backend/uv.lock
+backend/.pytest_cache/
+backend/.ruff_cache/
+
+# Test reports and results
+frontend/playwright-report/
+frontend/test-results/
+frontend/playwright/.auth/
+
+# Terraform state and cache
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/cost_report.zip
+*.tfstate
+*.tfstate.*
+
+# IDE configuration
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

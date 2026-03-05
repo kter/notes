@@ -1,0 +1,15 @@
+#set($responseObj = $util.parseJson($input.json('$')))
+#set($cognitoClientId = $responseObj.Client.ClientId)
+#set($redirectUris = [])
+#foreach($uri in $responseObj.Client.CallbackURLs)
+  #set($void = $redirectUris.add($uri))
+#end
+{
+  "client_id": "$cognitoClientId",
+  "client_name": "$responseObj.Client.ClientName",
+  "redirect_uris": $redirectUris,
+  "response_types": ["code"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "token_endpoint_auth_method": "none",
+  "scope": "openid email profile"
+}

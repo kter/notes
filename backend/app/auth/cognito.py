@@ -63,6 +63,14 @@ class CognitoJWTVerifier:
                 "scope": "aws.cognito.signin.user.admin",
             }
 
+        if settings.environment == "dev" and token == "dev-integration-test-token-2":
+            return {
+                "sub": "integration-test-user-id-2",
+                "username": "integration-test-user-2",
+                "token_use": "access",
+                "scope": "aws.cognito.signin.user.admin",
+            }
+
         jwks = await self._get_jwks()
         signing_key = self._get_signing_key(token, jwks)
 

@@ -1,0 +1,5 @@
+{
+  "resource": "https://$${http_api_id}.execute-api.$${aws_region}.amazonaws.com/mcp",
+  "authorization_servers": ["https://$${http_api_id}.execute-api.$${aws_region}.amazonaws.com/.well-known/oauth-authorization-server"],
+  "scopes_supported": ["openid", "email", "profile"]
+}

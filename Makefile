@@ -4,6 +4,12 @@
 # Configuration
 ENV ?= dev
 
+# Disable AWS CLI pager to prevent interactive pager from launching
+export AWS_PAGER=
+
+# Disable Terraform interactive input prompts
+export TF_INPUT=0
+
 # Use ENV as the default profile, but allow override from command line
 # Using '=' instead of '?=' to override environment variables like 'export AWS_PROFILE=dev'
 AWS_PROFILE = $(ENV)
@@ -12,6 +18,7 @@ AWS_REGION ?= ap-northeast-1
 # Use deferred evaluation (=) so these are evaluated when used, picked up after profile/env is set
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
+MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
 
 .PHONY: help
 help: ## Show this help
@@ -46,12 +53,14 @@ ecr-login: ## Login to ECR
 
 .PHONY: build-backend
 build-backend: ## Build backend Docker image
-	cd backend && docker build --platform linux/amd64 -t $(ECR_REPO):latest .
+	cd backend && docker buildx build --provenance=false --load -t $(ECR_REPO):latest .
 
 .PHONY: push-backend
 push-backend: ecr-login build-backend ## Build and push backend Docker image to ECR
 	docker push $(ECR_REPO):latest
 	@echo "Image pushed: $(ECR_REPO):latest"
+	$(eval DIGEST := $(shell docker inspect --format='{{.Id}}' $(ECR_REPO):latest | awk -F ':' '{print $$2}'))
+	@echo "Backend digest: $(DIGEST)"
 
 .PHONY: get-image-digest
 get-image-digest: ## Get the latest image digest from ECR
@@ -89,41 +98,100 @@ build-frontend: tf-switch ## Build frontend for production
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
 
 
+.PHONY: invalidate-cloudfront
+invalidate-cloudfront: ## Create CloudFront cache invalidation
+	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	$(eval INVALIDATION_ID := $(shell aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE) --query 'Id' --output text))
+	@echo "CloudFront invalidation created: $(INVALIDATION_ID)"
+	@echo "Waiting for invalidation to complete..."
+	@aws cloudfront wait invalidation-completed --id $(INVALIDATION_ID) --distribution-id $(CF_DIST) --profile $(AWS_PROFILE)
+	@echo "CloudFront invalidation completed!"
+
 .PHONY: deploy-frontend
 deploy-frontend: build-frontend ## Build and deploy frontend to S3
 	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	@echo "Syncing frontend files to S3..."
 	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
+	@echo "Creating CloudFront cache invalidation..."
 	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
 	@echo "Frontend deployed to $(BUCKET)"
+	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
 
 # =============================================================================
 # Full Deployment
 # =============================================================================
 
 .PHONY: deploy
-deploy: deploy-backend deploy-frontend ## Deploy both backend and frontend, then run tests
+deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-test ## Deploy both backend, frontend, and MCP, then run tests (optimized)
+	@echo "Full deployment and verification complete!"
+
+# =============================================================================
+# Optimized Full Deployment Targets
+# =============================================================================
+
+.PHONY: _deploy-setup
+_deploy-setup: tf-switch ## One-time setup (terraform init + workspace switch)
+
+.PHONY: _deploy-backend
+_deploy-backend: _deploy-setup push-backend push-mcp-server ## Build, push, and deploy all Lambda functions via Terraform (optimized)
+	$(eval DIGEST := $(shell $(MAKE) get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$(DIGEST)" -var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" -auto-approve
+	@echo "Backend and MCP server deployed!"
+
+.PHONY: _deploy-frontend
+_deploy-frontend: _deploy-setup ## Build and deploy frontend to S3 (optimized)
+	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
+	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
+	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
+	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
+	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	@echo "Building frontend..."
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
+	@echo "Syncing frontend files to S3..."
+	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
+	@echo "Creating CloudFront cache invalidation..."
+	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
+	@echo "Frontend deployed to $(BUCKET)"
+	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
+
+# _deploy-mcp is now merged into _deploy-backend above
+
+.PHONY: _deploy-test
+_deploy-test: ## Run post-deployment integration tests (dev only, uses already-initialized Terraform state)
 ifeq ($(ENV),prd)
 	@echo "Skipping integration tests in prd (backdoor auth not available)"
 else
-	$(MAKE) test-integration
+	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
+	cd backend && API_URL=$(API_URL) uv run --extra dev python -m pytest tests/integration -v
 endif
-	$(MAKE) test-e2e
-	@echo "Full deployment and verification complete!"
 
 # =============================================================================
 # Terraform
 # =============================================================================
 
-# Internal target to ensure terraform is initialized and workspace is selected for the correct environment
+# Sentinel file tracking the last initialized Terraform environment (stored inside .terraform/ which is gitignored)
+TF_SENTINEL := terraform/.terraform/.initialized_env
+
+# Internal target to ensure terraform is initialized and workspace is selected for the correct environment.
+# Skips `terraform init -reconfigure` if already initialized for the target ENV to speed up repeated calls.
 .PHONY: tf-switch
-tf-switch: ## Re-initialize backend and switch workspace based on ENV (dev/prd)
-	@echo "Switching to $(ENV) environment..."
-	cd terraform && \
-	export AWS_PROFILE=$(AWS_PROFILE) && \
-	rm -f .terraform/environment && \
-	terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
-	(terraform workspace select $(ENV) || terraform workspace new $(ENV))
+tf-switch: ## Initialize backend and switch workspace based on ENV (dev/prd); skips re-init if already done
+	@CURRENT=$$(cat $(TF_SENTINEL) 2>/dev/null || echo ""); \
+	if [ "$$CURRENT" != "$(ENV)" ]; then \
+		echo "Switching to $(ENV) environment (re-initializing Terraform backend)..."; \
+		cd terraform && \
+		export AWS_PROFILE=$(AWS_PROFILE) && \
+		rm -f .terraform/environment && \
+		terraform init -reconfigure -backend-config=backends/$(ENV).hcl && \
+		(terraform workspace select $(ENV) || terraform workspace new $(ENV)) && \
+		echo "$(ENV)" > .terraform/.initialized_env; \
+	else \
+		echo "Already initialized for $(ENV) environment, selecting workspace..."; \
+		cd terraform && export AWS_PROFILE=$(AWS_PROFILE) && \
+		(terraform workspace select $(ENV) || terraform workspace new $(ENV)); \
+	fi
 
 .PHONY: tf-init
 tf-init: tf-switch ## Initialize Terraform for the current environment
@@ -134,11 +202,19 @@ tf-plan: tf-switch ## Run Terraform plan
 
 .PHONY: tf-apply
 tf-apply: tf-switch ## Run Terraform apply
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
 
 .PHONY: tf-output
 tf-output: tf-switch ## Show Terraform outputs
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output
+
+.PHONY: tf-fmt
+tf-fmt: ## Format Terraform configuration
+	cd terraform && terraform fmt -recursive
+
+.PHONY: tf-validate
+tf-validate: ## Validate Terraform configuration
+	cd terraform && terraform validate
 
 # =============================================================================
 # Utilities
@@ -168,6 +244,7 @@ test-cost-report: tf-switch ## Manually invoke cost report Lambda
 .PHONY: clean
 clean: ## Clean build artifacts
 	rm -rf frontend/out frontend/.next
+	rm -f $(TF_SENTINEL)
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # =============================================================================
@@ -179,7 +256,7 @@ test: test-backend test-frontend test-lint ## Run all tests
 
 .PHONY: test-backend
 test-backend: ## Run backend tests
-	cd backend && uv run python -m pytest -v
+	cd backend && uv run --extra dev python -m pytest -v
 
 .PHONY: test-frontend
 test-frontend: ## Run frontend unit tests
@@ -188,7 +265,7 @@ test-frontend: ## Run frontend unit tests
 .PHONY: test-integration
 test-integration: tf-switch ## Run integration tests against the deployed environment
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
-	cd backend && API_URL=$(API_URL) uv run pytest tests/integration -v
+	cd backend && API_URL=$(API_URL) uv run --extra dev python -m pytest tests/integration -v
 
 .PHONY: test-lint
 test-lint: lint-backend lint-frontend ## Run all linters
@@ -222,4 +299,54 @@ install-hooks: ## Install git pre-commit hooks
 	chmod +x scripts/pre-commit
 	cp scripts/pre-commit .git/hooks/pre-commit
 	@echo "Pre-commit hook installed!"
+
+# =============================================================================
+# MCP Server Deployment
+# =============================================================================
+
+.PHONY: build-mcp-server
+build-mcp-server: ## Build MCP server Docker image
+	cd lambda/mcp_server && docker buildx build --provenance=false --load -t $(MCP_SERVER_REPO):latest .
+
+.PHONY: push-mcp-server
+push-mcp-server: ecr-login build-mcp-server ## Build and push MCP server Docker image to ECR
+	docker push $(MCP_SERVER_REPO):latest
+	@echo "MCP Server image pushed: $(MCP_SERVER_REPO):latest"
+	$(eval MCP_SERVER_DIGEST := $(shell docker inspect --format='{{.Id}}' $(MCP_SERVER_REPO):latest | awk -F ':' '{print $$2}'))
+	@echo "MCP Server digest: $(MCP_SERVER_DIGEST)"
+
+.PHONY: get-mcp-server-digest
+get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
+	@aws ecr describe-images --repository-name notes-app-mcp-server-$(ENV) \
+		--image-ids imageTag=latest \
+		--profile $(AWS_PROFILE) \
+		--query 'imageDetails[0].imageDigest' \
+		--output text
+
+.PHONY: deploy-mcp
+deploy-mcp: tf-switch push-mcp-server ## Deploy MCP infrastructure
+	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply \
+		-var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" \
+		-auto-approve
+	@echo "MCP infrastructure deployed!"
+
+.PHONY: mcp-logs
+mcp-logs: ## Tail MCP server logs
+	aws logs tail /aws/lambda/notes-app-mcp-server-$(ENV) --follow --profile $(AWS_PROFILE)
+
+.PHONY: test-mcp-server
+test-mcp-server: ## Test MCP server connection
+	$(eval MCP_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw mcp_server_api_url))
+	@echo "MCP Server URL: $(MCP_URL)"
+	@echo ""
+	@echo "Health check:"
+	@curl -s $(MCP_URL)/health | jq .
+	@echo ""
+	@echo "To test the MCP protocol, use a valid Cognito token:"
+	@echo "curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer <TOKEN>' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/list\",\"params\":{}}' $(MCP_URL)/"
+	@echo ""
+	@echo "To configure Claude Desktop, add the following to your MCP config:"
+	@echo '{"mcpServers": {"notes-app": {"url": "$(MCP_URL)/", "headers": {"Authorization": "Bearer <YOUR_COGNITO_TOKEN>"}}}}'
+
 

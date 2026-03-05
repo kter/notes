@@ -15,7 +15,37 @@ export interface FolderUpdate {
   name?: string;
 }
 
-// Note types
+export interface MCPTokenCreateRequest {
+  name: string;
+  expires_in_days: 30 | 60 | 90 | 365 | null;
+}
+
+export interface MCPTokenResponse {
+  id: string;
+  name: string;
+  token: string;
+  created_at: string;
+  expires_at: string | null;
+  expires_in: number;
+  expires_in_days: number | null;
+}
+
+export interface MCPTokenListItem {
+  id: string;
+  name: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  is_active: boolean;
+  last_used_at: string | null;
+  expires_in_days: number | null;
+}
+
+export interface MCPTokensListResponse {
+  tokens: MCPTokenListItem[];
+}
+
+// Token usage types
 export interface Note {
   id: string;
   title: string;
@@ -120,4 +150,23 @@ export interface SharedNote {
   title: string;
   content: string;
   updated_at: string;
+}
+
+// MCP Token Management types
+export interface MCPTokenInfo {
+  token: string;
+  expiresAt: Date;
+  expires_in: number;
+}
+
+export interface MCPTokenRequest {
+  url: string;
+  token: string;
+  expires_in: number;
+}
+
+export interface MCPSettingsResponse {
+  server_url: string;
+  token_expires_in: number;
+  token_expiration_options: number[];
 }

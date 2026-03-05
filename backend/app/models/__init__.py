@@ -1,4 +1,5 @@
 from app.models.folder import Folder, FolderCreate, FolderRead, FolderUpdate
+from app.models.mcp_token import MCPToken
 from app.models.note import Note, NoteCreate, NoteRead, NoteUpdate
 from app.models.note_share import (
     NoteShare,
@@ -48,5 +49,6 @@ __all__ = [
     "UserSettings",
     "UserSettingsRead",
     "UserSettingsUpdate",
+    "MCPToken",
 ]
 

@@ -53,6 +53,12 @@ output "backend_role_arn" {
   value       = aws_iam_role.backend.arn
 }
 
+# MCP Server API Gateway outputs
+output "mcp_server_api_url" {
+  description = "HTTP API Gateway URL for MCP Server"
+  value       = aws_apigatewayv2_api.mcp_server.api_endpoint
+}
+
 # Environment info
 output "environment" {
   description = "Current environment"

@@ -15,6 +15,10 @@ import type {
   SummarizeResponse,
   UserSettings,
   UserSettingsUpdate,
+  MCPTokenCreateRequest,
+  MCPTokenResponse,
+  MCPTokensListResponse,
+  MCPSettingsResponse,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -31,7 +35,7 @@ export class ApiError extends Error {
 }
 
 class ApiClient {
-  constructor(private readonly token: string | null = null) {}
+  constructor(private readonly token: string | null = null) { }
 
   private async request<T>(
     endpoint: string,
@@ -58,9 +62,9 @@ class ApiClient {
       } catch {
         // If parsing JSON fails, try to get text or fallback to empty object
         try {
-            errorData = await response.text();
+          errorData = await response.text();
         } catch {
-            errorData = {};
+          errorData = {};
         }
       }
       throw new ApiError(response.status, response.statusText, errorData);
@@ -161,6 +165,40 @@ class ApiClient {
     });
   }
 
+  // MCP Token Management API
+  async createMcpToken(data: MCPTokenCreateRequest): Promise<MCPTokenResponse> {
+    return this.request<MCPTokenResponse>("/api/mcp/tokens", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async listMcpTokens(): Promise<MCPTokensListResponse> {
+    return this.request<MCPTokensListResponse>("/api/mcp/tokens");
+  }
+
+  async getMcpSettings(): Promise<MCPSettingsResponse> {
+    return this.request<MCPSettingsResponse>("/api/mcp/settings");
+  }
+
+  async revokeMcpToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/api/mcp/tokens/${tokenId}/revoke`, {
+      method: "POST",
+    });
+  }
+
+  async deleteMcpToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/api/mcp/tokens/${tokenId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async restoreMcpToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/api/mcp/tokens/${tokenId}/restore`, {
+      method: "POST",
+    });
+  }
+
   async exportNotes(): Promise<Blob> {
     const response = await fetch(`${API_BASE_URL}/api/notes/export/all`, {
       headers: {
@@ -202,10 +240,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export async function getSharedNote(token: string): Promise<SharedNote> {
   const response = await fetch(`${API_BASE}/api/shared/${token}`);
-  
+
   if (!response.ok) {
     throw new ApiError(response.status, response.statusText, await response.json().catch(() => ({})));
   }
-  
+
   return response.json();
 }

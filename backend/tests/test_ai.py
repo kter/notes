@@ -11,8 +11,8 @@ from app.services import AIService, get_ai_service
 class MockAIService(AIService):
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> str:
-        return f"Summary: {content[:10]}..."
+    ) -> tuple[str, int]:
+        return f"Summary: {content[:10]}...", 20
 
     async def chat(
         self,
@@ -21,8 +21,8 @@ class MockAIService(AIService):
         history: list[dict] | None = None,
         model_id: str | None = None,
         language: str = "auto",
-    ) -> str:
-        return f"Answer for '{question}' based on {len(content)} chars"
+    ) -> tuple[str, int]:
+        return f"Answer for '{question}' based on {len(content)} chars", 20
 
 
 @pytest.fixture

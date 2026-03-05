@@ -34,3 +34,17 @@ def client(api_base_url, auth_token):
     }
     with httpx.Client(base_url=api_base_url, headers=headers, timeout=30.0) as client:
         yield client
+
+
+@pytest.fixture
+def another_client(api_base_url):
+    """
+    Create an httpx Client authenticated as a SECOND integration test user.
+    Used to verify that user A cannot access user B's resources.
+    """
+    headers = {
+        "Authorization": "Bearer dev-integration-test-token-2",
+        "Content-Type": "application/json",
+    }
+    with httpx.Client(base_url=api_base_url, headers=headers, timeout=30.0) as client:
+        yield client

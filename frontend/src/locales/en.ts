@@ -67,6 +67,7 @@ export const en = {
     mcpServerConfig: "MCP Server Configuration",
     mcpServerUrl: "MCP Server URL",
     mcpServerDescription: "Server URL for connecting to MCP clients like Claude Desktop.",
+    mcpConnectionDescription: "Set up MCP clients like Claude Desktop by copying the server URL and creating API keys. Maximum 2 active API keys per user.",
     mcpCopyUrl: "Copy URL",
   },
 

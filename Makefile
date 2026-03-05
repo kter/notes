@@ -7,6 +7,9 @@ ENV ?= dev
 # Disable AWS CLI pager to prevent interactive pager from launching
 export AWS_PAGER=
 
+# Disable Terraform interactive input prompts
+export TF_INPUT=0
+
 # Use ENV as the default profile, but allow override from command line
 # Using '=' instead of '?=' to override environment variables like 'export AWS_PROFILE=dev'
 AWS_PROFILE = $(ENV)
@@ -199,7 +202,7 @@ tf-plan: tf-switch ## Run Terraform plan
 
 .PHONY: tf-apply
 tf-apply: tf-switch ## Run Terraform apply
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
 
 .PHONY: tf-output
 tf-output: tf-switch ## Show Terraform outputs

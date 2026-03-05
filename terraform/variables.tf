@@ -17,11 +17,13 @@ locals {
       domain_name      = "notes.dev.devtools.site"
       hosted_zone_name = "dev.devtools.site"
       enable_noindex   = true
+      mcp_domain_name  = "mcp.notes.dev.devtools.site"
     }
     prd = {
       domain_name      = "notes.devtools.site"
       hosted_zone_name = "devtools.site"
       enable_noindex   = false
+      mcp_domain_name  = "mcp.notes.devtools.site"
     }
   }
 

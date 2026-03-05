@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import os
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -19,6 +20,8 @@ from app.models.mcp import (
 from app.models.mcp_token import MCPToken
 
 logger = logging.getLogger(__name__)
+
+MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "")
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
@@ -276,7 +279,7 @@ async def get_mcp_settings(
     logger.info(f"Fetching MCP settings for user {user_id}")
 
     return MCPSettingsResponse(
-        server_url="https://5gcqmlela7.execute-api.ap-northeast-1.amazonaws.com/",
+        server_url=MCP_SERVER_URL,
         token_expires_in=3600,
         token_expiration_options=[30, 60, 90, 365]
     )

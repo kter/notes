@@ -128,3 +128,62 @@ resource "aws_lambda_permission" "mcp_server_api_gateway" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.mcp_server.execution_arn}/*"
 }
+
+# ACM 証明書（API Gateway は ap-northeast-1 に作成）
+resource "aws_acm_certificate" "mcp_server" {
+  domain_name       = local.current_env.mcp_domain_name
+  validation_method = "DNS"
+  lifecycle { create_before_destroy = true }
+}
+
+# ACM DNS 検証レコード
+resource "aws_route53_record" "mcp_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.mcp_server.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+# ACM 証明書の検証完了を待機
+resource "aws_acm_certificate_validation" "mcp_server" {
+  certificate_arn         = aws_acm_certificate.mcp_server.arn
+  validation_record_fqdns = [for record in aws_route53_record.mcp_cert_validation : record.fqdn]
+}
+
+# API Gateway v2 カスタムドメイン名
+resource "aws_apigatewayv2_domain_name" "mcp_server" {
+  domain_name = local.current_env.mcp_domain_name
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.mcp_server.certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+# API マッピング（カスタムドメインを API Gateway ステージに紐付け）
+resource "aws_apigatewayv2_api_mapping" "mcp_server" {
+  api_id      = aws_apigatewayv2_api.mcp_server.id
+  domain_name = aws_apigatewayv2_domain_name.mcp_server.id
+  stage       = aws_apigatewayv2_stage.mcp_server.id
+}
+
+# Route53 A レコード（カスタムドメイン → API Gateway ドメイン）
+resource "aws_route53_record" "mcp_server" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.current_env.mcp_domain_name
+  type    = "A"
+  alias {
+    name                   = aws_apigatewayv2_domain_name.mcp_server.domain_name_configuration[0].target_domain_name
+    zone_id                = aws_apigatewayv2_domain_name.mcp_server.domain_name_configuration[0].hosted_zone_id
+    evaluate_target_health = false
+  }
+}

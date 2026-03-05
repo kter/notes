@@ -5,47 +5,51 @@ allowed-tools: Bash
 
 # playwright-cli
 
-Browser automation CLI tool.
+Playwright CLI を使ったブラウザ自動化ツール（MCPより低コスト、コンテキスト増加約1.3%）。
 
-## Quick Start
+## ワークフロー
+
+1. **確認**: `snapshot` / `click` / `screenshot` でブラウザ操作を対話的に確認
+2. **実装**: 確認したフローを `@playwright/test` でテストコードとして実装
+3. **検証**: `npx playwright test --headed` で実行、動画で動作確認
+
+## Core Commands
+
+```bash
+playwright-cli open <url>              # ページを開く
+playwright-cli snapshot                # 要素一覧をYAML形式で取得（refを確認）
+playwright-cli click <ref>             # 要素をクリック
+playwright-cli fill <ref> <text>       # テキスト入力
+playwright-cli type <text>             # テキストタイプ
+playwright-cli screenshot [ref]        # スクリーンショット取得
+playwright-cli close                   # ページを閉じる
+```
+
+## Sessions
+
+```bash
+playwright-cli --session=<name> open <url>  # 名前付きセッションで開く
+playwright-cli session-stop-all             # 全セッション停止
+```
+
+## DevTools
+
+```bash
+playwright-cli tracing-start           # トレース記録開始
+playwright-cli tracing-stop            # トレース記録停止
+playwright-cli console [min-level]     # コンソールメッセージ表示
+```
+
+## 使い方
+
+まず `open` でページを開き、`snapshot` で要素の `ref` を確認してから操作する。
 
 ```bash
 playwright-cli open https://example.com/
 playwright-cli snapshot
+# → ref: e3 のような識別子が表示される
 playwright-cli click e3
+playwright-cli snapshot  # 操作後の状態を確認
 ```
 
-## Core Workflow
-
-1. `open` to navigate to a page
-2. `snapshot` to get element refs
-3. `click`, `fill`, `type` to interact
-
-## Commands
-
-### Core
-
-```bash
-playwright-cli open <url>              # open url
-playwright-cli close                   # close the page
-playwright-cli click <ref>             # perform click
-playwright-cli fill <ref> <text>       # fill text
-playwright-cli type <text>             # type text
-playwright-cli snapshot                # capture page snapshot
-playwright-cli screenshot [ref]        # take screenshot
-```
-
-### Sessions
-
-```bash
-playwright-cli --session=<name> open <url>  # open with named session
-playwright-cli session-stop-all             # stop all sessions
-```
-
-### DevTools
-
-```bash
-playwright-cli tracing-start           # start trace recording
-playwright-cli tracing-stop            # stop trace recording
-playwright-cli console [min-level]     # list console messages
-```
+`.playwright-cli/` と `playwright-report/` は `.gitignore` に追加しておくこと。

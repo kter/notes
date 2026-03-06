@@ -63,6 +63,7 @@ export function EditorPanel({
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
@@ -191,6 +192,26 @@ export function EditorPanel({
   };
 
 
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+
+    const placeholder = `![${t("editor.uploading")}]()`;
+    const textarea = textareaRef.current;
+    const insertPos = textarea ? textarea.selectionStart : content.length;
+
+    const newContent =
+      content.slice(0, insertPos) + placeholder + content.slice(insertPos);
+    handleContentChange(newContent);
+
+    try {
+      const api = await getApi();
+      const { url } = await api.uploadImage(file);
+      setContent((prev) => prev.replace(placeholder, `![image](${url})`));
+    } catch {
+      setContent((prev) => prev.replace(placeholder, ""));
+    }
+  }, [content, getApi, handleContentChange, t]);
 
   // Helper: Get list marker information from current line
   interface ListMarkerInfo {
@@ -761,8 +782,16 @@ export function EditorPanel({
         <div className={`flex-1 flex min-h-0 ${isPreviewOpen ? "gap-4" : ""} px-4 md:px-6 pb-4`}>
           {/* Markdown Editor Column */}
           <div
-            className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""}`}
+            className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""} ${isDraggingOver ? "ring-2 ring-primary rounded" : ""}`}
             ref={editorContainerRef}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+            onDragLeave={() => setIsDraggingOver(false)}
+            onDrop={async (e) => {
+              e.preventDefault();
+              setIsDraggingOver(false);
+              const file = e.dataTransfer.files[0];
+              if (file) await handleImageUpload(file);
+            }}
           >
             <label htmlFor="note-content" className="sr-only">Note content</label>
             <Textarea
@@ -773,6 +802,13 @@ export function EditorPanel({
               onKeyDown={handleKeyDown}
               onScroll={handleEditorScroll}
               onBlur={handleBlur}
+              onPaste={async (e) => {
+                const file = e.clipboardData.files[0];
+                if (file?.type.startsWith("image/")) {
+                  e.preventDefault();
+                  await handleImageUpload(file);
+                }
+              }}
               placeholder={t("editor.noteContentPlaceholder")}
               className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
               data-testid="editor-content-input"

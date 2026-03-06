@@ -133,6 +133,7 @@ export const en = {
     exportNote: "Export note",
     share: "Share",
     shareNote: "Share note",
+    uploading: "Uploading...",
   },
 
   // AI Panel

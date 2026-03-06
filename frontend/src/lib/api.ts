@@ -199,6 +199,34 @@ class ApiClient {
     });
   }
 
+  async uploadImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/images`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorData: unknown;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = {};
+      }
+      throw new ApiError(response.status, response.statusText, errorData);
+    }
+
+    return response.json();
+  }
+
   async exportNotes(): Promise<Blob> {
     const response = await fetch(`${API_BASE_URL}/api/notes/export/all`, {
       headers: {

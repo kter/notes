@@ -133,6 +133,7 @@ export const en = {
     exportNote: "Export note",
     share: "Share",
     shareNote: "Share note",
+    uploading: "Uploading...",
   },
 
   // AI Panel
@@ -290,6 +291,7 @@ export type TranslationKeys = {
     mcpServerConfig: string;
     mcpServerUrl: string;
     mcpServerDescription: string;
+    mcpConnectionDescription: string;
     mcpCopyUrl: string;
   };
   sidebar: {
@@ -349,6 +351,7 @@ export type TranslationKeys = {
     exportNote: string;
     share: string;
     shareNote: string;
+    uploading: string;
   };
   ai: {
     title: string;

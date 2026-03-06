@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Cache settings
     cache_bucket_name: str = "notes-app-cache-local"
 
+    # Image settings
+    image_bucket_name: str = ""
+    cdn_domain: str = "localhost:8000"
+
 
 @lru_cache
 def get_settings() -> Settings:

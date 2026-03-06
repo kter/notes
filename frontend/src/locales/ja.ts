@@ -133,6 +133,7 @@ export const ja = {
     exportNote: "ノートをエクスポート",
     share: "共有",
     shareNote: "ノートを共有",
+    uploading: "アップロード中...",
   },
 
   // AI Panel
@@ -349,6 +350,7 @@ export type TranslationKeys = {
     exportNote: string;
     share: string;
     shareNote: string;
+    uploading: string;
   };
   ai: {
     title: string;

@@ -43,7 +43,7 @@ async def upload_image(
         )
 
     ext = MIME_TO_EXT[file.content_type]
-    key = f"{user_id}/{uuid.uuid4()}.{ext}"
+    key = f"images/{user_id}/{uuid.uuid4()}.{ext}"
 
     try:
         s3 = boto3.client("s3")
@@ -59,5 +59,5 @@ async def upload_image(
             detail=f"Failed to upload image: {e.response['Error']['Message']}",
         ) from e
 
-    url = f"https://{settings.cdn_domain}/images/{key}"
+    url = f"https://{settings.cdn_domain}/{key}"
     return {"url": url}

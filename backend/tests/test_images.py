@@ -78,8 +78,12 @@ class TestUploadImage:
         assert response.status_code == 201
         data = response.json()
         assert "url" in data
-        assert "/images/" in data["url"]
         assert data["url"].endswith(".png")
+        # S3 key must start with "images/" so CloudFront path /images/* maps correctly
+        call_kwargs = mock_s3.put_object.call_args.kwargs
+        assert call_kwargs["Key"].startswith("images/")
+        # CDN URL must not double the "images/" prefix
+        assert data["url"].count("/images/") == 1
         mock_s3.put_object.assert_called_once()
 
     def test_upload_invalid_mime_type_returns_400(self, client: TestClient):

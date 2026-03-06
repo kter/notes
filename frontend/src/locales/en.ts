@@ -291,6 +291,7 @@ export type TranslationKeys = {
     mcpServerConfig: string;
     mcpServerUrl: string;
     mcpServerDescription: string;
+    mcpConnectionDescription: string;
     mcpCopyUrl: string;
   };
   sidebar: {

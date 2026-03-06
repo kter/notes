@@ -1,8 +1,9 @@
 
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EditorPanel } from './EditorPanel'
 import type { Note } from '@/types'
+import { calculateHash } from '@/lib/utils'
 
 // Mock react-markdown
 vi.mock('react-markdown', () => ({
@@ -31,6 +32,12 @@ vi.mock('@/hooks/useApi', () => ({
 // Mock Clock to avoid interval timers
 vi.mock('@/components/Clock', () => ({
   Clock: () => <div data-testid="clock">Clock</div>,
+}))
+
+// Mock calculateHash to control timing in debounce tests
+vi.mock('@/lib/utils', () => ({
+  cn: (...args: string[]) => args.filter(Boolean).join(' '),
+  calculateHash: vi.fn().mockResolvedValue('mockhash'),
 }))
 
 describe('EditorPanel', () => {
@@ -109,13 +116,182 @@ describe('EditorPanel', () => {
     // Verify preview toggle works correctly
     // The actual useDeferredValue optimization is tested via code review
     render(<EditorPanel {...defaultProps} />)
-    
+
     // Click preview toggle
     const previewButton = screen.getByTestId('editor-preview-toggle')
     fireEvent.click(previewButton)
-    
+
     // Preview should be visible with the content
     expect(screen.getByTestId('markdown-preview')).toBeInTheDocument()
+  })
+
+  describe('Performance optimizations', () => {
+    const mockCalculateHash = vi.mocked(calculateHash)
+
+    beforeEach(() => {
+      mockCalculateHash.mockClear()
+    })
+
+    describe('Hash calculation debounce (500ms)', () => {
+      afterEach(() => {
+        vi.useRealTimers()
+      })
+
+      it('does not calculate hash before 500ms have elapsed', () => {
+        vi.useFakeTimers()
+        render(<EditorPanel {...defaultProps} />)
+        mockCalculateHash.mockClear() // clear the initial mount call
+
+        const textarea = screen.getByRole('textbox', { name: /content/i })
+        fireEvent.change(textarea, { target: { value: 'New content' } })
+
+        vi.advanceTimersByTime(499)
+        expect(mockCalculateHash).not.toHaveBeenCalled()
+      })
+
+      it('calculates hash after 500ms have elapsed', () => {
+        vi.useFakeTimers()
+        render(<EditorPanel {...defaultProps} />)
+        mockCalculateHash.mockClear()
+
+        const textarea = screen.getByRole('textbox', { name: /content/i })
+        fireEvent.change(textarea, { target: { value: 'New content' } })
+
+        vi.advanceTimersByTime(500)
+        expect(mockCalculateHash).toHaveBeenCalledWith('New content')
+      })
+
+      it('resets debounce timer on rapid typing (only calculates once)', () => {
+        vi.useFakeTimers()
+        render(<EditorPanel {...defaultProps} />)
+        mockCalculateHash.mockClear()
+
+        const textarea = screen.getByRole('textbox', { name: /content/i })
+
+        // Simulate rapid typing: 3 keystrokes within 500ms
+        fireEvent.change(textarea, { target: { value: 'a' } })
+        vi.advanceTimersByTime(200)
+        fireEvent.change(textarea, { target: { value: 'ab' } })
+        vi.advanceTimersByTime(200)
+        fireEvent.change(textarea, { target: { value: 'abc' } })
+
+        // 400ms elapsed since last change — not yet triggered
+        vi.advanceTimersByTime(499)
+        expect(mockCalculateHash).not.toHaveBeenCalled()
+
+        // 500ms after last change — triggered once with final value
+        vi.advanceTimersByTime(1)
+        expect(mockCalculateHash).toHaveBeenCalledTimes(1)
+        expect(mockCalculateHash).toHaveBeenCalledWith('abc')
+      })
+    })
+
+    describe('Scroll RAF throttling', () => {
+      let originalRaf: typeof requestAnimationFrame
+      let originalCaf: typeof cancelAnimationFrame
+
+      beforeEach(() => {
+        originalRaf = window.requestAnimationFrame
+        originalCaf = window.cancelAnimationFrame
+      })
+
+      afterEach(() => {
+        window.requestAnimationFrame = originalRaf
+        window.cancelAnimationFrame = originalCaf
+      })
+
+      it('throttles rapid editor scroll events to one RAF per frame', () => {
+        const mockRaf = vi.fn().mockReturnValue(1)
+        window.requestAnimationFrame = mockRaf
+
+        render(<EditorPanel {...defaultProps} />)
+
+        // Open preview to enable scroll sync
+        const previewButton = screen.getByTestId('editor-preview-toggle')
+        fireEvent.click(previewButton)
+
+        const textarea = screen.getByRole('textbox', { name: /content/i })
+
+        // Fire multiple scroll events in the same frame
+        fireEvent.scroll(textarea)
+        fireEvent.scroll(textarea)
+        fireEvent.scroll(textarea)
+
+        // Only one RAF should be scheduled (subsequent events are blocked by the ref guard)
+        expect(mockRaf).toHaveBeenCalledTimes(1)
+      })
+
+      it('allows a new RAF after previous frame completes', () => {
+        vi.useFakeTimers()
+
+        let rafCallback: FrameRequestCallback | null = null
+        const mockRaf = vi.fn().mockImplementation((cb: FrameRequestCallback) => {
+          rafCallback = cb
+          return 1
+        })
+        window.requestAnimationFrame = mockRaf
+
+        render(<EditorPanel {...defaultProps} />)
+
+        const previewButton = screen.getByTestId('editor-preview-toggle')
+        fireEvent.click(previewButton)
+
+        const textarea = screen.getByRole('textbox', { name: /content/i })
+
+        // First scroll — schedules RAF
+        fireEvent.scroll(textarea)
+        expect(mockRaf).toHaveBeenCalledTimes(1)
+
+        // Execute the RAF callback — clears scrollRafRef.current and sets isScrollingRef.current = true
+        act(() => {
+          rafCallback?.(0)
+        })
+
+        // Advance past the 50ms timeout inside the RAF callback that resets isScrollingRef
+        vi.advanceTimersByTime(50)
+
+        // Second scroll after frame + cooldown — should schedule a new RAF
+        fireEvent.scroll(textarea)
+        expect(mockRaf).toHaveBeenCalledTimes(2)
+
+        vi.useRealTimers()
+      })
+
+      it('cancels pending RAF on unmount to prevent stale callbacks', () => {
+        const pendingRafId = 42
+        const mockRaf = vi.fn().mockReturnValue(pendingRafId)
+        const mockCaf = vi.fn()
+        window.requestAnimationFrame = mockRaf
+        window.cancelAnimationFrame = mockCaf
+
+        const { unmount } = render(<EditorPanel {...defaultProps} />)
+
+        // Open preview and trigger a scroll to schedule a RAF
+        const previewButton = screen.getByTestId('editor-preview-toggle')
+        fireEvent.click(previewButton)
+
+        const textarea = screen.getByRole('textbox', { name: /content/i })
+        fireEvent.scroll(textarea)
+
+        // RAF is pending (callback not yet executed)
+        expect(mockRaf).toHaveBeenCalled()
+
+        // Unmount should cancel the pending RAF
+        unmount()
+        expect(mockCaf).toHaveBeenCalledWith(pendingRafId)
+      })
+
+      it('does not cancel RAF on unmount when no scroll was pending', () => {
+        const mockCaf = vi.fn()
+        window.cancelAnimationFrame = mockCaf
+
+        const { unmount } = render(<EditorPanel {...defaultProps} />)
+
+        // Unmount without triggering any scroll
+        unmount()
+        expect(mockCaf).not.toHaveBeenCalled()
+      })
+    })
   })
 })
 

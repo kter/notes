@@ -350,6 +350,7 @@ export type TranslationKeys = {
     exportNote: string;
     share: string;
     shareNote: string;
+    uploading: string;
   };
   ai: {
     title: string;

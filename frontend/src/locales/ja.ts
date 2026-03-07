@@ -134,6 +134,7 @@ export const ja = {
     share: "共有",
     shareNote: "ノートを共有",
     uploading: "アップロード中...",
+    imageTooLarge: "画像が大きすぎます。10MB未満の画像を使用してください。",
   },
 
   // AI Panel
@@ -351,6 +352,7 @@ export type TranslationKeys = {
     share: string;
     shareNote: string;
     uploading: string;
+    imageTooLarge: string;
   };
   ai: {
     title: string;

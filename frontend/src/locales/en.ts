@@ -134,6 +134,7 @@ export const en = {
     share: "Share",
     shareNote: "Share note",
     uploading: "Uploading...",
+    imageTooLarge: "Image is too large. Please use an image under 10MB.",
   },
 
   // AI Panel

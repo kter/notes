@@ -97,8 +97,8 @@ class TestUploadImage:
         assert "Unsupported file type" in response.json()["detail"]
 
     def test_upload_oversized_file_returns_400(self, client: TestClient):
-        """Files larger than 5MB should return 400."""
-        large_content = b"A" * (5 * 1024 * 1024 + 1)
+        """Files larger than 10MB should return 400."""
+        large_content = b"A" * (10 * 1024 * 1024 + 1)
 
         response = client.post(
             "/api/images",
@@ -107,6 +107,21 @@ class TestUploadImage:
 
         assert response.status_code == 400
         assert "exceeds" in response.json()["detail"]
+
+    def test_upload_file_exactly_at_size_limit_returns_201(self, client: TestClient):
+        """File exactly at 10MB (not exceeding) should be accepted (boundary: > not >=)."""
+        exact_content = b"A" * (10 * 1024 * 1024)
+
+        with patch("app.routers.images.boto3") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.client.return_value = mock_s3
+
+            response = client.post(
+                "/api/images",
+                files={"file": ("exact.png", io.BytesIO(exact_content), "image/png")},
+            )
+
+        assert response.status_code == 201
 
     def test_upload_unauthenticated_returns_401(self, unauthenticated_client: TestClient):
         """Request without auth should return 401."""

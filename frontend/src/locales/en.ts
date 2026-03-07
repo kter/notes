@@ -353,6 +353,7 @@ export type TranslationKeys = {
     share: string;
     shareNote: string;
     uploading: string;
+    imageTooLarge: string;
   };
   ai: {
     title: string;

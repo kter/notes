@@ -73,17 +73,28 @@ export function EditorPanel({
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
+  const contentLinesRef = useRef(1);
+  const scrollRafRef = useRef<number | null>(null);
+
+  // Cache line count whenever content changes (cheap ref update, avoids O(n) split in scroll handlers)
+  useEffect(() => {
+    let count = 1;
+    for (let i = 0; i < content.length; i++) {
+      if (content.charCodeAt(i) === 10) count++;
+    }
+    contentLinesRef.current = count;
+  }, [content]);
 
   // Hash-based Verification Logic
   const [currentHash, setCurrentHash] = useState("");
 
-  // Calculate hash of current content whenever it changes (debounced slightly to avoid freezing typing)
+  // Calculate hash of current content whenever it changes (debounced to avoid blocking typing)
   useEffect(() => {
     const calculate = async () => {
       const hash = await calculateHash(content);
       setCurrentHash(hash);
     };
-    const timer = setTimeout(calculate, 200);
+    const timer = setTimeout(calculate, 500);
     return () => clearTimeout(timer);
   }, [content]);
 
@@ -113,6 +124,15 @@ export function EditorPanel({
   useEffect(() => {
     noteIdRef.current = note?.id;
   }, [note?.id]);
+
+  // Clean up pending RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -428,77 +448,82 @@ export function EditorPanel({
 
 
 
-  // Scroll Sync Handlers
-  // Scroll Sync Handlers
+  // Scroll Sync Handlers (throttled with requestAnimationFrame, no content dependency)
   const handleEditorScroll = useCallback(() => {
     if (isScrollingRef.current || !isPreviewOpen || !textareaRef.current || !previewContainerRef.current) return;
+    if (scrollRafRef.current !== null) return;
 
-    isScrollingRef.current = true;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      if (!textareaRef.current || !previewContainerRef.current) return;
 
-    const editor = textareaRef.current;
-    const preview = previewContainerRef.current;
+      isScrollingRef.current = true;
 
-    // Calculate target line number based on scroll percentage of source
-    // This assumes roughly uniform line height in the source which is true for monospaced textarea
-    const contentLines = content.split("\n").length;
-    const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
-    const targetLine = Math.floor(contentLines * scrollPercentage);
+      const editor = textareaRef.current;
+      const preview = previewContainerRef.current;
 
-    // Find the element in preview that corresponds to this line or the next closest one
-    const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-    let targetElement = null;
+      const contentLines = contentLinesRef.current;
+      const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
+      const targetLine = Math.floor(contentLines * scrollPercentage);
 
-    for (const el of elements) {
-      const line = parseInt(el.getAttribute("data-source-line") || "0", 10);
-      if (line >= targetLine) {
-        targetElement = el;
-        break;
+      const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+      let targetElement = null;
+
+      for (const el of elements) {
+        const line = parseInt(el.getAttribute("data-source-line") || "0", 10);
+        if (line >= targetLine) {
+          targetElement = el;
+          break;
+        }
       }
-    }
 
-    if (targetElement) {
-      // Adjust for the element's position relative to the container
-      preview.scrollTop = targetElement.offsetTop - preview.offsetTop;
-    } else if (scrollPercentage > 0.99) {
-      // If roughly at the end, sync to bottom
-      preview.scrollTop = preview.scrollHeight;
-    }
+      if (targetElement) {
+        preview.scrollTop = targetElement.offsetTop - preview.offsetTop;
+      } else if (scrollPercentage > 0.99) {
+        preview.scrollTop = preview.scrollHeight;
+      }
 
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 50);
-  }, [content, isPreviewOpen]);
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 50);
+    });
+  }, [isPreviewOpen]);
 
   const handlePreviewScroll = useCallback(() => {
     if (isScrollingRef.current || !textareaRef.current || !previewContainerRef.current) return;
+    if (scrollRafRef.current !== null) return;
 
-    isScrollingRef.current = true;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      if (!textareaRef.current || !previewContainerRef.current) return;
 
-    const editor = textareaRef.current;
-    const preview = previewContainerRef.current;
-    const contentLines = content.split("\n").length;
+      isScrollingRef.current = true;
 
-    // Find the first visible element in the preview
-    const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-    let visibleElement: HTMLElement | null = null;
+      const editor = textareaRef.current;
+      const preview = previewContainerRef.current;
+      const contentLines = contentLinesRef.current;
 
-    for (const el of elements) {
-      if (el.offsetTop - preview.offsetTop >= preview.scrollTop) {
-        visibleElement = el;
-        break;
+      const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
+      let visibleElement: HTMLElement | null = null;
+
+      for (const el of elements) {
+        if (el.offsetTop - preview.offsetTop >= preview.scrollTop) {
+          visibleElement = el;
+          break;
+        }
       }
-    }
 
-    if (visibleElement) {
-      const line = parseInt(visibleElement.getAttribute("data-source-line") || "0", 10);
-      const targetScrollTop = (line / contentLines) * (editor.scrollHeight - editor.clientHeight);
-      editor.scrollTop = targetScrollTop;
-    }
+      if (visibleElement) {
+        const line = parseInt(visibleElement.getAttribute("data-source-line") || "0", 10);
+        const targetScrollTop = (line / contentLines) * (editor.scrollHeight - editor.clientHeight);
+        editor.scrollTop = targetScrollTop;
+      }
 
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 50);
-  }, [content]);
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 50);
+    });
+  }, []);
 
   // JSON export handlers
   const downloadFile = (content: string, filename: string, mimeType: string) => {

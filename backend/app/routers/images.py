@@ -10,7 +10,7 @@ from app.config import get_settings
 router = APIRouter()
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB — must match frontend/src/components/layout/EditorPanel.tsx MAX_SIZE
 
 MIME_TO_EXT = {
     "image/jpeg": "jpg",
@@ -39,7 +39,7 @@ async def upload_image(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File size {len(content)} bytes exceeds the maximum of {MAX_FILE_SIZE} bytes (5MB).",
+            detail=f"File size {len(content)} bytes exceeds the maximum of {MAX_FILE_SIZE} bytes (10MB).",
         )
 
     ext = MIME_TO_EXT[file.content_type]

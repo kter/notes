@@ -134,6 +134,7 @@ export const en = {
     share: "Share",
     shareNote: "Share note",
     uploading: "Uploading...",
+    imageTooLarge: "Image is too large. Please use an image under 10MB.",
   },
 
   // AI Panel
@@ -352,6 +353,7 @@ export type TranslationKeys = {
     share: string;
     shareNote: string;
     uploading: string;
+    imageTooLarge: string;
   };
   ai: {
     title: string;

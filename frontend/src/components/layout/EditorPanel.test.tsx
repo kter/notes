@@ -125,6 +125,111 @@ describe('EditorPanel', () => {
     expect(screen.getByTestId('markdown-preview')).toBeInTheDocument()
   })
 
+  describe('Fullscreen mode', () => {
+    it('renders fullscreen toggle button', () => {
+      render(<EditorPanel {...defaultProps} />)
+      expect(screen.getByTestId('editor-fullscreen-button')).toBeInTheDocument()
+    })
+
+    it('enters fullscreen when toggle button is clicked', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+      fireEvent.click(button)
+      // In fullscreen mode, the outer container has fixed positioning
+      const container = button.closest('[class*="fixed"]')
+      expect(container).toBeInTheDocument()
+    })
+
+    it('exits fullscreen when toggle button is clicked again', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+
+      // Enter fullscreen
+      fireEvent.click(button)
+      expect(button.closest('[class*="fixed"]')).toBeInTheDocument()
+
+      // Exit fullscreen
+      fireEvent.click(button)
+      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+    })
+
+    it('shows exit fullscreen aria-label when in fullscreen', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+      expect(button).toHaveAttribute('aria-label', 'editor.fullscreen')
+
+      fireEvent.click(button)
+      expect(button).toHaveAttribute('aria-label', 'editor.exitFullscreen')
+    })
+
+    it('exits fullscreen when Escape key is pressed', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+
+      // Enter fullscreen first
+      fireEvent.click(button)
+      expect(button.closest('[class*="fixed"]')).toBeInTheDocument()
+
+      // Press Escape to exit
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+    })
+
+    it('Escape key has no effect when not in fullscreen', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+
+      // Ensure we are not in fullscreen
+      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+
+      // Pressing Escape should not change anything
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+    })
+
+    it('toggles fullscreen with Ctrl+Shift+F', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+
+      // Toggle on
+      fireEvent.keyDown(document, { key: 'F', ctrlKey: true, shiftKey: true })
+      expect(button.closest('[class*="fixed"]')).toBeInTheDocument()
+
+      // Toggle off
+      fireEvent.keyDown(document, { key: 'F', ctrlKey: true, shiftKey: true })
+      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+    })
+
+    it('sets body overflow to hidden when fullscreen is active', () => {
+      render(<EditorPanel {...defaultProps} />)
+      expect(document.body.style.overflow).toBe('')
+
+      fireEvent.click(screen.getByTestId('editor-fullscreen-button'))
+      expect(document.body.style.overflow).toBe('hidden')
+    })
+
+    it('restores body overflow when exiting fullscreen', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-fullscreen-button')
+
+      fireEvent.click(button)
+      expect(document.body.style.overflow).toBe('hidden')
+
+      fireEvent.click(button)
+      expect(document.body.style.overflow).toBe('')
+    })
+
+    it('restores body overflow on unmount', () => {
+      const { unmount } = render(<EditorPanel {...defaultProps} />)
+
+      fireEvent.click(screen.getByTestId('editor-fullscreen-button'))
+      expect(document.body.style.overflow).toBe('hidden')
+
+      unmount()
+      expect(document.body.style.overflow).toBe('')
+    })
+  })
+
   describe('Performance optimizations', () => {
     const mockCalculateHash = vi.mocked(calculateHash)
 

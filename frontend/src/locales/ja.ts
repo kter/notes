@@ -134,6 +134,8 @@ export const ja = {
     share: "共有",
     shareNote: "ノートを共有",
     uploading: "アップロード中...",
+    fullscreen: "フルスクリーン",
+    exitFullscreen: "フルスクリーン終了",
   },
 
   // AI Panel

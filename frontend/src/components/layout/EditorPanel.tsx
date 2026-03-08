@@ -65,6 +65,7 @@ export function EditorPanel({
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
@@ -216,6 +217,13 @@ export function EditorPanel({
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
+
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB — must match backend/app/routers/images.py MAX_FILE_SIZE
+    if (file.size > MAX_SIZE) {
+      setImageUploadError(t("editor.imageTooLarge"));
+      setTimeout(() => setImageUploadError(null), 5000);
+      return;
+    }
 
     const placeholder = `![${t("editor.uploading")}]()`;
     const textarea = textareaRef.current;
@@ -847,11 +855,19 @@ export function EditorPanel({
         </div>
 
         {/* Editor and Preview Layout */}
-        <div className={`flex-1 flex min-h-0 ${isPreviewOpen ? "gap-4" : ""} px-4 md:px-6 pb-4`}>
+        <div className={`relative flex-1 flex min-h-0 ${isPreviewOpen ? "gap-4" : ""} px-4 md:px-6 pb-4`}>
+          {/* Image upload error message */}
+          {imageUploadError && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground text-sm px-4 py-2 rounded shadow-md">
+              {imageUploadError}
+            </div>
+          )}
+
           {/* Markdown Editor Column */}
           <div
             className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""} ${isDraggingOver ? "ring-2 ring-primary rounded" : ""}`}
             ref={editorContainerRef}
+            data-testid="editor-drop-zone"
             onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
             onDragLeave={() => setIsDraggingOver(false)}
             onDrop={async (e) => {

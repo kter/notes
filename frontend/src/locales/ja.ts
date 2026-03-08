@@ -136,6 +136,7 @@ export const ja = {
     uploading: "アップロード中...",
     fullscreen: "フルスクリーン",
     exitFullscreen: "フルスクリーン終了",
+    imageTooLarge: "画像が大きすぎます。10MB未満の画像を使用してください。",
   },
 
   // AI Panel
@@ -353,6 +354,9 @@ export type TranslationKeys = {
     share: string;
     shareNote: string;
     uploading: string;
+    fullscreen: string;
+    exitFullscreen: string;
+    imageTooLarge: string;
   };
   ai: {
     title: string;

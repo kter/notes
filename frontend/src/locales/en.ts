@@ -134,6 +134,8 @@ export const en = {
     share: "Share",
     shareNote: "Share note",
     uploading: "Uploading...",
+    fullscreen: "Fullscreen",
+    exitFullscreen: "Exit Fullscreen",
   },
 
   // AI Panel
@@ -352,6 +354,8 @@ export type TranslationKeys = {
     share: string;
     shareNote: string;
     uploading: string;
+    fullscreen: string;
+    exitFullscreen: string;
   };
   ai: {
     title: string;

@@ -9,7 +9,7 @@ import type { Note, Folder, TokenUsageRead } from "@/types";
 import { useApi, useTranslation } from "@/hooks";
 import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon, Maximize2Icon, Minimize2Icon } from "lucide-react";
-import { useEffect, useState, useRef, useCallback, KeyboardEvent, useDeferredValue, useLayoutEffect } from "react";
+import { useEffect, useState, useRef, useCallback, KeyboardEvent, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { SyncStatus } from "@/hooks/useNotes";
@@ -63,6 +63,7 @@ export function EditorPanel({
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
@@ -457,31 +458,35 @@ export function EditorPanel({
 
 
 
-  // Fullscreen keyboard shortcuts
+  // Fullscreen API toggle
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await fullscreenContainerRef.current?.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  }, []);
+
+  // Sync React state with Fullscreen API (handles ESC key from browser)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  // Fullscreen keyboard shortcut (Ctrl/Cmd+Shift+F)
   useEffect(() => {
     const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape" && isFullscreen) {
-        setIsFullscreen(false);
-      } else if (e.key === "F" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      if (e.key === "F" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();
-        setIsFullscreen((prev) => !prev);
+        toggleFullscreen();
       }
     };
     document.addEventListener("keydown", handleGlobalKeyDown);
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [isFullscreen]);
-
-  // Prevent body scroll when fullscreen
-  useLayoutEffect(() => {
-    if (isFullscreen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isFullscreen]);
+  }, [toggleFullscreen]);
 
   // Scroll Sync Handlers (throttled with requestAnimationFrame, no content dependency)
   const handleEditorScroll = useCallback(() => {
@@ -651,7 +656,7 @@ export function EditorPanel({
   // --- SAVE STATUS LOGIC END ---
 
   return (
-    <div className={isFullscreen ? "fixed inset-0 z-50 flex flex-col bg-background overflow-hidden" : "flex-1 flex flex-col overflow-hidden"}>
+    <div ref={fullscreenContainerRef} className={isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"}>
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">
@@ -807,7 +812,7 @@ export function EditorPanel({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsFullscreen(!isFullscreen)}
+            onClick={toggleFullscreen}
             aria-label={isFullscreen ? t("editor.exitFullscreen") : t("editor.fullscreen")}
             data-testid="editor-fullscreen-button"
             title={isFullscreen ? t("editor.exitFullscreen") : t("editor.fullscreen")}

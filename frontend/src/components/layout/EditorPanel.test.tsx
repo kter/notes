@@ -1,9 +1,10 @@
 
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, createEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EditorPanel } from './EditorPanel'
 import type { Note } from '@/types'
 import { calculateHash } from '@/lib/utils'
+import { useApi } from '@/hooks/useApi'
 
 // Mock react-markdown
 vi.mock('react-markdown', () => ({
@@ -24,9 +25,9 @@ vi.mock('@/hooks/useTranslation', () => ({
 
 // Mock useApi
 vi.mock('@/hooks/useApi', () => ({
-  useApi: () => ({
+  useApi: vi.fn(() => ({
     getApi: vi.fn(),
-  }),
+  })),
 }))
 
 // Mock Clock to avoid interval timers
@@ -227,6 +228,92 @@ describe('EditorPanel', () => {
 
       unmount()
       expect(document.body.style.overflow).toBe('')
+    })
+  })
+
+  describe('Image upload size validation', () => {
+    const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+
+    let uploadImageMock: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      uploadImageMock = vi.fn().mockResolvedValue({ url: 'https://cdn.example.com/image.png' })
+      vi.mocked(useApi).mockReturnValue({
+        getApi: vi.fn().mockResolvedValue({ uploadImage: uploadImageMock }),
+      })
+    })
+
+    afterEach(() => {
+      vi.mocked(useApi).mockReturnValue({ getApi: vi.fn() })
+    })
+
+    const dropFile = async (file: File) => {
+      const dropZone = screen.getByTestId('editor-drop-zone')
+      const dropEvent = createEvent.drop(dropZone)
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: { files: [file] } })
+      await act(async () => { fireEvent(dropZone, dropEvent) })
+    }
+
+    const pasteFile = async (file: File) => {
+      const textarea = screen.getByTestId('editor-content-input')
+      const pasteEvent = createEvent.paste(textarea)
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: { files: [file] } })
+      await act(async () => { fireEvent(textarea, pasteEvent) })
+    }
+
+    it('shows error and does not upload when dropped image exceeds 5MB', async () => {
+      const largeFile = new File([new Uint8Array(MAX_SIZE + 1)], 'large.png', { type: 'image/png' })
+
+      render(<EditorPanel {...defaultProps} />)
+      await dropFile(largeFile)
+
+      expect(screen.getByText('editor.imageTooLarge')).toBeInTheDocument()
+      expect(uploadImageMock).not.toHaveBeenCalled()
+    })
+
+    it('shows error and does not upload when pasted image exceeds 5MB', async () => {
+      const largeFile = new File([new Uint8Array(MAX_SIZE + 1)], 'large.png', { type: 'image/png' })
+
+      render(<EditorPanel {...defaultProps} />)
+      await pasteFile(largeFile)
+
+      expect(screen.getByText('editor.imageTooLarge')).toBeInTheDocument()
+      expect(uploadImageMock).not.toHaveBeenCalled()
+    })
+
+    it('auto-dismisses error message after 5 seconds', async () => {
+      vi.useFakeTimers()
+      const largeFile = new File([new Uint8Array(MAX_SIZE + 1)], 'large.png', { type: 'image/png' })
+
+      render(<EditorPanel {...defaultProps} />)
+      await dropFile(largeFile)
+
+      expect(screen.getByText('editor.imageTooLarge')).toBeInTheDocument()
+
+      await act(async () => { vi.advanceTimersByTime(5000) })
+
+      expect(screen.queryByText('editor.imageTooLarge')).not.toBeInTheDocument()
+      vi.useRealTimers()
+    })
+
+    it('does not show error for image exactly at 5MB (boundary: allowed)', async () => {
+      const exactFile = new File([new Uint8Array(MAX_SIZE)], 'exact.png', { type: 'image/png' })
+
+      render(<EditorPanel {...defaultProps} />)
+      await dropFile(exactFile)
+
+      expect(screen.queryByText('editor.imageTooLarge')).not.toBeInTheDocument()
+      expect(uploadImageMock).toHaveBeenCalled()
+    })
+
+    it('calls uploadImage for valid-sized image drop', async () => {
+      const validFile = new File(['png'], 'small.png', { type: 'image/png' })
+
+      render(<EditorPanel {...defaultProps} />)
+      await dropFile(validFile)
+
+      expect(screen.queryByText('editor.imageTooLarge')).not.toBeInTheDocument()
+      expect(uploadImageMock).toHaveBeenCalledWith(validFile)
     })
   })
 

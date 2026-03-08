@@ -134,6 +134,8 @@ export const en = {
     share: "Share",
     shareNote: "Share note",
     uploading: "Uploading...",
+    fullscreen: "Fullscreen",
+    exitFullscreen: "Exit Fullscreen",
     imageTooLarge: "Image is too large. Please use an image under 10MB.",
   },
 
@@ -353,6 +355,8 @@ export type TranslationKeys = {
     share: string;
     shareNote: string;
     uploading: string;
+    fullscreen: string;
+    exitFullscreen: string;
     imageTooLarge: string;
   };
   ai: {

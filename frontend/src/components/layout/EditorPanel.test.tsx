@@ -127,107 +127,92 @@ describe('EditorPanel', () => {
   })
 
   describe('Fullscreen mode', () => {
+    let requestFullscreenMock: ReturnType<typeof vi.fn>
+    let exitFullscreenMock: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      requestFullscreenMock = vi.fn().mockImplementation(() => {
+        Object.defineProperty(document, 'fullscreenElement', { value: document.body, configurable: true })
+        document.dispatchEvent(new Event('fullscreenchange'))
+        return Promise.resolve()
+      })
+      exitFullscreenMock = vi.fn().mockImplementation(() => {
+        Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+        document.dispatchEvent(new Event('fullscreenchange'))
+        return Promise.resolve()
+      })
+      HTMLElement.prototype.requestFullscreen = requestFullscreenMock
+      document.exitFullscreen = exitFullscreenMock
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+    })
+
+    afterEach(() => {
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+    })
+
     it('renders fullscreen toggle button', () => {
       render(<EditorPanel {...defaultProps} />)
       expect(screen.getByTestId('editor-fullscreen-button')).toBeInTheDocument()
     })
 
-    it('enters fullscreen when toggle button is clicked', () => {
+    it('calls requestFullscreen when toggle button is clicked', async () => {
       render(<EditorPanel {...defaultProps} />)
       const button = screen.getByTestId('editor-fullscreen-button')
-      fireEvent.click(button)
-      // In fullscreen mode, the outer container has fixed positioning
-      const container = button.closest('[class*="fixed"]')
-      expect(container).toBeInTheDocument()
+      await act(async () => { fireEvent.click(button) })
+      expect(requestFullscreenMock).toHaveBeenCalled()
     })
 
-    it('exits fullscreen when toggle button is clicked again', () => {
+    it('calls exitFullscreen when button is clicked while in fullscreen', async () => {
       render(<EditorPanel {...defaultProps} />)
       const button = screen.getByTestId('editor-fullscreen-button')
 
       // Enter fullscreen
-      fireEvent.click(button)
-      expect(button.closest('[class*="fixed"]')).toBeInTheDocument()
+      await act(async () => { fireEvent.click(button) })
+      expect(requestFullscreenMock).toHaveBeenCalled()
 
       // Exit fullscreen
-      fireEvent.click(button)
-      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+      await act(async () => { fireEvent.click(button) })
+      expect(exitFullscreenMock).toHaveBeenCalled()
     })
 
-    it('shows exit fullscreen aria-label when in fullscreen', () => {
+    it('shows exit fullscreen aria-label when in fullscreen', async () => {
       render(<EditorPanel {...defaultProps} />)
       const button = screen.getByTestId('editor-fullscreen-button')
       expect(button).toHaveAttribute('aria-label', 'editor.fullscreen')
 
-      fireEvent.click(button)
+      await act(async () => { fireEvent.click(button) })
       expect(button).toHaveAttribute('aria-label', 'editor.exitFullscreen')
     })
 
-    it('exits fullscreen when Escape key is pressed', () => {
+    it('syncs state when fullscreenchange event fires (e.g. ESC key)', async () => {
       render(<EditorPanel {...defaultProps} />)
       const button = screen.getByTestId('editor-fullscreen-button')
 
-      // Enter fullscreen first
-      fireEvent.click(button)
-      expect(button.closest('[class*="fixed"]')).toBeInTheDocument()
+      // Enter fullscreen
+      await act(async () => { fireEvent.click(button) })
+      expect(button).toHaveAttribute('aria-label', 'editor.exitFullscreen')
 
-      // Press Escape to exit
-      fireEvent.keyDown(document, { key: 'Escape' })
-      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
+      // Simulate browser ESC by dispatching fullscreenchange with no fullscreenElement
+      await act(async () => {
+        Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+        document.dispatchEvent(new Event('fullscreenchange'))
+      })
+      expect(button).toHaveAttribute('aria-label', 'editor.fullscreen')
     })
 
-    it('Escape key has no effect when not in fullscreen', () => {
-      render(<EditorPanel {...defaultProps} />)
-      const button = screen.getByTestId('editor-fullscreen-button')
-
-      // Ensure we are not in fullscreen
-      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
-
-      // Pressing Escape should not change anything
-      fireEvent.keyDown(document, { key: 'Escape' })
-      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
-    })
-
-    it('toggles fullscreen with Ctrl+Shift+F', () => {
+    it('toggles fullscreen with Ctrl+Shift+F', async () => {
       render(<EditorPanel {...defaultProps} />)
       const button = screen.getByTestId('editor-fullscreen-button')
 
       // Toggle on
-      fireEvent.keyDown(document, { key: 'F', ctrlKey: true, shiftKey: true })
-      expect(button.closest('[class*="fixed"]')).toBeInTheDocument()
+      await act(async () => { fireEvent.keyDown(document, { key: 'F', ctrlKey: true, shiftKey: true }) })
+      expect(requestFullscreenMock).toHaveBeenCalled()
+      expect(button).toHaveAttribute('aria-label', 'editor.exitFullscreen')
 
       // Toggle off
-      fireEvent.keyDown(document, { key: 'F', ctrlKey: true, shiftKey: true })
-      expect(button.closest('[class*="fixed"]')).not.toBeInTheDocument()
-    })
-
-    it('sets body overflow to hidden when fullscreen is active', () => {
-      render(<EditorPanel {...defaultProps} />)
-      expect(document.body.style.overflow).toBe('')
-
-      fireEvent.click(screen.getByTestId('editor-fullscreen-button'))
-      expect(document.body.style.overflow).toBe('hidden')
-    })
-
-    it('restores body overflow when exiting fullscreen', () => {
-      render(<EditorPanel {...defaultProps} />)
-      const button = screen.getByTestId('editor-fullscreen-button')
-
-      fireEvent.click(button)
-      expect(document.body.style.overflow).toBe('hidden')
-
-      fireEvent.click(button)
-      expect(document.body.style.overflow).toBe('')
-    })
-
-    it('restores body overflow on unmount', () => {
-      const { unmount } = render(<EditorPanel {...defaultProps} />)
-
-      fireEvent.click(screen.getByTestId('editor-fullscreen-button'))
-      expect(document.body.style.overflow).toBe('hidden')
-
-      unmount()
-      expect(document.body.style.overflow).toBe('')
+      await act(async () => { fireEvent.keyDown(document, { key: 'F', ctrlKey: true, shiftKey: true }) })
+      expect(exitFullscreenMock).toHaveBeenCalled()
+      expect(button).toHaveAttribute('aria-label', 'editor.fullscreen')
     })
   })
 

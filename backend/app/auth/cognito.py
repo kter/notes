@@ -59,6 +59,7 @@ class CognitoJWTVerifier:
             return {
                 "sub": "integration-test-user-id",
                 "username": "integration-test-user",
+                "email": "integration-test-user@example.com",
                 "token_use": "access",
                 "scope": "aws.cognito.signin.user.admin",
             }
@@ -67,6 +68,7 @@ class CognitoJWTVerifier:
             return {
                 "sub": "integration-test-user-id-2",
                 "username": "integration-test-user-2",
+                "email": "integration-test-user-2@example.com",
                 "token_use": "access",
                 "scope": "aws.cognito.signin.user.admin",
             }

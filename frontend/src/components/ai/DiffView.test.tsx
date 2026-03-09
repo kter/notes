@@ -91,4 +91,9 @@ describe("DiffView", () => {
     expect(queryByTestId("diff-accept-button")).toBeNull();
     expect(queryByTestId("diff-reject-button")).toBeNull();
   });
+
+  it("fullSizeのとき差分ラッパーがflex classを持つ", () => {
+    const { container } = render(<DiffView {...defaultProps} fullSize />);
+    expect(container.querySelector('[data-testid="diff-view"]')?.className).toContain("flex");
+  });
 });

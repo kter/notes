@@ -1,4 +1,5 @@
 import json
+import re
 from abc import ABC, abstractmethod
 
 import boto3
@@ -40,6 +41,21 @@ class AIService(ABC):
         """
         pass
 
+    @abstractmethod
+    async def edit(
+        self,
+        content: str,
+        instruction: str,
+        model_id: str | None = None,
+        language: str = "auto",
+    ) -> tuple[str, int]:
+        """Edit content based on the given instruction.
+
+        Returns:
+            Tuple of (edited_content, total_tokens_used)
+        """
+        pass
+
 
 
 
@@ -58,6 +74,7 @@ class BedrockService(AIService):
         messages: list[dict],
         system: str | None = None,
         model_id: str | None = None,
+        max_tokens: int = 4096,
     ) -> tuple[str, int]:
         """Invoke the Bedrock model and return the response text and token usage.
 
@@ -66,7 +83,7 @@ class BedrockService(AIService):
         """
         body = {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 4096,
+            "max_tokens": max_tokens,
             "messages": messages,
         }
 
@@ -176,6 +193,48 @@ class BedrockService(AIService):
         )
 
         return self._invoke_model(messages, system, model_id=model_id)
+
+    @staticmethod
+    def _extract_edited_content(text: str) -> str:
+        """Extract content from <edited_content> tags. Falls back to full text if no tags found."""
+        match = re.search(
+            r"<edited_content>(.*?)</edited_content>", text, re.DOTALL
+        )
+        if match:
+            return match.group(1).strip()
+        return text.strip()
+
+    async def edit(
+        self,
+        content: str,
+        instruction: str,
+        model_id: str | None = None,
+        language: str = "auto",
+    ) -> tuple[str, int]:
+        """Edit content based on the given instruction.
+
+        Returns:
+            Tuple of (edited_content, total_tokens_used)
+        """
+        resolved_lang = self._resolve_language(language)
+        system = get_prompt("edit", resolved_lang)
+
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"<current_content>\n{content}\n</current_content>\n\n"
+                    f"Instruction: {instruction}"
+                ),
+            }
+        ]
+
+        response_text, total_tokens = self._invoke_model(
+            messages, system, model_id=model_id, max_tokens=8192
+        )
+
+        edited_content = self._extract_edited_content(response_text)
+        return edited_content, total_tokens
 
 
 # Singleton instance

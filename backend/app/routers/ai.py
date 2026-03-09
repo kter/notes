@@ -74,6 +74,21 @@ class ChatResponse(BaseModel):
     tokens_used: int = 0
 
 
+class EditRequest(BaseModel):
+    """Request schema for AI edit."""
+
+    content: str
+    instruction: str
+    note_id: UUID | None = None
+
+
+class EditResponse(BaseModel):
+    """Response schema for AI edit."""
+
+    edited_content: str
+    tokens_used: int = 0
+
+
 def _check_token_limit(session: Session, user_id: str) -> None:
     """Check if user has exceeded token limit. Raises 429 if exceeded."""
     if not check_limit(session, user_id):
@@ -147,3 +162,45 @@ async def chat_with_context(
         record_usage(session, user_id, tokens_used)
 
     return ChatResponse(answer=answer, tokens_used=tokens_used)
+
+
+@router.post("/edit", response_model=EditResponse)
+async def edit_note_content(
+    request: EditRequest,
+    user_id: UserId,
+    session: Annotated[Session, Depends(get_session)],
+    ai_service: Annotated[AIService, Depends(get_ai_service)],
+):
+    """Edit note content using AI based on user instructions."""
+    if not request.content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Content is empty",
+        )
+
+    if not request.instruction.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Instruction is empty",
+        )
+
+    # Verify note ownership if note_id is provided
+    if request.note_id:
+        get_owned_resource(session, Note, request.note_id, user_id, "Note")
+
+    # Check token limit before making AI call
+    _check_token_limit(session, user_id)
+
+    model_id, language = get_user_settings(session, user_id)
+    edited_content, tokens_used = await ai_service.edit(
+        content=request.content,
+        instruction=request.instruction,
+        model_id=model_id,
+        language=language,
+    )
+
+    # Record token usage
+    if tokens_used > 0:
+        record_usage(session, user_id, tokens_used)
+
+    return EditResponse(edited_content=edited_content, tokens_used=tokens_used)

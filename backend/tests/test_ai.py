@@ -24,6 +24,15 @@ class MockAIService(AIService):
     ) -> tuple[str, int]:
         return f"Answer for '{question}' based on {len(content)} chars", 20
 
+    async def edit(
+        self,
+        content: str,
+        instruction: str,
+        model_id: str | None = None,
+        language: str = "auto",
+    ) -> tuple[str, int]:
+        return f"Edited: {content}", 30
+
 
 @pytest.fixture
 def mock_ai_service():
@@ -127,4 +136,76 @@ def test_chat_all_scope(client: TestClient, session: Session, mock_ai_service):
     assert response.status_code == 200
 
 
+def test_edit_note_content(client: TestClient, session: Session, mock_ai_service):
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "Hello world",
+            "instruction": "Fix typos",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "edited_content" in data
+    assert data["tokens_used"] == 30
+
+
+def test_edit_with_note_id(client: TestClient, session: Session, mock_ai_service):
+    user_id = "test-user-123"
+    note = Note(title="Test Note", content="Test Content", user_id=user_id)
+    session.add(note)
+    session.commit()
+
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "Test Content",
+            "instruction": "Improve grammar",
+            "note_id": str(note.id),
+        },
+    )
+    assert response.status_code == 200
+    assert "edited_content" in response.json()
+
+
+def test_edit_empty_content(client: TestClient, session: Session, mock_ai_service):
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "  ",
+            "instruction": "Fix typos",
+        },
+    )
+    assert response.status_code == 400
+    assert "empty" in response.json()["detail"].lower()
+
+
+def test_edit_empty_instruction(client: TestClient, session: Session, mock_ai_service):
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "Hello world",
+            "instruction": "  ",
+        },
+    )
+    assert response.status_code == 400
+    assert "empty" in response.json()["detail"].lower()
+
+
+def test_edit_unowned_note(make_client, session: Session, mock_ai_service):
+    other_user_id = "other-user"
+    note = Note(title="Other's Note", content="Secret content", user_id=other_user_id)
+    session.add(note)
+    session.commit()
+
+    client = make_client("test-user-123")
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "Some content",
+            "instruction": "Fix typos",
+            "note_id": str(note.id),
+        },
+    )
+    assert response.status_code == 404
 

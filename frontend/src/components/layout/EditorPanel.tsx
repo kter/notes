@@ -36,6 +36,8 @@ interface EditorPanelProps {
   triggerServerSync?: (id: string) => void;
   savedHash?: string;
   tokenUsage?: TokenUsageRead | null;
+  onContentChange?: (content: string) => void;
+  contentOverride?: { content: string; version: number } | null;
 }
 
 export function EditorPanel({
@@ -48,6 +50,8 @@ export function EditorPanel({
   isChatOpen,
   isSummarizing = false,
   syncStatus,
+  onContentChange,
+  contentOverride,
   triggerServerSync,
   savedHash,
   tokenUsage,
@@ -121,6 +125,15 @@ export function EditorPanel({
     // So we don't need to sync state here, just refs.
   }, [note?.id, note?.title, note?.content]);
 
+  // Apply content override from AI edit accept
+  const contentOverrideVersionRef = useRef<number>(-1);
+  useEffect(() => {
+    if (contentOverride && contentOverride.version !== contentOverrideVersionRef.current) {
+      contentOverrideVersionRef.current = contentOverride.version;
+      handleContentChange(contentOverride.content);
+    }
+  }, [contentOverride]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Trigger server sync on unmount or when switching notes
   // Store note.id in a ref so cleanup function has access to the current value
   const noteIdRef = useRef(note?.id);
@@ -189,10 +202,11 @@ export function EditorPanel({
     currentTitleRef.current = value;
   };
 
-  const handleContentChange = (value: string) => {
+  const handleContentChange = useCallback((value: string) => {
     setContent(value);
     currentContentRef.current = value;
-  };
+    onContentChange?.(value);
+  }, [onContentChange]);
 
   const handleBlur = () => {
     // Use refs to check for changes to ensure we have the latest values

@@ -168,6 +168,18 @@ export const ja = {
     openAIChat: "AIチャットを開く",
   },
 
+  // AI Edit
+  aiEdit: {
+    edit: "編集",
+    editPlaceholder: "編集内容を説明してください...",
+    accept: "適用",
+    reject: "却下",
+    accepted: "編集を適用しました",
+    rejected: "編集を却下しました",
+    noNoteForEdit: "編集するノートを選択してください",
+    noChanges: "変更はありませんでした",
+  },
+
   // Auth
   auth: {
     login: "ログイン",
@@ -384,6 +396,16 @@ export type TranslationKeys = {
     askAboutThisFolder: string;
     askAboutAllNotes: string;
     openAIChat: string;
+  };
+  aiEdit: {
+    edit: string;
+    editPlaceholder: string;
+    accept: string;
+    reject: string;
+    accepted: string;
+    rejected: string;
+    noNoteForEdit: string;
+    noChanges: string;
   };
   auth: {
     login: string;

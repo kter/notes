@@ -36,6 +36,15 @@ class MockAIServiceWithTokens(AIService):
     ) -> tuple[str, int]:
         return f"Answer for '{question}' based on {len(content)} chars", 200
 
+    async def edit(
+        self,
+        content: str,
+        instruction: str,
+        model_id: str | None = None,
+        language: str = "auto",
+    ) -> tuple[str, int]:
+        return f"Edited: {content}", 100
+
 
 @pytest.fixture
 def mock_ai_service():

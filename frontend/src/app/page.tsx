@@ -101,6 +101,13 @@ export default function Home() {
     }
   }, [handleAcceptEdit, selectedNoteId, handleUpdateNote]);
 
+  // Derive the last pending edit proposal from chatMessages
+  const pendingEditEntry = chatMessages.reduce<
+    { message: (typeof chatMessages)[0]; index: number } | null
+  >((found, msg, idx) =>
+    msg.editProposal?.status === "pending" ? { message: msg, index: idx } : found
+  , null);
+
   // Chat panel resize
   const chatPanelResize = useResizable({
     storageKey: "notes-chat-width",
@@ -242,6 +249,13 @@ export default function Home() {
               tokenUsage={tokenUsage}
               onContentChange={handleEditorContentChange}
               contentOverride={contentOverride}
+              pendingEditProposal={pendingEditEntry?.message.editProposal ?? null}
+              onAcceptEdit={pendingEditEntry
+                ? () => handleAcceptEditAndApply(pendingEditEntry.index)
+                : undefined}
+              onRejectEdit={pendingEditEntry
+                ? () => handleRejectEdit(pendingEditEntry.index)
+                : undefined}
             />
             <AIChatPanel
               isOpen={isChatOpen}

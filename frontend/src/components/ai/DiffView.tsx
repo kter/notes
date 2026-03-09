@@ -11,6 +11,7 @@ interface DiffViewProps {
   onAccept: () => void;
   onReject: () => void;
   isApplied?: "accepted" | "rejected" | null;
+  fullSize?: boolean;
 }
 
 export function DiffView({
@@ -19,6 +20,7 @@ export function DiffView({
   onAccept,
   onReject,
   isApplied,
+  fullSize,
 }: DiffViewProps) {
   const { t } = useTranslation();
   const changes = diffLines(originalContent, editedContent);
@@ -42,8 +44,11 @@ export function DiffView({
   }
 
   return (
-    <div className="mt-2" data-testid="diff-view">
-      <ScrollArea className="max-h-[300px] rounded-md border border-border/50 bg-muted/30">
+    <div className={cn("mt-2", fullSize && "flex flex-col flex-1 min-h-0")} data-testid="diff-view">
+      <ScrollArea className={cn(
+        "rounded-md border border-border/50 bg-muted/30",
+        fullSize ? "flex-1 min-h-0" : "max-h-[300px]"
+      )}>
         <div className="font-mono text-xs p-2">
           {changes.map((change, idx) => {
             const lines = change.value.replace(/\n$/, "").split("\n");
@@ -65,7 +70,7 @@ export function DiffView({
           })}
         </div>
       </ScrollArea>
-      <div className="flex gap-2 mt-2">
+      <div className="flex gap-2 mt-2 shrink-0">
         <Button
           size="sm"
           variant="default"

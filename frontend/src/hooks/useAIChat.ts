@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApi } from "./useApi";
+import { useTranslation } from "./useTranslation";
 import type { ChatMessage } from "@/types";
 
 export type ChatScope = "note" | "folder" | "all";
@@ -30,6 +31,7 @@ interface UseAIChatReturn {
 
 export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatReturn {
   const { getApi } = useApi();
+  const { t } = useTranslation();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAILoading, setIsAILoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -56,7 +58,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     } catch (error: unknown) {
       console.error("Failed to summarize:", error);
       if ((error as { status?: number })?.status === 429) {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings." }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: t("aiEdit.tokenLimitExceeded") }]);
       }
     } finally {
       setIsAILoading(false);
@@ -95,7 +97,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     } catch (error: unknown) {
       console.error("Failed to chat:", error);
       if ((error as { status?: number })?.status === 429) {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings." }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: t("aiEdit.tokenLimitExceeded") }]);
       }
     } finally {
       setIsAILoading(false);
@@ -141,7 +143,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
         assistantMessage.editProposal = undefined;
         setChatMessages((prev) => [
           ...prev,
-          { role: "assistant", content: "No changes were needed." },
+          { role: "assistant", content: t("aiEdit.noChanges") },
         ]);
       } else {
         setChatMessages((prev) => [...prev, assistantMessage]);
@@ -151,19 +153,12 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
       if ((error as { status?: number })?.status === 429) {
         setChatMessages((prev) => [
           ...prev,
-          {
-            role: "assistant",
-            content:
-              "Error: Monthly token limit exceeded. Please try again next month or adjust your settings.",
-          },
+          { role: "assistant", content: t("aiEdit.tokenLimitExceeded") },
         ]);
       } else {
         setChatMessages((prev) => [
           ...prev,
-          {
-            role: "assistant",
-            content: "Error: Failed to edit content. Please try again.",
-          },
+          { role: "assistant", content: t("aiEdit.editFailed") },
         ]);
       }
     } finally {

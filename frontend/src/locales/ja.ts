@@ -179,6 +179,8 @@ export const ja = {
     noNoteForEdit: "編集するノートを選択してください",
     noChanges: "変更はありませんでした",
     reviewInEditor: "編集案の確認はエディターで行ってください",
+    tokenLimitExceeded: "エラー: 月間トークン上限に達しました。来月以降にお試しいただくか、設定を変更してください。",
+    editFailed: "エラー: 編集に失敗しました。もう一度お試しください。",
   },
 
   // Auth

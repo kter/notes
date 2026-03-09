@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Clock } from "@/components/Clock";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import type { Note, Folder, TokenUsageRead } from "@/types";
+import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
+import { DiffView } from "@/components/ai/DiffView";
 import { useApi, useTranslation } from "@/hooks";
 import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon, Maximize2Icon, Minimize2Icon } from "lucide-react";
@@ -38,6 +39,9 @@ interface EditorPanelProps {
   tokenUsage?: TokenUsageRead | null;
   onContentChange?: (content: string) => void;
   contentOverride?: { content: string; version: number } | null;
+  pendingEditProposal?: EditProposal | null;
+  onAcceptEdit?: () => void;
+  onRejectEdit?: () => void;
 }
 
 export function EditorPanel({
@@ -55,6 +59,9 @@ export function EditorPanel({
   triggerServerSync,
   savedHash,
   tokenUsage,
+  pendingEditProposal,
+  onAcceptEdit,
+  onRejectEdit,
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -123,7 +130,8 @@ export function EditorPanel({
     // However, the existing logic `useState(note?.title)` only runs on mount.
     // The key={note.id} in parent ensures re-mount on switch.
     // So we don't need to sync state here, just refs.
-  }, [note?.id, note?.title, note?.content]);
+    onContentChange?.(note?.content ?? "");
+  }, [note?.id, note?.title, note?.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply content override from AI edit accept
   const contentOverrideVersionRef = useRef<number>(-1);
@@ -789,6 +797,7 @@ export function EditorPanel({
             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
             className="gap-1 md:gap-2"
             data-testid="editor-preview-toggle"
+            disabled={!!pendingEditProposal}
           >
             {isPreviewOpen ? (
               <EyeOffIcon className="h-4 w-4" />
@@ -882,60 +891,74 @@ export function EditorPanel({
             </div>
           )}
 
-          {/* Markdown Editor Column */}
-          <div
-            className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""} ${isDraggingOver ? "ring-2 ring-primary rounded" : ""}`}
-            ref={editorContainerRef}
-            data-testid="editor-drop-zone"
-            onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
-            onDragLeave={() => setIsDraggingOver(false)}
-            onDrop={async (e) => {
-              e.preventDefault();
-              setIsDraggingOver(false);
-              const file = e.dataTransfer.files[0];
-              if (file) await handleImageUpload(file);
-            }}
-          >
-            <label htmlFor="note-content" className="sr-only">Note content</label>
-            <Textarea
-              id="note-content"
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onScroll={handleEditorScroll}
-              onBlur={handleBlur}
-              onPaste={async (e) => {
-                const file = e.clipboardData.files[0];
-                if (file?.type.startsWith("image/")) {
-                  e.preventDefault();
-                  await handleImageUpload(file);
-                }
-              }}
-              placeholder={t("editor.noteContentPlaceholder")}
-              className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
-              data-testid="editor-content-input"
-            />
-          </div>
-
-
-          {/* Markdown Preview Column */}
-          {isPreviewOpen && (
+          {pendingEditProposal ? (
+            <div className="flex flex-col flex-1 min-h-0" data-testid="editor-diff-panel">
+              <DiffView
+                originalContent={pendingEditProposal.originalContent}
+                editedContent={pendingEditProposal.editedContent}
+                onAccept={onAcceptEdit ?? (() => {})}
+                onReject={onRejectEdit ?? (() => {})}
+                isApplied={null}
+                fullSize
+              />
+            </div>
+          ) : (
             <>
-              <Separator orientation="vertical" />
+              {/* Markdown Editor Column */}
               <div
-                className="flex-1 min-w-0 overflow-y-auto"
-                ref={previewContainerRef}
-                onScroll={handlePreviewScroll}
+                className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""} ${isDraggingOver ? "ring-2 ring-primary rounded" : ""}`}
+                ref={editorContainerRef}
+                data-testid="editor-drop-zone"
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+                onDragLeave={() => setIsDraggingOver(false)}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  setIsDraggingOver(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) await handleImageUpload(file);
+                }}
               >
-                <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                  >
-                    {deferredContent || `*${t("editor.previewPlaceholder")}*`}
-                  </ReactMarkdown>
-                </div>
+                <label htmlFor="note-content" className="sr-only">Note content</label>
+                <Textarea
+                  id="note-content"
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => handleContentChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onScroll={handleEditorScroll}
+                  onBlur={handleBlur}
+                  onPaste={async (e) => {
+                    const file = e.clipboardData.files[0];
+                    if (file?.type.startsWith("image/")) {
+                      e.preventDefault();
+                      await handleImageUpload(file);
+                    }
+                  }}
+                  placeholder={t("editor.noteContentPlaceholder")}
+                  className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
+                  data-testid="editor-content-input"
+                />
               </div>
+
+              {/* Markdown Preview Column */}
+              {isPreviewOpen && (
+                <>
+                  <Separator orientation="vertical" />
+                  <div
+                    className="flex-1 min-w-0 overflow-y-auto"
+                    ref={previewContainerRef}
+                    onScroll={handlePreviewScroll}
+                  >
+                    <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                      >
+                        {deferredContent || `*${t("editor.previewPlaceholder")}*`}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

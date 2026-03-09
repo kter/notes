@@ -330,19 +330,28 @@ export function AIChatPanel({
                       {msg.content && (
                         <p className="text-sm mb-2">{msg.content}</p>
                       )}
-                      <DiffView
-                        originalContent={msg.editProposal.originalContent}
-                        editedContent={msg.editProposal.editedContent}
-                        onAccept={() => onAcceptEdit?.(idx)}
-                        onReject={() => onRejectEdit?.(idx)}
-                        isApplied={
-                          msg.editProposal.status === "accepted"
-                            ? "accepted"
-                            : msg.editProposal.status === "rejected"
-                              ? "rejected"
-                              : null
-                        }
-                      />
+                      {msg.editProposal.status === "pending" ? (
+                        <div
+                          className="text-xs px-3 py-2 rounded-md mt-2 bg-primary/10 text-primary border border-primary/20"
+                          data-testid="diff-pending-indicator"
+                        >
+                          {t("aiEdit.reviewInEditor")}
+                        </div>
+                      ) : (
+                        <DiffView
+                          originalContent={msg.editProposal.originalContent}
+                          editedContent={msg.editProposal.editedContent}
+                          onAccept={() => {}}
+                          onReject={() => {}}
+                          isApplied={
+                            msg.editProposal.status === "accepted"
+                              ? "accepted"
+                              : msg.editProposal.status === "rejected"
+                                ? "rejected"
+                                : null
+                          }
+                        />
+                      )}
                     </div>
                   ) : (
                     <div data-testid="ai-message-content" className="prose prose-sm dark:prose-invert max-w-none break-words">

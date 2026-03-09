@@ -123,7 +123,11 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 # =============================================================================
 
 .PHONY: deploy
-deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-test ## Deploy both backend, frontend, and MCP, then run tests (optimized)
+deploy: ## Deploy both backend, frontend, and MCP, then run tests (optimized)
+	@$(MAKE) --no-print-directory _deploy-setup ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
+	@$(MAKE) --no-print-directory _deploy-backend ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
+	@$(MAKE) --no-print-directory _deploy-frontend ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
+	@$(MAKE) --no-print-directory _deploy-test ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
 	@echo "Full deployment and verification complete!"
 
 # =============================================================================
@@ -134,14 +138,15 @@ deploy: _deploy-setup _deploy-backend _deploy-frontend _deploy-test ## Deploy bo
 _deploy-setup: tf-switch ## One-time setup (terraform init + workspace switch)
 
 .PHONY: _deploy-backend
-_deploy-backend: _deploy-setup push-backend push-mcp-server ## Build, push, and deploy all Lambda functions via Terraform (optimized)
-	$(eval DIGEST := $(shell $(MAKE) get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
-	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$(DIGEST)" -var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" -auto-approve
+_deploy-backend: ## Build, push, and deploy all Lambda functions via Terraform (optimized)
+	@$(MAKE) --no-print-directory -j2 push-backend push-mcp-server ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
+	@DIGEST=$$($(MAKE) --no-print-directory get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)); \
+	MCP_SERVER_DIGEST=$$($(MAKE) --no-print-directory get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)); \
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$$DIGEST" -var="mcp_server_image_tag=$$MCP_SERVER_DIGEST" -auto-approve
 	@echo "Backend and MCP server deployed!"
 
 .PHONY: _deploy-frontend
-_deploy-frontend: _deploy-setup ## Build and deploy frontend to S3 (optimized)
+_deploy-frontend: ## Build and deploy frontend to S3 (optimized)
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
@@ -348,5 +353,3 @@ test-mcp-server: ## Test MCP server connection
 	@echo ""
 	@echo "To configure Claude Desktop, add the following to your MCP config:"
 	@echo '{"mcpServers": {"notes-app": {"url": "$(MCP_URL)/", "headers": {"Authorization": "Bearer <YOUR_COGNITO_TOKEN>"}}}}'
-
-

@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from sqlmodel import Field, SQLModel
 
 # Monthly token limit per user
-MONTHLY_TOKEN_LIMIT = 1_000_000
+MONTHLY_TOKEN_LIMIT = 30_000
 
 
 def _get_period_start() -> datetime:

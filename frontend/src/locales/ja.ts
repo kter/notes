@@ -168,6 +168,21 @@ export const ja = {
     openAIChat: "AIチャットを開く",
   },
 
+  // AI Edit
+  aiEdit: {
+    edit: "編集",
+    editPlaceholder: "編集内容を説明してください...",
+    accept: "適用",
+    reject: "却下",
+    accepted: "編集を適用しました",
+    rejected: "編集を却下しました",
+    noNoteForEdit: "編集するノートを選択してください",
+    noChanges: "変更はありませんでした",
+    reviewInEditor: "編集案の確認はエディターで行ってください",
+    tokenLimitExceeded: "エラー: 月間トークン上限に達しました。来月以降にお試しいただくか、設定を変更してください。",
+    editFailed: "エラー: 編集に失敗しました。もう一度お試しください。",
+  },
+
   // Auth
   auth: {
     login: "ログイン",
@@ -384,6 +399,17 @@ export type TranslationKeys = {
     askAboutThisFolder: string;
     askAboutAllNotes: string;
     openAIChat: string;
+  };
+  aiEdit: {
+    edit: string;
+    editPlaceholder: string;
+    accept: string;
+    reject: string;
+    accepted: string;
+    rejected: string;
+    noNoteForEdit: string;
+    noChanges: string;
+    reviewInEditor: string;
   };
   auth: {
     login: string;

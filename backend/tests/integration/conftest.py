@@ -7,6 +7,9 @@ import pytest
 # I got this URL from `make tf-output` previously
 DEFAULT_DEV_API_URL = "https://cmwds5zjfa.execute-api.ap-northeast-1.amazonaws.com"
 
+# Token limit for integration test users (large enough to never hit in tests)
+INTEGRATION_TEST_TOKEN_LIMIT = 10_000_000
+
 @pytest.fixture(scope="session")
 def api_base_url():
     """Get the API base URL from environment or default."""
@@ -21,6 +24,20 @@ def auth_token():
 def test_user_id():
     """Return the user ID associated with the backdoor token."""
     return "integration-test-user-id"
+
+@pytest.fixture(scope="session", autouse=True)
+def set_integration_test_token_limits(api_base_url, auth_token):
+    """
+    Set a large token limit for integration test users at the start of the session.
+    This prevents AI endpoint tests from hitting the monthly token limit.
+    """
+    for token in (auth_token, "dev-integration-test-token-2"):
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        with httpx.Client(base_url=api_base_url, headers=headers, timeout=30.0) as c:
+            c.put("/api/settings", json={"token_limit": INTEGRATION_TEST_TOKEN_LIMIT})
 
 @pytest.fixture
 def client(api_base_url, auth_token):

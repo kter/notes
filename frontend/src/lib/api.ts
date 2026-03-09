@@ -1,6 +1,8 @@
 import type {
   ChatRequest,
   ChatResponse,
+  EditRequest,
+  EditResponse,
   Folder,
   FolderCreate,
   FolderUpdate,
@@ -146,6 +148,13 @@ class ApiClient {
 
   async chatWithNote(data: ChatRequest): Promise<ChatResponse> {
     return this.request<ChatResponse>("/api/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async editNoteContent(data: EditRequest): Promise<EditResponse> {
+    return this.request<EditResponse>("/api/ai/edit", {
       method: "POST",
       body: JSON.stringify(data),
     });

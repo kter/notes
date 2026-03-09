@@ -5,6 +5,7 @@ import { Loader2Icon, LogOutIcon, RefreshCwIcon, SearchIcon, ShieldAlertIcon } f
 import Link from "next/link";
 
 import type {
+  AvailableModel,
   AdminUserDetailResponse,
   AdminUserSummary,
 } from "@/types";
@@ -178,6 +179,22 @@ export function AdminConsole() {
     );
   }, [detail, formAdmin, formLanguage, formModelId, formTokenLimit]);
 
+  const modelOptions = useMemo<AvailableModel[]>(() => {
+    if (!detail) return [];
+    const hasCurrent = detail.available_models.some((model) => model.id === detail.settings.llm_model_id);
+    if (hasCurrent) {
+      return detail.available_models;
+    }
+    return [
+      {
+        id: detail.settings.llm_model_id,
+        name: `${detail.settings.llm_model_id} (current)`,
+        description: "Current saved model",
+      },
+      ...detail.available_models,
+    ];
+  }, [detail]);
+
   async function refreshList() {
     setSearchQuery((value) => value);
     const apiClient = await getApi();
@@ -201,12 +218,18 @@ export function AdminConsole() {
     setSaveMessage(null);
     try {
       const apiClient = await getApi();
-      const updated = await apiClient.updateAdminUser(detail.user.user_id, {
-        admin: formAdmin,
-        language: formLanguage,
-        llm_model_id: formModelId,
-        token_limit: tokenLimit,
-      });
+      const payload: {
+        admin?: boolean;
+        language?: string;
+        llm_model_id?: string;
+        token_limit?: number;
+      } = {};
+      if (formAdmin !== detail.user.admin) payload.admin = formAdmin;
+      if (formLanguage !== detail.settings.language) payload.language = formLanguage;
+      if (formModelId !== detail.settings.llm_model_id) payload.llm_model_id = formModelId;
+      if (tokenLimit !== detail.settings.token_limit) payload.token_limit = tokenLimit;
+
+      const updated = await apiClient.updateAdminUser(detail.user.user_id, payload);
       setDetail(updated);
       setUsers((current) =>
         current.map((item) =>
@@ -476,7 +499,7 @@ export function AdminConsole() {
                         onChange={(event) => setFormModelId(event.target.value)}
                         className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-stone-100"
                       >
-                        {detail.available_models.map((model) => (
+                        {modelOptions.map((model) => (
                           <option key={model.id} value={model.id}>
                             {model.name}
                           </option>

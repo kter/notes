@@ -54,8 +54,8 @@ def _should_bootstrap_admin(claims: dict) -> bool:
     if settings.environment == "dev" and user_id.startswith("integration-test-user-id"):
         return True
     return (
-        user_id in settings.bootstrap_admin_user_ids
-        or email in {item.lower() for item in settings.bootstrap_admin_emails}
+        user_id in settings.bootstrap_admin_user_id_list
+        or email in {item.lower() for item in settings.bootstrap_admin_email_list}
     )
 
 

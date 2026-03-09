@@ -29,13 +29,18 @@ export function DiffView({
     return (
       <div
         className={cn(
-          "text-xs px-3 py-2 rounded-md mt-2",
+          "flex items-center gap-1.5 text-xs px-3 py-2 rounded-md mt-2 font-medium border",
           isApplied === "accepted"
-            ? "bg-green-500/10 text-green-700 dark:text-green-400"
-            : "bg-red-500/10 text-red-700 dark:text-red-400"
+            ? "border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-300"
+            : "border-red-500 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-300"
         )}
         data-testid="diff-resolved"
       >
+        {isApplied === "accepted" ? (
+          <CheckIcon className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <XIcon className="h-3.5 w-3.5 shrink-0" />
+        )}
         {isApplied === "accepted"
           ? t("aiEdit.accepted")
           : t("aiEdit.rejected")}

@@ -35,6 +35,17 @@ function usageRatio(detail: AdminUserDetailResponse | null): number {
   return detail.token_usage.tokens_used / detail.token_usage.token_limit;
 }
 
+export function resolveMainAppHref(currentHref: string): string {
+  const url = new URL(currentHref);
+  if (url.hostname.startsWith("admin.")) {
+    url.hostname = url.hostname.slice("admin.".length);
+  }
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 export function AdminConsole() {
   const { isAuthenticated, isLoading: authLoading, signOut, user } = useAuth();
   const { getApi } = useApi();
@@ -57,6 +68,12 @@ export function AdminConsole() {
   const [formLanguage, setFormLanguage] = useState("auto");
   const [formModelId, setFormModelId] = useState("");
   const [formTokenLimit, setFormTokenLimit] = useState("30000");
+  const [mainAppHref, setMainAppHref] = useState("/");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setMainAppHref(resolveMainAppHref(window.location.href));
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -294,7 +311,7 @@ export function AdminConsole() {
               ログアウト
             </Button>
             <Button asChild>
-              <Link href="/">通常画面へ</Link>
+              <Link href={mainAppHref}>通常画面へ</Link>
             </Button>
           </div>
         </div>

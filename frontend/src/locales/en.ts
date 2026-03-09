@@ -179,6 +179,8 @@ export const en = {
     noNoteForEdit: "Select a note to edit",
     noChanges: "No changes were needed",
     reviewInEditor: "Edit proposal ready — review in editor",
+    tokenLimitExceeded: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings.",
+    editFailed: "Error: Failed to edit content. Please try again.",
   },
 
   // Auth
@@ -409,6 +411,8 @@ export type TranslationKeys = {
     noNoteForEdit: string;
     noChanges: string;
     reviewInEditor: string;
+    tokenLimitExceeded: string;
+    editFailed: string;
   };
   auth: {
     login: string;

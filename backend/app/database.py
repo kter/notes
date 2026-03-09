@@ -181,6 +181,25 @@ def create_db_and_tables() -> None:
                     except Exception as alter_error:
                         logger.warning(f"Failed to migrate user_settings: {alter_error}")
 
+                # Self-healing migration: Add 'token_limit' column to 'user_settings' if missing
+                if table_name == "user_settings":
+                    logger.info("Checking for 'token_limit' column in 'user_settings'...")
+                    try:
+                        with engine.connect() as conn:
+                            try:
+                                conn.execute(text("ALTER TABLE user_settings ADD COLUMN token_limit INTEGER"))
+                                conn.commit()
+                                conn.execute(text(f"UPDATE user_settings SET token_limit = {30_000} WHERE token_limit IS NULL"))
+                                conn.commit()
+                                logger.info("Added 'token_limit' column to 'user_settings' table")
+                            except Exception as add_error:
+                                if "already exists" in str(add_error).lower() or "duplicate column" in str(add_error).lower():
+                                    pass
+                                else:
+                                    logger.warning(f"Failed to add token_limit column: {add_error}")
+                    except Exception as alter_error:
+                        logger.warning(f"Failed to migrate user_settings token_limit: {alter_error}")
+
                 # Self-healing migration: Add 'last_used_at' column to 'mcp_tokens' if missing
                 if table_name == "mcp_tokens":
                     logger.info("Checking for 'last_used_at' column in 'mcp_tokens'...")

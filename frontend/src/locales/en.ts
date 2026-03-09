@@ -178,6 +178,7 @@ export const en = {
     rejected: "Edit rejected",
     noNoteForEdit: "Select a note to edit",
     noChanges: "No changes were needed",
+    reviewInEditor: "Edit proposal ready — review in editor",
   },
 
   // Auth
@@ -407,6 +408,7 @@ export type TranslationKeys = {
     rejected: string;
     noNoteForEdit: string;
     noChanges: string;
+    reviewInEditor: string;
   };
   auth: {
     login: string;

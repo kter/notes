@@ -178,6 +178,7 @@ export const ja = {
     rejected: "編集を却下しました",
     noNoteForEdit: "編集するノートを選択してください",
     noChanges: "変更はありませんでした",
+    reviewInEditor: "編集案の確認はエディターで行ってください",
   },
 
   // Auth
@@ -406,6 +407,7 @@ export type TranslationKeys = {
     rejected: string;
     noNoteForEdit: string;
     noChanges: string;
+    reviewInEditor: string;
   };
   auth: {
     login: string;

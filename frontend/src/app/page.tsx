@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   ThreeColumnLayout,
   Sidebar,
@@ -72,10 +72,34 @@ export default function Home() {
   const {
     chatMessages,
     isAILoading,
+    isEditMode,
+    setIsEditMode,
     handleSummarize,
     handleSendMessage,
+    handleSendEditRequest,
+    handleAcceptEdit,
+    handleRejectEdit,
     clearChat,
   } = useAIChat(recordUsage);
+
+  // Track current editor content for AI edit
+  const editorContentRef = useRef("");
+  const [contentOverride, setContentOverride] = useState<{ content: string; version: number } | null>(null);
+
+  const handleEditorContentChange = useCallback((content: string) => {
+    editorContentRef.current = content;
+  }, []);
+
+  const handleAcceptEditAndApply = useCallback((messageIndex: number) => {
+    const editedContent = handleAcceptEdit(messageIndex);
+    if (editedContent && selectedNoteId) {
+      setContentOverride((prev) => ({
+        content: editedContent,
+        version: (prev?.version ?? 0) + 1,
+      }));
+      handleUpdateNote(selectedNoteId, { content: editedContent });
+    }
+  }, [handleAcceptEdit, selectedNoteId, handleUpdateNote]);
 
   // Chat panel resize
   const chatPanelResize = useResizable({
@@ -216,6 +240,8 @@ export default function Home() {
               triggerServerSync={triggerServerSync}
               savedHash={selectedNote ? savedHashes[selectedNote.id] : undefined}
               tokenUsage={tokenUsage}
+              onContentChange={handleEditorContentChange}
+              contentOverride={contentOverride}
             />
             <AIChatPanel
               isOpen={isChatOpen}
@@ -229,6 +255,14 @@ export default function Home() {
               width={chatPanelResize.width}
               isResizing={chatPanelResize.isResizing}
               onResizeStart={chatPanelResize.handleMouseDown}
+              isEditMode={isEditMode}
+              onToggleEditMode={setIsEditMode}
+              onSendEditRequest={(instruction, _content, noteId) =>
+                handleSendEditRequest(instruction, editorContentRef.current, noteId)
+              }
+              onAcceptEdit={handleAcceptEditAndApply}
+              onRejectEdit={handleRejectEdit}
+              currentEditorContent=""
             />
           </div>
         }

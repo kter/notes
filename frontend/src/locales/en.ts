@@ -168,6 +168,18 @@ export const en = {
     openAIChat: "Open AI Chat",
   },
 
+  // AI Edit
+  aiEdit: {
+    edit: "Edit",
+    editPlaceholder: "Describe the edit you want to make...",
+    accept: "Accept",
+    reject: "Reject",
+    accepted: "Edit applied",
+    rejected: "Edit rejected",
+    noNoteForEdit: "Select a note to edit",
+    noChanges: "No changes were needed",
+  },
+
   // Auth
   auth: {
     login: "Login",
@@ -385,6 +397,16 @@ export type TranslationKeys = {
     askAboutThisFolder: string;
     askAboutAllNotes: string;
     openAIChat: string;
+  };
+  aiEdit: {
+    edit: string;
+    editPlaceholder: string;
+    accept: string;
+    reject: string;
+    accepted: string;
+    rejected: string;
+    noNoteForEdit: string;
+    noChanges: string;
   };
   auth: {
     login: string;

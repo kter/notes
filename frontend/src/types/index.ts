@@ -78,9 +78,16 @@ export interface SummarizeResponse {
   tokens_used: number;
 }
 
+export interface EditProposal {
+  originalContent: string;
+  editedContent: string;
+  status?: "pending" | "accepted" | "rejected";
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  editProposal?: EditProposal;
 }
 
 export interface ChatRequest {
@@ -96,6 +103,16 @@ export interface ChatResponse {
   tokens_used: number;
 }
 
+export interface EditRequest {
+  content: string;
+  instruction: string;
+  note_id?: string;
+}
+
+export interface EditResponse {
+  edited_content: string;
+  tokens_used: number;
+}
 
 // Settings types
 export interface UserSettings {

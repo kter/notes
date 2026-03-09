@@ -14,16 +14,18 @@ variable "project_name" {
 locals {
   env_config = {
     dev = {
-      domain_name      = "notes.dev.devtools.site"
-      hosted_zone_name = "dev.devtools.site"
-      enable_noindex   = true
-      mcp_domain_name  = "mcp.notes.dev.devtools.site"
+      domain_name       = "notes.dev.devtools.site"
+      admin_domain_name = "admin.notes.dev.devtools.site"
+      hosted_zone_name  = "dev.devtools.site"
+      enable_noindex    = true
+      mcp_domain_name   = "mcp.notes.dev.devtools.site"
     }
     prd = {
-      domain_name      = "notes.devtools.site"
-      hosted_zone_name = "devtools.site"
-      enable_noindex   = false
-      mcp_domain_name  = "mcp.notes.devtools.site"
+      domain_name       = "notes.devtools.site"
+      admin_domain_name = "admin.notes.devtools.site"
+      hosted_zone_name  = "devtools.site"
+      enable_noindex    = false
+      mcp_domain_name   = "mcp.notes.devtools.site"
     }
   }
 
@@ -61,4 +63,16 @@ variable "mcp_auth_manager_image_tag" {
   description = "Docker image tag for MCP Auth Manager Lambda function (e.g., 'latest' or sha256 digest)"
   type        = string
   default     = "latest"
+}
+
+variable "bootstrap_admin_emails" {
+  description = "Comma-separated list of emails to bootstrap as admin users"
+  type        = string
+  default     = ""
+}
+
+variable "bootstrap_admin_user_ids" {
+  description = "Comma-separated list of user IDs to bootstrap as admin users"
+  type        = string
+  default     = ""
 }

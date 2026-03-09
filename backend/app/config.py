@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +42,17 @@ class Settings(BaseSettings):
     # Image settings
     image_bucket_name: str = ""
     cdn_domain: str = "localhost:8000"
+    bootstrap_admin_emails: list[str] = []
+    bootstrap_admin_user_ids: list[str] = []
+
+    @field_validator("bootstrap_admin_emails", "bootstrap_admin_user_ids", mode="before")
+    @classmethod
+    def parse_csv_list(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, list):
+            return value
+        if not value:
+            return []
+        return [item.strip() for item in value.split(",") if item.strip()]
 
 
 @lru_cache

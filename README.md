@@ -9,6 +9,7 @@ A Mac Notes app clone web application with AI-powered features built using moder
 - 🤖 **AI Summarization**: Get AI-generated summaries of your notes
 - 💬 **AI Q&A**: Chat with AI about your note content
 - 🔒 **Authentication**: Secure auth via Amazon Cognito
+- 🛠️ **Admin Console**: Manage users, token limits, and per-user settings
 
 ## Tech Stack
 
@@ -138,6 +139,7 @@ DATABASE_URL=postgresql://notes:notes@db:5432/notes
 COGNITO_USER_POOL_ID=<your-pool-id>
 COGNITO_APP_CLIENT_ID=<your-client-id>
 BEDROCK_REGION=us-east-1
+BOOTSTRAP_ADMIN_EMAILS=admin@example.com
 ```
 
 ### Frontend (.env.local)
@@ -145,6 +147,14 @@ BEDROCK_REGION=us-east-1
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_ENVIRONMENT=dev
 ```
+
+## Admin Console
+
+- Production: `https://admin.notes.devtools.site`
+- Development: `https://admin.notes.dev.devtools.site`
+
+Users are shared with the main application. Only users with `admin=true` in the app database can access the admin console.
+For the initial bootstrap, configure `BOOTSTRAP_ADMIN_EMAILS` or `BOOTSTRAP_ADMIN_USER_IDS` on the backend so the first admin user can be provisioned automatically on login.
 
 ## Infrastructure Deployment
 

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import create_db_and_tables
-from app.routers import ai, folders, images, mcp, notes, settings, share
+from app.routers import admin, ai, folders, images, mcp, notes, settings, share
 
 settings_app = get_settings()
 
@@ -43,6 +43,7 @@ app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(mcp.router)
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(share.router, prefix="/api", tags=["share"])
+app.include_router(admin.router)
 
 
 _db_initialized = False

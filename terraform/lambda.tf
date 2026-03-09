@@ -11,18 +11,23 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      COGNITO_USER_POOL_ID   = aws_cognito_user_pool.main.id
-      COGNITO_APP_CLIENT_ID  = aws_cognito_user_pool_client.main.id
-      COGNITO_REGION         = var.aws_region
-      BEDROCK_REGION         = "us-east-1"
-      BEDROCK_MODEL_ID       = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-      DSQL_CLUSTER_ENDPOINT  = aws_dsql_cluster.main.identifier
-      CORS_ORIGINS           = jsonencode(["https://${local.current_env.domain_name}"])
-      ENVIRONMENT            = terraform.workspace
-      CACHE_BUCKET_NAME      = aws_s3_bucket.cache.bucket
-      MCP_SERVER_URL         = "https://${local.current_env.mcp_domain_name}"
-      IMAGE_BUCKET_NAME      = aws_s3_bucket.images.bucket
-      CDN_DOMAIN             = local.current_env.domain_name
+      COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
+      COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
+      COGNITO_REGION        = var.aws_region
+      BEDROCK_REGION        = "us-east-1"
+      BEDROCK_MODEL_ID      = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+      DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
+      CORS_ORIGINS = jsonencode([
+        "https://${local.current_env.domain_name}",
+        "https://${local.current_env.admin_domain_name}"
+      ])
+      ENVIRONMENT              = terraform.workspace
+      CACHE_BUCKET_NAME        = aws_s3_bucket.cache.bucket
+      MCP_SERVER_URL           = "https://${local.current_env.mcp_domain_name}"
+      IMAGE_BUCKET_NAME        = aws_s3_bucket.images.bucket
+      CDN_DOMAIN               = local.current_env.domain_name
+      BOOTSTRAP_ADMIN_EMAILS   = var.bootstrap_admin_emails
+      BOOTSTRAP_ADMIN_USER_IDS = var.bootstrap_admin_user_ids
     }
   }
 
@@ -54,7 +59,10 @@ resource "aws_apigatewayv2_api" "api" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins     = ["https://${local.current_env.domain_name}"]
+    allow_origins = [
+      "https://${local.current_env.domain_name}",
+      "https://${local.current_env.admin_domain_name}"
+    ]
     allow_methods     = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     allow_headers     = ["Authorization", "Content-Type"]
     allow_credentials = true

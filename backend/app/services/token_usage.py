@@ -45,6 +45,16 @@ def get_or_create_current_period(session: Session, user_id: str) -> TokenUsage:
     return usage
 
 
+def get_current_period_usage(session: Session, user_id: str) -> TokenUsage | None:
+    """Get the token usage record for the current period without creating it."""
+    period_start = _get_period_start()
+    statement = select(TokenUsage).where(
+        TokenUsage.user_id == user_id,
+        TokenUsage.period_start == period_start,
+    )
+    return session.exec(statement).first()
+
+
 def _get_user_token_limit(session: Session, user_id: str) -> int:
     """Get the per-user token limit from UserSettings, falling back to the global default."""
     settings = session.get(UserSettings, user_id)
@@ -96,4 +106,15 @@ def get_usage_info(session: Session, user_id: str) -> TokenUsageRead:
         token_limit=_get_user_token_limit(session, user_id),
         period_start=usage.period_start,
         period_end=usage.period_end,
+    )
+
+
+def get_usage_snapshot(session: Session, user_id: str) -> TokenUsageRead:
+    """Get current usage information without creating a usage record."""
+    usage = get_current_period_usage(session, user_id)
+    return TokenUsageRead(
+        tokens_used=usage.tokens_used if usage else 0,
+        token_limit=_get_user_token_limit(session, user_id),
+        period_start=usage.period_start if usage else _get_period_start(),
+        period_end=usage.period_end if usage else _get_period_end(),
     )

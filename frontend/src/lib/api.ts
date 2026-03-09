@@ -15,12 +15,15 @@ import type {
   SharedNote,
   SummarizeRequest,
   SummarizeResponse,
-  UserSettings,
   UserSettingsUpdate,
   MCPTokenCreateRequest,
   MCPTokenResponse,
   MCPTokensListResponse,
   MCPSettingsResponse,
+  AppUser,
+  AdminUserDetailResponse,
+  AdminUsersListResponse,
+  AdminUserUpdateRequest,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -167,9 +170,43 @@ class ApiClient {
     return this.request<SettingsResponse>("/api/settings");
   }
 
-  async updateSettings(data: UserSettingsUpdate): Promise<UserSettings> {
-    return this.request<UserSettings>("/api/settings", {
+  async updateSettings(data: UserSettingsUpdate): Promise<SettingsResponse> {
+    return this.request<SettingsResponse>("/api/settings", {
       method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin API
+  async getAdminMe(): Promise<AppUser> {
+    return this.request<AppUser>("/api/admin/me");
+  }
+
+  async listAdminUsers(params: {
+    q?: string;
+    admin_only?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<AdminUsersListResponse> {
+    const search = new URLSearchParams();
+    if (params.q) search.set("q", params.q);
+    if (typeof params.admin_only === "boolean") {
+      search.set("admin_only", String(params.admin_only));
+    }
+    if (typeof params.limit === "number") search.set("limit", String(params.limit));
+    if (typeof params.offset === "number") search.set("offset", String(params.offset));
+
+    const query = search.toString();
+    return this.request<AdminUsersListResponse>(`/api/admin/users${query ? `?${query}` : ""}`);
+  }
+
+  async getAdminUser(userId: string): Promise<AdminUserDetailResponse> {
+    return this.request<AdminUserDetailResponse>(`/api/admin/users/${userId}`);
+  }
+
+  async updateAdminUser(userId: string, data: AdminUserUpdateRequest): Promise<AdminUserDetailResponse> {
+    return this.request<AdminUserDetailResponse>(`/api/admin/users/${userId}`, {
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }

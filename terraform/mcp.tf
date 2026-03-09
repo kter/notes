@@ -58,8 +58,8 @@ resource "aws_lambda_function" "mcp_server" {
 
   environment {
     variables = {
-      DSQL_CLUSTER_ENDPOINT  = aws_dsql_cluster.main.identifier
-      ENVIRONMENT            = terraform.workspace
+      DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
+      ENVIRONMENT           = terraform.workspace
     }
   }
 
@@ -86,7 +86,7 @@ resource "aws_apigatewayv2_stage" "mcp_server" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.mcp_api_gateway.arn
-    format         = jsonencode({
+    format = jsonencode({
       requestId               = "$context.requestId"
       ip                      = "$context.identity.sourceIp"
       requestTime             = "$context.requestTime"

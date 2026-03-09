@@ -47,9 +47,10 @@ resource "aws_s3_bucket_policy" "frontend" {
 
 # ACM Certificate (must be in us-east-1 for CloudFront)
 resource "aws_acm_certificate" "main" {
-  provider          = aws.us_east_1
-  domain_name       = local.current_env.domain_name
-  validation_method = "DNS"
+  provider                  = aws.us_east_1
+  domain_name               = local.current_env.domain_name
+  subject_alternative_names = [local.current_env.admin_domain_name]
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true
@@ -123,7 +124,7 @@ resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
-  aliases             = [local.current_env.domain_name]
+  aliases             = [local.current_env.domain_name, local.current_env.admin_domain_name]
   price_class         = "PriceClass_200"
 
   origin {
@@ -231,6 +232,30 @@ resource "aws_route53_record" "main" {
 resource "aws_route53_record" "main_ipv6" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = local.current_env.domain_name
+  type    = "AAAA"
+
+  alias {
+    name                   = aws_cloudfront_distribution.main.domain_name
+    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "admin" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.current_env.admin_domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.main.domain_name
+    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "admin_ipv6" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.current_env.admin_domain_name
   type    = "AAAA"
 
   alias {

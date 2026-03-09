@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
+from app.models.token_usage import MONTHLY_TOKEN_LIMIT
+
 # Default model ID (Claude 3.5 Haiku via cross-region inference profile)
 DEFAULT_LLM_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
@@ -57,6 +59,7 @@ class UserSettingsBase(SQLModel):
 
     llm_model_id: str = Field(default=DEFAULT_LLM_MODEL_ID, max_length=255)
     language: str = Field(default=DEFAULT_LANGUAGE, max_length=10)
+    token_limit: int = Field(default=MONTHLY_TOKEN_LIMIT)
 
 
 class UserSettings(UserSettingsBase, table=True):
@@ -74,6 +77,8 @@ class UserSettingsUpdate(SQLModel):
 
     llm_model_id: str | None = None
     language: str | None = None
+    # NOTE: In production this should be restricted to admin/paid-plan users only.
+    token_limit: int | None = None
 
 
 class UserSettingsRead(UserSettingsBase):

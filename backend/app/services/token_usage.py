@@ -12,6 +12,7 @@ from app.models.token_usage import (
     _get_period_end,
     _get_period_start,
 )
+from app.models.user_settings import UserSettings
 from app.routers.db_exceptions import commit_with_error_handling
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,14 @@ def get_or_create_current_period(session: Session, user_id: str) -> TokenUsage:
     return usage
 
 
+def _get_user_token_limit(session: Session, user_id: str) -> int:
+    """Get the per-user token limit from UserSettings, falling back to the global default."""
+    settings = session.get(UserSettings, user_id)
+    if settings is not None:
+        return settings.token_limit
+    return MONTHLY_TOKEN_LIMIT
+
+
 def check_limit(session: Session, user_id: str) -> bool:
     """Check if the user has exceeded their monthly token limit.
 
@@ -51,7 +60,7 @@ def check_limit(session: Session, user_id: str) -> bool:
         True if the user is within the limit, False if exceeded.
     """
     usage = get_or_create_current_period(session, user_id)
-    return usage.tokens_used < MONTHLY_TOKEN_LIMIT
+    return usage.tokens_used < _get_user_token_limit(session, user_id)
 
 
 def record_usage(session: Session, user_id: str, tokens: int) -> TokenUsage:
@@ -84,7 +93,7 @@ def get_usage_info(session: Session, user_id: str) -> TokenUsageRead:
     usage = get_or_create_current_period(session, user_id)
     return TokenUsageRead(
         tokens_used=usage.tokens_used,
-        token_limit=MONTHLY_TOKEN_LIMIT,
+        token_limit=_get_user_token_limit(session, user_id),
         period_start=usage.period_start,
         period_end=usage.period_end,
     )

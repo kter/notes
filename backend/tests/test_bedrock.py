@@ -79,13 +79,78 @@ async def test_chat_success(mock_boto_client, mock_settings):
     assert "User question" in messages_content
 
 @pytest.mark.asyncio
+async def test_edit_success(mock_boto_client, mock_settings):
+    service = BedrockService()
+
+    mock_response_body = json.dumps({
+        "content": [{"text": "<edited_content>Edited text here.</edited_content>"}],
+        "usage": {"input_tokens": 50, "output_tokens": 30}
+    })
+    mock_boto_client.invoke_model.return_value = {
+        "body": Mock(read=Mock(return_value=mock_response_body.encode()))
+    }
+
+    edited, total_tokens = await service.edit(
+        content="Original text",
+        instruction="Fix typos",
+    )
+
+    assert edited == "Edited text here."
+    assert isinstance(total_tokens, int)
+
+    # Verify max_tokens is 8192 for edit
+    call_args = mock_boto_client.invoke_model.call_args[1]
+    body = json.loads(call_args["body"])
+    assert body["max_tokens"] == 8192
+    assert "<current_content>" in body["messages"][0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_edit_fallback_no_tags(mock_boto_client, mock_settings):
+    service = BedrockService()
+
+    mock_response_body = json.dumps({
+        "content": [{"text": "Edited text without tags."}],
+        "usage": {"input_tokens": 50, "output_tokens": 30}
+    })
+    mock_boto_client.invoke_model.return_value = {
+        "body": Mock(read=Mock(return_value=mock_response_body.encode()))
+    }
+
+    edited, _ = await service.edit(
+        content="Original text",
+        instruction="Fix typos",
+    )
+
+    assert edited == "Edited text without tags."
+
+
+def test_extract_edited_content():
+    service = BedrockService()
+
+    # With tags
+    result = service._extract_edited_content(
+        "Some preamble\n<edited_content>\nHello world\n</edited_content>\nSome postamble"
+    )
+    assert result == "Hello world"
+
+    # Without tags (fallback)
+    result = service._extract_edited_content("Just plain text")
+    assert result == "Just plain text"
+
+    # Empty tags
+    result = service._extract_edited_content("<edited_content></edited_content>")
+    assert result == ""
+
+
+@pytest.mark.asyncio
 async def test_bedrock_error(mock_boto_client, mock_settings):
     service = BedrockService()
-    
+
     mock_boto_client.invoke_model.side_effect = ClientError(
         {"Error": {"Code": "ValidationException", "Message": "Bad request"}},
         "InvokeModel"
     )
-    
+
     with pytest.raises(ClientError):
         await service.summarize("Fail content")

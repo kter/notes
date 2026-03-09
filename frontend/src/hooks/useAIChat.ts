@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApi } from "./useApi";
+import { useTranslation } from "./useTranslation";
 import type { ChatMessage } from "@/types";
 
 export type ChatScope = "note" | "folder" | "all";
@@ -9,6 +10,8 @@ export type ChatScope = "note" | "folder" | "all";
 interface UseAIChatReturn {
   chatMessages: ChatMessage[];
   isAILoading: boolean;
+  isEditMode: boolean;
+  setIsEditMode: (v: boolean) => void;
   handleSummarize: (noteId: string) => Promise<void>;
   handleSendMessage: (
     message: string,
@@ -16,13 +19,22 @@ interface UseAIChatReturn {
     noteId?: string | null,
     folderId?: string | null
   ) => Promise<void>;
+  handleSendEditRequest: (
+    instruction: string,
+    currentContent: string,
+    noteId?: string
+  ) => Promise<void>;
+  handleAcceptEdit: (messageIndex: number) => string | null;
+  handleRejectEdit: (messageIndex: number) => void;
   clearChat: () => void;
 }
 
 export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatReturn {
   const { getApi } = useApi();
+  const { t } = useTranslation();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAILoading, setIsAILoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // We no longer clear chat automatically when note changes to allow persistent chat.
   // The user can clear it manually if needed.
@@ -46,7 +58,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     } catch (error: unknown) {
       console.error("Failed to summarize:", error);
       if ((error as { status?: number })?.status === 429) {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings." }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: t("aiEdit.tokenLimitExceeded") }]);
       }
     } finally {
       setIsAILoading(false);
@@ -85,11 +97,98 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     } catch (error: unknown) {
       console.error("Failed to chat:", error);
       if ((error as { status?: number })?.status === 429) {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: "Error: Monthly token limit exceeded. Please try again next month or adjust your settings." }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: t("aiEdit.tokenLimitExceeded") }]);
       }
     } finally {
       setIsAILoading(false);
     }
+  };
+
+  const handleSendEditRequest = async (
+    instruction: string,
+    currentContent: string,
+    noteId?: string
+  ) => {
+    const userMessage: ChatMessage = { role: "user", content: instruction };
+    setChatMessages((prev) => [...prev, userMessage]);
+    setIsAILoading(true);
+
+    try {
+      const apiClient = await getApi();
+      const result = await apiClient.editNoteContent({
+        content: currentContent,
+        instruction,
+        note_id: noteId,
+      });
+
+      if (result.tokens_used && onTokenUsage) {
+        onTokenUsage(result.tokens_used);
+      }
+
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: result.edited_content === currentContent
+          ? instruction
+          : "",
+        editProposal: {
+          originalContent: currentContent,
+          editedContent: result.edited_content,
+          status: result.edited_content === currentContent ? undefined : "pending",
+        },
+      };
+
+      // If no changes, show a message instead of diff
+      if (result.edited_content === currentContent) {
+        assistantMessage.content = "";
+        assistantMessage.editProposal = undefined;
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: t("aiEdit.noChanges") },
+        ]);
+      } else {
+        setChatMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (error: unknown) {
+      console.error("Failed to edit:", error);
+      if ((error as { status?: number })?.status === 429) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: t("aiEdit.tokenLimitExceeded") },
+        ]);
+      } else {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: t("aiEdit.editFailed") },
+        ]);
+      }
+    } finally {
+      setIsAILoading(false);
+    }
+  };
+
+  const handleAcceptEdit = (messageIndex: number): string | null => {
+    const msg = chatMessages[messageIndex];
+    if (!msg?.editProposal || msg.editProposal.status !== "pending") return null;
+
+    const editedContent = msg.editProposal.editedContent;
+    setChatMessages((prev) =>
+      prev.map((m, i) =>
+        i === messageIndex && m.editProposal
+          ? { ...m, editProposal: { ...m.editProposal, status: "accepted" as const } }
+          : m
+      )
+    );
+    return editedContent;
+  };
+
+  const handleRejectEdit = (messageIndex: number) => {
+    setChatMessages((prev) =>
+      prev.map((m, i) =>
+        i === messageIndex && m.editProposal
+          ? { ...m, editProposal: { ...m.editProposal, status: "rejected" as const } }
+          : m
+      )
+    );
   };
 
   const clearChat = () => {
@@ -99,8 +198,13 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
   return {
     chatMessages,
     isAILoading,
+    isEditMode,
+    setIsEditMode,
     handleSummarize,
     handleSendMessage,
+    handleSendEditRequest,
+    handleAcceptEdit,
+    handleRejectEdit,
     clearChat,
   };
 }

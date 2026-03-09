@@ -11,6 +11,16 @@ vi.mock('react-markdown', () => ({
   default: ({ children }: { children: string }) => <div data-testid="markdown-preview">{children}</div>,
 }))
 
+// Mock DiffView
+vi.mock('@/components/ai/DiffView', () => ({
+  DiffView: ({ onAccept, onReject }: { onAccept: () => void; onReject: () => void }) => (
+    <div data-testid="diff-view">
+      <button data-testid="diff-accept-button" onClick={onAccept}>Accept</button>
+      <button data-testid="diff-reject-button" onClick={onReject}>Reject</button>
+    </div>
+  ),
+}))
+
 // Mock remark-gfm
 vi.mock('remark-gfm', () => ({
   default: () => {},
@@ -70,9 +80,40 @@ describe('EditorPanel', () => {
 
   it('renders with initial content', () => {
     render(<EditorPanel {...defaultProps} />)
-    
+
     const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
     expect(textarea.value).toBe('Initial content')
+  })
+
+  describe('onContentChange callback', () => {
+    it('calls onContentChange with note content on mount', () => {
+      // Regression test: EditorPanel must notify the parent of its initial content on
+      // mount so that AI edit requests always send the actual note content, not an
+      // empty string.  Before the fix, onContentChange was only called on user input,
+      // so opening AI edit immediately after selecting a note sent "" to the backend
+      // and caused a 400 "Content is empty" error.
+      const onContentChange = vi.fn()
+      render(<EditorPanel {...defaultProps} onContentChange={onContentChange} />)
+      expect(onContentChange).toHaveBeenCalledWith(mockNote.content)
+    })
+
+    it('calls onContentChange when user edits content', () => {
+      const onContentChange = vi.fn()
+      render(<EditorPanel {...defaultProps} onContentChange={onContentChange} />)
+      onContentChange.mockClear()
+
+      const textarea = screen.getByRole('textbox', { name: /content/i })
+      fireEvent.change(textarea, { target: { value: 'Updated content' } })
+
+      expect(onContentChange).toHaveBeenCalledWith('Updated content')
+    })
+
+    it('calls onContentChange with empty string when note has no content', () => {
+      const onContentChange = vi.fn()
+      const emptyNote = { ...mockNote, content: '' }
+      render(<EditorPanel {...defaultProps} note={emptyNote} onContentChange={onContentChange} />)
+      expect(onContentChange).toHaveBeenCalledWith('')
+    })
   })
 
   it('calls onUpdateNote when typing', () => {
@@ -301,6 +342,29 @@ describe('EditorPanel', () => {
       expect(uploadImageMock).toHaveBeenCalledWith(validFile)
     })
   })
+
+  describe('pending edit proposal display', () => {
+    const proposal = { originalContent: "original", editedContent: "edited", status: "pending" as const };
+
+    it("pendingEditProposalがあるときdiff-panelを表示しtextareaを非表示にする", () => {
+      render(<EditorPanel {...defaultProps} pendingEditProposal={proposal} onAcceptEdit={vi.fn()} onRejectEdit={vi.fn()} />);
+      expect(screen.getByTestId("editor-diff-panel")).toBeInTheDocument();
+      expect(screen.queryByTestId("editor-content-input")).toBeNull();
+    });
+
+    it("pendingEditProposalがnullのときtextareaを表示する", () => {
+      render(<EditorPanel {...defaultProps} pendingEditProposal={null} />);
+      expect(screen.getByTestId("editor-content-input")).toBeInTheDocument();
+      expect(screen.queryByTestId("editor-diff-panel")).toBeNull();
+    });
+
+    it("AcceptクリックでonAcceptEditを呼ぶ", () => {
+      const onAcceptEdit = vi.fn();
+      render(<EditorPanel {...defaultProps} pendingEditProposal={proposal} onAcceptEdit={onAcceptEdit} onRejectEdit={vi.fn()} />);
+      fireEvent.click(screen.getByTestId("diff-accept-button"));
+      expect(onAcceptEdit).toHaveBeenCalledOnce();
+    });
+  });
 
   describe('Performance optimizations', () => {
     const mockCalculateHash = vi.mocked(calculateHash)

@@ -58,6 +58,25 @@ CHAT_PROMPTS = {
 }
 
 
+# Language-aware prompts for content editing
+EDIT_PROMPTS = {
+    "ja": (
+        "あなたはMarkdownコンテンツを編集するアシスタントです。"
+        "ユーザーの指示に従って、提供されたコンテンツを修正してください。"
+        "修正後のコンテンツ全体を<edited_content>タグで囲んで返してください。"
+        "説明や補足は不要です。修正後のコンテンツのみを返してください。"
+        "必ず日本語で回答してください。"
+    ),
+    "en": (
+        "You are a helpful assistant that edits Markdown content. "
+        "Follow the user's instructions to modify the provided content. "
+        "Return the entire edited content wrapped in <edited_content> tags. "
+        "Do not include explanations or commentary. Only return the edited content. "
+        "Always respond in English."
+    ),
+}
+
+
 def get_prompt(prompt_type: str, language: str) -> str:
     """Get the appropriate prompt for the given type and language.
 
@@ -73,6 +92,7 @@ def get_prompt(prompt_type: str, language: str) -> str:
         "summarize": SUMMARIZE_PROMPTS,
         "generate_title": GENERATE_TITLE_PROMPTS,
         "chat": CHAT_PROMPTS,
+        "edit": EDIT_PROMPTS,
     }
 
     prompts = prompts_map.get(prompt_type, SUMMARIZE_PROMPTS)

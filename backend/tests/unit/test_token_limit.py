@@ -17,12 +17,17 @@ from app.services.token_usage import check_limit
 
 def _make_session(tokens_used: int) -> MagicMock:
     """Return a mock SQLModel Session whose exec().first() yields a TokenUsage
-    with the given tokens_used value."""
+    with the given tokens_used value.
+
+    session.get() returns None to simulate a user with no custom UserSettings,
+    so _get_user_token_limit falls back to MONTHLY_TOKEN_LIMIT.
+    """
     mock_usage = MagicMock(spec=TokenUsage)
     mock_usage.tokens_used = tokens_used
 
     mock_session = MagicMock()
     mock_session.exec.return_value.first.return_value = mock_usage
+    mock_session.get.return_value = None  # No custom UserSettings
     return mock_session
 
 

@@ -10,7 +10,7 @@ from app.auth.dependencies import get_owned_resource
 from app.database import get_session
 from app.models import DEFAULT_LLM_MODEL_ID, Note, UserSettings
 from app.models.enums import ChatScope
-from app.services import AIService, get_ai_service
+from app.services import AIService, AIServiceTimeoutError, get_ai_service
 from app.services.context import ContextService
 from app.services.token_usage import check_limit, record_usage
 
@@ -98,6 +98,13 @@ def _check_token_limit(session: Session, user_id: str) -> None:
         )
 
 
+def _handle_ai_timeout() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        detail="AI request timed out. Try a shorter note or edit a smaller section.",
+    )
+
+
 @router.post("/summarize", response_model=SummarizeResponse)
 async def summarize_note(
     request: SummarizeRequest,
@@ -118,9 +125,12 @@ async def summarize_note(
     _check_token_limit(session, user_id)
 
     model_id, language = get_user_settings(session, user_id)
-    summary, tokens_used = await ai_service.summarize(
-        note.content, model_id=model_id, language=language
-    )
+    try:
+        summary, tokens_used = await ai_service.summarize(
+            note.content, model_id=model_id, language=language
+        )
+    except AIServiceTimeoutError:
+        _handle_ai_timeout()
 
     # Record token usage (only if tokens were actually used, not cached)
     if tokens_used > 0:
@@ -149,13 +159,16 @@ async def chat_with_context(
     )
 
     model_id, language = get_user_settings(session, user_id)
-    answer, tokens_used = await ai_service.chat(
-        content=content,
-        question=request.question,
-        history=request.history,
-        model_id=model_id,
-        language=language,
-    )
+    try:
+        answer, tokens_used = await ai_service.chat(
+            content=content,
+            question=request.question,
+            history=request.history,
+            model_id=model_id,
+            language=language,
+        )
+    except AIServiceTimeoutError:
+        _handle_ai_timeout()
 
     # Record token usage
     if tokens_used > 0:
@@ -192,12 +205,15 @@ async def edit_note_content(
     _check_token_limit(session, user_id)
 
     model_id, language = get_user_settings(session, user_id)
-    edited_content, tokens_used = await ai_service.edit(
-        content=request.content,
-        instruction=request.instruction,
-        model_id=model_id,
-        language=language,
-    )
+    try:
+        edited_content, tokens_used = await ai_service.edit(
+            content=request.content,
+            instruction=request.instruction,
+            model_id=model_id,
+            language=language,
+        )
+    except AIServiceTimeoutError:
+        _handle_ai_timeout()
 
     # Record token usage
     if tokens_used > 0:

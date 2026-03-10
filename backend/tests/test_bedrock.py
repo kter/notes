@@ -1,10 +1,11 @@
 import json
+import re
 from unittest.mock import Mock, patch
 
 import pytest
 from botocore.exceptions import ClientError
 
-from app.services.bedrock import BedrockService
+from app.services.bedrock import EDIT_SINGLE_PASS_MAX_CHARS, BedrockService
 
 
 @pytest.fixture
@@ -142,6 +143,13 @@ def test_extract_edited_content():
     result = service._extract_edited_content("<edited_content></edited_content>")
     assert result == ""
 
+    # Preserve whitespace for chunk joins
+    result = service._extract_edited_content(
+        "<edited_content>\nHello world\n</edited_content>",
+        preserve_whitespace=True,
+    )
+    assert result == "\nHello world\n"
+
 
 @pytest.mark.asyncio
 async def test_bedrock_error(mock_boto_client, mock_settings):
@@ -154,3 +162,57 @@ async def test_bedrock_error(mock_boto_client, mock_settings):
 
     with pytest.raises(ClientError):
         await service.summarize("Fail content")
+
+
+def test_chunk_content_for_edit_preserves_text():
+    service = BedrockService()
+    content = (
+        "# Title\n\n"
+        "Paragraph 1\n\n"
+        "## Section A\n\n"
+        + ("Line in section A.\n" * 300)
+        + "\n## Section B\n\n"
+        + ("Line in section B.\n" * 300)
+    )
+
+    chunks = service._chunk_content_for_edit(content)
+
+    assert len(chunks) > 1
+    assert "".join(chunks) == content
+
+
+@pytest.mark.asyncio
+async def test_edit_large_content_uses_chunking(mock_boto_client, mock_settings):
+    service = BedrockService()
+    content = "# Title\n\n" + ("teh quick brown fox.\n\n" * 1200)
+    calls: list[str] = []
+
+    def fake_invoke_model(
+        messages: list[dict],
+        system: str | None = None,
+        model_id: str | None = None,
+        max_tokens: int = 4096,
+    ) -> tuple[str, int]:
+        message = messages[0]["content"]
+        match = re.search(
+            r"<current_content>\n(.*)\n</current_content>", message, re.DOTALL
+        )
+        assert match is not None
+        chunk = match.group(1)
+        calls.append(chunk)
+        return (
+            f"<edited_content>{chunk.replace('teh', 'the')}</edited_content>",
+            11,
+        )
+
+    service._invoke_model = Mock(side_effect=fake_invoke_model)
+
+    edited, total_tokens = await service.edit(
+        content=content,
+        instruction="Fix typos",
+    )
+
+    assert len(content) > EDIT_SINGLE_PASS_MAX_CHARS
+    assert len(calls) > 1
+    assert edited == content.replace("teh", "the")
+    assert total_tokens == 11 * len(calls)

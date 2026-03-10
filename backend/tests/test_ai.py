@@ -4,7 +4,7 @@ from sqlmodel import Session
 
 from app.main import app
 from app.models import Folder, Note
-from app.services import AIService, get_ai_service
+from app.services import AIService, AIServiceTimeoutError, get_ai_service
 
 
 # Mock AI Service
@@ -209,3 +209,44 @@ def test_edit_unowned_note(make_client, session: Session, mock_ai_service):
     )
     assert response.status_code == 404
 
+
+def test_edit_timeout_returns_504(client: TestClient):
+    class TimeoutAIService(AIService):
+        async def summarize(
+            self, content: str, model_id: str | None = None, language: str = "auto"
+        ) -> tuple[str, int]:
+            raise AIServiceTimeoutError("timed out")
+
+        async def chat(
+            self,
+            content: str,
+            question: str,
+            history: list[dict] | None = None,
+            model_id: str | None = None,
+            language: str = "auto",
+        ) -> tuple[str, int]:
+            raise AIServiceTimeoutError("timed out")
+
+        async def edit(
+            self,
+            content: str,
+            instruction: str,
+            model_id: str | None = None,
+            language: str = "auto",
+        ) -> tuple[str, int]:
+            raise AIServiceTimeoutError("timed out")
+
+    app.dependency_overrides[get_ai_service] = lambda: TimeoutAIService()
+    try:
+        response = client.post(
+            "/api/ai/edit",
+            json={
+                "content": "Hello world",
+                "instruction": "Fix typos",
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_ai_service, None)
+
+    assert response.status_code == 504
+    assert "timed out" in response.json()["detail"].lower()

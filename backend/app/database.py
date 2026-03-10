@@ -9,6 +9,7 @@ from pathlib import Path
 import boto3
 import psycopg2
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -23,6 +24,7 @@ settings = get_settings()
 
 # Cached engine to reuse connections
 _engine = None
+ALEMBIC_VERSION_TABLE = "alembic_version"
 
 
 def get_dsql_engine():
@@ -239,6 +241,56 @@ def _bootstrap_legacy_schema(connection) -> None:
     )
 
 
+def _get_alembic_head_revision() -> str:
+    script = ScriptDirectory.from_config(_get_alembic_config())
+    head = script.get_current_head()
+    if head is None:
+        raise RuntimeError("Alembic head revision could not be determined")
+    return head
+
+
+def _get_current_alembic_revision(connection) -> str | None:
+    if ALEMBIC_VERSION_TABLE not in inspect(connection).get_table_names():
+        return None
+
+    return connection.execute(
+        text(f"SELECT version_num FROM {ALEMBIC_VERSION_TABLE}")
+    ).scalar_one_or_none()
+
+
+def _uses_dsql_runtime() -> bool:
+    return bool(os.environ.get("DSQL_CLUSTER_ENDPOINT"))
+
+
+def _stamp_head_manually(connection, revision: str) -> None:
+    if ALEMBIC_VERSION_TABLE not in inspect(connection).get_table_names():
+        connection.execute(
+            text(
+                """
+                CREATE TABLE alembic_version (
+                    version_num VARCHAR(32) NOT NULL PRIMARY KEY
+                )
+                """
+            )
+        )
+        connection.commit()
+
+    current_revision = _get_current_alembic_revision(connection)
+    if current_revision is None:
+        connection.execute(
+            text(
+                "INSERT INTO alembic_version (version_num) VALUES (:version_num)"
+            ),
+            {"version_num": revision},
+        )
+    else:
+        connection.execute(
+            text("UPDATE alembic_version SET version_num = :version_num"),
+            {"version_num": revision},
+        )
+    connection.commit()
+
+
 def create_db_and_tables() -> None:
     """Bring the database schema to the current Alembic revision.
 
@@ -255,11 +307,26 @@ def create_db_and_tables() -> None:
             table_names = set(inspect(connection).get_table_names())
             existing_tables = set(SQLModel.metadata.tables.keys()) & table_names
             alembic_config = _get_alembic_config(connection=connection)
+            head_revision = _get_alembic_head_revision()
+            current_revision = _get_current_alembic_revision(connection)
+            dsql_runtime = _uses_dsql_runtime()
 
-            if "alembic_version" in table_names:
+            if current_revision is not None:
+                if dsql_runtime and current_revision == head_revision:
+                    logger.info(
+                        "Alembic head revision already applied on DSQL; skipping upgrade"
+                    )
+                    return
                 logger.info("Alembic version table found; upgrading schema to head")
                 command.upgrade(alembic_config, "head")
                 connection.commit()
+            elif dsql_runtime:
+                logger.info(
+                    "DSQL database without Alembic version table detected; bootstrapping schema and stamping head"
+                )
+                _bootstrap_legacy_schema(connection)
+                connection.commit()
+                _stamp_head_manually(connection, head_revision)
             elif existing_tables:
                 logger.info(
                     "Existing schema without Alembic detected; bootstrapping and stamping head"

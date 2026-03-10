@@ -150,6 +150,57 @@ def test_migration_bootstraps_fresh_db_for_dsql_runtime():
     assert version == ALEMBIC_HEAD
 
 
+def test_migration_bootstraps_existing_dsql_revision_to_head():
+    """DSQL databases should bootstrap model metadata instead of Alembic upgrade."""
+    engine = _make_engine()
+
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE app_users (
+                    user_id VARCHAR PRIMARY KEY,
+                    admin BOOLEAN,
+                    created_at DATETIME,
+                    updated_at DATETIME,
+                    last_seen_at DATETIME,
+                    email VARCHAR,
+                    display_name VARCHAR
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE alembic_version (
+                    version_num VARCHAR(32) NOT NULL PRIMARY KEY
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO alembic_version (version_num) VALUES ('20260310_01')"
+            )
+        )
+        conn.commit()
+
+    with patch("app.database.get_dsql_engine", return_value=engine):
+        with patch.dict(os.environ, {"DSQL_CLUSTER_ENDPOINT": "test-cluster"}):
+            create_db_and_tables()
+
+    inspector = inspect(engine)
+    assert "ai_edit_jobs" in inspector.get_table_names()
+
+    with engine.connect() as conn:
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert version == ALEMBIC_HEAD
+
+
 def test_migration_idempotent():
     """Running schema initialization multiple times should be safe."""
     engine = _make_engine()

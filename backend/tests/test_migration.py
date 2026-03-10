@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 
 from sqlalchemy import inspect, text
@@ -111,6 +112,25 @@ def test_migration_applies_initial_revision_to_fresh_db():
     }
 
     assert expected_tables.issubset(set(inspector.get_table_names()))
+
+    with engine.connect() as conn:
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert version == ALEMBIC_HEAD
+
+
+def test_migration_bootstraps_fresh_db_for_dsql_runtime():
+    """DSQL bootstrap should stamp head without relying on Alembic DDL/DML mixing."""
+    engine = _make_engine()
+
+    with patch("app.database.get_dsql_engine", return_value=engine):
+        with patch.dict(os.environ, {"DSQL_CLUSTER_ENDPOINT": "test-cluster"}):
+            create_db_and_tables()
+
+    inspector = inspect(engine)
+    assert "alembic_version" in inspector.get_table_names()
 
     with engine.connect() as conn:
         version = conn.execute(

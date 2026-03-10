@@ -110,10 +110,75 @@ resource "aws_lambda_permission" "api_gateway" {
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*"
 }
 
+# ACM certificate for the API custom domain
+resource "aws_acm_certificate" "api" {
+  domain_name       = local.current_env.api_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# DNS validation record for the API certificate
+resource "aws_route53_record" "api_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+# Wait until the API certificate is validated before binding the custom domain
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn         = aws_acm_certificate.api.arn
+  validation_record_fqdns = [for record in aws_route53_record.api_cert_validation : record.fqdn]
+}
+
+# Custom domain name for the main API Gateway HTTP API
+resource "aws_apigatewayv2_domain_name" "api" {
+  domain_name = local.current_env.api_domain_name
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.api.certificate_arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+# Map the custom domain to the API's default stage
+resource "aws_apigatewayv2_api_mapping" "api" {
+  api_id      = aws_apigatewayv2_api.api.id
+  domain_name = aws_apigatewayv2_domain_name.api.id
+  stage       = aws_apigatewayv2_stage.default.id
+}
+
+# Route53 alias from the API subdomain to API Gateway
+resource "aws_route53_record" "api" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.current_env.api_domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].target_domain_name
+    zone_id                = aws_apigatewayv2_domain_name.api.domain_name_configuration[0].hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
 # Output the API URL
 output "api_url" {
-  description = "API URL (API Gateway)"
-  value       = aws_apigatewayv2_api.api.api_endpoint
+  description = "API URL (custom domain)"
+  value       = "https://${local.current_env.api_domain_name}"
 }
 
 output "ecr_repository_url" {

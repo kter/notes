@@ -1,6 +1,6 @@
 import httpx
 
-API_URL = "https://cmwds5zjfa.execute-api.ap-northeast-1.amazonaws.com"
+API_URL = "https://api.notes.dev.devtools.site"
 AUTH_TOKEN = "dev-integration-test-token"
 
 headers = {

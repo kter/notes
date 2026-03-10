@@ -10,14 +10,29 @@ from sqlmodel import Session, SQLModel
 from app.auth.cognito import cognito_verifier
 from app.config import get_settings
 from app.database import get_session
+from app.db_commit import commit_with_retry
 from app.models import AppUser
 from app.models.app_user import APP_USER_TOUCH_INTERVAL
 
 # Bearer token security scheme
 security = HTTPBearer()
 settings = get_settings()
+APP_USER_COMMIT_MAX_RETRIES = 3
 
 # Type variable for models with user_id attribute
+
+
+def _commit_app_user(session: Session, app_user: AppUser) -> AppUser:
+    session.add(app_user)
+    existing_user = commit_with_retry(
+        session,
+        max_retries=APP_USER_COMMIT_MAX_RETRIES,
+        recovery=lambda: session.get(AppUser, app_user.user_id),
+    )
+    if existing_user is not None:
+        return existing_user
+    session.refresh(app_user)
+    return app_user
 
 
 async def get_current_user(
@@ -85,10 +100,7 @@ def get_current_app_user(
             admin=_should_bootstrap_admin(current_user),
             last_seen_at=now,
         )
-        session.add(app_user)
-        session.commit()
-        session.refresh(app_user)
-        return app_user
+        return _commit_app_user(session, app_user)
 
     changed = False
     if email and app_user.email != email:
@@ -108,9 +120,7 @@ def get_current_app_user(
         changed = True
     if changed:
         app_user.updated_at = now
-        session.add(app_user)
-        session.commit()
-        session.refresh(app_user)
+        app_user = _commit_app_user(session, app_user)
     return app_user
 
 

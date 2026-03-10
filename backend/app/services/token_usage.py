@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
+from app.db_commit import commit_with_error_handling
 from app.models.token_usage import (
     MONTHLY_TOKEN_LIMIT,
     TokenUsage,
@@ -13,7 +14,6 @@ from app.models.token_usage import (
     _get_period_start,
 )
 from app.models.user_settings import UserSettings
-from app.routers.db_exceptions import commit_with_error_handling
 
 logger = logging.getLogger(__name__)
 

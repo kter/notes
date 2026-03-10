@@ -11,8 +11,8 @@ from sqlmodel import Session, select
 from app.auth import UserId
 from app.auth.dependencies import get_owned_resource
 from app.database import get_session
+from app.db_commit import commit_with_error_handling
 from app.models import Folder, Note, NoteCreate, NoteRead, NoteUpdate
-from app.routers.db_exceptions import commit_with_error_handling
 
 router = APIRouter()
 

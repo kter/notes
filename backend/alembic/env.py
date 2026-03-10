@@ -6,6 +6,7 @@ from sqlmodel import SQLModel
 from alembic import context
 from app.config import get_settings
 from app.models import (  # noqa: F401
+    AIEditJob,
     AppUser,
     Folder,
     MCPToken,

@@ -130,3 +130,42 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.backend.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
+
+resource "aws_iam_role_policy" "ai_edit_job_publish" {
+  name = "ai-edit-job-publish"
+  role = aws_iam_role.backend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = aws_sns_topic.ai_edit_jobs.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ai_edit_job_consume" {
+  name = "ai-edit-job-consume"
+  role = aws_iam_role.backend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:ChangeMessageVisibility"
+        ]
+        Resource = aws_sqs_queue.ai_edit_jobs.arn
+      }
+    ]
+  })
+}

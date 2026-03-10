@@ -1,5 +1,28 @@
 # Lambda Function and API Gateway for FastAPI Backend
 
+locals {
+  backend_lambda_environment = {
+    COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
+    COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
+    COGNITO_REGION        = var.aws_region
+    BEDROCK_REGION        = "us-east-1"
+    BEDROCK_MODEL_ID      = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
+    CORS_ORIGINS = jsonencode([
+      "https://${local.current_env.domain_name}",
+      "https://${local.current_env.admin_domain_name}"
+    ])
+    ENVIRONMENT              = terraform.workspace
+    CACHE_BUCKET_NAME        = aws_s3_bucket.cache.bucket
+    MCP_SERVER_URL           = "https://${local.current_env.mcp_domain_name}"
+    IMAGE_BUCKET_NAME        = aws_s3_bucket.images.bucket
+    AI_EDIT_JOB_TOPIC_ARN    = aws_sns_topic.ai_edit_jobs.arn
+    CDN_DOMAIN               = local.current_env.domain_name
+    BOOTSTRAP_ADMIN_EMAILS   = var.bootstrap_admin_emails
+    BOOTSTRAP_ADMIN_USER_IDS = var.bootstrap_admin_user_ids
+  }
+}
+
 # Lambda function
 resource "aws_lambda_function" "api" {
   function_name = "${var.project_name}-api-${terraform.workspace}"
@@ -10,29 +33,38 @@ resource "aws_lambda_function" "api" {
   memory_size   = 512
 
   environment {
-    variables = {
-      COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
-      COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
-      COGNITO_REGION        = var.aws_region
-      BEDROCK_REGION        = "us-east-1"
-      BEDROCK_MODEL_ID      = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-      DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
-      CORS_ORIGINS = jsonencode([
-        "https://${local.current_env.domain_name}",
-        "https://${local.current_env.admin_domain_name}"
-      ])
-      ENVIRONMENT              = terraform.workspace
-      CACHE_BUCKET_NAME        = aws_s3_bucket.cache.bucket
-      MCP_SERVER_URL           = "https://${local.current_env.mcp_domain_name}"
-      IMAGE_BUCKET_NAME        = aws_s3_bucket.images.bucket
-      CDN_DOMAIN               = local.current_env.domain_name
-      BOOTSTRAP_ADMIN_EMAILS   = var.bootstrap_admin_emails
-      BOOTSTRAP_ADMIN_USER_IDS = var.bootstrap_admin_user_ids
-    }
+    variables = local.backend_lambda_environment
+  }
+
+  image_config {
+    command = ["app.lambda_handler.handler"]
   }
 
   tags = {
     Name = "${var.project_name}-api-${terraform.workspace}"
+  }
+
+  depends_on = [aws_ecr_repository.api]
+}
+
+resource "aws_lambda_function" "ai_edit_worker" {
+  function_name = "${var.project_name}-ai-edit-worker-${terraform.workspace}"
+  role          = aws_iam_role.backend.arn
+  package_type  = "Image"
+  image_uri     = length(regexall("@?sha256:", var.lambda_image_tag)) > 0 ? "${aws_ecr_repository.api.repository_url}@${var.lambda_image_tag}" : "${aws_ecr_repository.api.repository_url}:${var.lambda_image_tag}"
+  timeout       = 180
+  memory_size   = 1024
+
+  environment {
+    variables = local.backend_lambda_environment
+  }
+
+  image_config {
+    command = ["app.worker_lambda_handler.handler"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-ai-edit-worker-${terraform.workspace}"
   }
 
   depends_on = [aws_ecr_repository.api]

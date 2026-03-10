@@ -6,7 +6,6 @@ from mangum import Mangum
 
 from app.database import create_db_and_tables
 from app.main import app
-from app.services.edit_jobs import ensure_current_event_loop, run_edit_job_queue_records
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -34,11 +33,5 @@ asgi_handler = Mangum(
 
 
 def handler(event, context):
-    """Dispatch API Gateway requests and SQS-driven edit job events."""
-    if isinstance(event, dict) and event.get("Records"):
-        first_record = event["Records"][0]
-        if first_record.get("eventSource") == "aws:sqs":
-            return run_edit_job_queue_records(event["Records"])
-
-    ensure_current_event_loop()
+    """Handle API Gateway requests."""
     return asgi_handler(event, context)

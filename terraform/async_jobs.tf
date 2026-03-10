@@ -63,7 +63,7 @@ resource "aws_sns_topic_subscription" "ai_edit_jobs_queue" {
 
 resource "aws_lambda_event_source_mapping" "ai_edit_jobs" {
   event_source_arn        = aws_sqs_queue.ai_edit_jobs.arn
-  function_name           = aws_lambda_function.api.arn
+  function_name           = aws_lambda_function.ai_edit_worker.arn
   batch_size              = 1
   function_response_types = ["ReportBatchItemFailures"]
 

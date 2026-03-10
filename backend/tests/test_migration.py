@@ -1,13 +1,22 @@
 import os
 from unittest.mock import patch
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlmodel import create_engine
 from sqlmodel.pool import StaticPool
 
 from app.database import create_db_and_tables
 
-ALEMBIC_HEAD = "20260310_01"
+
+def _get_alembic_head() -> str:
+    config = Config("alembic.ini")
+    config.set_main_option("script_location", "alembic")
+    return ScriptDirectory.from_config(config).get_current_head()
+
+
+ALEMBIC_HEAD = _get_alembic_head()
 
 
 def _make_engine():
@@ -102,6 +111,7 @@ def test_migration_applies_initial_revision_to_fresh_db():
     inspector = inspect(engine)
     expected_tables = {
         "alembic_version",
+        "ai_edit_jobs",
         "app_users",
         "folders",
         "mcp_tokens",

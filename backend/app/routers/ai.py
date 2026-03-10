@@ -1,17 +1,25 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.auth import UserId
 from app.auth.dependencies import get_owned_resource
 from app.database import get_session
-from app.models import DEFAULT_LLM_MODEL_ID, Note, UserSettings
+from app.models import (
+    DEFAULT_LLM_MODEL_ID,
+    AIEditJob,
+    AIEditJobCreate,
+    AIEditJobRead,
+    Note,
+    UserSettings,
+)
 from app.models.enums import ChatScope
 from app.services import AIService, AIServiceTimeoutError, get_ai_service
 from app.services.context import ContextService
+from app.services.edit_jobs import dispatch_edit_job
 from app.services.token_usage import check_limit, record_usage
 
 router = APIRouter()
@@ -87,6 +95,12 @@ class EditResponse(BaseModel):
 
     edited_content: str
     tokens_used: int = 0
+
+
+class EditJobCreateResponse(BaseModel):
+    """Response returned when an edit job is accepted."""
+
+    job: AIEditJobRead
 
 
 def _check_token_limit(session: Session, user_id: str) -> None:
@@ -220,3 +234,65 @@ async def edit_note_content(
         record_usage(session, user_id, tokens_used)
 
     return EditResponse(edited_content=edited_content, tokens_used=tokens_used)
+
+
+@router.post(
+    "/edit-jobs",
+    response_model=EditJobCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_edit_job(
+    request: AIEditJobCreate,
+    background_tasks: BackgroundTasks,
+    user_id: UserId,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Queue a long-running AI edit request and return a pollable job resource."""
+    if not request.content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Content is empty",
+        )
+
+    if not request.instruction.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Instruction is empty",
+        )
+
+    if request.note_id:
+        get_owned_resource(session, Note, request.note_id, user_id, "Note")
+
+    _check_token_limit(session, user_id)
+
+    job = AIEditJob(
+        user_id=user_id,
+        note_id=request.note_id,
+        content=request.content,
+        instruction=request.instruction,
+        status="pending",
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+
+    await dispatch_edit_job(job.id, background_tasks=background_tasks)
+
+    return EditJobCreateResponse(job=AIEditJobRead.model_validate(job))
+
+
+@router.get("/edit-jobs/{job_id}", response_model=AIEditJobRead)
+async def get_edit_job(
+    job_id: UUID,
+    user_id: UserId,
+    session: Annotated[Session, Depends(get_session)],
+):
+    """Poll an AI edit job."""
+    job = session.get(AIEditJob, job_id)
+    if job is None or job.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Edit job not found",
+        )
+
+    return AIEditJobRead.model_validate(job)

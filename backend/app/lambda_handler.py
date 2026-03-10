@@ -6,6 +6,7 @@ from mangum import Mangum
 
 from app.database import create_db_and_tables
 from app.main import app
+from app.services.edit_jobs import run_edit_job_queue_records
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -25,8 +26,18 @@ except Exception as e:
     raise
 
 # Create Lambda handler
-handler = Mangum(
+asgi_handler = Mangum(
     app,
     lifespan="off",
     api_gateway_base_path="/",
 )
+
+
+def handler(event, context):
+    """Dispatch API Gateway requests and SQS-driven edit job events."""
+    if isinstance(event, dict) and event.get("Records"):
+        first_record = event["Records"][0]
+        if first_record.get("eventSource") == "aws:sqs":
+            return run_edit_job_queue_records(event["Records"])
+
+    return asgi_handler(event, context)

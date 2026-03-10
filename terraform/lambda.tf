@@ -25,6 +25,7 @@ resource "aws_lambda_function" "api" {
       CACHE_BUCKET_NAME        = aws_s3_bucket.cache.bucket
       MCP_SERVER_URL           = "https://${local.current_env.mcp_domain_name}"
       IMAGE_BUCKET_NAME        = aws_s3_bucket.images.bucket
+      AI_EDIT_JOB_TOPIC_ARN    = aws_sns_topic.ai_edit_jobs.arn
       CDN_DOMAIN               = local.current_env.domain_name
       BOOTSTRAP_ADMIN_EMAILS   = var.bootstrap_admin_emails
       BOOTSTRAP_ADMIN_USER_IDS = var.bootstrap_admin_user_ids

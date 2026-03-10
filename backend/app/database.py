@@ -312,10 +312,20 @@ def create_db_and_tables() -> None:
             dsql_runtime = _uses_dsql_runtime()
 
             if current_revision is not None:
-                if dsql_runtime and current_revision == head_revision:
+                if dsql_runtime:
+                    if current_revision == head_revision:
+                        logger.info(
+                            "Alembic head revision already applied on DSQL; skipping upgrade"
+                        )
+                        return
                     logger.info(
-                        "Alembic head revision already applied on DSQL; skipping upgrade"
+                        "DSQL revision %s is behind head %s; bootstrapping current schema and stamping head",
+                        current_revision,
+                        head_revision,
                     )
+                    _bootstrap_legacy_schema(connection)
+                    connection.commit()
+                    _stamp_head_manually(connection, head_revision)
                     return
                 logger.info("Alembic version table found; upgrading schema to head")
                 command.upgrade(alembic_config, "head")

@@ -120,7 +120,7 @@ def get_dsql_engine():
 
 def _import_models() -> None:
     """Import models so SQLModel metadata is populated."""
-    from app.models import AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
+    from app.models import AIEditJob, AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
 
 
 def _get_backend_root() -> Path:

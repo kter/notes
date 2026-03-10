@@ -1,10 +1,14 @@
+import asyncio
+from uuid import UUID
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.main import app
-from app.models import Folder, Note
+from app.models import AIEditJob, Folder, Note
 from app.services import AIService, AIServiceTimeoutError, get_ai_service
+from app.services.edit_jobs import process_edit_job
 
 
 # Mock AI Service
@@ -250,3 +254,130 @@ def test_edit_timeout_returns_504(client: TestClient):
 
     assert response.status_code == 504
     assert "timed out" in response.json()["detail"].lower()
+
+
+def test_create_edit_job_and_poll_result(
+    client: TestClient, session: Session, mock_ai_service, monkeypatch: pytest.MonkeyPatch
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.routers.ai.dispatch_edit_job", noop_dispatch)
+
+    response = client.post(
+        "/api/ai/edit-jobs",
+        json={
+            "content": "Hello world",
+            "instruction": "Fix typos",
+        },
+    )
+
+    assert response.status_code == 202
+    job = response.json()["job"]
+    assert job["status"] == "pending"
+
+    engine = session.get_bind()
+    assert engine is not None
+    asyncio.run(
+        process_edit_job(
+            UUID(job["id"]),
+            session_factory=lambda: Session(engine),
+            ai_service=mock_ai_service,
+        )
+    )
+
+    poll_response = client.get(f"/api/ai/edit-jobs/{job['id']}")
+    assert poll_response.status_code == 200
+    poll_data = poll_response.json()
+    assert poll_data["status"] == "completed"
+    assert poll_data["edited_content"] == "Edited: Hello world"
+    assert poll_data["tokens_used"] == 30
+
+
+def test_edit_job_not_visible_to_other_user(
+    make_client,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.routers.ai.dispatch_edit_job", noop_dispatch)
+
+    other_client = make_client("other-user-456")
+    job = AIEditJob(
+        user_id="test-user-123",
+        content="Hello world",
+        instruction="Fix typos",
+    )
+    session.add(job)
+    session.commit()
+
+    response = other_client.get(f"/api/ai/edit-jobs/{job.id}")
+    assert response.status_code == 404
+
+
+def test_edit_job_failure_is_persisted(
+    client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+):
+    class TimeoutAIService(AIService):
+        async def summarize(
+            self, content: str, model_id: str | None = None, language: str = "auto"
+        ) -> tuple[str, int]:
+            raise AIServiceTimeoutError("timed out")
+
+        async def chat(
+            self,
+            content: str,
+            question: str,
+            history: list[dict] | None = None,
+            model_id: str | None = None,
+            language: str = "auto",
+        ) -> tuple[str, int]:
+            raise AIServiceTimeoutError("timed out")
+
+        async def edit(
+            self,
+            content: str,
+            instruction: str,
+            model_id: str | None = None,
+            language: str = "auto",
+        ) -> tuple[str, int]:
+            raise AIServiceTimeoutError("timed out")
+
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.routers.ai.dispatch_edit_job", noop_dispatch)
+
+    app.dependency_overrides[get_ai_service] = lambda: TimeoutAIService()
+    try:
+        response = client.post(
+            "/api/ai/edit-jobs",
+            json={
+                "content": "Hello world",
+                "instruction": "Fix typos",
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_ai_service, None)
+
+    assert response.status_code == 202
+    job_id = response.json()["job"]["id"]
+
+    engine = session.get_bind()
+    assert engine is not None
+    asyncio.run(
+        process_edit_job(
+            UUID(job_id),
+            session_factory=lambda: Session(engine),
+            ai_service=TimeoutAIService(),
+        )
+    )
+
+    poll_response = client.get(f"/api/ai/edit-jobs/{job_id}")
+    assert poll_response.status_code == 200
+    poll_data = poll_response.json()
+    assert poll_data["status"] == "failed"
+    assert "timed out" in poll_data["error_message"].lower()

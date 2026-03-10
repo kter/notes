@@ -6,6 +6,8 @@ import { useTranslation } from "./useTranslation";
 import type { ChatMessage } from "@/types";
 
 export type ChatScope = "note" | "folder" | "all";
+const EDIT_JOB_POLL_INTERVAL_MS = 1500;
+const EDIT_JOB_TIMEOUT_MS = 120000;
 
 interface UseAIChatReturn {
   chatMessages: ChatMessage[];
@@ -115,11 +117,32 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
 
     try {
       const apiClient = await getApi();
-      const result = await apiClient.editNoteContent({
+      const createResult = await apiClient.createEditJob({
         content: currentContent,
         instruction,
         note_id: noteId,
       });
+
+      const startedAt = Date.now();
+      let job = createResult.job;
+
+      while (job.status === "pending" || job.status === "running") {
+        if (Date.now() - startedAt >= EDIT_JOB_TIMEOUT_MS) {
+          throw new Error("Edit job polling timed out");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, EDIT_JOB_POLL_INTERVAL_MS));
+        job = await apiClient.getEditJob(job.id);
+      }
+
+      if (job.status === "failed") {
+        throw new Error(job.error_message || "Edit job failed");
+      }
+
+      const result = {
+        edited_content: job.edited_content || currentContent,
+        tokens_used: job.tokens_used,
+      };
 
       if (result.tokens_used && onTokenUsage) {
         onTokenUsage(result.tokens_used);
@@ -151,6 +174,14 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     } catch (error: unknown) {
       console.error("Failed to edit:", error);
       if ((error as { status?: number })?.status === 429) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: t("aiEdit.tokenLimitExceeded") },
+        ]);
+      } else if (
+        error instanceof Error &&
+        error.message.toLowerCase().includes("monthly token limit exceeded")
+      ) {
         setChatMessages((prev) => [
           ...prev,
           { role: "assistant", content: t("aiEdit.tokenLimitExceeded") },

@@ -1,4 +1,3 @@
-import asyncio
 import json
 from uuid import uuid4
 
@@ -8,10 +7,8 @@ from app.services.edit_jobs import (
     EDIT_JOB_TOPIC_ARN_ENV,
     PROCESS_EDIT_JOB_TASK,
     dispatch_edit_job,
-    ensure_current_event_loop,
     process_edit_job,
     process_edit_job_queue_records,
-    run_edit_job_queue_records,
 )
 
 
@@ -104,70 +101,3 @@ async def test_process_edit_job_queue_records_reports_partial_failures():
             {"itemIdentifier": "msg-3"},
         ]
     }
-
-
-def test_ensure_current_event_loop_recreates_missing_loop():
-    previous_loop = None
-    try:
-        try:
-            previous_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            previous_loop = None
-
-        asyncio.set_event_loop(None)
-
-        ensure_current_event_loop()
-
-        loop = asyncio.get_event_loop()
-        assert loop is not None
-        assert not loop.is_closed()
-    finally:
-        current_loop = None
-        try:
-            current_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            current_loop = None
-
-        if current_loop is not None and current_loop is not previous_loop:
-            current_loop.close()
-
-        asyncio.set_event_loop(previous_loop)
-
-
-def test_run_edit_job_queue_records_restores_event_loop(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    previous_loop = None
-    try:
-        try:
-            previous_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            previous_loop = None
-
-        asyncio.set_event_loop(None)
-
-        async def fake_process_records(records: list[dict]) -> dict[str, list[dict[str, str]]]:
-            return {"batchItemFailures": []}
-
-        monkeypatch.setattr(
-            "app.services.edit_jobs.process_edit_job_queue_records",
-            fake_process_records,
-        )
-
-        result = run_edit_job_queue_records([])
-
-        assert result == {"batchItemFailures": []}
-        loop = asyncio.get_event_loop()
-        assert loop is not None
-        assert not loop.is_closed()
-    finally:
-        current_loop = None
-        try:
-            current_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            current_loop = None
-
-        if current_loop is not None and current_loop is not previous_loop:
-            current_loop.close()
-
-        asyncio.set_event_loop(previous_loop)

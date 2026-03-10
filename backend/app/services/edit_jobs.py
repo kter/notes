@@ -31,14 +31,6 @@ def _get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
     return DEFAULT_LLM_MODEL_ID, "auto"
 
 
-def ensure_current_event_loop() -> None:
-    """Recreate a default event loop when previous sync async execution cleared it."""
-    try:
-        asyncio.get_event_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
-
-
 async def dispatch_edit_job(job_id: UUID, background_tasks: BackgroundTasks | None = None) -> None:
     """Queue AI edit job processing via SNS/SQS or local background execution."""
     topic_arn = os.getenv(EDIT_JOB_TOPIC_ARN_ENV)
@@ -166,7 +158,4 @@ async def process_edit_job_queue_records(
 
 def run_edit_job_queue_records(records: list[dict]) -> dict[str, list[dict[str, str]]]:
     """Synchronous wrapper for Lambda SQS event handling."""
-    try:
-        return asyncio.run(process_edit_job_queue_records(records))
-    finally:
-        ensure_current_event_loop()
+    return asyncio.run(process_edit_job_queue_records(records))

@@ -11,14 +11,15 @@ from app.main import app
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Create tables on Lambda cold start
-logger.info("Lambda cold start: initializing database tables...")
+# Run migrations on Lambda cold start
+logger.info("Lambda cold start: initializing database schema...")
 try:
     create_db_and_tables()
-    logger.info("Lambda cold start: database initialization complete")
+    logger.info("Lambda cold start: database schema initialization complete")
 except Exception as e:
     logger.error(
-        f"Lambda cold start: database initialization failed: {e}", exc_info=True
+        f"Lambda cold start: database schema initialization failed: {e}",
+        exc_info=True,
     )
     # Re-raise to ensure Lambda reports the error
     raise

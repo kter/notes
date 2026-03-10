@@ -15,9 +15,26 @@ Mac Notes Clone backend API built with FastAPI.
 # Install dependencies
 uv sync
 
+# Apply database migrations
+uv run alembic upgrade head
+
 # Run development server
 uv run uvicorn app.main:app --reload
 ```
+
+### Database Migrations
+
+Schema changes are now managed with Alembic.
+
+```bash
+# Create a new revision from model changes
+uv run alembic revision --autogenerate -m "add_new_column"
+
+# Apply pending migrations
+uv run alembic upgrade head
+```
+
+Databases created before Alembic adoption are bootstrapped once by the app and then stamped to the current head revision.
 
 ### API Documentation
 

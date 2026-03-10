@@ -4,12 +4,16 @@ import logging
 import os
 import time
 from collections.abc import Generator
+from pathlib import Path
 
 import boto3
 import psycopg2
-from sqlalchemy import text
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
+from alembic import command
 from app.config import get_settings
 
 # Configure logging
@@ -20,6 +24,7 @@ settings = get_settings()
 
 # Cached engine to reuse connections
 _engine = None
+ALEMBIC_VERSION_TABLE = "alembic_version"
 
 
 def get_dsql_engine():
@@ -113,119 +118,231 @@ def get_dsql_engine():
     return _engine
 
 
-def create_db_and_tables() -> None:
-    """Create database tables if they don't exist.
+def _import_models() -> None:
+    """Import models so SQLModel metadata is populated."""
+    from app.models import AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
 
-    Aurora DSQL has the following limitations:
-    1. Multiple DDL statements not supported in a single transaction
-    2. Synchronous index creation not supported (must use CREATE INDEX ASYNC)
 
-    To work around these, we create each table in a separate transaction.
-    """
-    logger.info("Starting database table creation...")
+def _get_backend_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def _get_alembic_config(connection=None) -> Config:
+    config = Config(str(_get_backend_root() / "alembic.ini"))
+    config.set_main_option("script_location", str(_get_backend_root() / "alembic"))
+    if connection is not None:
+        config.attributes["connection"] = connection
+    return config
+
+
+def _is_duplicate_column_error(error: Exception) -> bool:
+    message = str(error).lower()
+    return "already exists" in message or "duplicate column" in message
+
+
+def _ensure_legacy_column(
+    connection,
+    table_name: str,
+    column_name: str,
+    alter_sql: str,
+    update_sql: str | None = None,
+    params: dict | None = None,
+) -> None:
+    columns_result = connection.execute(text(f"PRAGMA table_info({table_name})"))
+    columns = {row[1] for row in columns_result}
+    if column_name in columns:
+        return
 
     try:
-        # Import models to register them with SQLModel.metadata
-        from app.models import AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
+        connection.execute(text(alter_sql))
+    except Exception as error:
+        if _is_duplicate_column_error(error):
+            return
+        raise
 
+    if update_sql is not None:
+        connection.execute(text(update_sql), params or {})
+
+
+def _ensure_legacy_column_portable(
+    connection,
+    table_name: str,
+    column_name: str,
+    alter_sql: str,
+    update_sql: str | None = None,
+    params: dict | None = None,
+) -> None:
+    dialect_name = connection.dialect.name
+    if dialect_name == "sqlite":
+        _ensure_legacy_column(
+            connection,
+            table_name=table_name,
+            column_name=column_name,
+            alter_sql=alter_sql,
+            update_sql=update_sql,
+            params=params,
+        )
+        return
+
+    query = text(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = :table_name AND column_name = :column_name
+        """
+    )
+    exists = connection.execute(
+        query,
+        {"table_name": table_name, "column_name": column_name},
+    ).scalar_one_or_none()
+    if exists:
+        return
+
+    try:
+        connection.execute(text(alter_sql))
+    except Exception as error:
+        if _is_duplicate_column_error(error):
+            return
+        raise
+
+    if update_sql is not None:
+        connection.execute(text(update_sql), params or {})
+
+
+def _bootstrap_legacy_schema(connection) -> None:
+    """Bring a pre-Alembic database schema up to the current baseline."""
+    from app.models.token_usage import MONTHLY_TOKEN_LIMIT
+
+    logger.info("Bootstrapping legacy schema before Alembic stamp")
+
+    for table in SQLModel.metadata.sorted_tables:
+        table.create(bind=connection, checkfirst=True)
+
+    _ensure_legacy_column_portable(
+        connection,
+        table_name="user_settings",
+        column_name="language",
+        alter_sql="ALTER TABLE user_settings ADD COLUMN language VARCHAR(10)",
+        update_sql="UPDATE user_settings SET language = 'auto' WHERE language IS NULL",
+    )
+    _ensure_legacy_column_portable(
+        connection,
+        table_name="user_settings",
+        column_name="token_limit",
+        alter_sql="ALTER TABLE user_settings ADD COLUMN token_limit INTEGER",
+        update_sql="UPDATE user_settings SET token_limit = :token_limit WHERE token_limit IS NULL",
+        params={"token_limit": MONTHLY_TOKEN_LIMIT},
+    )
+    _ensure_legacy_column_portable(
+        connection,
+        table_name="mcp_tokens",
+        column_name="last_used_at",
+        alter_sql="ALTER TABLE mcp_tokens ADD COLUMN last_used_at TIMESTAMP WITH TIME ZONE",
+    )
+
+
+def _get_alembic_head_revision() -> str:
+    script = ScriptDirectory.from_config(_get_alembic_config())
+    head = script.get_current_head()
+    if head is None:
+        raise RuntimeError("Alembic head revision could not be determined")
+    return head
+
+
+def _get_current_alembic_revision(connection) -> str | None:
+    if ALEMBIC_VERSION_TABLE not in inspect(connection).get_table_names():
+        return None
+
+    return connection.execute(
+        text(f"SELECT version_num FROM {ALEMBIC_VERSION_TABLE}")
+    ).scalar_one_or_none()
+
+
+def _uses_dsql_runtime() -> bool:
+    return bool(os.environ.get("DSQL_CLUSTER_ENDPOINT"))
+
+
+def _stamp_head_manually(connection, revision: str) -> None:
+    if ALEMBIC_VERSION_TABLE not in inspect(connection).get_table_names():
+        connection.execute(
+            text(
+                """
+                CREATE TABLE alembic_version (
+                    version_num VARCHAR(32) NOT NULL PRIMARY KEY
+                )
+                """
+            )
+        )
+        connection.commit()
+
+    current_revision = _get_current_alembic_revision(connection)
+    if current_revision is None:
+        connection.execute(
+            text(
+                "INSERT INTO alembic_version (version_num) VALUES (:version_num)"
+            ),
+            {"version_num": revision},
+        )
+    else:
+        connection.execute(
+            text("UPDATE alembic_version SET version_num = :version_num"),
+            {"version_num": revision},
+        )
+    connection.commit()
+
+
+def create_db_and_tables() -> None:
+    """Bring the database schema to the current Alembic revision.
+
+    Databases that predate Alembic are bootstrapped once and stamped at the
+    current head revision so future schema changes are managed by Alembic.
+    """
+    logger.info("Starting database schema initialization...")
+
+    try:
+        _import_models()
         logger.info(f"Models loaded: {list(SQLModel.metadata.tables.keys())}")
-
         engine = get_dsql_engine()
+        with engine.connect() as connection:
+            table_names = set(inspect(connection).get_table_names())
+            existing_tables = set(SQLModel.metadata.tables.keys()) & table_names
+            alembic_config = _get_alembic_config(connection=connection)
+            head_revision = _get_alembic_head_revision()
+            current_revision = _get_current_alembic_revision(connection)
+            dsql_runtime = _uses_dsql_runtime()
 
-        # For DSQL: create each table individually in separate transactions
-        # This works around the "multiple ddl statements not supported in a transaction" error
-        for table_name, table in SQLModel.metadata.tables.items():
-            logger.info(f"Creating table '{table_name}' if not exists...")
-            try:
-                table.create(engine, checkfirst=True)
-                logger.info(f"Table '{table_name}' created or already exists")
-            except Exception as e:
-                logger.warning(f"Failed to create table '{table_name}': {e}")
-                
-        # Force explicit creation of missing tables
-        try:
-            from app.models.token_usage import TokenUsage
-            TokenUsage.__table__.create(engine, checkfirst=True)
-            logger.info("TokenUsage table initialized")
-        except Exception as e:
-            logger.warning(f"Failed to create TokenUsage table: {e}")
+            if current_revision is not None:
+                if dsql_runtime and current_revision == head_revision:
+                    logger.info(
+                        "Alembic head revision already applied on DSQL; skipping upgrade"
+                    )
+                    return
+                logger.info("Alembic version table found; upgrading schema to head")
+                command.upgrade(alembic_config, "head")
+                connection.commit()
+            elif dsql_runtime:
+                logger.info(
+                    "DSQL database without Alembic version table detected; bootstrapping schema and stamping head"
+                )
+                _bootstrap_legacy_schema(connection)
+                connection.commit()
+                _stamp_head_manually(connection, head_revision)
+            elif existing_tables:
+                logger.info(
+                    "Existing schema without Alembic detected; bootstrapping and stamping head"
+                )
+                _bootstrap_legacy_schema(connection)
+                connection.commit()
+                command.stamp(alembic_config, "head")
+                connection.commit()
+            else:
+                logger.info("Fresh database detected; applying Alembic migrations")
+                command.upgrade(alembic_config, "head")
+                connection.commit()
 
-        try:
-            from app.models.mcp_token import MCPToken
-            # Match the class name to the table name
-            MCPToken.__table__.create(engine, checkfirst=True)
-            logger.info("MCPToken table initialized")
-        except Exception as e:
-            logger.warning(f"Failed to create MCPToken table: {e}")
-        
-        for table_name, table in SQLModel.metadata.tables.items():
-            try:
-
-                # Self-healing migration: Add 'language' column to 'user_settings' if missing
-                if table_name == "user_settings":
-                    logger.info("Checking for 'language' column in 'user_settings'...")
-                    try:
-                        with engine.connect() as conn:
-                            # Step 1: Add the column
-                            try:
-                                conn.execute(text("ALTER TABLE user_settings ADD COLUMN language VARCHAR(10)"))
-                                conn.commit()
-                                # Step 2: Set the default value
-                                conn.execute(text("UPDATE user_settings SET language = 'auto' WHERE language IS NULL"))
-                                conn.commit()
-                            except Exception as add_error:
-                                if "already exists" in str(add_error).lower() or "duplicate column" in str(add_error).lower():
-                                    pass
-                                else:
-                                    logger.warning(f"Failed to add language column: {add_error}")
-                    except Exception as alter_error:
-                        logger.warning(f"Failed to migrate user_settings: {alter_error}")
-
-                # Self-healing migration: Add 'token_limit' column to 'user_settings' if missing
-                if table_name == "user_settings":
-                    logger.info("Checking for 'token_limit' column in 'user_settings'...")
-                    try:
-                        with engine.connect() as conn:
-                            try:
-                                conn.execute(text("ALTER TABLE user_settings ADD COLUMN token_limit INTEGER"))
-                                conn.commit()
-                                conn.execute(text(f"UPDATE user_settings SET token_limit = {30_000} WHERE token_limit IS NULL"))
-                                conn.commit()
-                                logger.info("Added 'token_limit' column to 'user_settings' table")
-                            except Exception as add_error:
-                                if "already exists" in str(add_error).lower() or "duplicate column" in str(add_error).lower():
-                                    pass
-                                else:
-                                    logger.warning(f"Failed to add token_limit column: {add_error}")
-                    except Exception as alter_error:
-                        logger.warning(f"Failed to migrate user_settings token_limit: {alter_error}")
-
-                # Self-healing migration: Add 'last_used_at' column to 'mcp_tokens' if missing
-                if table_name == "mcp_tokens":
-                    logger.info("Checking for 'last_used_at' column in 'mcp_tokens'...")
-                    try:
-                        with engine.connect() as conn:
-                            try:
-                                conn.execute(text("ALTER TABLE mcp_tokens ADD COLUMN last_used_at TIMESTAMP WITH TIME ZONE"))
-                                conn.commit()
-                                logger.info("Added 'last_used_at' column to 'mcp_tokens' table")
-                            except Exception as add_error:
-                                if "already exists" in str(add_error).lower() or "duplicate column" in str(add_error).lower():
-                                    pass
-                                else:
-                                    logger.warning(f"Failed to add last_used_at column: {add_error}")
-                    except Exception as alter_error:
-                        logger.warning(f"Failed to migrate mcp_tokens: {alter_error}")
-
-                # Note: 'content' column in 'notes' table needs to be migrated to TEXT manually in DSQL
-                # because ALTER COLUMN TYPE is not supported and it may timeout in Lambda.
-            except Exception as table_error:
-                # Log but continue if table already exists or other non-critical error
-                logger.warning(f"Table '{table_name}' creation: {table_error}")
-
-        logger.info("Database tables created successfully")
+        logger.info("Database schema initialization completed successfully")
     except Exception as e:
-        logger.error(f"Failed to create database tables: {e}", exc_info=True)
+        logger.error(f"Failed to initialize database schema: {e}", exc_info=True)
         raise
 
 

@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.database import create_db_and_tables
+from app.database import create_db_and_tables, get_session
 from app.routers import admin, ai, folders, images, mcp, notes, settings, share
 
 settings_app = get_settings()
@@ -51,8 +51,11 @@ _db_initialized = False
 
 @app.middleware("http")
 async def db_init_middleware(request: Request, call_next):
-    """Ensure database is initialized on the first request."""
+    """Ensure database migrations have run on the first request."""
     global _db_initialized
+    if get_session in app.dependency_overrides:
+        return await call_next(request)
+
     if not _db_initialized and not request.url.path.endswith("/health"):
         create_db_and_tables()
         _db_initialized = True

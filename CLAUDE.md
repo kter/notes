@@ -45,6 +45,19 @@ make lint-backend  # Ruff
 make lint-frontend # ESLint
 ```
 
+### Database Migrations
+```bash
+# Create a new Alembic migration after schema changes
+make db-revision MESSAGE="add_new_column"
+
+# Apply all pending migrations
+make db-upgrade
+
+# Backend-local equivalents
+cd backend && uv run alembic revision --autogenerate -m "add_new_column"
+cd backend && uv run alembic upgrade head
+```
+
 ### Deployment
 
 **IMPORTANT: All deployment commands MUST be run from the project root directory.**
@@ -101,6 +114,7 @@ make logs ENV=dev
 - Manual UUIDs (no auto-increment)
 - Soft deletes via timestamps
 - User-based data isolation (all models have `user_id`)
+- Schema changes must be managed with **Alembic** revisions, not ad hoc SQL in application startup code
 
 ### Terraform & AWS
 - Uses **workspaces** for environment separation (dev/prd)

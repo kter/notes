@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   ThreeColumnLayout,
   Sidebar,
@@ -30,6 +30,15 @@ export default function Home() {
   const [isNoteListOpen, setIsNoteListOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("folders");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hostname = window.location.hostname;
+    const isAdminHost = hostname === "admin.notes.devtools.site" || hostname === "admin.notes.dev.devtools.site";
+    if (isAdminHost && window.location.pathname === "/") {
+      window.location.replace("/admin/");
+    }
+  }, []);
 
   // Custom hooks
   const { folders, setFolders, notes, setNotes, isLoading: isDataLoading } = useHomeData(isAuthenticated);

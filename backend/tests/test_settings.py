@@ -100,6 +100,7 @@ class TestUpdateSettings:
         settings = data["settings"]
         assert settings["llm_model_id"] == valid_model_id
         assert settings["user_id"] == TEST_USER_ID
+        assert settings["token_limit"] > 0
 
     def test_update_settings_invalid_model_id(self, client: TestClient):
         """Test that invalid model ID is rejected."""
@@ -128,6 +129,15 @@ class TestUpdateSettings:
         data = response.json()
         settings = data["settings"]
         assert settings["llm_model_id"] == valid_model_id
+
+    def test_update_settings_rejects_token_limit(self, client: TestClient):
+        """Token limit must not be user-editable from the settings endpoint."""
+        response = client.put(
+            "/api/settings",
+            json={"token_limit": 999999},
+        )
+
+        assert response.status_code == 422
 
 
 class TestUpdateLanguageSettings:

@@ -37,7 +37,11 @@ def set_integration_test_token_limits(api_base_url, auth_token):
             "Content-Type": "application/json",
         }
         with httpx.Client(base_url=api_base_url, headers=headers, timeout=30.0) as c:
-            c.put("/api/settings", json={"token_limit": INTEGRATION_TEST_TOKEN_LIMIT})
+            user_id = "integration-test-user-id" if token == auth_token else "integration-test-user-id-2"
+            c.patch(
+                f"/api/admin/users/{user_id}",
+                json={"token_limit": INTEGRATION_TEST_TOKEN_LIMIT},
+            )
 
 @pytest.fixture
 def client(api_base_url, auth_token):

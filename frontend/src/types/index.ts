@@ -119,6 +119,7 @@ export interface UserSettings {
   user_id: string;
   llm_model_id: string;
   language: string;
+  token_limit: number;
   created_at: string;
   updated_at: string;
 }
@@ -152,6 +153,44 @@ export interface SettingsResponse {
 export interface UserSettingsUpdate {
   llm_model_id?: string;
   language?: string;
+}
+
+export interface AppUser {
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  admin: boolean;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+}
+
+export interface AdminUserSummary {
+  user: AppUser;
+  settings: UserSettings;
+  token_usage: TokenUsageRead;
+  note_count: number;
+  folder_count: number;
+  mcp_token_count: number;
+}
+
+export interface AdminUsersListResponse {
+  users: AdminUserSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminUserDetailResponse extends AdminUserSummary {
+  available_models: AvailableModel[];
+  available_languages: AvailableLanguage[];
+}
+
+export interface AdminUserUpdateRequest {
+  admin?: boolean;
+  llm_model_id?: string;
+  language?: string;
+  token_limit?: number;
 }
 
 // Share types

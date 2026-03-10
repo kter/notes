@@ -59,7 +59,7 @@ class UserSettingsBase(SQLModel):
 
     llm_model_id: str = Field(default=DEFAULT_LLM_MODEL_ID, max_length=255)
     language: str = Field(default=DEFAULT_LANGUAGE, max_length=10)
-    token_limit: int = Field(default=MONTHLY_TOKEN_LIMIT)
+    token_limit: int = Field(default=MONTHLY_TOKEN_LIMIT, ge=1, le=10_000_000)
 
 
 class UserSettings(UserSettingsBase, table=True):
@@ -75,10 +75,10 @@ class UserSettings(UserSettingsBase, table=True):
 class UserSettingsUpdate(SQLModel):
     """Schema for updating user settings."""
 
+    model_config = {"extra": "forbid"}
+
     llm_model_id: str | None = None
     language: str | None = None
-    # NOTE: In production this should be restricted to admin/paid-plan users only.
-    token_limit: int | None = None
 
 
 class UserSettingsRead(UserSettingsBase):

@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from app.auth import UserId
 from app.database import get_session
+from app.db_commit import commit_with_error_handling
 from app.models import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
@@ -19,7 +20,6 @@ from app.models import (
     UserSettingsRead,
     UserSettingsUpdate,
 )
-from app.routers.db_exceptions import commit_with_error_handling
 from app.services.token_usage import get_usage_info
 
 router = APIRouter()

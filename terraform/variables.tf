@@ -15,6 +15,7 @@ locals {
   env_config = {
     dev = {
       domain_name       = "notes.dev.devtools.site"
+      api_domain_name   = "api.notes.dev.devtools.site"
       admin_domain_name = "admin.notes.dev.devtools.site"
       hosted_zone_name  = "dev.devtools.site"
       enable_noindex    = true
@@ -22,6 +23,7 @@ locals {
     }
     prd = {
       domain_name       = "notes.devtools.site"
+      api_domain_name   = "api.notes.devtools.site"
       admin_domain_name = "admin.notes.devtools.site"
       hosted_zone_name  = "devtools.site"
       enable_noindex    = false

@@ -5,7 +5,7 @@ import pytest
 
 # Default to the dev URL integration testing if not provided
 # I got this URL from `make tf-output` previously
-DEFAULT_DEV_API_URL = "https://cmwds5zjfa.execute-api.ap-northeast-1.amazonaws.com"
+DEFAULT_DEV_API_URL = "https://api.notes.dev.devtools.site"
 
 # Token limit for integration test users (large enough to never hit in tests)
 INTEGRATION_TEST_TOKEN_LIMIT = 10_000_000

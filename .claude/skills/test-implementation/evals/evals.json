@@ -1,0 +1,23 @@
+{
+  "skill_name": "test-implementation",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I have a FastAPI app with a token usage tracking service. The service has a check_limit(session, user_id) function that returns True if tokens_used < MONTHLY_TOKEN_LIMIT (1,000,000) and False otherwise. There's also a router helper _check_token_limit(session, user_id) that calls check_limit and raises HTTP 429 if it returns False. Write unit tests for both of these. The code is at backend/app/services/token_usage.py and backend/app/routers/ai.py. I can't test the 429 behavior in integration tests because hitting 1M tokens in production would be way too expensive.",
+      "expected_output": "A test file with unittest-based tests: TestCheckLimit class covering 0, limit-1, limit, limit+1 cases; TestCheckTokenLimitRouter class testing that 429 is raised when limit exceeded and no exception when within limit. Uses MagicMock to mock the DB session.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "I've got a notes app (FastAPI + httpx integration tests against a real deployed Lambda). I just added a share feature: POST /api/notes/{id}/share creates a share link, GET /api/notes/{id}/share gets current share info (or null if none), DELETE /api/notes/{id}/share revokes it, and GET /api/shared/{token} is a public endpoint that returns the note without auth. Write integration tests for all of this. The conftest.py already has a 'client' fixture (authenticated) and an api_base_url fixture.",
+      "expected_output": "A test_share_endpoints.py with: TestShareNote class, a public_client fixture (no auth), fixtures for test_note and test_note_with_share using yield+cleanup, tests for create, idempotency, get_info, revoke, public access, 404 for invalid tokens. Cleanup independence via try/finally where needed.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I'm building a multi-tenant task manager with FastAPI. Users can create tasks, and each task has a user_id field. My backend uses a dev backdoor token 'test-token-1' that maps to user_id 'user-1'. I need to write integration tests that verify a second user (test-token-2 / user-2) cannot read, update, or delete user-1's tasks. I also want to verify that GET /api/tasks only returns the authenticated user's tasks, not other users' tasks. The conftest already has a client fixture for user-1. What do I need to add?",
+      "expected_output": "Updates to conftest.py to add another_client fixture using test-token-2. A TestCrossUserAuthorization class with fixtures and tests: cannot_read, cannot_update, cannot_delete return 404; tasks_are_isolated verifies list endpoint doesn't include other user's tasks.",
+      "files": []
+    }
+  ]
+}

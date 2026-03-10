@@ -17,3 +17,10 @@ A skill is a set of local instructions stored in a `SKILL.md` file. Below is the
 - Load files from `references/`, `scripts/`, or `assets/` only when they are needed.
 - If multiple skills apply, use the minimal set and state the order.
 - Keep context small by loading only the relevant reference files.
+
+## Migration Rules
+
+- Backend schema migrations must be created and managed with Alembic.
+- When changing SQLModel table definitions, create a revision with `make db-revision MESSAGE="your_message"` or `cd backend && uv run alembic revision --autogenerate -m "your_message"`.
+- Apply migrations with `make db-upgrade` from the repository root, or `cd backend && uv run alembic upgrade head` from `backend/`.
+- Do not add new ad hoc schema migration logic to `backend/app/database.py`; use Alembic revisions instead.

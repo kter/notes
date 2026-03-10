@@ -60,6 +60,7 @@ async def get_settings(
             user_id=settings.user_id,
             llm_model_id=settings.llm_model_id,
             language=settings.language,
+            token_limit=settings.token_limit,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         ),
@@ -110,8 +111,6 @@ async def update_settings(
                     detail=f"Invalid language. Must be one of: {valid_langs}",
                 )
             settings.language = settings_in.language
-        if settings_in.token_limit is not None:
-            settings.token_limit = settings_in.token_limit
         settings.updated_at = datetime.now(UTC)
 
     commit_with_error_handling(session, "UserSettings")
@@ -125,6 +124,7 @@ async def update_settings(
             user_id=settings.user_id,
             llm_model_id=settings.llm_model_id,
             language=settings.language,
+            token_limit=settings.token_limit,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         ),

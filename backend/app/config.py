@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # Image settings
     image_bucket_name: str = ""
     cdn_domain: str = "localhost:8000"
+    bootstrap_admin_emails: str = ""
+    bootstrap_admin_user_ids: str = ""
+
+    @property
+    def bootstrap_admin_email_list(self) -> list[str]:
+        return [item.strip() for item in self.bootstrap_admin_emails.split(",") if item.strip()]
+
+    @property
+    def bootstrap_admin_user_id_list(self) -> list[str]:
+        return [item.strip() for item in self.bootstrap_admin_user_ids.split(",") if item.strip()]
 
 
 @lru_cache

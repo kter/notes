@@ -25,8 +25,13 @@ except Exception as e:
     raise
 
 # Create Lambda handler
-handler = Mangum(
+asgi_handler = Mangum(
     app,
     lifespan="off",
     api_gateway_base_path="/",
 )
+
+
+def handler(event, context):
+    """Handle API Gateway requests."""
+    return asgi_handler(event, context)

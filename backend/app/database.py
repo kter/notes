@@ -120,7 +120,7 @@ def get_dsql_engine():
 
 def _import_models() -> None:
     """Import models so SQLModel metadata is populated."""
-    from app.models import AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
+    from app.models import AIEditJob, AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
 
 
 def _get_backend_root() -> Path:
@@ -312,10 +312,20 @@ def create_db_and_tables() -> None:
             dsql_runtime = _uses_dsql_runtime()
 
             if current_revision is not None:
-                if dsql_runtime and current_revision == head_revision:
+                if dsql_runtime:
+                    if current_revision == head_revision:
+                        logger.info(
+                            "Alembic head revision already applied on DSQL; skipping upgrade"
+                        )
+                        return
                     logger.info(
-                        "Alembic head revision already applied on DSQL; skipping upgrade"
+                        "DSQL revision %s is behind head %s; bootstrapping current schema and stamping head",
+                        current_revision,
+                        head_revision,
                     )
+                    _bootstrap_legacy_schema(connection)
+                    connection.commit()
+                    _stamp_head_manually(connection, head_revision)
                     return
                 logger.info("Alembic version table found; upgrading schema to head")
                 command.upgrade(alembic_config, "head")

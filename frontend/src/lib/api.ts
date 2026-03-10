@@ -1,6 +1,9 @@
 import type {
   ChatRequest,
   ChatResponse,
+  EditJob,
+  EditJobCreateResponse,
+  EditJobRequest,
   EditRequest,
   EditResponse,
   Folder,
@@ -161,6 +164,17 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  async createEditJob(data: EditJobRequest): Promise<EditJobCreateResponse> {
+    return this.request<EditJobCreateResponse>("/api/ai/edit-jobs", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getEditJob(jobId: string): Promise<EditJob> {
+    return this.request<EditJob>(`/api/ai/edit-jobs/${jobId}`);
   }
 
 

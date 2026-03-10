@@ -114,6 +114,29 @@ export interface EditResponse {
   tokens_used: number;
 }
 
+export interface EditJobRequest {
+  content: string;
+  instruction: string;
+  note_id?: string;
+}
+
+export interface EditJob {
+  id: string;
+  note_id: string | null;
+  status: "pending" | "running" | "completed" | "failed";
+  edited_content: string | null;
+  error_message: string | null;
+  tokens_used: number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface EditJobCreateResponse {
+  job: EditJob;
+}
+
 // Settings types
 export interface UserSettings {
   user_id: string;

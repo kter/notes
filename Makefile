@@ -42,6 +42,14 @@ dev: ## Run both backend and frontend (requires tmux or run in separate terminal
 	@echo "  make dev-backend"
 	@echo "  make dev-frontend"
 
+.PHONY: db-upgrade
+db-upgrade: ## Apply backend database migrations locally
+	cd backend && uv run alembic upgrade head
+
+.PHONY: db-revision
+db-revision: ## Create a new backend Alembic revision (MESSAGE="...")
+	cd backend && uv run alembic revision --autogenerate -m "$(MESSAGE)"
+
 # =============================================================================
 # Backend Deployment
 # =============================================================================

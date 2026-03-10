@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 
 from sqlalchemy import inspect, text
@@ -6,70 +7,150 @@ from sqlmodel.pool import StaticPool
 
 from app.database import create_db_and_tables
 
+ALEMBIC_HEAD = "20260310_01"
 
-def test_migration_adds_language_column():
-    """Test that create_db_and_tables adds the language column to an existing table."""
-    # 1. Create a database with an old schema (missing 'language' column)
-    engine = create_engine(
+
+def _make_engine():
+    return create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
 
-    # Manually create the table without the language column
+
+def test_migration_bootstraps_legacy_schema_and_stamps_head():
+    """Legacy schemas are normalized once and brought under Alembic control."""
+    engine = _make_engine()
+
     with engine.connect() as conn:
         conn.execute(
-            text("""
-            CREATE TABLE user_settings (
-                user_id VARCHAR PRIMARY KEY,
-                llm_model_id VARCHAR,
-                created_at DATETIME,
-                updated_at DATETIME
+            text(
+                """
+                CREATE TABLE user_settings (
+                    user_id VARCHAR PRIMARY KEY,
+                    llm_model_id VARCHAR,
+                    created_at DATETIME,
+                    updated_at DATETIME
+                )
+                """
             )
-        """)
         )
         conn.execute(
-            text("""
-            INSERT INTO user_settings (user_id, llm_model_id) VALUES ('user1', 'gpt-4')
-        """)
+            text(
+                """
+                CREATE TABLE mcp_tokens (
+                    id VARCHAR PRIMARY KEY,
+                    user_id VARCHAR,
+                    token_hash VARCHAR,
+                    name VARCHAR,
+                    created_at DATETIME,
+                    expires_at DATETIME,
+                    revoked_at DATETIME
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO user_settings (user_id, llm_model_id)
+                VALUES ('user1', 'gpt-4')
+                """
+            )
         )
         conn.commit()
 
-    # 2. Patch get_dsql_engine to return our test engine
     with patch("app.database.get_dsql_engine", return_value=engine):
-        # 3. Run the migration
         create_db_and_tables()
 
-    # 4. Verify the column exists and has the default value
-    with engine.connect() as conn:
-        # Check column existence
-        inspector = inspect(engine)
-        columns = [c["name"] for c in inspector.get_columns("user_settings")]
-        assert "language" in columns
+    inspector = inspect(engine)
+    user_settings_columns = {
+        column["name"] for column in inspector.get_columns("user_settings")
+    }
+    mcp_tokens_columns = {
+        column["name"] for column in inspector.get_columns("mcp_tokens")
+    }
 
-        # Check existing row values
-        result = conn.execute(
+    assert "language" in user_settings_columns
+    assert "token_limit" in user_settings_columns
+    assert "last_used_at" in mcp_tokens_columns
+    assert "alembic_version" in inspector.get_table_names()
+
+    with engine.connect() as conn:
+        language = conn.execute(
             text("SELECT language FROM user_settings WHERE user_id = 'user1'")
-        ).fetchone()
-        assert result[0] == "auto"
+        ).scalar_one()
+        token_limit = conn.execute(
+            text("SELECT token_limit FROM user_settings WHERE user_id = 'user1'")
+        ).scalar_one()
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert language == "auto"
+    assert token_limit == 30_000
+    assert version == ALEMBIC_HEAD
+
+
+def test_migration_applies_initial_revision_to_fresh_db():
+    """Fresh databases should be created from the Alembic revision history."""
+    engine = _make_engine()
+
+    with patch("app.database.get_dsql_engine", return_value=engine):
+        create_db_and_tables()
+
+    inspector = inspect(engine)
+    expected_tables = {
+        "alembic_version",
+        "app_users",
+        "folders",
+        "mcp_tokens",
+        "note_shares",
+        "notes",
+        "token_usage",
+        "user_settings",
+    }
+
+    assert expected_tables.issubset(set(inspector.get_table_names()))
+
+    with engine.connect() as conn:
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert version == ALEMBIC_HEAD
+
+
+def test_migration_bootstraps_fresh_db_for_dsql_runtime():
+    """DSQL bootstrap should stamp head without relying on Alembic DDL/DML mixing."""
+    engine = _make_engine()
+
+    with patch("app.database.get_dsql_engine", return_value=engine):
+        with patch.dict(os.environ, {"DSQL_CLUSTER_ENDPOINT": "test-cluster"}):
+            create_db_and_tables()
+
+    inspector = inspect(engine)
+    assert "alembic_version" in inspector.get_table_names()
+
+    with engine.connect() as conn:
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+
+    assert version == ALEMBIC_HEAD
 
 
 def test_migration_idempotent():
-    """Test that running migration multiple times doesn't fail."""
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    """Running schema initialization multiple times should be safe."""
+    engine = _make_engine()
 
     with patch("app.database.get_dsql_engine", return_value=engine):
-        # Run first time
+        create_db_and_tables()
         create_db_and_tables()
 
-        # Run second time
-        create_db_and_tables()
+    with engine.connect() as conn:
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
 
-    # Verify column exists
-    inspector = inspect(engine)
-    columns = [c["name"] for c in inspector.get_columns("user_settings")]
-    assert "language" in columns
+    assert version == ALEMBIC_HEAD

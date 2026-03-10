@@ -15,6 +15,8 @@ COPY --from=builder /.venv/lib/python3.12/site-packages /var/lang/lib/python3.12
 
 # Copy application code
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 
 # Set the CMD to your handler
 CMD ["app.lambda_handler.handler"]

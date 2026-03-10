@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -18,6 +19,7 @@ BEDROCK_READ_TIMEOUT_SECONDS = 45
 EDIT_SINGLE_PASS_MAX_CHARS = 12_000
 EDIT_CHUNK_TARGET_CHARS = 4_000
 EDIT_CHUNK_MAX_CHARS = 6_000
+EDIT_MAX_CONCURRENCY = 3
 
 
 class AIServiceTimeoutError(Exception):
@@ -401,23 +403,33 @@ class BedrockService(AIService):
             return self._edit_single_chunk(content, instruction, model_id, system)
 
         chunks = self._chunk_content_for_edit(content)
-        edited_chunks: list[str] = []
-        total_tokens = 0
 
-        for index, chunk in enumerate(chunks):
-            edited_chunk, chunk_tokens = self._edit_single_chunk(
-                chunk,
-                instruction,
-                model_id,
-                system,
-                chunk_index=index,
-                chunk_count=len(chunks),
-                preserve_whitespace=True,
-            )
-            edited_chunks.append(edited_chunk)
-            total_tokens += chunk_tokens
+        semaphore = asyncio.Semaphore(EDIT_MAX_CONCURRENCY)
 
-        return "".join(edited_chunks), total_tokens
+        async def edit_chunk(
+            index: int, chunk: str
+        ) -> tuple[int, str, int]:
+            async with semaphore:
+                edited_chunk, chunk_tokens = await asyncio.to_thread(
+                    self._edit_single_chunk,
+                    chunk,
+                    instruction,
+                    model_id,
+                    system,
+                    index,
+                    len(chunks),
+                    True,
+                )
+                return index, edited_chunk, chunk_tokens
+
+        results = await asyncio.gather(
+            *(edit_chunk(index, chunk) for index, chunk in enumerate(chunks))
+        )
+        results.sort(key=lambda item: item[0])
+
+        edited_content = "".join(chunk for _, chunk, _ in results)
+        total_tokens = sum(chunk_tokens for _, _, chunk_tokens in results)
+        return edited_content, total_tokens
 
 
 # Singleton instance

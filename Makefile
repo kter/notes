@@ -267,6 +267,10 @@ clean: ## Clean build artifacts
 .PHONY: test
 test: test-backend test-frontend test-lint ## Run all tests
 
+.PHONY: test-mcp-lambda-unit
+test-mcp-lambda-unit: ## Run MCP Lambda unit tests
+	cd lambda/mcp_server && uv run --extra dev pytest tests/test_app_unit.py -q --tb=short
+
 .PHONY: test-backend
 test-backend: ## Run backend tests
 	cd backend && uv run --extra dev python -m pytest -v
@@ -308,10 +312,9 @@ install-playwright-deps: ## Install Playwright browser dependencies (dnf)
 	dnf install -y libicu libjpeg-turbo gstreamer1-plugins-base
 
 .PHONY: install-hooks
-install-hooks: ## Install git pre-commit hooks
-	chmod +x scripts/pre-commit
-	cp scripts/pre-commit .git/hooks/pre-commit
-	@echo "Pre-commit hook installed!"
+install-hooks: ## Install git hooks via lefthook
+	mise exec -- lefthook install
+	@echo "Git hooks installed via lefthook."
 
 # =============================================================================
 # MCP Server Deployment

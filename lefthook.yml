@@ -1,0 +1,15 @@
+pre-commit:
+  commands:
+    backend-lint:
+      run: make lint-backend
+    frontend-lint:
+      run: make lint-frontend
+
+pre-push:
+  commands:
+    mcp-lambda-unit:
+      run: make test-mcp-lambda-unit
+    backend-tests:
+      run: make test-backend
+    frontend-tests:
+      run: make test-frontend

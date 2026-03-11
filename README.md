@@ -107,9 +107,14 @@ mise install
 
 # Allow direnv to load the .envrc and mise environment
 direnv allow
+
+# Install git hooks
+make install-hooks
 ```
 
 Once set up, the correct versions of `node`, `python`, and `go` will be automatically activated whenever you enter the project directory.
+
+Git hooks are managed with `lefthook`. The configured hooks run fast lint checks on `pre-commit`, and heavier test suites on `pre-push`.
 
 ### Quick Start
 

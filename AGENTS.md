@@ -28,6 +28,7 @@ This repository is a Mac Notes app clone with AI-powered features built on a ser
 ```bash
 make dev
 make test
+make install-hooks
 make deploy ENV=prd
 make tf-plan ENV=dev
 ```

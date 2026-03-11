@@ -242,6 +242,27 @@ npx playwright test --ui
 npx playwright show-report
 ```
 
+#### Make Targets
+
+```bash
+# Host execution
+make test-e2e-dev
+make test-e2e-prd
+
+# Pass through specific files or grep filters
+make test-e2e-dev TEST_ARGS='tests/auth.spec.ts'
+make test-e2e-dev TEST_ARGS='-g "full cycle"'
+
+# Docker execution for WebKit/Safari on hosts with incompatible system libraries
+make test-e2e-webkit-docker ENV=dev
+make test-e2e-mobile-safari-docker ENV=dev
+
+# Generic Docker target
+make test-e2e-docker ENV=dev PROJECT=webkit TEST_ARGS='tests/auth.spec.ts'
+```
+
+GitHub Actions also uses the same split: `chromium` and `Mobile Chrome` run on the standard Ubuntu runner, while `webkit` and `Mobile Safari` run inside the Playwright Docker image. Configure `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD` as repository secrets before enabling the workflow.
+
 > [!TIP]
 > For detailed credential management and CI/CD setup, see [frontend/docs/E2E_CREDENTIALS.md](frontend/docs/E2E_CREDENTIALS.md).
 

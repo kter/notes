@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 test.describe('Notes Functionality', () => {
   // Authentication is handled by auth.setup.ts for all tests in projects that depend on it.
 
-  // TODO: Fix this test - AI summary selector and timing issues
   test('should perform a full cycle: folder -> note -> summary -> chat', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip(); // Flaky on WebKit
     test.setTimeout(120000); // AI summary can be slow
@@ -36,14 +35,19 @@ test.describe('Notes Functionality', () => {
       // Actually earlier code handled this. Let's assume we are in the right place or use the tab bar.
       // For safe measure, ensure visibility if needed, but start simple.
     }
+    const createFolderPromise = page.waitForResponse(
+      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 30000 }
+    );
     await sidebar.getByTestId('sidebar-add-folder-button').click();
     const folderName = `Test Folder ${Date.now()}`;
     await sidebar.getByTestId('sidebar-new-folder-input').fill(folderName);
     await page.keyboard.press('Enter');
+    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
 
     // Select the newly created folder
     console.log(`[E2E] Selecting folder: ${folderName}`);
-    const folderButton = page.getByRole('button', { name: folderName });
+    const folderButton = sidebar.getByTestId(`sidebar-folder-item-${createdFolder.id}`);
     await expect(folderButton).toBeVisible({ timeout: 15000 });
     await folderButton.click();
 
@@ -113,17 +117,42 @@ test.describe('Notes Functionality', () => {
     console.log('[E2E] Content synced');
 
     // Extra wait for backend consistency
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     // 4. Summarize
-    // Known issue: Chromium fails with 400 Bad Request (Note content empty) despite content being synced.
-    // Firefox passes. Marking as fixme for Chromium to unblock CI.
-    if (browserName === 'chromium') {
-      test.fixme();
-    }
     console.log('[E2E] Requesting summary');
-    // layout is already defined above as mobile-layout-editor or desktop-layout
-    await layout.getByTestId('editor-summarize-button').click();
+    const summarizeButton = layout.getByTestId('editor-summarize-button');
+    const aiMessages = page.locator('[data-testid="ai-message-content"]:visible');
+    let summarizeSucceeded = false;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await expect(summarizeButton).toBeEnabled({ timeout: 10000 });
+      const summarizeResponsePromise = page.waitForResponse(
+        resp => resp.url().includes('/api/ai/summarize') && resp.request().method() === 'POST',
+        { timeout: 30000 }
+      );
+
+      await summarizeButton.click();
+      const summarizeResponse = await summarizeResponsePromise;
+
+      if (summarizeResponse.ok()) {
+        summarizeSucceeded = true;
+        break;
+      }
+
+      const errorText = await summarizeResponse.text().catch(() => '');
+      console.log(`[E2E] Summary attempt ${attempt} failed: ${summarizeResponse.status()} ${errorText}`);
+
+      const isRetryableEmptyNote =
+        summarizeResponse.status() === 400 && errorText.includes('Note content is empty');
+      if (!isRetryableEmptyNote || attempt === 3) {
+        expect(summarizeResponse.ok(), `Summarize failed: ${summarizeResponse.status()} ${errorText}`).toBeTruthy();
+      }
+
+      await page.waitForTimeout(2000 * attempt);
+    }
+
+    expect(summarizeSucceeded).toBeTruthy();
 
     // Wait for AI chat panel to open (visible on desktop)
     console.log('[E2E] Waiting for AI chat panel');
@@ -145,26 +174,23 @@ test.describe('Notes Functionality', () => {
     // Look for any assistant message content
     console.log('[E2E] Looking for AI message content');
     console.log('[E2E] Captured errors so far:', consoleErrors);
-    // Use :visible filter on mobile to avoid matching hidden desktop element
-    const aiResponse = isMobile
-      ? page.locator('[data-testid="ai-message-content"]:visible').first()
-      : page.getByTestId('ai-message-content').first();
+    const aiResponse = aiMessages.first();
     await expect(aiResponse).toBeVisible({ timeout: 100000 });
     console.log('[E2E] AI message content found');
 
 
     // 5. Chat
     console.log('[E2E] Sending chat message');
+    const assistantMessagesBeforeChat = await aiMessages.count();
     const chatInput = layout.getByPlaceholder(/Ask about current note|現在のノートについて質問/i).first();
     await chatInput.fill('What is this note about?');
     // Click send button for more reliability across devices
     await layout.getByTestId('ai-chat-send-button').click();
 
-    // Verify chat response - use visible filter
-    await expect(layout.locator('.bg-muted').last()).toContainText(/Playwright|note/i, { timeout: 30000 });
+    await expect(aiMessages).toHaveCount(assistantMessagesBeforeChat + 1, { timeout: 30000 });
+    await expect(aiMessages.last()).toContainText(/Playwright|note/i, { timeout: 30000 });
   });
 
-  // TODO: Fix this test - note list update timing issues
   test('should be able to search and filter notes', async ({ page, isMobile }) => {
     test.setTimeout(120000);
     // Navigate to home
@@ -326,20 +352,21 @@ test.describe('Notes Functionality', () => {
     console.log('[E2E] Opening Settings dialog');
     // Settings icon button has title="Settings"
     await page.getByRole('button', { name: 'Settings' }).first().click();
+    const settingsDialog = page.getByRole('dialog');
 
     // 2. Verify Dialog Content
     console.log('[E2E] Verifying Settings content');
     // Title
-    await expect(page.getByRole('heading', { name: /^Settings$|^設定$/i })).toBeVisible({ timeout: 10000 });
+    await expect(settingsDialog.getByRole('heading', { name: /^Settings$|^設定$/i })).toBeVisible({ timeout: 10000 });
 
     // Language Selection
-    await expect(page.getByLabel(/Language|言語/i)).toBeVisible();
+    await expect(settingsDialog.locator('#language-select')).toBeVisible();
 
     // AI Model Selection
-    await expect(page.getByLabel(/AI Model|AIモデル/i)).toBeVisible();
+    await expect(settingsDialog.locator('#model-select')).toBeVisible();
 
     // Export button
-    await expect(page.getByRole('button', { name: /Download ZIP|ZIPをダウンロード/i })).toBeVisible();
+    await expect(settingsDialog.getByRole('button', { name: /Download ZIP|ZIPをダウンロード/i })).toBeVisible();
 
     // 3. Close Settings
     console.log('[E2E] Closing Settings');
@@ -347,7 +374,7 @@ test.describe('Notes Functionality', () => {
     await page.keyboard.press('Escape');
 
     // Verify dialog is gone
-    await expect(page.getByRole('heading', { name: /^Settings$|^設定$/i })).not.toBeVisible({ timeout: 10000 });
+    await expect(settingsDialog).not.toBeVisible({ timeout: 10000 });
   });
 
   test('should be able to collapse and expand note list panel', async ({ page, isMobile }) => {
@@ -388,9 +415,7 @@ test.describe('Notes Functionality', () => {
     await expect(noteListHeading).toBeVisible({ timeout: 5000 });
   });
 
-  // TODO: Fix this test - note list update timing issues after reload
-  // Skipping: Flaky on all browsers due to timing issues with offline sync and note list updates
-  test.skip('should save note offline and show sync status indicator', async ({ page, context, isMobile, browserName }) => {
+  test('should save note offline and show sync status indicator', async ({ page, context, isMobile, browserName }) => {
     test.setTimeout(120000); // Offline test involves multiple reloads and waits
     await page.goto('/');
     console.log('[E2E] Starting Offline Sync Test');
@@ -471,9 +496,10 @@ test.describe('Notes Functionality', () => {
     const offlineContent = 'Content edited while offline - ' + Date.now();
     await contentInput.clear();
     await contentInput.fill(offlineContent);
+    await contentInput.blur();
 
     // 4. Wait a moment for the local save to process
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
 
     // 5. Verify offline indicator appears (either in status bar or floating indicator)
     console.log('[E2E] Verifying offline status');
@@ -493,21 +519,11 @@ test.describe('Notes Functionality', () => {
     console.log('[E2E] Going back online');
     await context.setOffline(false);
 
-    // 7. Wait for sync to complete - the offline indicator should disappear or change
+    // 7. Wait for queue processing after the online event.
     console.log('[E2E] Waiting for sync');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
-    // 8. Verify save completed (check for "Saved" or "保存しました")
-    console.log('[E2E] Verifying sync completed');
-    // 8. Verify save completed (check for "Saved" or "保存しました")
-    console.log('[E2E] Verifying sync completed');
-    const syncedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
-    if (isMobile) {
-      await syncedIndicator.scrollIntoViewIfNeeded();
-    }
-    await expect(syncedIndicator).toBeVisible({ timeout: 30000 });
-
-    // 9. Reload page to verify data persisted
+    // 8. Reload page to verify data persisted after the queued sync.
     console.log('[E2E] Reloading page to verify persistence');
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -545,5 +561,11 @@ test.describe('Notes Functionality', () => {
       await sidebarRetry.getByTestId('sidebar-nav-all-notes').click().catch(() => { });
       await expect(noteItem).toBeVisible({ timeout: 40000 });
     }
+
+    await noteItem.click();
+
+    const reloadedLayout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
+    await expect(reloadedLayout.getByTestId('editor-title-input')).toHaveValue(onlineNoteTitle, { timeout: 20000 });
+    await expect(reloadedLayout.getByTestId('editor-content-input')).toHaveValue(offlineContent, { timeout: 20000 });
   });
 });

@@ -4,7 +4,6 @@ test.describe('Mobile Comprehensive Scenario', () => {
   // Mobile testing requires isMobile to be true
   test.skip(({ isMobile }) => !isMobile, 'This test is only for mobile viewports');
 
-  // TODO: Fix this test - AI summary selector and timing issues
   test('should navigate through sequential flow on mobile', async ({ page, browserName }) => {
     if (browserName === 'webkit') test.skip(); // Flaky on Mobile Safari
     test.setTimeout(120000);
@@ -14,15 +13,21 @@ test.describe('Mobile Comprehensive Scenario', () => {
     // 1. Folders View - Create a folder
     console.log('[Mobile Test] Creating folder');
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 25000 });
+    const foldersLayout = page.getByTestId('mobile-layout-folders');
+    const createFolderPromise = page.waitForResponse(
+      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 30000 }
+    );
     await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
     
     const folderName = `Mobile Project ${Date.now()}`;
     await page.getByPlaceholder(/Folder name|フォルダ名/i).fill(folderName);
     await page.keyboard.press('Enter');
+    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
 
     // 2. Select Folder
     console.log(`[Mobile Test] Selecting folder: ${folderName}`);
-    await page.getByRole('button', { name: folderName }).click();
+    await foldersLayout.getByTestId(`sidebar-folder-item-${createdFolder.id}`).click();
     // Verify transition to Notes view
     await expect(page.getByRole('heading', { level: 2, name: new RegExp(folderName, 'i') })).toBeVisible({ timeout: 20000 });
 
@@ -81,11 +86,42 @@ test.describe('Mobile Comprehensive Scenario', () => {
     console.log('[Mobile Test] Content synced');
     
     // Extra wait for backend consistency
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     // 4. Summarize -> Auto transition to Chat/Summary view
     console.log('[Mobile Test] Summarizing');
-    await page.getByRole('button', { name: /Summarize note|ノートを要約/i }).click();
+    const summarizeButton = layout.getByTestId('editor-summarize-button');
+    const aiMessages = page.locator('[data-testid="ai-message-content"]:visible');
+    let summarizeSucceeded = false;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await expect(summarizeButton).toBeEnabled({ timeout: 10000 });
+      const summarizeResponsePromise = page.waitForResponse(
+        resp => resp.url().includes('/api/ai/summarize') && resp.request().method() === 'POST',
+        { timeout: 30000 }
+      );
+
+      await summarizeButton.click();
+      const summarizeResponse = await summarizeResponsePromise;
+
+      if (summarizeResponse.ok()) {
+        summarizeSucceeded = true;
+        break;
+      }
+
+      const errorText = await summarizeResponse.text().catch(() => '');
+      console.log(`[Mobile Test] Summary attempt ${attempt} failed: ${summarizeResponse.status()} ${errorText}`);
+
+      const isRetryableEmptyNote =
+        summarizeResponse.status() === 400 && errorText.includes('Note content is empty');
+      if (!isRetryableEmptyNote || attempt === 3) {
+        expect(summarizeResponse.ok(), `Summarize failed: ${summarizeResponse.status()} ${errorText}`).toBeTruthy();
+      }
+
+      await page.waitForTimeout(2000 * attempt);
+    }
+
+    expect(summarizeSucceeded).toBeTruthy();
     
     // Verify Summary response is visible
     try {
@@ -100,7 +136,7 @@ test.describe('Mobile Comprehensive Scenario', () => {
     // On mobile, the AI panel is a fixed overlay - wait for message to appear then check content exists
     // Use .locator with visible filter to avoid matching hidden desktop element
     console.log('[Mobile Test] Looking for AI message content');
-    const aiResponse = page.locator('[data-testid="ai-message-content"]:visible').first();
+    const aiResponse = aiMessages.first();
     await expect(aiResponse).toBeVisible({ timeout: 100000 });
     console.log('[Mobile Test] AI message content found');
 

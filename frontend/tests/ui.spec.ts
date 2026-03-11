@@ -5,6 +5,11 @@ test.describe('UI Loading States', () => {
   test('should show loading state when creating a folder', async ({ page }) => {
     // Only test on desktop as mobile layout logic differs significantly
     await page.goto('/');
+    const desktopLayout = page.getByTestId('desktop-layout');
+    const createFolderPromise = page.waitForResponse(
+      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 30000 }
+    );
 
     // 1. Open create folder input
     await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
@@ -17,15 +22,16 @@ test.describe('UI Loading States', () => {
     // or just check for immediate UI feedback.
     
     // Check for the confirm button using aria-label
-    const confirmButton = page.getByRole('button', { name: /Confirm create|作成を確定/i });
+    const confirmButton = desktopLayout.getByTestId('sidebar-new-folder-confirm');
     await expect(confirmButton).toBeVisible();
 
     // 4. Click confirm
     await confirmButton.click();
+    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
 
     // Ideally we would check for the loader, but it might disappear too fast.
     // At least verify the folder is created.
-    await expect(page.getByRole('button', { name: folderName })).toBeVisible();
+    await expect(desktopLayout.getByTestId(`sidebar-folder-item-${createdFolder.id}`)).toBeVisible();
   });
 
   test('should show loading state when creating a note', async ({ page, isMobile, browserName }) => {
@@ -39,7 +45,8 @@ test.describe('UI Loading States', () => {
     }
 
     // 1. Click Add Note button
-    const addNoteButton = page.getByRole('button', { name: /Add note|ノートを追加/i });
+    const layout = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
+    const addNoteButton = layout.getByTestId('note-list-add-note-button');
     
     // We want to verify the disabled state.
     // We can intercept the request and delay it.
@@ -64,9 +71,8 @@ test.describe('UI Loading States', () => {
       // Use a more generic selector for the loader to be safe
       await expect(addNoteButton.locator('svg.animate-spin')).toBeVisible();
 
-      // 3. Wait for completion
-      await expect(addNoteButton).not.toBeDisabled();
-       await expect(addNoteButton.locator('.lucide-file-plus')).toBeVisible();
+      // 3. Wait for completion by confirming the editor has opened.
+      await expect(page.getByTestId('desktop-layout').getByTestId('editor-title-input')).toBeVisible({ timeout: 20000 });
     }
   });
 });

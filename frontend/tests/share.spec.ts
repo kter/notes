@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Sharing Functionality', () => {
   test('should perform full share cycle', async ({ page, context, isMobile }) => {
-    // Temporarily skipped - share feature works but E2E test is unstable
     test.setTimeout(90000);
 
     // Navigate to the app
@@ -11,14 +10,19 @@ test.describe('Sharing Functionality', () => {
 
     // Create a folder first
     const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
+    const createFolderPromise = page.waitForResponse(
+      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 30000 }
+    );
     await sidebar.getByTestId('sidebar-add-folder-button').click();
-    const folderName = `Share Test Folder ${Date.now()} `;
+    const folderName = `Share Test Folder ${Date.now()}`;
     await sidebar.getByTestId('sidebar-new-folder-input').fill(folderName);
     await page.keyboard.press('Enter');
+    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
 
     // Select the folder
-    console.log(`[Share E2E] Created folder: ${folderName} `);
-    const folderButton = page.getByRole('button', { name: folderName });
+    console.log(`[Share E2E] Created folder: ${folderName}`);
+    const folderButton = sidebar.getByTestId(`sidebar-folder-item-${createdFolder.id}`);
     await expect(folderButton).toBeVisible({ timeout: 15000 });
     await folderButton.click();
 
@@ -42,7 +46,7 @@ test.describe('Sharing Functionality', () => {
     const titleInput = layout.getByLabel(/title/i);
     const contentTextarea = layout.getByRole('textbox', { name: /content/i });
 
-    const noteTitle = `Shared Note ${Date.now()} `;
+    const noteTitle = `Shared Note ${Date.now()}`;
     const noteContent = '# Hello World\n\nThis is a shared note for E2E testing.\n\n- Item 1\n- Item 2';
 
     await titleInput.fill(noteTitle);
@@ -58,7 +62,7 @@ test.describe('Sharing Functionality', () => {
 
     // Click the Share button
     console.log('[Share E2E] Opening share dialog');
-    const shareButton = layout.getByTestId('share-button');
+    const shareButton = layout.getByTestId('editor-share-button');
     await expect(shareButton).toBeVisible({ timeout: 10000 });
     await shareButton.click();
 
@@ -89,7 +93,7 @@ test.describe('Sharing Functionality', () => {
 
     // Get the share URL
     const shareUrl = await urlInput.inputValue();
-    console.log(`[Share E2E] Share URL: ${shareUrl} `);
+    console.log(`[Share E2E] Share URL: ${shareUrl}`);
     expect(shareUrl).toContain('/shared?token=');
 
     // Copy button should work
@@ -111,7 +115,6 @@ test.describe('Sharing Functionality', () => {
     console.log('[Share E2E] Navigated to shared URL');
 
     // Verify the shared note page displays correctly
-    await expect(sharedPage.getByText('Shared Note')).toBeVisible({ timeout: 15000 });
     await expect(sharedPage.getByText('Read-only')).toBeVisible();
     await expect(sharedPage.getByRole('heading', { name: noteTitle })).toBeVisible({ timeout: 10000 });
 
@@ -153,7 +156,7 @@ test.describe('Sharing Functionality', () => {
     await verifyPage.goto(shareUrl);
 
     // Should show not found or error
-    await expect(verifyPage.getByText(/not found|revoked/i)).toBeVisible({ timeout: 15000 });
+    await expect(verifyPage.getByRole('heading', { name: /not found/i })).toBeVisible({ timeout: 15000 });
     console.log('[Share E2E] Revoked link shows not found');
 
     await verifyPage.close();

@@ -1,6 +1,19 @@
 name: E2E Tests
 
 on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - '.github/workflows/e2e.yml'
+      - 'frontend/**'
+      - 'Makefile'
+      - 'README.md'
   push:
     branches:
       - main
@@ -33,6 +46,7 @@ env:
 jobs:
   e2e-chromium:
     name: E2E (${{ matrix.label }})
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -87,6 +101,7 @@ jobs:
 
   e2e-webkit:
     name: E2E (${{ matrix.label }})
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.fork == false)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:

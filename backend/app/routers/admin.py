@@ -27,13 +27,17 @@ from app.services.token_usage import get_usage_snapshot
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def _build_settings_read(settings: UserSettings | None, user_id: str) -> UserSettingsRead:
+def _build_settings_read(
+    settings: UserSettings | None, user_id: str
+) -> UserSettingsRead:
     now = datetime.now(UTC)
     return UserSettingsRead(
         user_id=user_id,
         llm_model_id=settings.llm_model_id if settings else DEFAULT_LLM_MODEL_ID,
         language=settings.language if settings else DEFAULT_LANGUAGE,
-        token_limit=settings.token_limit if settings else UserSettings.model_fields["token_limit"].default,
+        token_limit=settings.token_limit
+        if settings
+        else UserSettings.model_fields["token_limit"].default,
         created_at=settings.created_at if settings else now,
         updated_at=settings.updated_at if settings else now,
     )
@@ -75,7 +79,9 @@ class AdminUserUpdateRequest(BaseModel):
     token_limit: int | None = Field(default=None, ge=1, le=10_000_000)
 
 
-def _count_for_user(session: Session, model: type[Note | Folder | MCPToken], user_id: str) -> int:
+def _count_for_user(
+    session: Session, model: type[Note | Folder | MCPToken], user_id: str
+) -> int:
     statement = select(func.count()).select_from(model).where(model.user_id == user_id)
     return int(session.exec(statement).one())
 
@@ -100,7 +106,11 @@ def _ensure_not_demoting_last_admin(
     if requested_admin or not target_user.admin:
         return
 
-    admin_count = int(session.exec(select(func.count()).select_from(AppUser).where(AppUser.admin.is_(True))).one())
+    admin_count = int(
+        session.exec(
+            select(func.count()).select_from(AppUser).where(AppUser.admin.is_(True))
+        ).one()
+    )
     if admin_count <= 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -139,7 +149,9 @@ def list_admin_users(
     if admin_only is not None:
         statement = statement.where(AppUser.admin == admin_only)
 
-    total = int(session.exec(select(func.count()).select_from(statement.subquery())).one())
+    total = int(
+        session.exec(select(func.count()).select_from(statement.subquery())).one()
+    )
     app_users = session.exec(
         statement.order_by(AppUser.last_seen_at.desc()).offset(offset).limit(limit)
     ).all()
@@ -162,7 +174,9 @@ def get_admin_user_detail(
     del admin_user
     app_user = session.get(AppUser, user_id)
     if app_user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     settings = session.get(UserSettings, user_id)
     return AdminUserDetailResponse(
@@ -188,7 +202,9 @@ def update_admin_user(
     del admin_user
     app_user = session.get(AppUser, user_id)
     if app_user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     settings = session.get(UserSettings, user_id)
     now = datetime.now(UTC)
@@ -199,7 +215,11 @@ def update_admin_user(
         app_user.updated_at = now
         session.add(app_user)
 
-    if payload.llm_model_id is not None or payload.language is not None or payload.token_limit is not None:
+    if (
+        payload.llm_model_id is not None
+        or payload.language is not None
+        or payload.token_limit is not None
+    ):
         if settings is None:
             settings = UserSettings(user_id=user_id)
 

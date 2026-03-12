@@ -23,7 +23,9 @@ class TestShareNote:
     def test_note(self, client):
         """Fixture that creates a note and deletes it after the test."""
         title = generate_title("Share Note")
-        response = client.post("/api/notes", json={"title": title, "content": "Content for share test."})
+        response = client.post(
+            "/api/notes", json={"title": title, "content": "Content for share test."}
+        )
         assert response.status_code == 201
         note = response.json()
         yield note
@@ -35,7 +37,10 @@ class TestShareNote:
     def test_note_with_share(self, client):
         """Fixture that creates a note with a share link and cleans both up after the test."""
         title = generate_title("Share Note With Link")
-        note_response = client.post("/api/notes", json={"title": title, "content": "Content for share link test."})
+        note_response = client.post(
+            "/api/notes",
+            json={"title": title, "content": "Content for share link test."},
+        )
         assert note_response.status_code == 201
         note = note_response.json()
 
@@ -136,7 +141,9 @@ class TestShareNote:
         response = client.delete(f"/api/notes/{note_id}/share")
         assert response.status_code == 404
 
-    def test_public_access_shared_note(self, client, public_client, test_note_with_share):
+    def test_public_access_shared_note(
+        self, client, public_client, test_note_with_share
+    ):
         """Access a shared note via the public endpoint without any auth header."""
         note, share = test_note_with_share
         token = share["share_token"]

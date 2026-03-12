@@ -114,9 +114,9 @@ make install-hooks
 
 Once set up, the correct versions of `node`, `python`, and `go` will be automatically activated whenever you enter the project directory.
 
-Git hooks are managed with `lefthook`. The configured hooks run fast lint checks on `pre-commit`, and heavier test suites on `pre-push`.
+Git hooks are managed with `lefthook`. The `pre-commit` hook now runs formatter checks, linting, and the full unit suite. The `pre-push` hook runs the full unit suite plus the full integration suite against `dev`.
 
-Agent hook settings are checked into the repo for both Claude Code and Codex. Their Stop hooks run `make stop-hook-unit-tests`, and you can verify the wiring with `make test-agent-hooks`.
+Agent hook settings are checked into the repo for both Claude Code and Codex. Their Stop hooks run `make stop-hook-unit-tests`, which only runs unit tests for the app surfaces changed in the current working tree. You can verify the wiring with `make test-agent-hooks`, and the changed-surface selector is covered by `make test-git-hook-helpers`.
 
 ### Quick Start
 

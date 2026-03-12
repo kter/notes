@@ -42,7 +42,9 @@ class TestAdminUserManagement:
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 2
-        target = next(item for item in data["users"] if item["user"]["user_id"] == "target-user")
+        target = next(
+            item for item in data["users"] if item["user"]["user_id"] == "target-user"
+        )
         assert target["settings"]["token_limit"] == 123456
         assert target["token_usage"]["tokens_used"] == 321
         assert target["note_count"] == 1
@@ -94,7 +96,9 @@ class TestAdminUserManagement:
         assert response.status_code == 400
         assert response.json()["detail"] == "Cannot remove the last admin user"
 
-    def test_admin_detail_returns_default_settings_when_missing(self, make_client, session):
+    def test_admin_detail_returns_default_settings_when_missing(
+        self, make_client, session
+    ):
         seed_admin_user(session, "admin-user", "admin@example.com", admin=True)
         seed_admin_user(session, "target-user", "member@example.com", admin=False)
 

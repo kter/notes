@@ -83,7 +83,9 @@ class TestGenerateMcpToken:
         # Plain token should be returned
         assert "token" in data
 
-    def test_generate_token_with_30_day_expiration(self, client: TestClient, session: Session):
+    def test_generate_token_with_30_day_expiration(
+        self, client: TestClient, session: Session
+    ):
         """Test token generation with 30 day expiration."""
         response = client.post(
             "/api/mcp/tokens",
@@ -101,7 +103,9 @@ class TestGenerateMcpToken:
         expires_at = token.expires_at
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=dt_module.UTC)
-        days_until_expiration = (expires_at - dt_module.datetime.now(dt_module.UTC)).days
+        days_until_expiration = (
+            expires_at - dt_module.datetime.now(dt_module.UTC)
+        ).days
         assert 29 <= days_until_expiration <= 31  # Allow for test timing
 
     def test_generate_token_with_90_day_expiration(self, client: TestClient):
@@ -135,10 +139,14 @@ class TestGenerateMcpToken:
         token = session.exec(select(MCPToken)).all()[0]
         assert token.expires_at is None
 
-    def test_generate_token_no_expiration_limit_1(self, client: TestClient, session: Session):
+    def test_generate_token_no_expiration_limit_1(
+        self, client: TestClient, session: Session
+    ):
         """Test maximum 1 non-expiring token per user."""
         # Clean up any existing tokens first
-        tokens = session.exec(select(MCPToken).where(MCPToken.user_id == "test-user-123")).all()
+        tokens = session.exec(
+            select(MCPToken).where(MCPToken.user_id == "test-user-123")
+        ).all()
         for token in tokens:
             session.delete(token)
         session.commit()
@@ -159,10 +167,14 @@ class TestGenerateMcpToken:
         assert response2.status_code == 400
         assert "Maximum of 1 non-expiring" in response2.json()["detail"]
 
-    def test_generate_token_expired_does_not_count_towards_limit(self, client: TestClient, session: Session):
+    def test_generate_token_expired_does_not_count_towards_limit(
+        self, client: TestClient, session: Session
+    ):
         """Test that expired tokens don't count towards active token limit."""
         # Clean up any existing tokens first
-        tokens = session.exec(select(MCPToken).where(MCPToken.user_id == "test-user-123")).all()
+        tokens = session.exec(
+            select(MCPToken).where(MCPToken.user_id == "test-user-123")
+        ).all()
         for token in tokens:
             session.delete(token)
         session.commit()
@@ -176,7 +188,9 @@ class TestGenerateMcpToken:
 
         # Manually expire the first token
         token = session.exec(select(MCPToken)).all()[0]
-        token.expires_at = dt_module.datetime.now(dt_module.UTC) - dt_module.timedelta(days=1)
+        token.expires_at = dt_module.datetime.now(dt_module.UTC) - dt_module.timedelta(
+            days=1
+        )
         session.add(token)
         session.commit()
 
@@ -282,7 +296,9 @@ class TestRevokeMcpToken:
         assert revoke_response.status_code == 200
 
         # Verify token is revoked in database
-        token = session.exec(select(MCPToken).where(MCPToken.id == UUID(token_id))).first()
+        token = session.exec(
+            select(MCPToken).where(MCPToken.id == UUID(token_id))
+        ).first()
         assert token is not None
         assert token.revoked_at is not None
 
@@ -333,7 +349,9 @@ class TestRestoreMcpToken:
         assert restore_response.status_code == 200
 
         # Verify token is restored in database
-        token = session.exec(select(MCPToken).where(MCPToken.id == UUID(token_id))).first()
+        token = session.exec(
+            select(MCPToken).where(MCPToken.id == UUID(token_id))
+        ).first()
         assert token is not None
         assert token.revoked_at is None
 
@@ -378,7 +396,9 @@ class TestDeleteMcpToken:
         assert delete_response.status_code == 200
 
         # Verify token is deleted from database
-        token = session.exec(select(MCPToken).where(MCPToken.id == UUID(token_id))).first()
+        token = session.exec(
+            select(MCPToken).where(MCPToken.id == UUID(token_id))
+        ).first()
         assert token is None
 
     def test_delete_token_not_found(self, client: TestClient):
@@ -387,4 +407,3 @@ class TestDeleteMcpToken:
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
-

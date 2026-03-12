@@ -1,4 +1,5 @@
 """Integration tests for MCP token API endpoints."""
+
 import pytest
 
 
@@ -39,29 +40,21 @@ class TestGenerateMcpToken:
     def test_generate_token_limit_check(self, client):
         """Test that maximum 2 active tokens are enforced."""
         # Create first token
-        response1 = client.post(
-            "/api/mcp/tokens", json={"name": "Token 1"}
-        )
+        response1 = client.post("/api/mcp/tokens", json={"name": "Token 1"})
         assert response1.status_code == 200
 
         # Create second token
-        response2 = client.post(
-            "/api/mcp/tokens", json={"name": "Token 2"}
-        )
+        response2 = client.post("/api/mcp/tokens", json={"name": "Token 2"})
         assert response2.status_code == 200
 
         # Try to create third token - should fail
-        response3 = client.post(
-            "/api/mcp/tokens", json={"name": "Token 3"}
-        )
+        response3 = client.post("/api/mcp/tokens", json={"name": "Token 3"})
         assert response3.status_code == 400
         assert "Maximum of 2 active" in response3.json()["detail"]
 
     def test_generate_token_expiration(self, client):
         """Test that token has proper expiration."""
-        response = client.post(
-            "/api/mcp/tokens", json={"name": "Test Expiration"}
-        )
+        response = client.post("/api/mcp/tokens", json={"name": "Test Expiration"})
 
         assert response.status_code == 200
         data = response.json()
@@ -105,9 +98,7 @@ class TestListMcpTokens:
         tokens = list_response.json()["tokens"]
 
         # Find our created token
-        created_token = next(
-            (t for t in tokens if t["id"] == created_id), None
-        )
+        created_token = next((t for t in tokens if t["id"] == created_id), None)
         assert created_token is not None
         assert created_token["name"] == "List Test Token"
         assert "token" not in created_token  # Plain token should not be exposed
@@ -115,9 +106,7 @@ class TestListMcpTokens:
     def test_list_tokens_has_is_active(self, client):
         """Test that is_active field is present and correct."""
         # Create a token
-        create_response = client.post(
-            "/api/mcp/tokens", json={"name": "Active Test"}
-        )
+        create_response = client.post("/api/mcp/tokens", json={"name": "Active Test"})
         token_id = create_response.json()["id"]
 
         # List tokens
@@ -138,9 +127,7 @@ class TestRevokeMcpToken:
     def test_revoke_token(self, client):
         """Test revoking a token."""
         # Create a token
-        create_response = client.post(
-            "/api/mcp/tokens", json={"name": "Revoke Test"}
-        )
+        create_response = client.post("/api/mcp/tokens", json={"name": "Revoke Test"})
         token_id = create_response.json()["id"]
 
         # Revoke the token
@@ -172,9 +159,7 @@ class TestDeleteMcpToken:
     def test_delete_token(self, client):
         """Test deleting a token."""
         # Create a token
-        create_response = client.post(
-            "/api/mcp/tokens", json={"name": "Delete Test"}
-        )
+        create_response = client.post("/api/mcp/tokens", json={"name": "Delete Test"})
         token_id = create_response.json()["id"]
 
         # Delete the token
@@ -191,9 +176,7 @@ class TestDeleteMcpToken:
 
     def test_delete_nonexistent(self, client):
         """Test deleting a non-existent token."""
-        response = client.delete(
-            "/api/mcp/tokens/00000000-0000-0000-0000-000000000000"
-        )
+        response = client.delete("/api/mcp/tokens/00000000-0000-0000-0000-000000000000")
 
         assert response.status_code == 404
 
@@ -220,9 +203,7 @@ class TestRestoreMcpToken:
     def test_restore_token(self, client):
         """Test restoring a revoked token."""
         # Create a token
-        create_response = client.post(
-            "/api/mcp/tokens", json={"name": "Restore Test"}
-        )
+        create_response = client.post("/api/mcp/tokens", json={"name": "Restore Test"})
         token_id = create_response.json()["id"]
 
         # Revoke the token

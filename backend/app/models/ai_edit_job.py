@@ -51,7 +51,9 @@ class AIEditJobRead(SQLModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
-    @field_validator("created_at", "updated_at", "started_at", "completed_at", mode="before")
+    @field_validator(
+        "created_at", "updated_at", "started_at", "completed_at", mode="before"
+    )
     @classmethod
     def ensure_utc_timezone(cls, value: datetime | None) -> datetime | None:
         if isinstance(value, datetime) and value.tzinfo is None:

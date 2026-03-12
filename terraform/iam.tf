@@ -169,3 +169,28 @@ resource "aws_iam_role_policy" "ai_edit_job_consume" {
     ]
   })
 }
+
+resource "aws_iam_role_policy" "sentry_ssm_access" {
+  name = "sentry-ssm-access"
+  role = aws_iam_role.backend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter"
+        ]
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${trimprefix(local.sentry_dsn_parameter_name, "/")}"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alias/aws/ssm"
+      }
+    ]
+  })
+}

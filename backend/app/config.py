@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     environment: str = "local"
     debug: bool = False
     sentry_dsn: str = ""
+    sentry_dsn_parameter_name: str = ""
     sentry_traces_sample_rate: float | None = None
 
     # Database settings

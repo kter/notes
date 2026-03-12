@@ -1,6 +1,8 @@
 # Lambda Function and API Gateway for FastAPI Backend
 
 locals {
+  sentry_dsn_parameter_name = "/${var.project_name}/${terraform.workspace}/sentry-dsn"
+
   backend_lambda_environment = merge(
     {
       COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
@@ -13,17 +15,15 @@ locals {
         "https://${local.current_env.domain_name}",
         "https://${local.current_env.admin_domain_name}"
       ])
-      ENVIRONMENT              = terraform.workspace
-      CACHE_BUCKET_NAME        = aws_s3_bucket.cache.bucket
-      MCP_SERVER_URL           = "https://${local.current_env.mcp_domain_name}"
-      IMAGE_BUCKET_NAME        = aws_s3_bucket.images.bucket
-      AI_EDIT_JOB_TOPIC_ARN    = aws_sns_topic.ai_edit_jobs.arn
-      CDN_DOMAIN               = local.current_env.domain_name
-      BOOTSTRAP_ADMIN_EMAILS   = var.bootstrap_admin_emails
-      BOOTSTRAP_ADMIN_USER_IDS = var.bootstrap_admin_user_ids
-    },
-    var.sentry_dsn == "" ? {} : {
-      SENTRY_DSN = var.sentry_dsn
+      ENVIRONMENT               = terraform.workspace
+      CACHE_BUCKET_NAME         = aws_s3_bucket.cache.bucket
+      MCP_SERVER_URL            = "https://${local.current_env.mcp_domain_name}"
+      IMAGE_BUCKET_NAME         = aws_s3_bucket.images.bucket
+      AI_EDIT_JOB_TOPIC_ARN     = aws_sns_topic.ai_edit_jobs.arn
+      CDN_DOMAIN                = local.current_env.domain_name
+      SENTRY_DSN_PARAMETER_NAME = local.sentry_dsn_parameter_name
+      BOOTSTRAP_ADMIN_EMAILS    = var.bootstrap_admin_emails
+      BOOTSTRAP_ADMIN_USER_IDS  = var.bootstrap_admin_user_ids
     },
     var.sentry_traces_sample_rate == null ? {} : {
       SENTRY_TRACES_SAMPLE_RATE = tostring(var.sentry_traces_sample_rate)

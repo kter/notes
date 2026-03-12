@@ -1,7 +1,7 @@
 # Lambda Function and API Gateway for FastAPI Backend
 
 locals {
-  sentry_dsn_parameter_name = "/${var.project_name}/${terraform.workspace}/sentry-dsn"
+  sentry_backend_dsn_parameter_name = "/${var.project_name}/${terraform.workspace}/sentry-dsn-backend"
 
   backend_lambda_environment = merge(
     {
@@ -21,7 +21,7 @@ locals {
       IMAGE_BUCKET_NAME         = aws_s3_bucket.images.bucket
       AI_EDIT_JOB_TOPIC_ARN     = aws_sns_topic.ai_edit_jobs.arn
       CDN_DOMAIN                = local.current_env.domain_name
-      SENTRY_DSN_PARAMETER_NAME = local.sentry_dsn_parameter_name
+      SENTRY_DSN_PARAMETER_NAME = local.sentry_backend_dsn_parameter_name
       BOOTSTRAP_ADMIN_EMAILS    = var.bootstrap_admin_emails
       BOOTSTRAP_ADMIN_USER_IDS  = var.bootstrap_admin_user_ids
     },

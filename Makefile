@@ -19,7 +19,8 @@ AWS_REGION ?= ap-northeast-1
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
 MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
-SENTRY_DSN_PARAMETER_NAME ?= /notes-app/$(ENV)/sentry-dsn
+SENTRY_DSN_PARAMETER_NAME_FRONTEND ?= /notes-app/$(ENV)/sentry-dsn-frontend
+SENTRY_DSN_PARAMETER_NAME_BACKEND ?= /notes-app/$(ENV)/sentry-dsn-backend
 
 .PHONY: help
 help: ## Show this help
@@ -110,6 +111,14 @@ put-sentry-dsn: ## Store the Sentry DSN in AWS SSM Parameter Store as a SecureSt
 		--profile $(AWS_PROFILE)
 	@echo "Stored Sentry DSN at $(SENTRY_DSN_PARAMETER_NAME)"
 
+.PHONY: put-sentry-dsn-frontend
+put-sentry-dsn-frontend: SENTRY_DSN_PARAMETER_NAME=$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)
+put-sentry-dsn-frontend: put-sentry-dsn ## Store the frontend Sentry DSN in AWS SSM Parameter Store
+
+.PHONY: put-sentry-dsn-backend
+put-sentry-dsn-backend: SENTRY_DSN_PARAMETER_NAME=$(SENTRY_DSN_PARAMETER_NAME_BACKEND)
+put-sentry-dsn-backend: put-sentry-dsn ## Store the backend Sentry DSN in AWS SSM Parameter Store
+
 # =============================================================================
 # Frontend Deployment
 # =============================================================================
@@ -119,7 +128,7 @@ build-frontend: tf-switch ## Build frontend for production
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
-	SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
+	SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
 
 .PHONY: build-frontend-local
@@ -182,7 +191,7 @@ _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
 	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
 	@echo "Building frontend..."
-	@SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
+	@SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
 	@echo "Syncing frontend files to S3..."
 	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)

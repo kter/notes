@@ -182,7 +182,7 @@ resource "aws_iam_role_policy" "sentry_ssm_access" {
         Action = [
           "ssm:GetParameter"
         ]
-        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${trimprefix(local.sentry_dsn_parameter_name, "/")}"
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${trimprefix(local.sentry_backend_dsn_parameter_name, "/")}"
       },
       {
         Effect = "Allow"

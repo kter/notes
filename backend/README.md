@@ -53,11 +53,11 @@ Once running, visit:
 | `BEDROCK_REGION` | AWS Bedrock region | `us-east-1` |
 | `BEDROCK_MODEL_ID` | Bedrock model ID | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
 | `SENTRY_DSN` | Local-only Sentry DSN loaded from `.env` | - |
-| `SENTRY_DSN_PARAMETER_NAME` | AWS SSM SecureString parameter name used outside local development | - |
+| `SENTRY_DSN_PARAMETER_NAME` | Backend AWS SSM SecureString parameter name used outside local development | - |
 | `SENTRY_TRACES_SAMPLE_RATE` | Optional trace sample rate override | `1.0` in `local`/`dev`, `0.1` otherwise |
 
-For AWS environments, register the DSN in Parameter Store and keep the Lambda config on the parameter name:
+For AWS environments, register the backend DSN in Parameter Store and keep the Lambda config on the parameter name:
 
 ```bash
-make put-sentry-dsn ENV=dev SENTRY_DSN='https://...'
+make put-sentry-dsn-backend ENV=dev SENTRY_DSN='https://...'
 ```

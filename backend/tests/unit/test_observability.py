@@ -86,7 +86,7 @@ def test_get_sentry_dsn_reads_from_ssm_parameter_store():
     _reset_sentry_state()
     settings = SimpleNamespace(
         sentry_dsn="",
-        sentry_dsn_parameter_name="/notes-app/dev/sentry-dsn",
+        sentry_dsn_parameter_name="/notes-app/dev/sentry-dsn-backend",
         aws_region="ap-northeast-1",
     )
     ssm_client = SimpleNamespace(

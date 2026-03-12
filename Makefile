@@ -264,23 +264,46 @@ clean: ## Clean build artifacts
 # Testing
 # =============================================================================
 
+# Test command guide:
+# - `make test` is the fastest day-to-day check: backend + frontend unit tests + lint.
+# - `make test-unit` adds the MCP Lambda unit tests to the fast local suite.
+# - `make test-all ENV=dev` runs the full validation suite: lint + unit + integration + E2E.
+# - `make test-integration ENV=dev` hits the deployed backend in the selected environment.
+# - `make test-e2e-host ENV=dev` runs browsers that work well on the host (Chromium family).
+# - `make test-e2e-all ENV=dev` mirrors CI locally: host Chromium + Docker WebKit/Safari.
+#
+# Common overrides:
+# - `ENV=dev|prd` selects the deployed environment for integration/E2E tests.
+# - `TEST_ARGS='tests/auth.spec.ts'` or `TEST_ARGS='-g "full cycle"'` narrows Playwright runs.
+# - `PROJECT=webkit` is required only for the generic Docker Playwright target.
+
 .PHONY: test
-test: test-backend test-frontend test-lint ## Run all tests
+test: test-backend test-frontend test-lint ## Run the default fast suite: backend + frontend unit tests + lint
+
+.PHONY: test-unit
+test-unit: test-backend test-frontend test-mcp-lambda-unit ## Run all unit tests across backend, frontend, and MCP Lambda
+
+.PHONY: test-all
+test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-e2e-all ## Run the full suite: lint + unit + integration + E2E
 
 .PHONY: test-mcp-lambda-unit
 test-mcp-lambda-unit: ## Run MCP Lambda unit tests
 	cd lambda/mcp_server && uv run --extra dev pytest tests/test_app_unit.py -q --tb=short
 
+.PHONY: test-mcp-lambda-integration
+test-mcp-lambda-integration: ## Run MCP Lambda integration tests (requires AWS/Cognito env vars)
+	cd lambda/mcp_server && uv run --extra dev pytest tests/test_mcp_integration.py -v
+
 .PHONY: test-backend
-test-backend: ## Run backend tests
+test-backend: ## Run backend unit/integration-free tests locally
 	cd backend && uv run --extra dev python -m pytest -v
 
 .PHONY: test-frontend
-test-frontend: ## Run frontend unit tests
+test-frontend: ## Run frontend Vitest unit tests
 	cd frontend && npm run test -- --run
 
 .PHONY: test-integration
-test-integration: tf-switch ## Run integration tests against the deployed environment
+test-integration: tf-switch ## Run backend integration tests against the deployed environment selected by ENV
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	cd backend && API_URL=$(API_URL) uv run --extra dev python -m pytest tests/integration -v
 
@@ -290,6 +313,13 @@ test-lint: lint-backend lint-frontend ## Run all linters
 .PHONY: test-claude-hooks
 test-claude-hooks: ## Verify Claude Code PostToolUse hook routing
 	./scripts/test_claude_post_tool_use_hook.sh
+
+# Playwright browser split:
+# - `chromium` and `Mobile Chrome` run directly on the host.
+# - `webkit` and `Mobile Safari` run in Docker because Linux host WebKit/WPE is less stable
+#   and can crash with messages like `WPEWebProcess quit unexpectedly`.
+PLAYWRIGHT_DOCKER_IMAGE ?= mcr.microsoft.com/playwright:v1.57.0-noble
+PLAYWRIGHT_DOCKER_RUN = docker run --rm --ipc=host -u "$$(id -u):$$(id -g)" -e HOME=/tmp -v "$(CURDIR):/work" -w /work/frontend $(PLAYWRIGHT_DOCKER_IMAGE) bash -lc
 
 BACKEND_PATH ?= .
 FRONTEND_PATH ?= .
@@ -346,11 +376,8 @@ claude-post-tool-use: ## Run hook-safe format/lint steps for a single edited fil
 			true ;; \
 	esac
 
-PLAYWRIGHT_DOCKER_IMAGE ?= mcr.microsoft.com/playwright:v1.57.0-noble
-PLAYWRIGHT_DOCKER_RUN = docker run --rm --ipc=host -u "$$(id -u):$$(id -g)" -e HOME=/tmp -v "$(CURDIR):/work" -w /work/frontend $(PLAYWRIGHT_DOCKER_IMAGE) bash -lc
-
 .PHONY: test-e2e
-test-e2e: ## Run E2E tests against dev or prd (E2E_TARGET=dev|prd)
+test-e2e: ## Run all Playwright projects on the host (use only if your host can run every browser)
 	cd frontend && E2E_TARGET=$(ENV) npx playwright test $(TEST_ARGS)
 
 .PHONY: test-e2e-dev
@@ -360,6 +387,11 @@ test-e2e-dev: ## Run E2E tests against dev environment
 .PHONY: test-e2e-prd
 test-e2e-prd: ## Run E2E tests against prd environment
 	cd frontend && E2E_TARGET=prd npx playwright test $(TEST_ARGS)
+
+.PHONY: test-e2e-host
+test-e2e-host: ## Run the host-supported Playwright projects: chromium + Mobile Chrome
+	cd frontend && E2E_TARGET=$(ENV) npx playwright test --project=chromium $(TEST_ARGS)
+	cd frontend && E2E_TARGET=$(ENV) npx playwright test --project="Mobile Chrome" $(TEST_ARGS)
 
 .PHONY: test-e2e-docker
 test-e2e-docker: ## Run E2E tests in Docker (PROJECT required, ENV=dev|prd)
@@ -374,8 +406,14 @@ test-e2e-webkit-docker: ## Run WebKit E2E tests in Docker
 test-e2e-mobile-safari-docker: ## Run Mobile Safari E2E tests in Docker
 	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) npx playwright test --project="Mobile Safari" $(TEST_ARGS)'
 
+.PHONY: test-e2e-all
+test-e2e-all: ## Run the CI-style Playwright split locally: host Chromium + Docker WebKit/Safari
+	@$(MAKE) --no-print-directory test-e2e-host ENV=$(ENV) TEST_ARGS='$(TEST_ARGS)'
+	@$(MAKE) --no-print-directory test-e2e-webkit-docker ENV=$(ENV) TEST_ARGS='$(TEST_ARGS)'
+	@$(MAKE) --no-print-directory test-e2e-mobile-safari-docker ENV=$(ENV) TEST_ARGS='$(TEST_ARGS)'
+
 .PHONY: install-playwright-deps
-install-playwright-deps: ## Install Playwright browser dependencies (dnf)
+install-playwright-deps: ## Install host-side Playwright dependencies for Chromium (WebKit still uses Docker here)
 	dnf install -y libicu libjpeg-turbo gstreamer1-plugins-base
 
 .PHONY: install-hooks

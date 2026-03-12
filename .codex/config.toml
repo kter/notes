@@ -1,0 +1,4 @@
+[features]
+codex_hooks = true
+
+suppress_unstable_features_warning = true

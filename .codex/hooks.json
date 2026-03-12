@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/agent_stop_hook_unit_tests.sh",
+            "timeout": 1800,
+            "statusMessage": "Running unit tests before stopping"
+          }
+        ]
+      }
+    ]
+  }
+}

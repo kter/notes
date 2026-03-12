@@ -116,6 +116,8 @@ Once set up, the correct versions of `node`, `python`, and `go` will be automati
 
 Git hooks are managed with `lefthook`. The configured hooks run fast lint checks on `pre-commit`, and heavier test suites on `pre-push`.
 
+Agent hook settings are checked into the repo for both Claude Code and Codex. Their Stop hooks run `make stop-hook-unit-tests`, and you can verify the wiring with `make test-agent-hooks`.
+
 ### Quick Start
 
 1. Open the project in VS Code

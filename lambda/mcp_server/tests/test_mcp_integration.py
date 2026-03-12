@@ -10,8 +10,8 @@ import os
 from typing import Any
 
 import boto3
+import httpx
 import pytest
-import requests
 from jose import jwk, jwt
 from jose.exceptions import JWTError
 
@@ -28,19 +28,20 @@ COGNITO_REGION = os.environ.get("COGNITO_REGION", "ap-northeast-1")
 cognito_client = boto3.client("cognito-idp", region_name=COGNITO_REGION)
 
 
+def require_env_vars(*env_var_names: str) -> None:
+    """Skip integration tests when required environment variables are missing."""
+    missing = [name for name in env_var_names if not os.environ.get(name)]
+    if missing:
+        pytest.skip(f"Missing required environment variables: {', '.join(missing)}")
+
+
 def get_test_token() -> str:
     """Get a valid JWT token for testing.
 
     Returns:
         JWT access token string
-
-    Raises:
-        AssertionError: If credentials not configured
     """
-    if not all([TEST_USER_EMAIL, TEST_USER_PASSWORD, COGNITO_CLIENT_ID]):
-        raise AssertionError(
-            "Test credentials not configured. Set TEST_USER_EMAIL, TEST_USER_PASSWORD, and COGNITO_CLIENT_ID"
-        )
+    require_env_vars("TEST_USER_EMAIL", "TEST_USER_PASSWORD", "COGNITO_CLIENT_ID")
 
     response = cognito_client.initiate_auth(
         ClientId=COGNITO_CLIENT_ID,
@@ -60,8 +61,9 @@ def get_jwks() -> dict:
     Returns:
         JWKS dictionary
     """
+    require_env_vars("COGNITO_USER_POOL_ID")
     url = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
-    response = requests.get(url, timeout=5)
+    response = httpx.get(url, timeout=5)
     response.raise_for_status()
     return response.json()
 
@@ -118,7 +120,7 @@ class TestMCPAuthManager:
         if not AUTH_MANAGER_URL:
             pytest.skip("AUTH_MANAGER_URL not configured")
 
-        response = requests.post(
+        response = httpx.post(
             f"{AUTH_MANAGER_URL}/api/mcp/create-client",
             headers=headers,
             json={"name": "Test Client", "description": "Integration test client"},
@@ -142,7 +144,7 @@ class TestMCPAuthManager:
         if not AUTH_MANAGER_URL:
             pytest.skip("AUTH_MANAGER_URL not configured")
 
-        response = requests.get(
+        response = httpx.get(
             f"{AUTH_MANAGER_URL}/api/mcp/list-clients",
             headers=headers,
             timeout=10,
@@ -160,7 +162,7 @@ class TestMCPAuthManager:
             pytest.skip("AUTH_MANAGER_URL not configured")
 
         # First create a client
-        create_response = requests.post(
+        create_response = httpx.post(
             f"{AUTH_MANAGER_URL}/api/mcp/create-client",
             headers=headers,
             json={"name": "Test Client to Revoke"},
@@ -171,7 +173,7 @@ class TestMCPAuthManager:
         client_id = create_response.json()["client_id"]
 
         # Now revoke it
-        revoke_response = requests.delete(
+        revoke_response = httpx.delete(
             f"{AUTH_MANAGER_URL}/api/mcp/revoke-client",
             headers=headers,
             json={"client_id": client_id},
@@ -197,7 +199,7 @@ class TestMCPAuthManager:
         if not AUTH_MANAGER_URL:
             pytest.skip("AUTH_MANAGER_URL not configured")
 
-        response = requests.delete(
+        response = httpx.delete(
             f"{AUTH_MANAGER_URL}/api/mcp/revoke-client",
             headers=headers,
             json={"client_id": "nonexistent-client-id"},
@@ -211,7 +213,7 @@ class TestMCPAuthManager:
         if not AUTH_MANAGER_URL:
             pytest.skip("AUTH_MANAGER_URL not configured")
 
-        response = requests.post(
+        response = httpx.post(
             f"{AUTH_MANAGER_URL}/api/mcp/create-client",
             headers={
                 "Authorization": "Bearer invalid-token",
@@ -229,7 +231,7 @@ class TestMCPAuthManager:
             pytest.skip("AUTH_MANAGER_URL not configured")
 
         # Create a client first
-        create_response = requests.post(
+        create_response = httpx.post(
             f"{AUTH_MANAGER_URL}/api/mcp/create-client",
             headers=headers,
             json={"name": "Test Config Client"},
@@ -240,7 +242,7 @@ class TestMCPAuthManager:
         client_id = create_response.json()["client_id"]
 
         # Get configuration
-        config_response = requests.get(
+        config_response = httpx.get(
             f"{AUTH_MANAGER_URL}/api/mcp/configure-client/{client_id}",
             headers=headers,
             timeout=10,
@@ -258,7 +260,7 @@ class TestMCPAuthManager:
     def _cleanup_client(self, client_id: str, headers: dict[str, str]) -> None:
         """Helper to clean up a test client."""
         try:
-            requests.delete(
+            httpx.delete(
                 f"{AUTH_MANAGER_URL}/api/mcp/revoke-client",
                 headers=headers,
                 json={"client_id": client_id},
@@ -282,7 +284,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.get(f"{MCP_SERVER_URL}/health", timeout=10)
+        response = httpx.get(f"{MCP_SERVER_URL}/health", timeout=10)
 
         assert response.status_code == 200
         data = response.json()
@@ -294,7 +296,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.get(
+        response = httpx.get(
             f"{MCP_SERVER_URL}/resources",
             headers={"Authorization": f"Bearer {auth_token}"},
             timeout=10,
@@ -334,7 +336,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.get(
+        response = httpx.get(
             f"{MCP_SERVER_URL}/resources",
             headers={"Authorization": "Bearer invalid-token"},
             timeout=10,
@@ -347,7 +349,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.get(
+        response = httpx.get(
             f"{MCP_SERVER_URL}/resources",
             timeout=10,
         )
@@ -359,7 +361,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.post(
+        response = httpx.post(
             MCP_SERVER_URL,
             headers={
                 "Authorization": "Bearer invalid-token",
@@ -380,7 +382,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.post(
+        response = httpx.post(
             MCP_SERVER_URL,
             headers={
                 "Authorization": f"Bearer {auth_token}",
@@ -430,7 +432,7 @@ class TestMCPServer:
             pytest.skip("MCP_SERVER_URL not configured")
 
         # First, get a list of resources to find a note ID
-        list_response = requests.post(
+        list_response = httpx.post(
             MCP_SERVER_URL,
             headers={
                 "Authorization": f"Bearer {auth_token}",
@@ -460,7 +462,7 @@ class TestMCPServer:
         # Read the first note
         note_uri = resources[0]["uri"]
 
-        read_response = requests.post(
+        read_response = httpx.post(
             MCP_SERVER_URL,
             headers={
                 "Authorization": f"Bearer {auth_token}",
@@ -507,7 +509,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.post(
+        response = httpx.post(
             MCP_SERVER_URL,
             headers={
                 "Authorization": f"Bearer {auth_token}",
@@ -536,7 +538,7 @@ class TestMCPServer:
         if not MCP_SERVER_URL:
             pytest.skip("MCP_SERVER_URL not configured")
 
-        response = requests.post(
+        response = httpx.post(
             MCP_SERVER_URL,
             headers={
                 "Authorization": f"Bearer {auth_token}",
@@ -585,7 +587,7 @@ def test_data_isolation() -> None:
     token2 = get_test_token_override(email2, password2)
 
     # List resources for user 1
-    response1 = requests.post(
+    response1 = httpx.post(
         MCP_SERVER_URL,
         headers={
             "Authorization": f"Bearer {token1}",
@@ -600,7 +602,7 @@ def test_data_isolation() -> None:
     )
 
     # List resources for user 2
-    response2 = requests.post(
+    response2 = httpx.post(
         MCP_SERVER_URL,
         headers={
             "Authorization": f"Bearer {token2}",
@@ -641,6 +643,7 @@ def test_data_isolation() -> None:
 
 def get_test_token_override(email: str, password: str) -> str:
     """Get a JWT token for specific credentials."""
+    require_env_vars("COGNITO_CLIENT_ID")
     response = cognito_client.initiate_auth(
         ClientId=COGNITO_CLIENT_ID,
         AuthFlow="USER_PASSWORD_AUTH",

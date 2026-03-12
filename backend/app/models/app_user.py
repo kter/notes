@@ -39,4 +39,3 @@ class AppUserRead(AppUserBase):
         if isinstance(value, datetime) and value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value
-

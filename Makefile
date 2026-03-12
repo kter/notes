@@ -19,6 +19,8 @@ AWS_REGION ?= ap-northeast-1
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
 MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
+SENTRY_DSN_PARAMETER_NAME_FRONTEND ?= /notes-app/$(ENV)/sentry-dsn-frontend
+SENTRY_DSN_PARAMETER_NAME_BACKEND ?= /notes-app/$(ENV)/sentry-dsn-backend
 
 .PHONY: help
 help: ## Show this help
@@ -94,6 +96,29 @@ update-lambda: push-backend ## Update Lambda function code only (without Terrafo
 		--profile $(AWS_PROFILE)
 	@echo "Lambda function $(LAMBDA_NAME) updated!"
 
+.PHONY: put-sentry-dsn
+put-sentry-dsn: ## Store the Sentry DSN in AWS SSM Parameter Store as a SecureString
+	@if [ -z "$(SENTRY_DSN)" ]; then \
+		echo "SENTRY_DSN is required"; \
+		exit 1; \
+	fi
+	aws ssm put-parameter \
+		--name "$(SENTRY_DSN_PARAMETER_NAME)" \
+		--type SecureString \
+		--value "$(SENTRY_DSN)" \
+		--overwrite \
+		--region $(AWS_REGION) \
+		--profile $(AWS_PROFILE)
+	@echo "Stored Sentry DSN at $(SENTRY_DSN_PARAMETER_NAME)"
+
+.PHONY: put-sentry-dsn-frontend
+put-sentry-dsn-frontend: SENTRY_DSN_PARAMETER_NAME=$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)
+put-sentry-dsn-frontend: put-sentry-dsn ## Store the frontend Sentry DSN in AWS SSM Parameter Store
+
+.PHONY: put-sentry-dsn-backend
+put-sentry-dsn-backend: SENTRY_DSN_PARAMETER_NAME=$(SENTRY_DSN_PARAMETER_NAME_BACKEND)
+put-sentry-dsn-backend: put-sentry-dsn ## Store the backend Sentry DSN in AWS SSM Parameter Store
+
 # =============================================================================
 # Frontend Deployment
 # =============================================================================
@@ -103,7 +128,12 @@ build-frontend: tf-switch ## Build frontend for production
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
-	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
+	SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
+
+.PHONY: build-frontend-local
+build-frontend-local: ## Build frontend locally with local defaults and optional Sentry env vars
+	cd frontend && NEXT_PUBLIC_API_URL=$${NEXT_PUBLIC_API_URL:-http://localhost:8000} NEXT_PUBLIC_ENVIRONMENT=$${NEXT_PUBLIC_ENVIRONMENT:-dev} NEXT_PUBLIC_COGNITO_USER_POOL_ID=$${NEXT_PUBLIC_COGNITO_USER_POOL_ID:-local-user-pool} NEXT_PUBLIC_COGNITO_CLIENT_ID=$${NEXT_PUBLIC_COGNITO_CLIENT_ID:-local-client-id} npm run build
 
 
 .PHONY: invalidate-cloudfront
@@ -161,7 +191,8 @@ _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
 	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
 	@echo "Building frontend..."
-	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
+	@SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
 	@echo "Syncing frontend files to S3..."
 	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
 	@echo "Creating CloudFront cache invalidation..."
@@ -266,7 +297,7 @@ clean: ## Clean build artifacts
 
 # Test command guide:
 # - `make test` is the fastest day-to-day check: backend + frontend unit tests + lint.
-# - `make test-unit` adds the MCP Lambda unit tests to the fast local suite.
+# - `make test-unit` runs the full unit suite across backend, frontend, and Lambda packages.
 # - `make test-all ENV=dev` runs the full validation suite: lint + unit + integration + E2E.
 # - `make test-integration ENV=dev` hits the deployed backend in the selected environment.
 # - `make test-e2e-host ENV=dev` runs browsers that work well on the host (Chromium family).
@@ -281,11 +312,19 @@ clean: ## Clean build artifacts
 test: test-backend test-frontend test-lint ## Run the default fast suite: backend + frontend unit tests + lint
 
 .PHONY: test-unit
-test-unit: test-backend test-frontend test-mcp-lambda-unit ## Run all unit tests across backend, frontend, and MCP Lambda
+test-unit: test-backend test-frontend test-mcp-lambda-unit test-auth-manager-unit ## Run all unit tests across backend, frontend, and Lambda packages
 
 .PHONY: stop-hook-unit-tests
-stop-hook-unit-tests: ## Run unit tests from Claude/Codex Stop hooks
-	@$(MAKE) --no-print-directory test-unit
+stop-hook-unit-tests: ## Run unit tests only for changed app surfaces from Claude/Codex Stop hooks
+	@targets="$$(./scripts/changed_unit_test_targets.sh)"; \
+	if [ -z "$$targets" ]; then \
+		echo "No backend/frontend/lambda unit tests required for current changes."; \
+		exit 0; \
+	fi; \
+	for target in $$targets; do \
+		echo "Running $$target"; \
+		$(MAKE) --no-print-directory $$target; \
+	done
 
 .PHONY: test-all
 test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-e2e-all ## Run the full suite: lint + unit + integration + E2E
@@ -294,9 +333,16 @@ test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-
 test-mcp-lambda-unit: ## Run MCP Lambda unit tests
 	cd lambda/mcp_server && uv run --extra dev pytest tests/test_app_unit.py -q --tb=short
 
+.PHONY: test-auth-manager-unit
+test-auth-manager-unit: ## Run auth-manager Lambda unit tests
+	cd lambda/auth_manager && uv run --extra dev python -m pytest tests/test_main_unit.py -q --tb=short
+
 .PHONY: test-mcp-lambda-integration
 test-mcp-lambda-integration: ## Run MCP Lambda integration tests (requires AWS/Cognito env vars)
 	cd lambda/mcp_server && uv run --extra dev pytest tests/test_mcp_integration.py -v
+
+.PHONY: test-integration-full
+test-integration-full: test-integration test-mcp-lambda-integration ## Run all integration tests against deployed services
 
 .PHONY: test-backend
 test-backend: ## Run backend unit/integration-free tests locally
@@ -328,6 +374,10 @@ test-stop-hooks: ## Verify shared Stop hook behavior
 test-codex-hooks: ## Verify Codex hook routing
 	./scripts/test_agent_hook_configs.sh --codex
 
+.PHONY: test-git-hook-helpers
+test-git-hook-helpers: ## Verify helper scripts used by git hooks
+	./scripts/test_changed_unit_test_targets.sh
+
 .PHONY: test-agent-hooks
 test-agent-hooks: test-claude-hooks test-stop-hooks test-codex-hooks ## Verify Claude Code and Codex hook routing
 
@@ -345,6 +395,9 @@ TERRAFORM_PATH ?= .
 .PHONY: format
 format: format-backend format-frontend format-terraform ## Run project auto-formatters
 
+.PHONY: format-check
+format-check: format-check-backend format-check-frontend format-check-terraform ## Run formatter checks without modifying files
+
 .PHONY: lint-backend-fix
 lint-backend-fix: ## Run backend linter with auto-fixes (ruff --fix)
 	cd backend && uv run ruff check --fix $(BACKEND_PATH)
@@ -352,6 +405,10 @@ lint-backend-fix: ## Run backend linter with auto-fixes (ruff --fix)
 .PHONY: format-backend
 format-backend: ## Run backend formatter (ruff format)
 	cd backend && uv run ruff format $(BACKEND_PATH)
+
+.PHONY: format-check-backend
+format-check-backend: ## Check backend formatting without modifying files
+	cd backend && uv run ruff format --check $(BACKEND_PATH)
 
 .PHONY: lint-backend
 lint-backend: ## Run backend linter (ruff)
@@ -361,6 +418,10 @@ lint-backend: ## Run backend linter (ruff)
 format-frontend: ## Run frontend auto-fixes (eslint --fix)
 	cd frontend && npm run lint -- --fix $(FRONTEND_PATH)
 
+.PHONY: format-check-frontend
+format-check-frontend: ## Check frontend formatting without modifying files
+	cd frontend && npm run lint -- --fix-dry-run $(FRONTEND_PATH)
+
 .PHONY: lint-frontend
 lint-frontend: ## Run frontend linter (eslint)
 	cd frontend && npm run lint -- $(FRONTEND_PATH)
@@ -368,6 +429,10 @@ lint-frontend: ## Run frontend linter (eslint)
 .PHONY: format-terraform
 format-terraform: ## Run Terraform formatter
 	cd terraform && terraform fmt $(TERRAFORM_PATH)
+
+.PHONY: format-check-terraform
+format-check-terraform: ## Check Terraform formatting without modifying files
+	cd terraform && terraform fmt -check $(TERRAFORM_PATH)
 
 .PHONY: claude-post-tool-use
 claude-post-tool-use: ## Run hook-safe format/lint steps for a single edited file (FILE_PATH=...)

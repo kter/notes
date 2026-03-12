@@ -8,6 +8,7 @@ headers = {
     "Content-Type": "application/json",
 }
 
+
 def cleanup():
     with httpx.Client(base_url=API_URL, headers=headers, timeout=30.0) as client:
         # 1. List tokens
@@ -29,6 +30,7 @@ def cleanup():
                 print(f"Successfully deleted {token_id}")
             else:
                 print(f"Failed to delete {token_id}: {del_resp.status_code}")
+
 
 if __name__ == "__main__":
     cleanup()

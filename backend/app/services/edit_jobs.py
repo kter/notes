@@ -31,16 +31,16 @@ def _get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
     return DEFAULT_LLM_MODEL_ID, "auto"
 
 
-async def dispatch_edit_job(job_id: UUID, background_tasks: BackgroundTasks | None = None) -> None:
+async def dispatch_edit_job(
+    job_id: UUID, background_tasks: BackgroundTasks | None = None
+) -> None:
     """Queue AI edit job processing via SNS/SQS or local background execution."""
     topic_arn = os.getenv(EDIT_JOB_TOPIC_ARN_ENV)
 
     if topic_arn:
         boto3.client("sns").publish(
             TopicArn=topic_arn,
-            Message=json.dumps(
-                {"task": PROCESS_EDIT_JOB_TASK, "job_id": str(job_id)}
-            ),
+            Message=json.dumps({"task": PROCESS_EDIT_JOB_TASK, "job_id": str(job_id)}),
         )
         return
 
@@ -98,9 +98,7 @@ async def process_edit_job(
             job.error_message = None
         except AIServiceTimeoutError:
             job.status = "failed"
-            job.error_message = (
-                "AI request timed out. Try editing a smaller section."
-            )
+            job.error_message = "AI request timed out. Try editing a smaller section."
         except Exception as exc:
             logger.exception("AI edit job %s failed", job_id)
             job.status = "failed"
@@ -150,7 +148,9 @@ async def process_edit_job_queue_records(
 
             await process_job_fn(job_id)
         except Exception:
-            logger.exception("Failed to process AI edit job queue record %s", message_id)
+            logger.exception(
+                "Failed to process AI edit job queue record %s", message_id
+            )
             failures.append({"itemIdentifier": message_id})
 
     return {"batchItemFailures": failures}

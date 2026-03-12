@@ -102,7 +102,11 @@ class TestAIChat:
         note1_title = generate_title("Chat Folder Note 1")
         note1_response = client.post(
             "/api/notes",
-            json={"title": note1_title, "content": content_base, "folder_id": folder["id"]},
+            json={
+                "title": note1_title,
+                "content": content_base,
+                "folder_id": folder["id"],
+            },
         )
         assert note1_response.status_code == 201
         note1 = note1_response.json()
@@ -259,7 +263,9 @@ class TestTokenUsage:
         before = client.get("/api/settings").json()["token_usage"]["tokens_used"]
 
         # Make a summarize call (unique content ensures no S3 cache hit)
-        ai_response = client.post("/api/ai/summarize", json={"note_id": test_note["id"]})
+        ai_response = client.post(
+            "/api/ai/summarize", json={"note_id": test_note["id"]}
+        )
         assert ai_response.status_code == 200
         tokens_charged = ai_response.json()["tokens_used"]
 

@@ -17,8 +17,12 @@ def _get_period_end() -> datetime:
     """Get the end of the current monthly period (1st of next month, UTC)."""
     now = datetime.now(UTC)
     if now.month == 12:
-        return now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    return now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        return now.replace(
+            year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+    return now.replace(
+        month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0
+    )
 
 
 class TokenUsage(SQLModel, table=True):

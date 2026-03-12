@@ -167,9 +167,7 @@ async def chat_with_context(
     _check_token_limit(session, user_id)
 
     content = context_service.get_context(
-        scope=request.scope,
-        note_id=request.note_id,
-        folder_id=request.folder_id
+        scope=request.scope, note_id=request.note_id, folder_id=request.folder_id
     )
 
     model_id, language = get_user_settings(session, user_id)

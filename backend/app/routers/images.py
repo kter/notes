@@ -10,7 +10,9 @@ from app.config import get_settings
 router = APIRouter()
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB — must match frontend/src/components/layout/EditorPanel.tsx MAX_SIZE
+MAX_FILE_SIZE = (
+    10 * 1024 * 1024
+)  # 10MB — must match frontend/src/components/layout/EditorPanel.tsx MAX_SIZE
 
 MIME_TO_EXT = {
     "image/jpeg": "jpg",

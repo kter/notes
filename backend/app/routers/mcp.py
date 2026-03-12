@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 async def generate_mcp_token(
     request: MCPTokenCreateRequest,
     current_user: Annotated[dict, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)]
+    session: Annotated[Session, Depends(get_session)],
 ) -> MCPTokenResponse:
     """
     Generate a new MCP API key for current user.
@@ -51,7 +51,7 @@ async def generate_mcp_token(
         if len(active_tokens) >= 1:
             raise HTTPException(
                 status_code=400,
-                detail="Maximum of 1 non-expiring API key per user. Revoke an existing key first."
+                detail="Maximum of 1 non-expiring API key per user. Revoke an existing key first.",
             )
         expires_at = None
         expires_in = None
@@ -66,14 +66,14 @@ async def generate_mcp_token(
             select(MCPToken).where(
                 MCPToken.user_id == user_id,
                 MCPToken.revoked_at.is_(None),
-                MCPToken.expires_at > datetime.now(UTC)
+                MCPToken.expires_at > datetime.now(UTC),
             )
         ).all()
 
         if len(active_tokens) >= 2:
             raise HTTPException(
                 status_code=400,
-                detail="Maximum of 2 active API keys per user. Revoke an existing key first."
+                detail="Maximum of 2 active API keys per user. Revoke an existing key first.",
             )
 
     # Generate a random short token
@@ -86,14 +86,16 @@ async def generate_mcp_token(
         token_hash=token_hash,
         name=request.name,
         created_at=datetime.now(UTC),
-        expires_at=expires_at
+        expires_at=expires_at,
     )
 
     session.add(new_token)
     session.commit()
     session.refresh(new_token)
 
-    logger.info(f"Generated MCP API key for user {user_id}: {new_token.name}, expires_in_days={expires_in_days}")
+    logger.info(
+        f"Generated MCP API key for user {user_id}: {new_token.name}, expires_in_days={expires_in_days}"
+    )
 
     # Return response with full plain token (only shown once)
     return MCPTokenResponse(
@@ -103,14 +105,14 @@ async def generate_mcp_token(
         created_at=new_token.created_at.isoformat(),
         expires_at=new_token.expires_at.isoformat() if new_token.expires_at else None,
         expires_in=expires_in if expires_in else 365 * 24 * 3600,
-        expires_in_days=expires_in_days
+        expires_in_days=expires_in_days,
     )
 
 
 @router.get("/tokens", response_model=MCPTokensListResponse)
 async def list_mcp_tokens(
     current_user: Annotated[dict, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)]
+    session: Annotated[Session, Depends(get_session)],
 ) -> MCPTokensListResponse:
     """
     List all MCP API keys for the current user.
@@ -120,9 +122,7 @@ async def list_mcp_tokens(
         user_id = current_user.get("sub")
         logger.info(f"Listing MCP tokens for user_id: {user_id}")
 
-        tokens = session.exec(
-            select(MCPToken).where(MCPToken.user_id == user_id)
-        ).all()
+        tokens = session.exec(select(MCPToken).where(MCPToken.user_id == user_id)).all()
 
         logger.info(f"Found {len(tokens)} MCP tokens for user {user_id}")
 
@@ -131,11 +131,19 @@ async def list_mcp_tokens(
                 "id": str(token.id),
                 "name": token.name,
                 "created_at": token.created_at.isoformat(),
-                "expires_at": token.expires_at.isoformat() if token.expires_at else None,
-                "revoked_at": token.revoked_at.isoformat() if token.revoked_at else None,
+                "expires_at": token.expires_at.isoformat()
+                if token.expires_at
+                else None,
+                "revoked_at": token.revoked_at.isoformat()
+                if token.revoked_at
+                else None,
                 "is_active": token.is_active,
-                "last_used_at": token.last_used_at.isoformat() if token.last_used_at else None,
-                "expires_in_days": (token.expires_at - token.created_at).days if token.expires_at else None,
+                "last_used_at": token.last_used_at.isoformat()
+                if token.last_used_at
+                else None,
+                "expires_in_days": (token.expires_at - token.created_at).days
+                if token.expires_at
+                else None,
             }
             for token in tokens
         ]
@@ -150,7 +158,7 @@ async def list_mcp_tokens(
 async def revoke_mcp_token(
     token_id: str,
     current_user: Annotated[dict, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)]
+    session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     """
     Revoke (deactivate) a specific MCP API key.
@@ -163,10 +171,7 @@ async def revoke_mcp_token(
         raise HTTPException(status_code=404, detail="API key not found")
 
     token = session.exec(
-        select(MCPToken).where(
-            MCPToken.id == token_uuid,
-            MCPToken.user_id == user_id
-        )
+        select(MCPToken).where(MCPToken.id == token_uuid, MCPToken.user_id == user_id)
     ).first()
 
     if not token:
@@ -181,8 +186,7 @@ async def revoke_mcp_token(
 
     logger.info(f"Revoked MCP API key {token_id} for user {user_id}")
     return Response(
-        status_code=200,
-        content='{"message":"API key revoked successfully"}'
+        status_code=200, content='{"message":"API key revoked successfully"}'
     )
 
 
@@ -190,7 +194,7 @@ async def revoke_mcp_token(
 async def restore_mcp_token(
     token_id: str,
     current_user: Annotated[dict, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)]
+    session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     """
     Restore (reactivate) a revoked MCP API key.
@@ -203,10 +207,7 @@ async def restore_mcp_token(
         raise HTTPException(status_code=404, detail="API key not found")
 
     token = session.exec(
-        select(MCPToken).where(
-            MCPToken.id == token_uuid,
-            MCPToken.user_id == user_id
-        )
+        select(MCPToken).where(MCPToken.id == token_uuid, MCPToken.user_id == user_id)
     ).first()
 
     if not token:
@@ -214,10 +215,7 @@ async def restore_mcp_token(
 
     # Only allow restoring revoked tokens
     if not token.revoked_at:
-        raise HTTPException(
-            status_code=400,
-            detail="Can only restore revoked API keys"
-        )
+        raise HTTPException(status_code=400, detail="Can only restore revoked API keys")
 
     token.revoked_at = None
     session.add(token)
@@ -225,8 +223,7 @@ async def restore_mcp_token(
 
     logger.info(f"Restored MCP API key {token_id} for user {user_id}")
     return Response(
-        status_code=200,
-        content='{"message":"API key restored successfully"}'
+        status_code=200, content='{"message":"API key restored successfully"}'
     )
 
 
@@ -234,7 +231,7 @@ async def restore_mcp_token(
 async def delete_mcp_token(
     token_id: str,
     current_user: Annotated[dict, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)]
+    session: Annotated[Session, Depends(get_session)],
 ) -> Response:
     """
     Delete a specific MCP API key permanently.
@@ -247,10 +244,7 @@ async def delete_mcp_token(
         raise HTTPException(status_code=404, detail="API key not found")
 
     token = session.exec(
-        select(MCPToken).where(
-            MCPToken.id == token_uuid,
-            MCPToken.user_id == user_id
-        )
+        select(MCPToken).where(MCPToken.id == token_uuid, MCPToken.user_id == user_id)
     ).first()
 
     if not token:
@@ -261,15 +255,13 @@ async def delete_mcp_token(
 
     logger.info(f"Deleted MCP API key {token_id} for user {user_id}")
     return Response(
-        status_code=200,
-        content='{"message":"API key deleted successfully"}'
+        status_code=200, content='{"message":"API key deleted successfully"}'
     )
 
 
 @router.get("/settings", response_model=MCPSettingsResponse)
 async def get_mcp_settings(
-    request: Request,
-    current_user: Annotated[dict, Depends(get_current_user)]
+    request: Request, current_user: Annotated[dict, Depends(get_current_user)]
 ) -> MCPSettingsResponse:
     """
     Get current MCP settings for user.
@@ -281,5 +273,5 @@ async def get_mcp_settings(
     return MCPSettingsResponse(
         server_url=MCP_SERVER_URL,
         token_expires_in=3600,
-        token_expiration_options=[30, 60, 90, 365]
+        token_expiration_options=[30, 60, 90, 365],
     )

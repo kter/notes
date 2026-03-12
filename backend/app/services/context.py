@@ -19,7 +19,10 @@ class ContextService:
         return "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
 
     def get_context(
-        self, scope: ChatScope, note_id: UUID | None = None, folder_id: UUID | None = None
+        self,
+        scope: ChatScope,
+        note_id: UUID | None = None,
+        folder_id: UUID | None = None,
     ) -> str:
         content = ""
         if scope == ChatScope.NOTE:
@@ -28,9 +31,7 @@ class ContextService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="note_id is required for note scope",
                 )
-            note = get_owned_resource(
-                self.session, Note, note_id, self.user_id, "Note"
-            )
+            note = get_owned_resource(self.session, Note, note_id, self.user_id, "Note")
             content = note.content
         elif scope == ChatScope.FOLDER:
             if not folder_id:

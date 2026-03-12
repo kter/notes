@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     app_name: str = "Notes API"
     environment: str = "local"
     debug: bool = False
+    sentry_dsn: str = ""
+    sentry_dsn_parameter_name: str = ""
+    sentry_traces_sample_rate: float | None = None
 
     # Database settings
     database_url: str = "postgresql://notes:notes@localhost:5432/notes"
@@ -46,11 +49,25 @@ class Settings(BaseSettings):
 
     @property
     def bootstrap_admin_email_list(self) -> list[str]:
-        return [item.strip() for item in self.bootstrap_admin_emails.split(",") if item.strip()]
+        return [
+            item.strip()
+            for item in self.bootstrap_admin_emails.split(",")
+            if item.strip()
+        ]
 
     @property
     def bootstrap_admin_user_id_list(self) -> list[str]:
-        return [item.strip() for item in self.bootstrap_admin_user_ids.split(",") if item.strip()]
+        return [
+            item.strip()
+            for item in self.bootstrap_admin_user_ids.split(",")
+            if item.strip()
+        ]
+
+    @property
+    def effective_sentry_traces_sample_rate(self) -> float:
+        if self.sentry_traces_sample_rate is not None:
+            return self.sentry_traces_sample_rate
+        return 1.0 if self.environment in {"local", "dev"} else 0.1
 
 
 @lru_cache

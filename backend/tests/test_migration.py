@@ -180,9 +180,7 @@ def test_migration_bootstraps_existing_dsql_revision_to_head():
             )
         )
         conn.execute(
-            text(
-                "INSERT INTO alembic_version (version_num) VALUES ('20260310_01')"
-            )
+            text("INSERT INTO alembic_version (version_num) VALUES ('20260310_01')")
         )
         conn.commit()
 

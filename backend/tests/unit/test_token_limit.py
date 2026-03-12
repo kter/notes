@@ -5,6 +5,7 @@ The 429 rate-limit behaviour cannot easily be exercised through the real API
 session to drive check_limit into both the under-limit and over-limit code paths
 and verify the AI router raises the correct HTTPException.
 """
+
 import unittest
 from unittest.mock import MagicMock
 

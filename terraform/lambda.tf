@@ -1,26 +1,34 @@
 # Lambda Function and API Gateway for FastAPI Backend
 
 locals {
-  backend_lambda_environment = {
-    COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
-    COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
-    COGNITO_REGION        = var.aws_region
-    BEDROCK_REGION        = "us-east-1"
-    BEDROCK_MODEL_ID      = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-    DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
-    CORS_ORIGINS = jsonencode([
-      "https://${local.current_env.domain_name}",
-      "https://${local.current_env.admin_domain_name}"
-    ])
-    ENVIRONMENT              = terraform.workspace
-    CACHE_BUCKET_NAME        = aws_s3_bucket.cache.bucket
-    MCP_SERVER_URL           = "https://${local.current_env.mcp_domain_name}"
-    IMAGE_BUCKET_NAME        = aws_s3_bucket.images.bucket
-    AI_EDIT_JOB_TOPIC_ARN    = aws_sns_topic.ai_edit_jobs.arn
-    CDN_DOMAIN               = local.current_env.domain_name
-    BOOTSTRAP_ADMIN_EMAILS   = var.bootstrap_admin_emails
-    BOOTSTRAP_ADMIN_USER_IDS = var.bootstrap_admin_user_ids
-  }
+  sentry_backend_dsn_parameter_name = "/${var.project_name}/${terraform.workspace}/sentry-dsn-backend"
+
+  backend_lambda_environment = merge(
+    {
+      COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
+      COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
+      COGNITO_REGION        = var.aws_region
+      BEDROCK_REGION        = "us-east-1"
+      BEDROCK_MODEL_ID      = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+      DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
+      CORS_ORIGINS = jsonencode([
+        "https://${local.current_env.domain_name}",
+        "https://${local.current_env.admin_domain_name}"
+      ])
+      ENVIRONMENT               = terraform.workspace
+      CACHE_BUCKET_NAME         = aws_s3_bucket.cache.bucket
+      MCP_SERVER_URL            = "https://${local.current_env.mcp_domain_name}"
+      IMAGE_BUCKET_NAME         = aws_s3_bucket.images.bucket
+      AI_EDIT_JOB_TOPIC_ARN     = aws_sns_topic.ai_edit_jobs.arn
+      CDN_DOMAIN                = local.current_env.domain_name
+      SENTRY_DSN_PARAMETER_NAME = local.sentry_backend_dsn_parameter_name
+      BOOTSTRAP_ADMIN_EMAILS    = var.bootstrap_admin_emails
+      BOOTSTRAP_ADMIN_USER_IDS  = var.bootstrap_admin_user_ids
+    },
+    var.sentry_traces_sample_rate == null ? {} : {
+      SENTRY_TRACES_SAMPLE_RATE = tostring(var.sentry_traces_sample_rate)
+    }
+  )
 }
 
 # Lambda function
@@ -96,7 +104,7 @@ resource "aws_apigatewayv2_api" "api" {
       "https://${local.current_env.admin_domain_name}"
     ]
     allow_methods     = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers     = ["Authorization", "Content-Type"]
+    allow_headers     = ["Authorization", "Content-Type", "sentry-trace", "baggage"]
     allow_credentials = true
     max_age           = 86400
   }

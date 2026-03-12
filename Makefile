@@ -316,6 +316,7 @@ test-lint: lint-backend lint-frontend ## Run all linters
 
 .PHONY: test-claude-hooks
 test-claude-hooks: ## Verify Claude Code hook routing
+	./scripts/test_claude_pre_tool_use_hook.sh
 	./scripts/test_claude_post_tool_use_hook.sh
 	./scripts/test_agent_hook_configs.sh --claude
 
@@ -391,6 +392,10 @@ claude-post-tool-use: ## Run hook-safe format/lint steps for a single edited fil
 		*) \
 			true ;; \
 	esac
+
+.PHONY: claude-pre-tool-use
+claude-pre-tool-use: ## Block destructive Claude Bash commands based on CLAUDE_HOOK_COMMAND
+	@python3 scripts/claude_pre_tool_use_guard.py
 
 .PHONY: test-e2e
 test-e2e: ## Run all Playwright projects on the host (use only if your host can run every browser)

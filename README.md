@@ -195,18 +195,60 @@ make deploy ENV=prd
 
 ## Testing
 
-### Backend Unit Tests
+Makefile is the primary entry point for tests. `make help` shows the full list, and the targets below are the normal day-to-day commands.
+
+### Quick Start
 
 ```bash
-cd backend
-uv run pytest
+# Fast local check used most often
+make test
+
+# All unit tests, including the MCP Lambda package
+make test-unit
+
+# Backend integration tests against the deployed dev environment
+make test-integration ENV=dev
+
+# Full E2E split that matches CI
+make test-e2e-all ENV=dev
+
+# Everything: lint + unit + integration + E2E
+make test-all ENV=dev
 ```
 
-### Frontend E2E Tests (Playwright)
+### What Each Target Runs
 
-E2E tests use Playwright to test the application across multiple browsers.
+```bash
+# Default fast suite: backend + frontend unit tests + lint
+make test
 
-#### Setup
+# Unit tests only
+make test-backend
+make test-frontend
+make test-mcp-lambda-unit
+make test-unit
+
+# Deployed-environment tests
+make test-integration ENV=dev
+make test-mcp-lambda-integration
+
+# E2E on browsers that run well on the host
+make test-e2e-host ENV=dev
+
+# E2E for each Safari/WebKit project in Docker
+make test-e2e-webkit-docker ENV=dev
+make test-e2e-mobile-safari-docker ENV=dev
+
+# CI-style full E2E run
+make test-e2e-all ENV=dev
+
+# Full validation before a larger merge or release
+make test-all ENV=dev
+```
+
+### E2E Setup
+
+E2E tests use Playwright across Chromium and Safari-family projects.
 
 1. Create `frontend/.env.local` with test credentials:
    ```env
@@ -214,54 +256,41 @@ E2E tests use Playwright to test the application across multiple browsers.
    E2E_TEST_USER_PASSWORD=YourTestPassword123!
    ```
 
-2. Install Playwright browsers:
+2. Install Playwright browsers for host-side projects:
    ```bash
    cd frontend
    npx playwright install
    ```
 
-#### Running Tests
+3. Use Docker for `webkit` and `Mobile Safari`.
+   On Linux hosts we have seen WebKit/WPE crashes such as `WPEWebProcess quit unexpectedly`, so the supported local path is:
+   - Host execution: `chromium`, `Mobile Chrome`
+   - Docker execution: `webkit`, `Mobile Safari`
+
+### E2E Examples
 
 ```bash
-# Local development (starts dev server automatically)
-npx playwright test
+# Narrow to a specific file
+make test-e2e-host ENV=dev TEST_ARGS='tests/auth.spec.ts'
 
-# Against dev environment
-E2E_TARGET=dev npx playwright test
+# Narrow by grep
+make test-e2e-host ENV=dev TEST_ARGS='-g "full cycle"'
 
-# Against production
-E2E_TARGET=prd npx playwright test
-
-# Run specific test file
-E2E_TARGET=dev npx playwright test tests/auth.spec.ts
-
-# Run with UI mode (interactive)
-npx playwright test --ui
-
-# View HTML report
-npx playwright show-report
-```
-
-#### Make Targets
-
-```bash
-# Host execution
-make test-e2e-dev
-make test-e2e-prd
-
-# Pass through specific files or grep filters
-make test-e2e-dev TEST_ARGS='tests/auth.spec.ts'
-make test-e2e-dev TEST_ARGS='-g "full cycle"'
-
-# Docker execution for WebKit/Safari on hosts with incompatible system libraries
-make test-e2e-webkit-docker ENV=dev
-make test-e2e-mobile-safari-docker ENV=dev
-
-# Generic Docker target
+# Run a single Docker-backed browser
 make test-e2e-docker ENV=dev PROJECT=webkit TEST_ARGS='tests/auth.spec.ts'
+
+# If your host can run every Playwright project directly, this remains available
+make test-e2e ENV=dev
 ```
 
-GitHub Actions also uses the same split: `chromium` and `Mobile Chrome` run on the standard Ubuntu runner, while `webkit` and `Mobile Safari` run inside the Playwright Docker image. Configure `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD` as repository secrets before enabling the workflow.
+GitHub Actions uses the same split as `make test-e2e-all`: `chromium` and `Mobile Chrome` run on the standard Ubuntu runner, while `webkit` and `Mobile Safari` run inside the Playwright Docker image. Configure `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD` as repository secrets before enabling the workflow.
+
+### Notes
+
+- `ENV=dev|prd` selects the deployed environment for integration and E2E tests.
+- `TEST_ARGS='...'` is passed through to Playwright, so file paths and `-g` filters work as-is.
+- `test-mcp-lambda-integration` requires the AWS/Cognito-related environment variables expected by [`lambda/mcp_server/tests/test_mcp_integration.py`](lambda/mcp_server/tests/test_mcp_integration.py).
+- `test-all` includes `test-integration`, `test-mcp-lambda-integration`, and `test-e2e-all`, so it assumes the deployed environment, Docker, and E2E credentials are all available.
 
 > [!TIP]
 > For detailed credential management and CI/CD setup, see [frontend/docs/E2E_CREDENTIALS.md](frontend/docs/E2E_CREDENTIALS.md).

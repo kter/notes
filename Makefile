@@ -287,13 +287,64 @@ test-integration: tf-switch ## Run integration tests against the deployed enviro
 .PHONY: test-lint
 test-lint: lint-backend lint-frontend ## Run all linters
 
+.PHONY: test-claude-hooks
+test-claude-hooks: ## Verify Claude Code PostToolUse hook routing
+	./scripts/test_claude_post_tool_use_hook.sh
+
+BACKEND_PATH ?= .
+FRONTEND_PATH ?= .
+TERRAFORM_PATH ?= .
+
+.PHONY: format
+format: format-backend format-frontend format-terraform ## Run project auto-formatters
+
+.PHONY: lint-backend-fix
+lint-backend-fix: ## Run backend linter with auto-fixes (ruff --fix)
+	cd backend && uv run ruff check --fix $(BACKEND_PATH)
+
+.PHONY: format-backend
+format-backend: ## Run backend formatter (ruff format)
+	cd backend && uv run ruff format $(BACKEND_PATH)
+
 .PHONY: lint-backend
 lint-backend: ## Run backend linter (ruff)
-	cd backend && uv run ruff check .
+	cd backend && uv run ruff check $(BACKEND_PATH)
+
+.PHONY: format-frontend
+format-frontend: ## Run frontend auto-fixes (eslint --fix)
+	cd frontend && npm run lint -- --fix $(FRONTEND_PATH)
 
 .PHONY: lint-frontend
 lint-frontend: ## Run frontend linter (eslint)
-	cd frontend && npm run lint
+	cd frontend && npm run lint -- $(FRONTEND_PATH)
+
+.PHONY: format-terraform
+format-terraform: ## Run Terraform formatter
+	cd terraform && terraform fmt $(TERRAFORM_PATH)
+
+.PHONY: claude-post-tool-use
+claude-post-tool-use: ## Run hook-safe format/lint steps for a single edited file (FILE_PATH=...)
+	@if [ -z "$(FILE_PATH)" ]; then \
+		echo "FILE_PATH is required"; \
+		exit 1; \
+	fi
+	@file_path="$(FILE_PATH)"; \
+	case "$$file_path" in \
+		backend/*.py) \
+			rel_path="$${file_path#backend/}"; \
+			$(MAKE) --no-print-directory lint-backend-fix BACKEND_PATH="$$rel_path" && \
+			$(MAKE) --no-print-directory format-backend BACKEND_PATH="$$rel_path" && \
+			$(MAKE) --no-print-directory lint-backend BACKEND_PATH="$$rel_path" ;; \
+		frontend/*.js|frontend/*.jsx|frontend/*.ts|frontend/*.tsx|frontend/*.mjs|frontend/*.cjs) \
+			rel_path="$${file_path#frontend/}"; \
+			$(MAKE) --no-print-directory format-frontend FRONTEND_PATH="$$rel_path" && \
+			$(MAKE) --no-print-directory lint-frontend FRONTEND_PATH="$$rel_path" ;; \
+		terraform/*.tf|terraform/*.tfvars) \
+			rel_path="$${file_path#terraform/}"; \
+			$(MAKE) --no-print-directory format-terraform TERRAFORM_PATH="$$rel_path" ;; \
+		*) \
+			true ;; \
+	esac
 
 PLAYWRIGHT_DOCKER_IMAGE ?= mcr.microsoft.com/playwright:v1.57.0-noble
 PLAYWRIGHT_DOCKER_RUN = docker run --rm --ipc=host -u "$$(id -u):$$(id -g)" -e HOME=/tmp -v "$(CURDIR):/work" -w /work/frontend $(PLAYWRIGHT_DOCKER_IMAGE) bash -lc

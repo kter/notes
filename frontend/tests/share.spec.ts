@@ -35,16 +35,27 @@ test.describe('Sharing Functionality', () => {
 
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
     await noteList.getByTestId('note-list-add-note-button').click();
-    await createPromise;
+    const createdNote = await createPromise.then(resp => resp.json() as Promise<{ id: string }>);
     console.log('[Share E2E] Note created');
 
-    // Wait for editor
-    await page.waitForTimeout(500);
-
-    // Enter note content
+    // Wait for editor. On mobile, note creation can leave the view on the list,
+    // so open the created note explicitly if the editor is not visible yet.
     const layout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
-    const titleInput = layout.getByLabel(/title/i);
-    const contentTextarea = layout.getByRole('textbox', { name: /content/i });
+    const titleInput = layout.getByTestId('editor-title-input');
+    const contentTextarea = layout.getByTestId('editor-content-input');
+
+    if (isMobile) {
+      try {
+        await expect(titleInput).toBeVisible({ timeout: 5000 });
+      } catch {
+        const createdNoteItem = noteList.getByTestId(`note-list-item-${createdNote.id}`);
+        await expect(createdNoteItem).toBeVisible({ timeout: 15000 });
+        await createdNoteItem.click();
+        await expect(titleInput).toBeVisible({ timeout: 20000 });
+      }
+    } else {
+      await expect(titleInput).toBeVisible({ timeout: 20000 });
+    }
 
     const noteTitle = `Shared Note ${Date.now()}`;
     const noteContent = '# Hello World\n\nThis is a shared note for E2E testing.\n\n- Item 1\n- Item 2';

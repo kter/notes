@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('UI Loading States', () => {
 
-  test('should show loading state when creating a folder', async ({ page }) => {
-    // Only test on desktop as mobile layout logic differs significantly
+  test('should show loading state when creating a folder', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Desktop only');
     await page.goto('/');
     const desktopLayout = page.getByTestId('desktop-layout');
     const createFolderPromise = page.waitForResponse(

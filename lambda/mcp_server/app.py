@@ -6,6 +6,7 @@ import json
 import hashlib
 from datetime import datetime, timezone
 from typing import Any
+import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from jose import jwk, jwt
@@ -59,8 +60,7 @@ def get_jwks() -> dict:
         url = f"https://cognito-idp.{region}.amazonaws.com/{pool_id}/.well-known/jwks.json"
         
         logger.info(f"Fetching JWKS from {url}")
-        import requests
-        response = requests.get(url, timeout=5)
+        response = httpx.get(url, timeout=5)
         response.raise_for_status()
         
         _jwks_cache = response.json()

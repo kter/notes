@@ -1,6 +1,25 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
+vi.mock('@sentry/nextjs', () => ({
+  init: vi.fn(),
+  setUser: vi.fn(),
+  captureException: vi.fn(),
+  captureRouterTransitionStart: vi.fn(),
+  browserTracingIntegration: vi.fn((options?: unknown) => ({
+    name: 'browserTracingIntegration',
+    options,
+  })),
+  replayIntegration: vi.fn((options?: unknown) => ({
+    name: 'replayIntegration',
+    options,
+  })),
+  withSentryConfig: vi.fn((config: Record<string, unknown>, options: Record<string, unknown>) => ({
+    ...config,
+    _sentryOptions: options,
+  })),
+}))
+
 // Mock aws-amplify/auth
 vi.mock('aws-amplify/auth', () => ({
   getCurrentUser: vi.fn().mockResolvedValue({

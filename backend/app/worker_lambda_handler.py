@@ -3,10 +3,13 @@
 import logging
 
 from app.database import create_db_and_tables
+from app.observability import init_sentry
 from app.services.edit_jobs import run_edit_job_queue_records
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+init_sentry()
 
 logger.info("AI edit worker cold start: initializing database schema...")
 try:

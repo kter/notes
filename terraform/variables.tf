@@ -78,3 +78,16 @@ variable "bootstrap_admin_user_ids" {
   type        = string
   default     = ""
 }
+
+variable "sentry_dsn" {
+  description = "Sentry DSN for backend Lambda monitoring"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "sentry_traces_sample_rate" {
+  description = "Optional backend Sentry trace sample rate override"
+  type        = number
+  default     = null
+}

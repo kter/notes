@@ -12,8 +12,12 @@ fi
 
 if [ "$mode" = "--claude" ]; then
   jq -e '
+    .hooks.PreToolUse[0].matcher == "Bash" and
+    .hooks.PreToolUse[0].hooks[0].type == "command" and
+    .hooks.PreToolUse[0].hooks[0].command == "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-use-block-destructive-commands.sh" and
     .hooks.Stop[0].hooks[0].type == "command" and
-    .hooks.Stop[0].hooks[0].command == "$CLAUDE_PROJECT_DIR/scripts/agent_stop_hook_unit_tests.sh"
+    .hooks.Stop[0].hooks[0].command == "$CLAUDE_PROJECT_DIR/scripts/agent_stop_hook_unit_tests.sh" and
+    .hooks.PostToolUse[0].matcher == "Edit|MultiEdit|Write"
   ' "$project_dir/.claude/settings.json" >/dev/null
   exit 0
 fi

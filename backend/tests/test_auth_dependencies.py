@@ -21,7 +21,9 @@ def test_get_current_app_user_returns_existing_user_after_retryable_commit_confl
         OperationalError(
             "INSERT INTO app_users ...",
             {},
-            Exception("change conflicts with another transaction, please retry: (OC000)"),
+            Exception(
+                "change conflicts with another transaction, please retry: (OC000)"
+            ),
         )
     ]
 

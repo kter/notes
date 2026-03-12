@@ -297,7 +297,7 @@ clean: ## Clean build artifacts
 
 # Test command guide:
 # - `make test` is the fastest day-to-day check: backend + frontend unit tests + lint.
-# - `make test-unit` adds the MCP Lambda unit tests to the fast local suite.
+# - `make test-unit` runs the full unit suite across backend, frontend, and Lambda packages.
 # - `make test-all ENV=dev` runs the full validation suite: lint + unit + integration + E2E.
 # - `make test-integration ENV=dev` hits the deployed backend in the selected environment.
 # - `make test-e2e-host ENV=dev` runs browsers that work well on the host (Chromium family).
@@ -312,11 +312,19 @@ clean: ## Clean build artifacts
 test: test-backend test-frontend test-lint ## Run the default fast suite: backend + frontend unit tests + lint
 
 .PHONY: test-unit
-test-unit: test-backend test-frontend test-mcp-lambda-unit ## Run all unit tests across backend, frontend, and MCP Lambda
+test-unit: test-backend test-frontend test-mcp-lambda-unit test-auth-manager-unit ## Run all unit tests across backend, frontend, and Lambda packages
 
 .PHONY: stop-hook-unit-tests
-stop-hook-unit-tests: ## Run unit tests from Claude/Codex Stop hooks
-	@$(MAKE) --no-print-directory test-unit
+stop-hook-unit-tests: ## Run unit tests only for changed app surfaces from Claude/Codex Stop hooks
+	@targets="$$(./scripts/changed_unit_test_targets.sh)"; \
+	if [ -z "$$targets" ]; then \
+		echo "No backend/frontend/lambda unit tests required for current changes."; \
+		exit 0; \
+	fi; \
+	for target in $$targets; do \
+		echo "Running $$target"; \
+		$(MAKE) --no-print-directory $$target; \
+	done
 
 .PHONY: test-all
 test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-e2e-all ## Run the full suite: lint + unit + integration + E2E
@@ -325,9 +333,16 @@ test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-
 test-mcp-lambda-unit: ## Run MCP Lambda unit tests
 	cd lambda/mcp_server && uv run --extra dev pytest tests/test_app_unit.py -q --tb=short
 
+.PHONY: test-auth-manager-unit
+test-auth-manager-unit: ## Run auth-manager Lambda unit tests
+	cd lambda/auth_manager && uv run --extra dev python -m pytest tests/test_main_unit.py -q --tb=short
+
 .PHONY: test-mcp-lambda-integration
 test-mcp-lambda-integration: ## Run MCP Lambda integration tests (requires AWS/Cognito env vars)
 	cd lambda/mcp_server && uv run --extra dev pytest tests/test_mcp_integration.py -v
+
+.PHONY: test-integration-full
+test-integration-full: test-integration test-mcp-lambda-integration ## Run all integration tests against deployed services
 
 .PHONY: test-backend
 test-backend: ## Run backend unit/integration-free tests locally
@@ -359,6 +374,10 @@ test-stop-hooks: ## Verify shared Stop hook behavior
 test-codex-hooks: ## Verify Codex hook routing
 	./scripts/test_agent_hook_configs.sh --codex
 
+.PHONY: test-git-hook-helpers
+test-git-hook-helpers: ## Verify helper scripts used by git hooks
+	./scripts/test_changed_unit_test_targets.sh
+
 .PHONY: test-agent-hooks
 test-agent-hooks: test-claude-hooks test-stop-hooks test-codex-hooks ## Verify Claude Code and Codex hook routing
 
@@ -376,6 +395,9 @@ TERRAFORM_PATH ?= .
 .PHONY: format
 format: format-backend format-frontend format-terraform ## Run project auto-formatters
 
+.PHONY: format-check
+format-check: format-check-backend format-check-frontend format-check-terraform ## Run formatter checks without modifying files
+
 .PHONY: lint-backend-fix
 lint-backend-fix: ## Run backend linter with auto-fixes (ruff --fix)
 	cd backend && uv run ruff check --fix $(BACKEND_PATH)
@@ -383,6 +405,10 @@ lint-backend-fix: ## Run backend linter with auto-fixes (ruff --fix)
 .PHONY: format-backend
 format-backend: ## Run backend formatter (ruff format)
 	cd backend && uv run ruff format $(BACKEND_PATH)
+
+.PHONY: format-check-backend
+format-check-backend: ## Check backend formatting without modifying files
+	cd backend && uv run ruff format --check $(BACKEND_PATH)
 
 .PHONY: lint-backend
 lint-backend: ## Run backend linter (ruff)
@@ -392,6 +418,10 @@ lint-backend: ## Run backend linter (ruff)
 format-frontend: ## Run frontend auto-fixes (eslint --fix)
 	cd frontend && npm run lint -- --fix $(FRONTEND_PATH)
 
+.PHONY: format-check-frontend
+format-check-frontend: ## Check frontend formatting without modifying files
+	cd frontend && npm run lint -- --fix-dry-run $(FRONTEND_PATH)
+
 .PHONY: lint-frontend
 lint-frontend: ## Run frontend linter (eslint)
 	cd frontend && npm run lint -- $(FRONTEND_PATH)
@@ -399,6 +429,10 @@ lint-frontend: ## Run frontend linter (eslint)
 .PHONY: format-terraform
 format-terraform: ## Run Terraform formatter
 	cd terraform && terraform fmt $(TERRAFORM_PATH)
+
+.PHONY: format-check-terraform
+format-check-terraform: ## Check Terraform formatting without modifying files
+	cd terraform && terraform fmt -check $(TERRAFORM_PATH)
 
 .PHONY: claude-post-tool-use
 claude-post-tool-use: ## Run hook-safe format/lint steps for a single edited file (FILE_PATH=...)

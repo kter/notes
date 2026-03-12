@@ -33,8 +33,12 @@ async def test_dispatch_edit_job_publishes_to_sns(monkeypatch: pytest.MonkeyPatc
     job_id = uuid4()
     sns_client = StubSNSClient()
 
-    monkeypatch.setenv(EDIT_JOB_TOPIC_ARN_ENV, "arn:aws:sns:ap-northeast-1:123456789012:edit-jobs")
-    monkeypatch.setattr("app.services.edit_jobs.boto3.client", lambda service_name: sns_client)
+    monkeypatch.setenv(
+        EDIT_JOB_TOPIC_ARN_ENV, "arn:aws:sns:ap-northeast-1:123456789012:edit-jobs"
+    )
+    monkeypatch.setattr(
+        "app.services.edit_jobs.boto3.client", lambda service_name: sns_client
+    )
 
     await dispatch_edit_job(job_id)
 
@@ -48,7 +52,9 @@ async def test_dispatch_edit_job_publishes_to_sns(monkeypatch: pytest.MonkeyPatc
 
 
 @pytest.mark.asyncio
-async def test_dispatch_edit_job_falls_back_to_background_tasks(monkeypatch: pytest.MonkeyPatch):
+async def test_dispatch_edit_job_falls_back_to_background_tasks(
+    monkeypatch: pytest.MonkeyPatch,
+):
     job_id = uuid4()
     background_tasks = StubBackgroundTasks()
 
@@ -73,15 +79,11 @@ async def test_process_edit_job_queue_records_reports_partial_failures():
     records = [
         {
             "messageId": "msg-1",
-            "body": json.dumps(
-                {"task": PROCESS_EDIT_JOB_TASK, "job_id": "job-1"}
-            ),
+            "body": json.dumps({"task": PROCESS_EDIT_JOB_TASK, "job_id": "job-1"}),
         },
         {
             "messageId": "msg-2",
-            "body": json.dumps(
-                {"task": PROCESS_EDIT_JOB_TASK, "job_id": "job-2"}
-            ),
+            "body": json.dumps({"task": PROCESS_EDIT_JOB_TASK, "job_id": "job-2"}),
         },
         {
             "messageId": "msg-3",

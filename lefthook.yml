@@ -1,15 +1,15 @@
 pre-commit:
   commands:
-    backend-lint:
-      run: make lint-backend
-    frontend-lint:
-      run: make lint-frontend
+    format-check:
+      run: make format-check
+    lint:
+      run: make test-lint
+    unit-tests:
+      run: make test-unit
 
 pre-push:
   commands:
-    mcp-lambda-unit:
-      run: make test-mcp-lambda-unit
-    backend-tests:
-      run: make test-backend
-    frontend-tests:
-      run: make test-frontend
+    unit-tests:
+      run: make test-unit
+    integration-tests:
+      run: make test-integration-full ENV=dev

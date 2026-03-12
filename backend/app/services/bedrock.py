@@ -72,8 +72,6 @@ class AIService(ABC):
         pass
 
 
-
-
 class BedrockService(AIService):
     """Amazon Bedrock service using Claude."""
 
@@ -152,7 +150,7 @@ class BedrockService(AIService):
             Tuple of (summary_text, total_tokens_used)
         """
         resolved_lang = self._resolve_language(language)
-        
+
         # Check cache
         cache_service = get_cache_service()
         cached_summary = cache_service.get_cached_summary(content, model_id)
@@ -169,13 +167,11 @@ class BedrockService(AIService):
         ]
 
         summary, total_tokens = self._invoke_model(messages, system, model_id=model_id)
-        
+
         # Save to cache
         cache_service.save_summary(content, model_id, summary)
-        
+
         return summary, total_tokens
-
-
 
     async def chat(
         self,
@@ -223,17 +219,13 @@ class BedrockService(AIService):
         return self._invoke_model(messages, system, model_id=model_id)
 
     @staticmethod
-    def _extract_edited_content(
-        text: str, preserve_whitespace: bool = False
-    ) -> str:
+    def _extract_edited_content(text: str, preserve_whitespace: bool = False) -> str:
         """Extract content from <edited_content> tags.
 
         When chunking long edits, preserve boundary whitespace so chunks can be
         concatenated without dropping blank lines between sections.
         """
-        match = re.search(
-            r"<edited_content>(.*?)</edited_content>", text, re.DOTALL
-        )
+        match = re.search(r"<edited_content>(.*?)</edited_content>", text, re.DOTALL)
         if match:
             content = match.group(1)
             return content if preserve_whitespace else content.strip()
@@ -277,7 +269,7 @@ class BedrockService(AIService):
                     current = []
                     current_len = 0
                 for start in range(0, line_len, max_chars):
-                    parts.append(line[start:start + max_chars])
+                    parts.append(line[start : start + max_chars])
                 continue
 
             if current_len + line_len > max_chars and current:
@@ -406,9 +398,7 @@ class BedrockService(AIService):
 
         semaphore = asyncio.Semaphore(EDIT_MAX_CONCURRENCY)
 
-        async def edit_chunk(
-            index: int, chunk: str
-        ) -> tuple[int, str, int]:
+        async def edit_chunk(index: int, chunk: str) -> tuple[int, str, int]:
             async with semaphore:
                 edited_chunk, chunk_tokens = await asyncio.to_thread(
                     self._edit_single_chunk,

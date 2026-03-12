@@ -10,20 +10,24 @@ DEFAULT_DEV_API_URL = "https://api.notes.dev.devtools.site"
 # Token limit for integration test users (large enough to never hit in tests)
 INTEGRATION_TEST_TOKEN_LIMIT = 10_000_000
 
+
 @pytest.fixture(scope="session")
 def api_base_url():
     """Get the API base URL from environment or default."""
     return os.getenv("API_URL", DEFAULT_DEV_API_URL)
+
 
 @pytest.fixture(scope="session")
 def auth_token():
     """Return the backdoor token for integration tests."""
     return "dev-integration-test-token"
 
+
 @pytest.fixture(scope="session")
 def test_user_id():
     """Return the user ID associated with the backdoor token."""
     return "integration-test-user-id"
+
 
 @pytest.fixture(scope="session", autouse=True)
 def set_integration_test_token_limits(api_base_url, auth_token):
@@ -37,11 +41,16 @@ def set_integration_test_token_limits(api_base_url, auth_token):
             "Content-Type": "application/json",
         }
         with httpx.Client(base_url=api_base_url, headers=headers, timeout=30.0) as c:
-            user_id = "integration-test-user-id" if token == auth_token else "integration-test-user-id-2"
+            user_id = (
+                "integration-test-user-id"
+                if token == auth_token
+                else "integration-test-user-id-2"
+            )
             c.patch(
                 f"/api/admin/users/{user_id}",
                 json={"token_limit": INTEGRATION_TEST_TOKEN_LIMIT},
             )
+
 
 @pytest.fixture
 def client(api_base_url, auth_token):

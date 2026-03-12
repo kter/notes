@@ -31,9 +31,9 @@ class CacheService:
 
         except ClientError as e:
             # S3 returns NoSuchKey error if object doesn't exist
-            if e.response['Error']['Code'] == "NoSuchKey":
+            if e.response["Error"]["Code"] == "NoSuchKey":
                 return None
-            
+
             logger.error(f"Error retrieving cache: {e}")
             return None
 
@@ -44,9 +44,7 @@ class CacheService:
 
         try:
             self.s3.put_object(
-                Bucket=self.bucket,
-                Key=s3_key,
-                Body=summary.encode("utf-8")
+                Bucket=self.bucket, Key=s3_key, Body=summary.encode("utf-8")
             )
             logger.info(f"Cache saved to S3 for hash: {content_hash}")
 

@@ -44,24 +44,26 @@ def get_dsql_engine():
         )
 
         def get_connection():
-            
             max_retries = 3
             base_delay = 0.5
-            
+
             for attempt in range(max_retries):
                 try:
                     # Log system time to diagnose clock skew issues
                     import datetime
+
                     now = datetime.datetime.now()
-                    logger.info(f"Attempt {attempt+1}/{max_retries}: Generating auth token at {now} (timestamp: {now.timestamp()})")
-                    
+                    logger.info(
+                        f"Attempt {attempt + 1}/{max_retries}: Generating auth token at {now} (timestamp: {now.timestamp()})"
+                    )
+
                     # Generate IAM auth token
                     client = boto3.client("dsql", region_name=region)
                     token = client.generate_db_connect_admin_auth_token(
                         Hostname=f"{dsql_endpoint}.dsql.{region}.on.aws",
                         Region=region,
                     )
-                    
+
                     # Connect using psycopg2
                     conn = psycopg2.connect(
                         host=f"{dsql_endpoint}.dsql.{region}.on.aws",
@@ -70,20 +72,27 @@ def get_dsql_engine():
                         user="admin",
                         password=token,
                         sslmode="require",
-                        connect_timeout=5
+                        connect_timeout=5,
                     )
                     return conn
                 except psycopg2.OperationalError as e:
                     error_msg = str(e)
                     # Check for signature expired error which indicates clock skew
-                    if "Signature expired" in error_msg or "Signature not yet current" in error_msg:
-                        logger.warning(f"DSQL connection failed with signature error (likely clock skew): {e}")
+                    if (
+                        "Signature expired" in error_msg
+                        or "Signature not yet current" in error_msg
+                    ):
+                        logger.warning(
+                            f"DSQL connection failed with signature error (likely clock skew): {e}"
+                        )
                         if attempt < max_retries - 1:
                             sleep_time = base_delay * (attempt + 1)
-                            logger.info(f"Sleeping for {sleep_time}s to allow clock synchronization...")
+                            logger.info(
+                                f"Sleeping for {sleep_time}s to allow clock synchronization..."
+                            )
                             time.sleep(sleep_time)
                             continue
-                    
+
                     # For other errors or if retries exhausted
                     logger.error(f"Failed to create DSQL connection: {e}")
                     raise
@@ -120,7 +129,7 @@ def get_dsql_engine():
 
 def _import_models() -> None:
     """Import models so SQLModel metadata is populated."""
-    from app.models import AIEditJob, AppUser, Folder, MCPToken, Note, NoteShare, TokenUsage, UserSettings  # noqa: E401, I001, F401
+    import app.models  # noqa: F401
 
 
 def _get_backend_root() -> Path:
@@ -278,9 +287,7 @@ def _stamp_head_manually(connection, revision: str) -> None:
     current_revision = _get_current_alembic_revision(connection)
     if current_revision is None:
         connection.execute(
-            text(
-                "INSERT INTO alembic_version (version_num) VALUES (:version_num)"
-            ),
+            text("INSERT INTO alembic_version (version_num) VALUES (:version_num)"),
             {"version_num": revision},
         )
     else:

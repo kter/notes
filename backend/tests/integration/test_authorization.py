@@ -15,7 +15,9 @@ class TestCrossUserAuthorization:
     def user_a_note(self, client):
         """Fixture that creates a note as user A and deletes it after the test."""
         title = generate_title("User A Note")
-        response = client.post("/api/notes", json={"title": title, "content": "User A content"})
+        response = client.post(
+            "/api/notes", json={"title": title, "content": "User A content"}
+        )
         assert response.status_code == 201
         note = response.json()
         yield note
@@ -44,7 +46,10 @@ class TestCrossUserAuthorization:
         """User B cannot update a note that belongs to user A."""
         response = another_client.patch(
             f"/api/notes/{user_a_note['id']}",
-            json={"title": generate_title("Unauthorized Update"), "content": "Unauthorized content"},
+            json={
+                "title": generate_title("Unauthorized Update"),
+                "content": "Unauthorized content",
+            },
         )
         assert response.status_code == 404
 

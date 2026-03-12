@@ -123,7 +123,9 @@ class TestUploadImage:
 
         assert response.status_code == 201
 
-    def test_upload_unauthenticated_returns_401(self, unauthenticated_client: TestClient):
+    def test_upload_unauthenticated_returns_401(
+        self, unauthenticated_client: TestClient
+    ):
         """Request without auth should return 401."""
         png_bytes = make_png_bytes()
 

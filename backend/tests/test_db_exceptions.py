@@ -14,7 +14,9 @@ def test_commit_with_retry_returns_recovered_resource_on_retryable_conflict():
         OperationalError(
             "UPDATE app_users ...",
             {},
-            Exception("change conflicts with another transaction, please retry: (OC000)"),
+            Exception(
+                "change conflicts with another transaction, please retry: (OC000)"
+            ),
         )
     ]
 

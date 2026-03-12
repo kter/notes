@@ -40,7 +40,9 @@ def get_or_create_current_period(session: Session, user_id: str) -> TokenUsage:
         session.add(usage)
         commit_with_error_handling(session, "TokenUsage")
         session.refresh(usage)
-        logger.info(f"Created new token usage period for user {user_id}: {period_start}")
+        logger.info(
+            f"Created new token usage period for user {user_id}: {period_start}"
+        )
 
     return usage
 
@@ -90,7 +92,9 @@ def record_usage(session: Session, user_id: str, tokens: int) -> TokenUsage:
     session.add(usage)
     commit_with_error_handling(session, "TokenUsage")
     session.refresh(usage)
-    logger.info(f"Recorded {tokens} tokens for user {user_id}. Total: {usage.tokens_used}/{MONTHLY_TOKEN_LIMIT}")
+    logger.info(
+        f"Recorded {tokens} tokens for user {user_id}. Total: {usage.tokens_used}/{MONTHLY_TOKEN_LIMIT}"
+    )
     return usage
 
 

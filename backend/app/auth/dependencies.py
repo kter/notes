@@ -68,10 +68,9 @@ def _should_bootstrap_admin(claims: dict) -> bool:
     email = (claims.get("email") or "").lower()
     if settings.environment == "dev" and user_id.startswith("integration-test-user-id"):
         return True
-    return (
-        user_id in settings.bootstrap_admin_user_id_list
-        or email in {item.lower() for item in settings.bootstrap_admin_email_list}
-    )
+    return user_id in settings.bootstrap_admin_user_id_list or email in {
+        item.lower() for item in settings.bootstrap_admin_email_list
+    }
 
 
 def get_current_app_user(
@@ -129,7 +128,9 @@ def get_user_id(app_user: Annotated[AppUser, Depends(get_current_app_user)]) -> 
     return app_user.user_id
 
 
-def require_admin(app_user: Annotated[AppUser, Depends(get_current_app_user)]) -> AppUser:
+def require_admin(
+    app_user: Annotated[AppUser, Depends(get_current_app_user)],
+) -> AppUser:
     """Require the current user to have admin privileges."""
     if not app_user.admin:
         raise HTTPException(
@@ -137,7 +138,6 @@ def require_admin(app_user: Annotated[AppUser, Depends(get_current_app_user)]) -
             detail="Admin access required",
         )
     return app_user
-
 
 
 def get_owned_resource[T: SQLModel](

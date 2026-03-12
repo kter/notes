@@ -13,7 +13,10 @@ class TestCreateShare:
     def test_create_share(self, client: TestClient):
         """Test creating a share link for a note."""
         # Create a note first
-        note_response = client.post("/api/notes", json={"title": "Shareable Note", "content": "Content to share"})
+        note_response = client.post(
+            "/api/notes",
+            json={"title": "Shareable Note", "content": "Content to share"},
+        )
         assert note_response.status_code == 201
         note_id = note_response.json()["id"]
 
@@ -106,7 +109,9 @@ class TestGetSharedNote:
     def test_get_shared_note(self, client: TestClient):
         """Test accessing a shared note via token."""
         # Create note and share
-        note_response = client.post("/api/notes", json={"title": "Shared Title", "content": "Shared Content"})
+        note_response = client.post(
+            "/api/notes", json={"title": "Shared Title", "content": "Shared Content"}
+        )
         note_id = note_response.json()["id"]
         share_response = client.post(f"/api/notes/{note_id}/share")
         share_token = share_response.json()["share_token"]
@@ -130,7 +135,9 @@ class TestGetSharedNote:
         owner_client = make_client(TEST_USER_ID)
 
         # Owner creates and shares note
-        note_response = owner_client.post("/api/notes", json={"title": "Public Note", "content": "Public Content"})
+        note_response = owner_client.post(
+            "/api/notes", json={"title": "Public Note", "content": "Public Content"}
+        )
         note_id = note_response.json()["id"]
         share_response = owner_client.post(f"/api/notes/{note_id}/share")
         share_token = share_response.json()["share_token"]
@@ -146,4 +153,3 @@ class TestGetSharedNote:
 # test_cannot_delete_share_of_others_note) are verified through the get_owned_resource pattern
 # which is tested in test_notes.py. The test fixture's make_client sharing global state prevents
 # reliable multi-user authorization tests in this context.
-

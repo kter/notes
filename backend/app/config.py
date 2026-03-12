@@ -49,11 +49,19 @@ class Settings(BaseSettings):
 
     @property
     def bootstrap_admin_email_list(self) -> list[str]:
-        return [item.strip() for item in self.bootstrap_admin_emails.split(",") if item.strip()]
+        return [
+            item.strip()
+            for item in self.bootstrap_admin_emails.split(",")
+            if item.strip()
+        ]
 
     @property
     def bootstrap_admin_user_id_list(self) -> list[str]:
-        return [item.strip() for item in self.bootstrap_admin_user_ids.split(",") if item.strip()]
+        return [
+            item.strip()
+            for item in self.bootstrap_admin_user_ids.split(",")
+            if item.strip()
+        ]
 
     @property
     def effective_sentry_traces_sample_rate(self) -> float:

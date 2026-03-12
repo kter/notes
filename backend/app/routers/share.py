@@ -19,7 +19,11 @@ router = APIRouter()
 # ----- Authenticated Endpoints -----
 
 
-@router.post("/notes/{note_id}/share", response_model=NoteShareRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/notes/{note_id}/share",
+    response_model=NoteShareRead,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_share(
     note_id: UUID,
     user_id: UserId,
@@ -55,9 +59,7 @@ def get_share(
     # Verify ownership
     get_owned_resource(session, Note, note_id, user_id, "Note")
 
-    share = session.exec(
-        select(NoteShare).where(NoteShare.note_id == note_id)
-    ).first()
+    share = session.exec(select(NoteShare).where(NoteShare.note_id == note_id)).first()
 
     return share
 
@@ -72,9 +74,7 @@ def delete_share(
     # Verify ownership
     get_owned_resource(session, Note, note_id, user_id, "Note")
 
-    share = session.exec(
-        select(NoteShare).where(NoteShare.note_id == note_id)
-    ).first()
+    share = session.exec(select(NoteShare).where(NoteShare.note_id == note_id)).first()
 
     if not share:
         raise HTTPException(

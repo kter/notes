@@ -257,7 +257,10 @@ def test_edit_timeout_returns_504(client: TestClient):
 
 
 def test_create_edit_job_and_poll_result(
-    client: TestClient, session: Session, mock_ai_service, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     async def noop_dispatch(*args, **kwargs):
         return None

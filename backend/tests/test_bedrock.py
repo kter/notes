@@ -14,6 +14,7 @@ def mock_settings():
         mock_settings.aws_region = "us-east-1"
         yield mock_settings
 
+
 @pytest.fixture
 def mock_boto_client():
     with patch("boto3.client") as mock_client:
@@ -21,25 +22,28 @@ def mock_boto_client():
         mock_client.return_value = client_instance
         yield client_instance
 
+
 @pytest.mark.asyncio
 async def test_summarize_success(mock_boto_client, mock_settings):
     service = BedrockService()
-    
+
     # Mock response from Bedrock
-    mock_response_body = json.dumps({
-        "content": [{"text": "This is a summary."}],
-        "usage": {"inputTokens": 10, "outputTokens": 10}
-    })
+    mock_response_body = json.dumps(
+        {
+            "content": [{"text": "This is a summary."}],
+            "usage": {"inputTokens": 10, "outputTokens": 10},
+        }
+    )
     mock_boto_client.invoke_model.return_value = {
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
-    
+
     summary, total_tokens = await service.summarize("Original content")
-    
+
     assert summary == "This is a summary."
     assert isinstance(total_tokens, int)
     mock_boto_client.invoke_model.assert_called_once()
-    
+
     # Verify call args
     call_args = mock_boto_client.invoke_model.call_args[1]
     # Check if modelId is correct (default from None in settings mock, assuming mock_settings allows usage)
@@ -48,30 +52,33 @@ async def test_summarize_success(mock_boto_client, mock_settings):
     # Current mock_settings fixture only sets aws_region.
     # Default behavior of MagicMock (settings) is to return Mocks for attributes.
     # So self.model_id will be a Mock object.
-    
+
     body = json.loads(call_args["body"])
     assert "Original content" in body["messages"][0]["content"]
+
 
 @pytest.mark.asyncio
 async def test_chat_success(mock_boto_client, mock_settings):
     service = BedrockService()
-    
-    mock_response_body = json.dumps({
-        "content": [{"text": "Chat answer."}],
-        "usage": {"inputTokens": 10, "outputTokens": 10}
-    })
+
+    mock_response_body = json.dumps(
+        {
+            "content": [{"text": "Chat answer."}],
+            "usage": {"inputTokens": 10, "outputTokens": 10},
+        }
+    )
     mock_boto_client.invoke_model.return_value = {
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
-    
+
     answer, total_tokens = await service.chat(
         content="Context info",
         question="User question",
     )
-    
+
     assert answer == "Chat answer."
     assert isinstance(total_tokens, int)
-    
+
     # Verify context and question are in the prompt
     call_args = mock_boto_client.invoke_model.call_args[1]
     body = json.loads(call_args["body"])
@@ -79,14 +86,17 @@ async def test_chat_success(mock_boto_client, mock_settings):
     assert "Context info" in messages_content
     assert "User question" in messages_content
 
+
 @pytest.mark.asyncio
 async def test_edit_success(mock_boto_client, mock_settings):
     service = BedrockService()
 
-    mock_response_body = json.dumps({
-        "content": [{"text": "<edited_content>Edited text here.</edited_content>"}],
-        "usage": {"input_tokens": 50, "output_tokens": 30}
-    })
+    mock_response_body = json.dumps(
+        {
+            "content": [{"text": "<edited_content>Edited text here.</edited_content>"}],
+            "usage": {"input_tokens": 50, "output_tokens": 30},
+        }
+    )
     mock_boto_client.invoke_model.return_value = {
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
@@ -110,10 +120,12 @@ async def test_edit_success(mock_boto_client, mock_settings):
 async def test_edit_fallback_no_tags(mock_boto_client, mock_settings):
     service = BedrockService()
 
-    mock_response_body = json.dumps({
-        "content": [{"text": "Edited text without tags."}],
-        "usage": {"input_tokens": 50, "output_tokens": 30}
-    })
+    mock_response_body = json.dumps(
+        {
+            "content": [{"text": "Edited text without tags."}],
+            "usage": {"input_tokens": 50, "output_tokens": 30},
+        }
+    )
     mock_boto_client.invoke_model.return_value = {
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
@@ -157,7 +169,7 @@ async def test_bedrock_error(mock_boto_client, mock_settings):
 
     mock_boto_client.invoke_model.side_effect = ClientError(
         {"Error": {"Code": "ValidationException", "Message": "Bad request"}},
-        "InvokeModel"
+        "InvokeModel",
     )
 
     with pytest.raises(ClientError):

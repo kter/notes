@@ -283,6 +283,10 @@ test: test-backend test-frontend test-lint ## Run the default fast suite: backen
 .PHONY: test-unit
 test-unit: test-backend test-frontend test-mcp-lambda-unit ## Run all unit tests across backend, frontend, and MCP Lambda
 
+.PHONY: stop-hook-unit-tests
+stop-hook-unit-tests: ## Run unit tests from Claude/Codex Stop hooks
+	@$(MAKE) --no-print-directory test-unit
+
 .PHONY: test-all
 test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-e2e-all ## Run the full suite: lint + unit + integration + E2E
 
@@ -311,8 +315,20 @@ test-integration: tf-switch ## Run backend integration tests against the deploye
 test-lint: lint-backend lint-frontend ## Run all linters
 
 .PHONY: test-claude-hooks
-test-claude-hooks: ## Verify Claude Code PostToolUse hook routing
+test-claude-hooks: ## Verify Claude Code hook routing
 	./scripts/test_claude_post_tool_use_hook.sh
+	./scripts/test_agent_hook_configs.sh --claude
+
+.PHONY: test-stop-hooks
+test-stop-hooks: ## Verify shared Stop hook behavior
+	./scripts/test_agent_stop_hook.sh
+
+.PHONY: test-codex-hooks
+test-codex-hooks: ## Verify Codex hook routing
+	./scripts/test_agent_hook_configs.sh --codex
+
+.PHONY: test-agent-hooks
+test-agent-hooks: test-claude-hooks test-stop-hooks test-codex-hooks ## Verify Claude Code and Codex hook routing
 
 # Playwright browser split:
 # - `chromium` and `Mobile Chrome` run directly on the host.

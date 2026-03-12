@@ -5,9 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import create_db_and_tables, get_session
+from app.observability import init_sentry
 from app.routers import admin, ai, folders, images, mcp, notes, settings, share
 
 settings_app = get_settings()
+init_sentry(with_fastapi=True)
 
 
 @asynccontextmanager

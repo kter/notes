@@ -52,3 +52,5 @@ Once running, visit:
 | `COGNITO_APP_CLIENT_ID` | Cognito App Client ID | - |
 | `BEDROCK_REGION` | AWS Bedrock region | `us-east-1` |
 | `BEDROCK_MODEL_ID` | Bedrock model ID | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| `SENTRY_DSN` | Sentry DSN for Lambda error monitoring and tracing | - |
+| `SENTRY_TRACES_SAMPLE_RATE` | Optional trace sample rate override | `1.0` in `local`/`dev`, `0.1` otherwise |

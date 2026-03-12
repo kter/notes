@@ -16,6 +16,7 @@ dependencies = [
     "mangum>=0.17.0",
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.9",
+    "sentry-sdk>=2.54.0",
 ]
 
 [project.optional-dependencies]

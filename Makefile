@@ -105,6 +105,10 @@ build-frontend: tf-switch ## Build frontend for production
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) npm run build
 
+.PHONY: build-frontend-local
+build-frontend-local: ## Build frontend locally with local defaults and optional Sentry env vars
+	cd frontend && NEXT_PUBLIC_API_URL=$${NEXT_PUBLIC_API_URL:-http://localhost:8000} NEXT_PUBLIC_ENVIRONMENT=$${NEXT_PUBLIC_ENVIRONMENT:-dev} NEXT_PUBLIC_COGNITO_USER_POOL_ID=$${NEXT_PUBLIC_COGNITO_USER_POOL_ID:-local-user-pool} NEXT_PUBLIC_COGNITO_CLIENT_ID=$${NEXT_PUBLIC_COGNITO_CLIENT_ID:-local-client-id} npm run build
+
 
 .PHONY: invalidate-cloudfront
 invalidate-cloudfront: ## Create CloudFront cache invalidation

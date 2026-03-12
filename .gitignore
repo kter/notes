@@ -53,9 +53,12 @@ Thumbs.db
 test-payload.json
 
 # Playwright
+test-results/
+playwright-report/
 frontend/test-results/
 frontend/playwright-report/
 frontend/playwright/.auth/
+after-login.png
 
 # Playwright CLI
 .playwright-cli/

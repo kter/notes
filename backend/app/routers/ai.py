@@ -6,50 +6,20 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.auth import UserId
-from app.auth.dependencies import get_owned_resource
 from app.database import get_session
-from app.models import (
-    DEFAULT_LLM_MODEL_ID,
-    AIEditJob,
-    AIEditJobCreate,
-    AIEditJobRead,
-    Note,
-    UserSettings,
-)
+from app.models import AIEditJobCreate, AIEditJobRead
 from app.models.enums import ChatScope
-from app.services import AIService, AIServiceTimeoutError, get_ai_service
-from app.services.context import ContextService
+from app.services import AIService, get_ai_service
+from app.services.ai_application_service import (
+    TOKEN_LIMIT_EXCEEDED_MESSAGE,
+    AIApplicationService,
+    AIApplicationTimeoutError,
+    AITokenLimitExceededError,
+)
 from app.services.edit_jobs import dispatch_edit_job
-from app.services.token_usage import check_limit, record_usage
+from app.services.token_usage import check_limit
 
 router = APIRouter()
-
-
-def get_user_model_id(session: Session, user_id: str) -> str:
-    """Get the user's preferred LLM model ID."""
-    settings = session.get(UserSettings, user_id)
-    if settings:
-        return settings.llm_model_id
-    return DEFAULT_LLM_MODEL_ID
-
-
-def get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
-    """Get the user's preferred LLM model ID and language.
-
-    Returns:
-        Tuple of (model_id, language)
-    """
-    settings = session.get(UserSettings, user_id)
-    if settings:
-        return settings.llm_model_id, settings.language
-    return DEFAULT_LLM_MODEL_ID, "auto"
-
-
-def get_context_service(
-    session: Annotated[Session, Depends(get_session)],
-    user_id: UserId,
-) -> ContextService:
-    return ContextService(session, user_id)
 
 
 class SummarizeRequest(BaseModel):
@@ -103,20 +73,31 @@ class EditJobCreateResponse(BaseModel):
     job: AIEditJobRead
 
 
-def _check_token_limit(session: Session, user_id: str) -> None:
-    """Check if user has exceeded token limit. Raises 429 if exceeded."""
-    if not check_limit(session, user_id):
+def _get_ai_application_service(
+    session: Session, user_id: str, ai_service: AIService | None = None
+) -> AIApplicationService:
+    return AIApplicationService(session=session, user_id=user_id, ai_service=ai_service)
+
+
+def _raise_ai_http_error(exc: Exception) -> None:
+    if isinstance(exc, AITokenLimitExceededError):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Monthly token limit exceeded. Your usage will reset at the beginning of next month.",
-        )
+            detail=str(exc),
+        ) from exc
+
+    if isinstance(exc, AIApplicationTimeoutError):
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=str(exc),
+        ) from exc
+
+    raise exc
 
 
-def _handle_ai_timeout() -> None:
-    raise HTTPException(
-        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-        detail="AI request timed out. Try a shorter note or edit a smaller section.",
-    )
+def _check_token_limit(session: Session, user_id: str) -> None:
+    if not check_limit(session, user_id):
+        _raise_ai_http_error(AITokenLimitExceededError(TOKEN_LIMIT_EXCEEDED_MESSAGE))
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
@@ -127,28 +108,11 @@ async def summarize_note(
     ai_service: Annotated[AIService, Depends(get_ai_service)],
 ):
     """Summarize a note's content using AI."""
-    note = get_owned_resource(session, Note, request.note_id, user_id, "Note")
-
-    if not note.content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Note content is empty",
-        )
-
-    # Check token limit before making AI call
-    _check_token_limit(session, user_id)
-
-    model_id, language = get_user_settings(session, user_id)
+    application_service = _get_ai_application_service(session, user_id, ai_service)
     try:
-        summary, tokens_used = await ai_service.summarize(
-            note.content, model_id=model_id, language=language
-        )
-    except AIServiceTimeoutError:
-        _handle_ai_timeout()
-
-    # Record token usage (only if tokens were actually used, not cached)
-    if tokens_used > 0:
-        record_usage(session, user_id, tokens_used)
+        summary, tokens_used = await application_service.summarize_note(request.note_id)
+    except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
+        _raise_ai_http_error(exc)
 
     return SummarizeResponse(summary=summary, tokens_used=tokens_used)
 
@@ -159,32 +123,19 @@ async def chat_with_context(
     user_id: UserId,
     session: Annotated[Session, Depends(get_session)],
     ai_service: Annotated[AIService, Depends(get_ai_service)],
-    context_service: Annotated[ContextService, Depends(get_context_service)],
 ):
     """Chat with AI about notes' content."""
-
-    # Check token limit before making AI call
-    _check_token_limit(session, user_id)
-
-    content = context_service.get_context(
-        scope=request.scope, note_id=request.note_id, folder_id=request.folder_id
-    )
-
-    model_id, language = get_user_settings(session, user_id)
+    application_service = _get_ai_application_service(session, user_id, ai_service)
     try:
-        answer, tokens_used = await ai_service.chat(
-            content=content,
+        answer, tokens_used = await application_service.chat_with_context(
+            scope=request.scope,
             question=request.question,
             history=request.history,
-            model_id=model_id,
-            language=language,
+            note_id=request.note_id,
+            folder_id=request.folder_id,
         )
-    except AIServiceTimeoutError:
-        _handle_ai_timeout()
-
-    # Record token usage
-    if tokens_used > 0:
-        record_usage(session, user_id, tokens_used)
+    except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
+        _raise_ai_http_error(exc)
 
     return ChatResponse(answer=answer, tokens_used=tokens_used)
 
@@ -197,39 +148,15 @@ async def edit_note_content(
     ai_service: Annotated[AIService, Depends(get_ai_service)],
 ):
     """Edit note content using AI based on user instructions."""
-    if not request.content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Content is empty",
-        )
-
-    if not request.instruction.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Instruction is empty",
-        )
-
-    # Verify note ownership if note_id is provided
-    if request.note_id:
-        get_owned_resource(session, Note, request.note_id, user_id, "Note")
-
-    # Check token limit before making AI call
-    _check_token_limit(session, user_id)
-
-    model_id, language = get_user_settings(session, user_id)
+    application_service = _get_ai_application_service(session, user_id, ai_service)
     try:
-        edited_content, tokens_used = await ai_service.edit(
+        edited_content, tokens_used = await application_service.edit_content(
             content=request.content,
             instruction=request.instruction,
-            model_id=model_id,
-            language=language,
+            note_id=request.note_id,
         )
-    except AIServiceTimeoutError:
-        _handle_ai_timeout()
-
-    # Record token usage
-    if tokens_used > 0:
-        record_usage(session, user_id, tokens_used)
+    except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
+        _raise_ai_http_error(exc)
 
     return EditResponse(edited_content=edited_content, tokens_used=tokens_used)
 
@@ -246,33 +173,11 @@ async def create_edit_job(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Queue a long-running AI edit request and return a pollable job resource."""
-    if not request.content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Content is empty",
-        )
-
-    if not request.instruction.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Instruction is empty",
-        )
-
-    if request.note_id:
-        get_owned_resource(session, Note, request.note_id, user_id, "Note")
-
-    _check_token_limit(session, user_id)
-
-    job = AIEditJob(
-        user_id=user_id,
-        note_id=request.note_id,
-        content=request.content,
-        instruction=request.instruction,
-        status="pending",
-    )
-    session.add(job)
-    session.commit()
-    session.refresh(job)
+    application_service = _get_ai_application_service(session, user_id)
+    try:
+        job = application_service.create_edit_job(request)
+    except AITokenLimitExceededError as exc:
+        _raise_ai_http_error(exc)
 
     await dispatch_edit_job(job.id, background_tasks=background_tasks)
 
@@ -286,11 +191,6 @@ async def get_edit_job(
     session: Annotated[Session, Depends(get_session)],
 ):
     """Poll an AI edit job."""
-    job = session.get(AIEditJob, job_id)
-    if job is None or job.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Edit job not found",
-        )
-
+    application_service = _get_ai_application_service(session, user_id)
+    job = application_service.get_edit_job(job_id)
     return AIEditJobRead.model_validate(job)

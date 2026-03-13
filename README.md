@@ -39,18 +39,36 @@ notes/
 ├── backend/           # FastAPI backend
 │   ├── app/
 │   │   ├── auth/      # Cognito JWT verification
+│   │   ├── bootstrap/ # Runtime schema/bootstrap helpers
 │   │   ├── models/    # SQLModel models
+│   │   ├── repositories/ # DSQL-aware persistence
 │   │   ├── routers/   # API endpoints
-│   │   └── services/  # Bedrock AI service
+│   │   └── services/  # Application services
 │   └── pyproject.toml
+├── docs/              # ADRs and deployment/reference docs
 ├── frontend/          # Next.js frontend
 │   └── src/
 │       ├── app/       # App Router pages
 │       ├── components/ # UI components
-│       ├── lib/       # API client
+│       ├── hooks/     # UI-facing state hooks
+│       ├── lib/       # Sync engine, API client, shared utilities
+│       ├── locales/   # i18n strings
 │       └── types/     # TypeScript types
 └── terraform/         # AWS infrastructure
 ```
+
+## Architecture Notes
+
+The app now keeps external behavior stable while separating internal responsibilities more explicitly.
+
+- Backend routers in `backend/app/routers` handle HTTP I/O and dependency wiring.
+- Backend use-case orchestration lives in `backend/app/services`.
+- DSQL-aware persistence lives in `backend/app/repositories` and `backend/app/core/persistence.py`.
+- Frontend authenticated workspace composition lives in `frontend/src/components/workspace`.
+- Frontend workspace state orchestration lives in `frontend/src/hooks/workspace`.
+- Frontend note sync behavior lives in `frontend/src/lib/sync`, with UI-facing wrappers in `frontend/src/hooks`.
+
+DSQL constraints are first-class design inputs. The current persistence and bootstrap policy is documented in [`docs/adr/README.md`](/home/ttakahashi/workspace/notes/docs/adr/README.md).
 
 ## Development Setup
 
@@ -211,6 +229,9 @@ make test-unit
 # Backend integration tests against the deployed dev environment
 make test-integration ENV=dev
 
+# High-value regression suite for internal refactors
+make test-refactor-regressions
+
 # Full E2E split that matches CI
 make test-e2e-all ENV=dev
 
@@ -233,6 +254,12 @@ make test-unit
 # Deployed-environment tests
 make test-integration ENV=dev
 make test-mcp-lambda-integration
+
+# Focused regression checks for internal refactors
+make test-app-contracts
+make test-sync
+make test-ai-regression
+make test-refactor-regressions
 
 # E2E on browsers that run well on the host
 make test-e2e-host ENV=dev
@@ -286,6 +313,24 @@ make test-e2e ENV=dev
 ```
 
 GitHub Actions uses the same split as `make test-e2e-all`: `chromium` and `Mobile Chrome` run on the standard Ubuntu runner, while `webkit` and `Mobile Safari` run inside the Playwright Docker image. Configure `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD` as repository secrets before enabling the workflow.
+
+### Refactor Workflow
+
+Use the narrower regression targets before running the full suite when a change is intended to keep UI and API behavior stable.
+
+```bash
+# Backend CRUD, sharing, settings, and admin contracts
+make test-app-contracts
+
+# Frontend sync and offline behavior
+make test-sync
+
+# Backend AI behavior
+make test-ai-regression
+
+# Combined guardrail for internal refactors
+make test-refactor-regressions
+```
 
 ### Notes
 

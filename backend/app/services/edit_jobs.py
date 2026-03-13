@@ -10,9 +10,14 @@ from fastapi import BackgroundTasks
 from sqlmodel import Session
 
 from app.database import get_dsql_engine
-from app.models import DEFAULT_LLM_MODEL_ID, AIEditJob, UserSettings
-from app.services import AIService, AIServiceTimeoutError, get_ai_service
-from app.services.token_usage import check_limit, record_usage
+from app.models import AIEditJob
+from app.services import AIService, get_ai_service
+from app.services.ai_application_service import (
+    AI_EDIT_JOB_TIMEOUT_MESSAGE,
+    AIApplicationService,
+    AIApplicationTimeoutError,
+    AITokenLimitExceededError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +27,6 @@ EDIT_JOB_TOPIC_ARN_ENV = "AI_EDIT_JOB_TOPIC_ARN"
 
 def _get_session() -> Session:
     return Session(get_dsql_engine())
-
-
-def _get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
-    settings = session.get(UserSettings, user_id)
-    if settings:
-        return settings.llm_model_id, settings.language
-    return DEFAULT_LLM_MODEL_ID, "auto"
 
 
 async def dispatch_edit_job(
@@ -76,29 +74,26 @@ async def process_edit_job(
         session.commit()
 
         try:
-            if not check_limit(session, job.user_id):
-                raise RuntimeError(
-                    "Monthly token limit exceeded. Your usage will reset at the beginning of next month."
-                )
-
-            model_id, language = _get_user_settings(session, job.user_id)
-            edited_content, tokens_used = await ai_service.edit(
+            application_service = AIApplicationService(
+                session=session,
+                user_id=job.user_id,
+                ai_service=ai_service,
+            )
+            edited_content, tokens_used = await application_service.execute_edit(
                 content=job.content,
                 instruction=job.instruction,
-                model_id=model_id,
-                language=language,
             )
-
-            if tokens_used > 0:
-                record_usage(session, job.user_id, tokens_used)
 
             job.status = "completed"
             job.edited_content = edited_content
             job.tokens_used = tokens_used
             job.error_message = None
-        except AIServiceTimeoutError:
+        except AIApplicationTimeoutError:
             job.status = "failed"
-            job.error_message = "AI request timed out. Try editing a smaller section."
+            job.error_message = AI_EDIT_JOB_TIMEOUT_MESSAGE
+        except AITokenLimitExceededError as exc:
+            job.status = "failed"
+            job.error_message = str(exc)
         except Exception as exc:
             logger.exception("AI edit job %s failed", job_id)
             job.status = "failed"

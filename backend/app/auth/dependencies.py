@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -8,31 +7,14 @@ from jose import JWTError
 from sqlmodel import Session, SQLModel
 
 from app.auth.cognito import cognito_verifier
-from app.config import get_settings
 from app.database import get_session
-from app.db_commit import commit_with_retry
 from app.models import AppUser
-from app.models.app_user import APP_USER_TOUCH_INTERVAL
+from app.services.app_user_service import AppUserService
 
 # Bearer token security scheme
 security = HTTPBearer()
-settings = get_settings()
-APP_USER_COMMIT_MAX_RETRIES = 3
 
 # Type variable for models with user_id attribute
-
-
-def _commit_app_user(session: Session, app_user: AppUser) -> AppUser:
-    session.add(app_user)
-    existing_user = commit_with_retry(
-        session,
-        max_retries=APP_USER_COMMIT_MAX_RETRIES,
-        recovery=lambda: session.get(AppUser, app_user.user_id),
-    )
-    if existing_user is not None:
-        return existing_user
-    session.refresh(app_user)
-    return app_user
 
 
 async def get_current_user(
@@ -63,16 +45,6 @@ async def get_current_user(
         )
 
 
-def _should_bootstrap_admin(claims: dict) -> bool:
-    user_id = claims.get("sub", "")
-    email = (claims.get("email") or "").lower()
-    if settings.environment == "dev" and user_id.startswith("integration-test-user-id"):
-        return True
-    return user_id in settings.bootstrap_admin_user_id_list or email in {
-        item.lower() for item in settings.bootstrap_admin_email_list
-    }
-
-
 def get_current_app_user(
     current_user: Annotated[dict, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
@@ -85,42 +57,7 @@ def get_current_app_user(
             detail="Missing user subject",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    email = current_user.get("email")
-    display_name = current_user.get("name") or current_user.get("username")
-    now = datetime.now(UTC)
-    app_user = session.get(AppUser, user_id)
-
-    if app_user is None:
-        app_user = AppUser(
-            user_id=user_id,
-            email=email,
-            display_name=display_name,
-            admin=_should_bootstrap_admin(current_user),
-            last_seen_at=now,
-        )
-        return _commit_app_user(session, app_user)
-
-    changed = False
-    if email and app_user.email != email:
-        app_user.email = email
-        changed = True
-    if display_name and app_user.display_name != display_name:
-        app_user.display_name = display_name
-        changed = True
-    if _should_bootstrap_admin(current_user) and not app_user.admin:
-        app_user.admin = True
-        changed = True
-    last_seen_at = app_user.last_seen_at
-    if last_seen_at.tzinfo is None:
-        last_seen_at = last_seen_at.replace(tzinfo=UTC)
-    if now - last_seen_at >= APP_USER_TOUCH_INTERVAL:
-        app_user.last_seen_at = now
-        changed = True
-    if changed:
-        app_user.updated_at = now
-        app_user = _commit_app_user(session, app_user)
-    return app_user
+    return AppUserService(session).ensure_app_user(current_user)
 
 
 def get_user_id(app_user: Annotated[AppUser, Depends(get_current_app_user)]) -> str:

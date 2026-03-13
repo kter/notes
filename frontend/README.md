@@ -1,50 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Notes Frontend
 
-## Getting Started
+Next.js App Router frontend for the Notes application.
 
-First, run the development server:
+## Responsibilities
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- authenticated workspace composition
+- local note editing and optimistic updates
+- offline persistence with IndexedDB
+- debounced note sync and pending queue handling
+- AI chat and edit interactions
+- admin and shared-note surfaces
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Current Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `src/app`: route entry points
+- `src/components/workspace`: authenticated workspace composition
+- `src/hooks/workspace`: workspace-level orchestration
+- `src/lib/sync`: note sync engine and sync helpers
+- `src/hooks`: UI-facing hooks that bind app state to components
+- `src/locales`: user-facing text definitions
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Frontend Boundaries
 
-## Learn More
+- Keep user-facing text in i18n files, not inline in components or hooks.
+- Keep page files thin; workspace orchestration belongs in hooks/components under `workspace`.
+- Keep sync protocol details in `src/lib/sync` or `src/lib/syncQueue`, not directly in page components.
+- When adding tests for internal refactors, prefer focused regression coverage for workspace state and sync behavior.
 
-To learn more about Next.js, take a look at the following resources:
+## Common Workflows
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Testing
-
-### E2E Tests
-Run E2E tests against specific environments:
+Run frontend commands from the repository root unless you are debugging locally.
 
 ```bash
-# Connect to dev environment
-E2E_TARGET=dev npx playwright test
+# Frontend unit tests
+make test-frontend
 
-# Connect to prd environment
-E2E_TARGET=prd npx playwright test
+# Sync/offline regression checks
+make test-sync
+
+# Frontend lint
+make lint-frontend
+
+# Frontend dev server
+make dev-frontend
 ```
 
+## Environment
+
+Required local environment variables:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_ENVIRONMENT=dev
+```
+
+For E2E:
+
+```env
+E2E_TEST_USER_EMAIL=your-test-user@example.com
+E2E_TEST_USER_PASSWORD=YourTestPassword123!
+```
+
+Additional E2E setup details live in [`frontend/docs/E2E_CREDENTIALS.md`](/home/ttakahashi/workspace/notes/frontend/docs/E2E_CREDENTIALS.md).

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.bootstrap import RequestDatabaseInitializer
 from app.config import get_settings
 from app.database import create_db_and_tables, get_session
 from app.observability import init_sentry
@@ -48,19 +49,17 @@ app.include_router(share.router, prefix="/api", tags=["share"])
 app.include_router(admin.router)
 
 
-_db_initialized = False
+database_initializer = RequestDatabaseInitializer(create_db_and_tables)
 
 
 @app.middleware("http")
 async def db_init_middleware(request: Request, call_next):
     """Ensure database migrations have run on the first request."""
-    global _db_initialized
-    if get_session in app.dependency_overrides:
-        return await call_next(request)
-
-    if not _db_initialized and not request.url.path.endswith("/health"):
-        create_db_and_tables()
-        _db_initialized = True
+    database_initializer.ensure_ready(
+        path=request.url.path,
+        dependency_overrides=app.dependency_overrides,
+        session_dependency=get_session,
+    )
     return await call_next(request)
 
 

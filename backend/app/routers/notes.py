@@ -1,6 +1,6 @@
 import io
 import zipfile
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -9,88 +9,64 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.auth import UserId
-from app.auth.dependencies import get_owned_resource
 from app.database import get_session
-from app.db_commit import commit_with_error_handling
 from app.models import Folder, Note, NoteCreate, NoteRead, NoteUpdate
+from app.services.note_service import NoteService
 
 router = APIRouter()
 
 
+def get_note_service(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> NoteService:
+    return NoteService(session, user_id)
+
+
 @router.get("", response_model=list[NoteRead])
 def list_notes(
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[NoteService, Depends(get_note_service)],
     folder_id: UUID | None = Query(default=None),
 ):
     """List notes for the current user, optionally filtered by folder."""
-    statement = select(Note).where(Note.user_id == user_id)
-
-    if folder_id is not None:
-        statement = statement.where(Note.folder_id == folder_id)
-
-    statement = statement.order_by(Note.updated_at.desc())
-    notes = session.exec(statement).all()
-    return notes
+    return service.list_notes(folder_id)
 
 
 @router.post("", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
 def create_note(
     note_in: NoteCreate,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[NoteService, Depends(get_note_service)],
 ):
     """Create a new note."""
-    note = Note(**note_in.model_dump(), user_id=user_id)
-    session.add(note)
-    commit_with_error_handling(session, "Note")
-    session.refresh(note)
-    return note
+    return service.create_note(note_in)
 
 
 @router.get("/{note_id}", response_model=NoteRead)
 def get_note(
     note_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[NoteService, Depends(get_note_service)],
 ):
     """Get a specific note by ID."""
-    note = get_owned_resource(session, Note, note_id, user_id, "Note")
-    return note
+    return service.get_note(note_id)
 
 
 @router.patch("/{note_id}", response_model=NoteRead)
 def update_note(
     note_id: UUID,
     note_in: NoteUpdate,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[NoteService, Depends(get_note_service)],
 ):
     """Update a note."""
-    note = get_owned_resource(session, Note, note_id, user_id, "Note")
-
-    update_data = note_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(note, key, value)
-
-    note.updated_at = datetime.now(UTC)
-    session.add(note)
-    commit_with_error_handling(session, "Note")
-    session.refresh(note)
-    return note
+    return service.update_note(note_id, note_in)
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_note(
     note_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[NoteService, Depends(get_note_service)],
 ):
     """Delete a note."""
-    note = get_owned_resource(session, Note, note_id, user_id, "Note")
-
-    session.delete(note)
-    commit_with_error_handling(session, "Note")
+    service.delete_note(note_id)
 
 
 @router.get("/export/all")

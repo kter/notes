@@ -143,6 +143,19 @@ describe('EditorPanel', () => {
     expect(screen.getByText('common.loading')).toBeInTheDocument()
   })
 
+  it('displays translated remote failure status', () => {
+    const props = {
+        ...defaultProps,
+        syncStatus: {
+          ...defaultProps.syncStatus,
+          remote: 'failed' as const,
+          lastError: 'sync.serverSyncFailed',
+        }
+    }
+    render(<EditorPanel {...props} />)
+    expect(screen.getByText('sync.failedSavedLocally')).toBeInTheDocument()
+  })
+
   it('displays unsaved status', () => {
      // Strictly mismatch logic relies on savedHash vs calculated hash.
      // Loosely mismatch relies on remoteStatus === 'unsynced'.
@@ -535,4 +548,3 @@ describe('EditorPanel', () => {
     })
   })
 })
-

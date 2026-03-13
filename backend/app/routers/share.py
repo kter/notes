@@ -1,19 +1,30 @@
 """Share router for public note sharing."""
 
-from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, status
+from sqlmodel import Session
 
 from app.auth import UserId
-from app.auth.dependencies import get_owned_resource
 from app.database import get_session
-from app.db_commit import commit_with_error_handling
-from app.models import Note, NoteShare, NoteShareRead, SharedNoteRead
+from app.models import NoteShareRead, SharedNoteRead
+from app.services.share_service import ShareService
 
 router = APIRouter()
+
+
+def get_share_service(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> ShareService:
+    return ShareService(session, user_id)
+
+
+def get_public_share_service(
+    session: Annotated[Session, Depends(get_session)],
+) -> ShareService:
+    return ShareService(session)
 
 
 # ----- Authenticated Endpoints -----
@@ -26,64 +37,28 @@ router = APIRouter()
 )
 def create_share(
     note_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[ShareService, Depends(get_share_service)],
 ):
     """Create a share link for a note. Only the note owner can share."""
-    # Verify ownership
-    get_owned_resource(session, Note, note_id, user_id, "Note")
-
-    # Check if share already exists
-    existing = session.exec(
-        select(NoteShare).where(NoteShare.note_id == note_id)
-    ).first()
-
-    if existing:
-        return existing
-
-    # Create new share
-    share = NoteShare(note_id=note_id)
-    session.add(share)
-    commit_with_error_handling(session, "NoteShare")
-    session.refresh(share)
-    return share
+    return service.create_share(note_id)
 
 
 @router.get("/notes/{note_id}/share", response_model=NoteShareRead | None)
 def get_share(
     note_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[ShareService, Depends(get_share_service)],
 ):
     """Get the share info for a note. Returns null if not shared."""
-    # Verify ownership
-    get_owned_resource(session, Note, note_id, user_id, "Note")
-
-    share = session.exec(select(NoteShare).where(NoteShare.note_id == note_id)).first()
-
-    return share
+    return service.get_share(note_id)
 
 
 @router.delete("/notes/{note_id}/share", status_code=status.HTTP_204_NO_CONTENT)
 def delete_share(
     note_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[ShareService, Depends(get_share_service)],
 ):
     """Revoke a share link for a note."""
-    # Verify ownership
-    get_owned_resource(session, Note, note_id, user_id, "Note")
-
-    share = session.exec(select(NoteShare).where(NoteShare.note_id == note_id)).first()
-
-    if not share:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Share not found",
-        )
-
-    session.delete(share)
-    commit_with_error_handling(session, "NoteShare")
+    service.delete_share(note_id)
 
 
 # ----- Public Endpoint (No Auth Required) -----
@@ -92,37 +67,7 @@ def delete_share(
 @router.get("/shared/{token}", response_model=SharedNoteRead)
 def get_shared_note(
     token: UUID,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[ShareService, Depends(get_public_share_service)],
 ):
     """Get a shared note by its token. No authentication required."""
-    # Find the share record
-    share = session.exec(
-        select(NoteShare).where(NoteShare.share_token == token)
-    ).first()
-
-    if not share:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shared note not found",
-        )
-
-    # Check expiration
-    if share.expires_at and share.expires_at < datetime.now(UTC):
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Share link has expired",
-        )
-
-    # Get the note
-    note = session.get(Note, share.note_id)
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shared note not found",
-        )
-
-    return SharedNoteRead(
-        title=note.title,
-        content=note.content,
-        updated_at=note.updated_at,
-    )
+    return service.get_shared_note(token)

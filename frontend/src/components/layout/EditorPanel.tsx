@@ -649,13 +649,13 @@ export function EditorPanel({
   if (isSaving) {
     statusIcon = <Loader2Icon className="h-3 w-3 animate-spin" />;
     statusText = t("common.loading");
-    statusTooltip = "リモートに保存中...";
+    statusTooltip = t("sync.savingRemote");
     statusColorClass = "text-muted-foreground";
   } else if (remoteStatus === 'failed') {
     // Remote Failed
     statusIcon = <CheckIcon className="h-3 w-3" />;
-    statusText = "Failed (Saved locally)";
-    statusTooltip = "ローカルには保存されましたが、リモートへの保存に失敗しました";
+    statusText = t("sync.failedSavedLocally");
+    statusTooltip = t("sync.remoteSaveFailed");
     statusColorClass = "text-orange-500";
   } else if (isStrictlyMismatch || isLooselyMismatch) {
     // Unsaved state (Strict or Loose)
@@ -667,7 +667,7 @@ export function EditorPanel({
     // Default / Success / Verified
     statusIcon = <CheckIcon className="h-3 w-3" />;
     statusText = t("common.saved");
-    statusTooltip = "保存済み (検証完了)";
+    statusTooltip = t("sync.savedVerified");
     statusColorClass = "text-green-500";
   }
 

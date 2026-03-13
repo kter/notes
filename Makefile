@@ -315,6 +315,21 @@ test: test-backend test-frontend test-lint ## Run the default fast suite: backen
 .PHONY: test-unit
 test-unit: test-backend test-frontend test-mcp-lambda-unit test-auth-manager-unit ## Run all unit tests across backend, frontend, and Lambda packages
 
+.PHONY: test-app-contracts
+test-app-contracts: ## Run high-value backend API contract regressions
+	cd backend && uv run --extra dev python -m pytest tests/test_notes.py tests/test_folders.py tests/test_settings.py tests/test_share.py tests/test_admin.py -q --tb=short
+
+.PHONY: test-sync
+test-sync: ## Run frontend sync and offline regression tests
+	cd frontend && npm run test -- --run src/hooks/useHomeData.test.ts src/hooks/useNotes.test.ts src/hooks/useOfflineSync.test.ts src/lib/syncQueue.test.ts src/lib/merge.test.ts
+
+.PHONY: test-ai-regression
+test-ai-regression: ## Run backend AI regression tests
+	cd backend && uv run --extra dev python -m pytest tests/test_ai.py tests/test_token_usage.py tests/test_edit_jobs.py -q --tb=short
+
+.PHONY: test-refactor-regressions
+test-refactor-regressions: test-app-contracts test-sync test-ai-regression ## Run the focused regression suite used before and after internal refactors
+
 .PHONY: stop-hook-unit-tests
 stop-hook-unit-tests: ## Run unit tests only for changed app surfaces from Claude/Codex Stop hooks
 	@targets="$$(./scripts/changed_unit_test_targets.sh)"; \

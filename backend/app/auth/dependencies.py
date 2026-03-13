@@ -10,6 +10,7 @@ from app.auth.cognito import cognito_verifier
 from app.database import get_session
 from app.models import AppUser
 from app.services.app_user_service import AppUserService
+from app.shared import NotFound
 
 # Bearer token security scheme
 security = HTTPBearer()
@@ -98,14 +99,11 @@ def get_owned_resource[T: SQLModel](
         The resource if found and owned by the user
 
     Raises:
-        HTTPException: 404 if resource not found or not owned by user
+        NotFound: If the resource is missing or not owned by the user
     """
     resource = session.get(model, resource_id)
     if not resource or resource.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{resource_name} not found",
-        )
+        raise NotFound(f"{resource_name} not found")
     return resource
 
 

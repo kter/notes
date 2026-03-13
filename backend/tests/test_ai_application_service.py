@@ -1,5 +1,4 @@
 import pytest
-from fastapi import HTTPException
 from sqlmodel import Session
 
 from app.models import AIEditJob, Note, UserSettings
@@ -9,6 +8,7 @@ from app.services.ai_application_service import (
     AITokenLimitExceededError,
 )
 from app.services.token_usage import get_usage_info, record_usage
+from app.shared import NotFound
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID
 
 
@@ -122,7 +122,7 @@ def test_get_edit_job_enforces_user_scope(session: Session):
 
     service = AIApplicationService(session, TEST_USER_ID)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(NotFound) as exc_info:
         service.get_edit_job(job.id)
 
-    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Edit job not found"

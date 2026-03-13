@@ -1,7 +1,6 @@
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlmodel import Session
 
 from app.auth.dependencies import get_owned_resource
@@ -16,6 +15,7 @@ from app.models.enums import ChatScope
 from app.services import AIService, AIServiceTimeoutError
 from app.services.context import ContextService
 from app.services.token_usage import check_limit, record_usage
+from app.shared import NotFound, ValidationFailed
 
 TOKEN_LIMIT_EXCEEDED_MESSAGE = "Monthly token limit exceeded. Your usage will reset at the beginning of next month."
 AI_TIMEOUT_MESSAGE = (
@@ -116,10 +116,7 @@ class AIApplicationService:
     def get_edit_job(self, job_id: UUID) -> AIEditJob:
         job = self.session.get(AIEditJob, job_id)
         if job is None or job.user_id != self.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Edit job not found",
-            )
+            raise NotFound("Edit job not found")
         return job
 
     def get_user_settings(self) -> tuple[str, str]:
@@ -168,7 +165,4 @@ class AIApplicationService:
     @staticmethod
     def _require_non_empty(value: str, detail: str) -> None:
         if not value.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=detail,
-            )
+            raise ValidationFailed(detail)

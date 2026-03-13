@@ -1,13 +1,13 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from app.auth import UserId
 from app.auth.dependencies import get_owned_resource
 from app.models import Folder, Note
 from app.models.enums import ChatScope
+from app.shared import ValidationFailed
 
 
 class ContextService:
@@ -27,18 +27,12 @@ class ContextService:
         content = ""
         if scope == ChatScope.NOTE:
             if not note_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="note_id is required for note scope",
-                )
+                raise ValidationFailed("note_id is required for note scope")
             note = get_owned_resource(self.session, Note, note_id, self.user_id, "Note")
             content = note.content
         elif scope == ChatScope.FOLDER:
             if not folder_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="folder_id is required for folder scope",
-                )
+                raise ValidationFailed("folder_id is required for folder scope")
             # Validate folder ownership
             get_owned_resource(self.session, Folder, folder_id, self.user_id, "Folder")
 
@@ -56,15 +50,9 @@ class ContextService:
             notes = self.session.exec(statement).all()
             content = self._format_notes(notes)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid scope: {scope}",
-            )
+            raise ValidationFailed(f"Invalid scope: {scope}")
 
         if not content.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Context content is empty",
-            )
+            raise ValidationFailed("Context content is empty")
 
         return content

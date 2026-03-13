@@ -24,6 +24,7 @@ export function AuthenticatedWorkspace({
 }: AuthenticatedWorkspaceProps) {
   const { t } = useTranslation();
   const workspace = useWorkspaceState(true);
+  const pendingEditEntry = workspace.pendingEditEntry;
 
   if (workspace.isDataLoading) {
     return (
@@ -112,20 +113,15 @@ export function AuthenticatedWorkspace({
               tokenUsage={workspace.tokenUsage}
               onContentChange={workspace.handleEditorContentChange}
               contentOverride={workspace.contentOverride}
-              pendingEditProposal={
-                workspace.pendingEditEntry?.message.editProposal ?? null
-              }
+              pendingEditProposal={pendingEditEntry?.message.editProposal ?? null}
               onAcceptEdit={
-                workspace.pendingEditEntry
-                  ? () =>
-                      workspace.handleAcceptEditAndApply(
-                        workspace.pendingEditEntry.index
-                      )
+                pendingEditEntry
+                  ? () => workspace.handleAcceptEditAndApply(pendingEditEntry.index)
                   : undefined
               }
               onRejectEdit={
-                workspace.pendingEditEntry
-                  ? () => workspace.handleRejectEdit(workspace.pendingEditEntry.index)
+                pendingEditEntry
+                  ? () => workspace.handleRejectEdit(pendingEditEntry.index)
                   : undefined
               }
             />

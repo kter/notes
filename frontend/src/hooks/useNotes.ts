@@ -4,6 +4,8 @@ import type { Note } from "@/types";
 import { useNoteSyncEngine } from "@/lib/sync";
 import type { SyncStatus } from "@/lib/sync";
 
+export type { SyncStatus } from "@/lib/sync";
+
 interface UseNotesReturn {
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;

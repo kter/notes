@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 
-from fastapi import HTTPException, status
 from sqlmodel import Session
 
 from app.db_commit import commit_with_error_handling
@@ -14,6 +13,7 @@ from app.models import (
     UserSettings,
     UserSettingsUpdate,
 )
+from app.shared import ValidationFailed
 
 
 class SettingsService:
@@ -51,18 +51,16 @@ class SettingsService:
             if settings_in.llm_model_id is not None:
                 valid_ids = [model["id"] for model in AVAILABLE_MODELS]
                 if settings_in.llm_model_id not in valid_ids:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid model ID. Must be one of: {valid_ids}",
+                    raise ValidationFailed(
+                        f"Invalid model ID. Must be one of: {valid_ids}"
                     )
                 settings.llm_model_id = settings_in.llm_model_id
 
             if settings_in.language is not None:
                 valid_langs = [language["id"] for language in AVAILABLE_LANGUAGES]
                 if settings_in.language not in valid_langs:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid language. Must be one of: {valid_langs}",
+                    raise ValidationFailed(
+                        f"Invalid language. Must be one of: {valid_langs}"
                     )
                 settings.language = settings_in.language
 

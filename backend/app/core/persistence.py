@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 from typing import TypeVar
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlmodel import Session, SQLModel
 
 from app.db_commit import commit_with_error_handling
+from app.shared import NotFound
 
 TModel = TypeVar("TModel", bound=SQLModel)
 
@@ -34,10 +34,7 @@ class UserScopedRepository[TModel: SQLModel]:
     def get_owned(self, resource_id: UUID) -> TModel:
         resource = self.session.get(self.model, resource_id)
         if resource is None or getattr(resource, "user_id", None) != self.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"{self.resource_name} not found",
-            )
+            raise NotFound(f"{self.resource_name} not found")
         return resource
 
     def save(

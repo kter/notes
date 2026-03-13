@@ -2,12 +2,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.bootstrap import RequestDatabaseInitializer
 from app.config import get_settings
 from app.database import create_db_and_tables, get_session
+from app.http_errors import to_http_exception
 from app.observability import init_sentry
 from app.routers import admin, ai, folders, images, mcp, notes, settings, share
+from app.shared import DomainError
 
 settings_app = get_settings()
 init_sentry(with_fastapi=True)
@@ -47,6 +50,16 @@ app.include_router(mcp.router)
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(share.router, prefix="/api", tags=["share"])
 app.include_router(admin.router)
+
+
+@app.exception_handler(DomainError)
+async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
+    http_error = to_http_exception(exc)
+    return JSONResponse(
+        status_code=http_error.status_code,
+        content={"detail": http_error.detail},
+        headers=http_error.headers,
+    )
 
 
 database_initializer = RequestDatabaseInitializer(create_db_and_tables)

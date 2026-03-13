@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
-from app.auth.dependencies import get_owned_resource
 from app.db_commit import commit_with_error_handling
 from app.models import Note, NoteShare, SharedNoteRead
+from app.repositories.note_repository import NoteRepository
+from app.shared import NotFound, ShareExpired, ValidationFailed
 
 
 class ShareService:
@@ -15,6 +15,9 @@ class ShareService:
     def __init__(self, session: Session, user_id: str | None = None):
         self.session = session
         self.user_id = user_id
+        self.note_repository = (
+            NoteRepository(session, user_id) if user_id is not None else None
+        )
 
     def create_share(self, note_id: UUID) -> NoteShare:
         self._ensure_owned_note(note_id)
@@ -43,10 +46,7 @@ class ShareService:
             select(NoteShare).where(NoteShare.note_id == note_id)
         ).first()
         if share is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Share not found",
-            )
+            raise NotFound("Share not found")
 
         self.session.delete(share)
         commit_with_error_handling(self.session, "NoteShare")
@@ -56,23 +56,14 @@ class ShareService:
             select(NoteShare).where(NoteShare.share_token == token)
         ).first()
         if share is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Shared note not found",
-            )
+            raise NotFound("Shared note not found")
 
         if share.expires_at and share.expires_at < datetime.now(UTC):
-            raise HTTPException(
-                status_code=status.HTTP_410_GONE,
-                detail="Share link has expired",
-            )
+            raise ShareExpired("Share link has expired")
 
         note = self.session.get(Note, share.note_id)
         if note is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Shared note not found",
-            )
+            raise NotFound("Shared note not found")
 
         return SharedNoteRead(
             title=note.title,
@@ -81,6 +72,6 @@ class ShareService:
         )
 
     def _ensure_owned_note(self, note_id: UUID) -> Note:
-        if self.user_id is None:
-            raise RuntimeError("user_id is required for authenticated share flows")
-        return get_owned_resource(self.session, Note, note_id, self.user_id, "Note")
+        if self.note_repository is None:
+            raise ValidationFailed("user_id is required for authenticated share flows")
+        return self.note_repository.get_owned(note_id)

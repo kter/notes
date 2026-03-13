@@ -219,6 +219,13 @@ export const ja = {
     syncComplete: "同期完了",
     syncError: "同期エラー",
     savedLocally: "ローカルに保存",
+    savingRemote: "リモートに保存中...",
+    failedSavedLocally: "同期失敗（ローカル保存済み）",
+    remoteSaveFailed: "ローカルには保存されましたが、リモートへの保存に失敗しました",
+    savedVerified: "保存済み（検証完了）",
+    serverSyncFailed: "サーバー同期に失敗しました",
+    offlineSyncUnavailable: "オフラインのため同期できません",
+    localSaveFailed: "ローカル保存に失敗しました",
   },
 
   // Share
@@ -440,6 +447,13 @@ export type TranslationKeys = {
     syncComplete: string;
     syncError: string;
     savedLocally: string;
+    savingRemote: string;
+    failedSavedLocally: string;
+    remoteSaveFailed: string;
+    savedVerified: string;
+    serverSyncFailed: string;
+    offlineSyncUnavailable: string;
+    localSaveFailed: string;
   };
   share: {
     title: string;

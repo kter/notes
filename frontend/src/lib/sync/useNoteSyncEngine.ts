@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import { useTranslation } from "@/hooks/useTranslation";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
@@ -40,6 +41,7 @@ export function useNoteSyncEngine({
   setSelectedNoteId,
 }: NoteSyncEngineParams): NoteSyncEngineResult {
   const { getApi } = useApi();
+  const { t } = useTranslation();
   const [localStatus, setLocalStatus] = useState<LocalSyncStatus>("saved");
   const [remoteStatus, setRemoteStatus] = useState<RemoteSyncStatus>("synced");
   const [lastError, setLastError] = useState<string | undefined>(undefined);
@@ -75,7 +77,7 @@ export function useNoteSyncEngine({
             console.error("Failed to sync note to server:", error);
             await syncQueue.addChange("update", "note", id, updates);
             setRemoteStatus("failed");
-            setLastError("サーバー同期に失敗しました");
+            setLastError(t("sync.serverSyncFailed"));
           } finally {
             if (activeSavePromiseRef.current === currentPromise) {
               activeSavePromiseRef.current = null;
@@ -91,9 +93,9 @@ export function useNoteSyncEngine({
 
       await syncQueue.addChange("update", "note", id, updates);
       setRemoteStatus("failed");
-      setLastError("オフラインのため同期できません");
+      setLastError(t("sync.offlineSyncUnavailable"));
     },
-    [getApi, setNotes]
+    [getApi, setNotes, t]
   );
 
   const {
@@ -188,13 +190,13 @@ export function useNoteSyncEngine({
       } catch (error) {
         console.error("Failed to save locally", error);
         setLocalStatus("failed");
-        setLastError("ローカル保存に失敗しました");
+        setLastError(t("sync.localSaveFailed"));
       }
 
       setRemoteStatus("unsynced");
       debouncedServerSync(id, updates);
     },
-    [debouncedServerSync, setNotes]
+    [debouncedServerSync, setNotes, t]
   );
 
   const handleDeleteNote = useCallback(

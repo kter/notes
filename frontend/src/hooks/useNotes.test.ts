@@ -8,10 +8,19 @@ import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";
 
 const getApiMock = vi.fn();
+const translationMap = {
+  "sync.offlineSyncUnavailable": "Cannot sync while offline",
+} as const;
 
 vi.mock("./useApi", () => ({
   useApi: () => ({
     getApi: getApiMock,
+  }),
+}));
+
+vi.mock("@/hooks/useTranslation", () => ({
+  useTranslation: () => ({
+    t: (key: keyof typeof translationMap) => translationMap[key] ?? key,
   }),
 }));
 
@@ -174,7 +183,7 @@ describe("useNotes", () => {
       content: "Offline update",
     });
     expect(result.current.syncStatus.remote).toBe("failed");
-    expect(result.current.syncStatus.lastError).toBe("オフラインのため同期できません");
+    expect(result.current.syncStatus.lastError).toBe("Cannot sync while offline");
 
     vi.useRealTimers();
   });

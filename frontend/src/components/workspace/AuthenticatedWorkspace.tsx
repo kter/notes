@@ -10,6 +10,7 @@ import {
 } from "@/components/layout";
 import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
 import { WorkspaceSidebarFooter } from "@/components/workspace/WorkspaceSidebarFooter";
+import { useTranslation } from "@/hooks";
 import { useWorkspaceState } from "@/hooks/workspace/useWorkspaceState";
 
 interface AuthenticatedWorkspaceProps {
@@ -21,12 +22,13 @@ export function AuthenticatedWorkspace({
   userEmail,
   onSignOut,
 }: AuthenticatedWorkspaceProps) {
+  const { t } = useTranslation();
   const workspace = useWorkspaceState(true);
 
   if (workspace.isDataLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="text-muted-foreground">{t("common.loading")}</div>
       </div>
     );
   }

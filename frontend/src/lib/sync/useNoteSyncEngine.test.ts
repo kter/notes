@@ -8,10 +8,21 @@ import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";
 
 const getApiMock = vi.fn();
+const translationMap = {
+  "sync.serverSyncFailed": "Failed to sync with the server",
+  "sync.offlineSyncUnavailable": "Cannot sync while offline",
+  "sync.localSaveFailed": "Failed to save locally",
+} as const;
 
 vi.mock("@/hooks/useApi", () => ({
   useApi: () => ({
     getApi: getApiMock,
+  }),
+}));
+
+vi.mock("@/hooks/useTranslation", () => ({
+  useTranslation: () => ({
+    t: (key: keyof typeof translationMap) => translationMap[key] ?? key,
   }),
 }));
 
@@ -135,7 +146,26 @@ describe("useNoteSyncEngine", () => {
       content: "Offline update",
     });
     expect(result.current.syncStatus.remote).toBe("failed");
+    expect(result.current.syncStatus.lastError).toBe("Cannot sync while offline");
 
     vi.useRealTimers();
+  });
+
+  it("surfaces translated local save failures", async () => {
+    const initialNote = buildNote();
+    vi.mocked(notesDB.saveNote).mockRejectedValueOnce(new Error("indexeddb unavailable"));
+
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, {
+        content: "Offline update",
+      });
+    });
+
+    expect(result.current.syncStatus.local).toBe("failed");
+    expect(result.current.syncStatus.lastError).toBe("Failed to save locally");
   });
 });

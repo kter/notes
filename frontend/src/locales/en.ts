@@ -219,6 +219,13 @@ export const en = {
     syncComplete: "Sync complete",
     syncError: "Sync error",
     savedLocally: "Saved locally",
+    savingRemote: "Saving to remote...",
+    failedSavedLocally: "Sync failed (saved locally)",
+    remoteSaveFailed: "Changes were saved locally, but saving to remote failed",
+    savedVerified: "Saved (verified)",
+    serverSyncFailed: "Failed to sync with the server",
+    offlineSyncUnavailable: "Cannot sync while offline",
+    localSaveFailed: "Failed to save locally",
   },
 
   // Share
@@ -443,6 +450,13 @@ export type TranslationKeys = {
     syncComplete: string;
     syncError: string;
     savedLocally: string;
+    savingRemote: string;
+    failedSavedLocally: string;
+    remoteSaveFailed: string;
+    savedVerified: string;
+    serverSyncFailed: string;
+    offlineSyncUnavailable: string;
+    localSaveFailed: string;
   };
   share: {
     title: string;

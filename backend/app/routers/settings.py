@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -7,19 +6,14 @@ from sqlmodel import Session
 
 from app.auth import UserId
 from app.database import get_session
-from app.db_commit import commit_with_error_handling
 from app.models import (
-    AVAILABLE_LANGUAGES,
-    AVAILABLE_MODELS,
-    DEFAULT_LANGUAGE,
-    DEFAULT_LLM_MODEL_ID,
     AvailableLanguage,
     AvailableModel,
     TokenUsageRead,
-    UserSettings,
     UserSettingsRead,
     UserSettingsUpdate,
 )
+from app.services.settings_service import SettingsService
 from app.services.token_usage import get_usage_info
 
 router = APIRouter()
@@ -34,26 +28,23 @@ class SettingsResponse(BaseModel):
     token_usage: TokenUsageRead
 
 
+def get_settings_service(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> SettingsService:
+    return SettingsService(session, user_id)
+
+
 @router.get("", response_model=SettingsResponse)
 async def get_settings(
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[SettingsService, Depends(get_settings_service)],
 ):
     """Get user settings. Creates default settings if not exists."""
-    settings = session.get(UserSettings, user_id)
-
-    if not settings:
-        # Create default settings for new user
-        settings = UserSettings(
-            user_id=user_id,
-            llm_model_id=DEFAULT_LLM_MODEL_ID,
-        )
-        session.add(settings)
-        commit_with_error_handling(session, "UserSettings")
-        session.refresh(settings)
+    settings = service.get_or_create_settings()
 
     # Get token usage info
-    token_usage = get_usage_info(session, user_id)
+    token_usage = get_usage_info(service.session, user_id)
 
     return SettingsResponse(
         settings=UserSettingsRead(
@@ -64,8 +55,8 @@ async def get_settings(
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         ),
-        available_models=[AvailableModel(**m) for m in AVAILABLE_MODELS],
-        available_languages=[AvailableLanguage(**lang) for lang in AVAILABLE_LANGUAGES],
+        available_models=service.available_models(),
+        available_languages=service.available_languages(),
         token_usage=token_usage,
     )
 
@@ -74,50 +65,13 @@ async def get_settings(
 async def update_settings(
     settings_in: UserSettingsUpdate,
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[SettingsService, Depends(get_settings_service)],
 ):
     """Update user settings."""
-    settings = session.get(UserSettings, user_id)
-
-    if not settings:
-        # Create new settings
-        settings = UserSettings(
-            user_id=user_id,
-            llm_model_id=settings_in.llm_model_id or DEFAULT_LLM_MODEL_ID,
-            language=settings_in.language or DEFAULT_LANGUAGE,
-        )
-        session.add(settings)
-    else:
-        # Update existing settings
-        if settings_in.llm_model_id is not None:
-            # Validate model_id is in available models
-            valid_ids = [m["id"] for m in AVAILABLE_MODELS]
-            if settings_in.llm_model_id not in valid_ids:
-                from fastapi import HTTPException, status
-
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid model ID. Must be one of: {valid_ids}",
-                )
-            settings.llm_model_id = settings_in.llm_model_id
-        if settings_in.language is not None:
-            # Validate language is in available languages
-            valid_langs = [lang["id"] for lang in AVAILABLE_LANGUAGES]
-            if settings_in.language not in valid_langs:
-                from fastapi import HTTPException, status
-
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid language. Must be one of: {valid_langs}",
-                )
-            settings.language = settings_in.language
-        settings.updated_at = datetime.now(UTC)
-
-    commit_with_error_handling(session, "UserSettings")
-    session.refresh(settings)
+    settings = service.update_settings(settings_in)
 
     # Get token usage info
-    token_usage = get_usage_info(session, user_id)
+    token_usage = get_usage_info(service.session, user_id)
 
     return SettingsResponse(
         settings=UserSettingsRead(
@@ -128,7 +82,7 @@ async def update_settings(
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         ),
-        available_models=[AvailableModel(**m) for m in AVAILABLE_MODELS],
-        available_languages=[AvailableLanguage(**lang) for lang in AVAILABLE_LANGUAGES],
+        available_models=service.available_models(),
+        available_languages=service.available_languages(),
         token_usage=token_usage,
     )

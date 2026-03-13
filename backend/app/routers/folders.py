@@ -1,88 +1,64 @@
-from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.auth import UserId
-from app.auth.dependencies import get_owned_resource
 from app.database import get_session
-from app.db_commit import commit_with_error_handling
-from app.models import Folder, FolderCreate, FolderRead, FolderUpdate
+from app.models import FolderCreate, FolderRead, FolderUpdate
+from app.services.folder_service import FolderService
 
 router = APIRouter()
 
 
+def get_folder_service(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> FolderService:
+    return FolderService(session, user_id)
+
+
 @router.get("", response_model=list[FolderRead])
 def list_folders(
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[FolderService, Depends(get_folder_service)],
 ):
     """List all folders for the current user."""
-    statement = (
-        select(Folder)
-        .where(Folder.user_id == user_id)
-        .order_by(Folder.updated_at.desc())
-    )
-    folders = session.exec(statement).all()
-    return folders
+    return service.list_folders()
 
 
 @router.post("", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
 def create_folder(
     folder_in: FolderCreate,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[FolderService, Depends(get_folder_service)],
 ):
     """Create a new folder."""
-    folder = Folder(**folder_in.model_dump(), user_id=user_id)
-    session.add(folder)
-    commit_with_error_handling(session, "Folder")
-    session.refresh(folder)
-    return folder
+    return service.create_folder(folder_in)
 
 
 @router.get("/{folder_id}", response_model=FolderRead)
 def get_folder(
     folder_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[FolderService, Depends(get_folder_service)],
 ):
     """Get a specific folder by ID."""
-    folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
-    return folder
+    return service.get_folder(folder_id)
 
 
 @router.patch("/{folder_id}", response_model=FolderRead)
 def update_folder(
     folder_id: UUID,
     folder_in: FolderUpdate,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[FolderService, Depends(get_folder_service)],
 ):
     """Update a folder."""
-    folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
-
-    update_data = folder_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(folder, key, value)
-
-    folder.updated_at = datetime.now(UTC)
-    session.add(folder)
-    commit_with_error_handling(session, "Folder")
-    session.refresh(folder)
-    return folder
+    return service.update_folder(folder_id, folder_in)
 
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_folder(
     folder_id: UUID,
-    user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    service: Annotated[FolderService, Depends(get_folder_service)],
 ):
     """Delete a folder."""
-    folder = get_owned_resource(session, Folder, folder_id, user_id, "Folder")
-
-    session.delete(folder)
-    commit_with_error_handling(session, "Folder")
+    service.delete_folder(folder_id)

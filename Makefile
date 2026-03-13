@@ -21,6 +21,7 @@ ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$
 MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
 SENTRY_DSN_PARAMETER_NAME_FRONTEND ?= /notes-app/$(ENV)/sentry-dsn-frontend
 SENTRY_DSN_PARAMETER_NAME_BACKEND ?= /notes-app/$(ENV)/sentry-dsn-backend
+OPTIONAL_SSM_PARAMETER_SCRIPT := ./scripts/get_optional_ssm_parameter.sh
 
 .PHONY: help
 help: ## Show this help
@@ -128,7 +129,7 @@ build-frontend: tf-switch ## Build frontend for production
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
-	SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
+	SENTRY_DSN=$$($(OPTIONAL_SSM_PARAMETER_SCRIPT) "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" "$(AWS_REGION)" "$(AWS_PROFILE)") && \
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
 
 .PHONY: build-frontend-local
@@ -191,7 +192,7 @@ _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
 	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
 	@echo "Building frontend..."
-	@SENTRY_DSN=$$(aws ssm get-parameter --name "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" --with-decryption --region $(AWS_REGION) --profile $(AWS_PROFILE) --query 'Parameter.Value' --output text) && \
+	@SENTRY_DSN=$$($(OPTIONAL_SSM_PARAMETER_SCRIPT) "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" "$(AWS_REGION)" "$(AWS_PROFILE)") && \
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
 	@echo "Syncing frontend files to S3..."
 	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
@@ -377,6 +378,10 @@ test-codex-hooks: ## Verify Codex hook routing
 .PHONY: test-git-hook-helpers
 test-git-hook-helpers: ## Verify helper scripts used by git hooks
 	./scripts/test_changed_unit_test_targets.sh
+
+.PHONY: test-ssm-parameter-helper
+test-ssm-parameter-helper: ## Verify the optional SSM parameter lookup helper
+	./scripts/test_get_optional_ssm_parameter.sh
 
 .PHONY: test-agent-hooks
 test-agent-hooks: test-claude-hooks test-stop-hooks test-codex-hooks ## Verify Claude Code and Codex hook routing

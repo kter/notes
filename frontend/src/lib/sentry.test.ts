@@ -52,4 +52,13 @@ describe("Sentry browser config", () => {
     expect(config.replaysSessionSampleRate).toBe(0.1);
     expect(config.replaysOnErrorSampleRate).toBe(1);
   });
+
+  it("disables Sentry when the browser DSN is not configured", () => {
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+    const config = getSentryBrowserConfig();
+
+    expect(config.enabled).toBe(false);
+    expect(config.dsn).toBeUndefined();
+  });
 });

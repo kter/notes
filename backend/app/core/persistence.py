@@ -1,0 +1,60 @@
+from datetime import UTC, datetime
+from typing import TypeVar
+from uuid import UUID
+
+from fastapi import HTTPException, status
+from sqlmodel import Session, SQLModel
+
+from app.db_commit import commit_with_error_handling
+
+TModel = TypeVar("TModel", bound=SQLModel)
+
+
+def utc_now() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
+
+
+def touch_updated_at(resource: object) -> None:
+    """Update `updated_at` for resources that expose the field."""
+    if hasattr(resource, "updated_at"):
+        setattr(resource, "updated_at", utc_now())
+
+
+class UserScopedRepository[TModel: SQLModel]:
+    """Shared DSQL-friendly repository helpers for user-owned models."""
+
+    model: type[TModel]
+    resource_name: str
+
+    def __init__(self, session: Session, user_id: str):
+        self.session = session
+        self.user_id = user_id
+
+    def get_owned(self, resource_id: UUID) -> TModel:
+        resource = self.session.get(self.model, resource_id)
+        if resource is None or getattr(resource, "user_id", None) != self.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"{self.resource_name} not found",
+            )
+        return resource
+
+    def save(
+        self,
+        resource: TModel,
+        *,
+        touch: bool = False,
+        resource_name: str | None = None,
+    ) -> TModel:
+        if touch:
+            touch_updated_at(resource)
+        self.session.add(resource)
+        commit_with_error_handling(self.session, resource_name or self.resource_name)
+        self.session.refresh(resource)
+        return resource
+
+    def delete_owned(self, resource_id: UUID) -> None:
+        resource = self.get_owned(resource_id)
+        self.session.delete(resource)
+        commit_with_error_handling(self.session, self.resource_name)

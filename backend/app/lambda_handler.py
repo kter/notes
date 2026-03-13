@@ -4,6 +4,7 @@ import logging
 
 from mangum import Mangum
 
+from app.bootstrap import run_cold_start_database_bootstrap
 from app.database import create_db_and_tables
 from app.main import app
 
@@ -11,18 +12,11 @@ from app.main import app
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Run migrations on Lambda cold start
-logger.info("Lambda cold start: initializing database schema...")
-try:
-    create_db_and_tables()
-    logger.info("Lambda cold start: database schema initialization complete")
-except Exception as e:
-    logger.error(
-        f"Lambda cold start: database schema initialization failed: {e}",
-        exc_info=True,
-    )
-    # Re-raise to ensure Lambda reports the error
-    raise
+run_cold_start_database_bootstrap(
+    initialize_database=create_db_and_tables,
+    logger=logger,
+    context_label="Lambda cold start",
+)
 
 # Create Lambda handler
 asgi_handler = Mangum(

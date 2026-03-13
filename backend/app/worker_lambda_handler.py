@@ -2,6 +2,7 @@
 
 import logging
 
+from app.bootstrap import run_cold_start_database_bootstrap
 from app.database import create_db_and_tables
 from app.observability import init_sentry
 from app.services.edit_jobs import run_edit_job_queue_records
@@ -11,16 +12,11 @@ logger.setLevel(logging.INFO)
 
 init_sentry()
 
-logger.info("AI edit worker cold start: initializing database schema...")
-try:
-    create_db_and_tables()
-    logger.info("AI edit worker cold start: database schema initialization complete")
-except Exception as e:
-    logger.error(
-        f"AI edit worker cold start: database schema initialization failed: {e}",
-        exc_info=True,
-    )
-    raise
+run_cold_start_database_bootstrap(
+    initialize_database=create_db_and_tables,
+    logger=logger,
+    context_label="AI edit worker cold start",
+)
 
 
 def handler(event, context):

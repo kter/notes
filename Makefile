@@ -327,6 +327,9 @@ test-sync: ## Run frontend sync and offline regression tests
 test-ai-regression: ## Run backend AI regression tests
 	cd backend && uv run --extra dev python -m pytest tests/test_ai.py tests/test_token_usage.py tests/test_edit_jobs.py -q --tb=short
 
+.PHONY: test-refactor-regressions
+test-refactor-regressions: test-app-contracts test-sync test-ai-regression ## Run the focused regression suite used before and after internal refactors
+
 .PHONY: stop-hook-unit-tests
 stop-hook-unit-tests: ## Run unit tests only for changed app surfaces from Claude/Codex Stop hooks
 	@targets="$$(./scripts/changed_unit_test_targets.sh)"; \

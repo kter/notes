@@ -3,13 +3,12 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.auth.dependencies import get_owned_resource
 from app.features.assistant.context import ContextService
+from app.features.workspace.query_service import WorkspaceQueryService
 from app.models import (
     DEFAULT_LLM_MODEL_ID,
     AIEditJob,
     AIEditJobCreate,
-    Note,
     UserSettings,
 )
 from app.models.enums import ChatScope
@@ -42,9 +41,10 @@ class AIApplicationService:
         self.user_id = user_id
         self.ai_service = ai_service
         self.context_service = ContextService(session, user_id)
+        self.workspace_queries = WorkspaceQueryService(session, user_id)
 
     async def summarize_note(self, note_id: UUID) -> tuple[str, int]:
-        note = get_owned_resource(self.session, Note, note_id, self.user_id, "Note")
+        note = self.workspace_queries.get_owned_note(note_id)
         self._require_non_empty(note.content, "Note content is empty")
         return await self._summarize_content(note.content)
 
@@ -80,7 +80,7 @@ class AIApplicationService:
         self._require_non_empty(content, "Content is empty")
         self._require_non_empty(instruction, "Instruction is empty")
         if note_id is not None:
-            get_owned_resource(self.session, Note, note_id, self.user_id, "Note")
+            self.workspace_queries.get_owned_note(note_id)
         return await self.execute_edit(content=content, instruction=instruction)
 
     async def execute_edit(self, *, content: str, instruction: str) -> tuple[str, int]:
@@ -97,7 +97,7 @@ class AIApplicationService:
         self._require_non_empty(job_in.content, "Content is empty")
         self._require_non_empty(job_in.instruction, "Instruction is empty")
         if job_in.note_id is not None:
-            get_owned_resource(self.session, Note, job_in.note_id, self.user_id, "Note")
+            self.workspace_queries.get_owned_note(job_in.note_id)
 
         self._ensure_token_limit()
 

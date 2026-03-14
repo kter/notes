@@ -1,0 +1,290 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.0",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.frontend",
+      "type": "aws_s3_bucket",
+      "name": "frontend",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "notes-app-frontend-dev",
+          "tags": { "Name": "notes-app-frontend-dev" },
+          "tags_all": {
+            "Name": "notes-app-frontend-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_public_access_block.frontend",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "frontend",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "notes-app-frontend-dev",
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "ignore_public_acls": true,
+          "restrict_public_buckets": true
+        }
+      }
+    },
+    {
+      "address": "aws_lambda_function.api",
+      "type": "aws_lambda_function",
+      "name": "api",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "function_name": "notes-app-api-dev",
+          "timeout": 60,
+          "memory_size": 512,
+          "tags": { "Name": "notes-app-api-dev" },
+          "tags_all": {
+            "Name": "notes-app-api-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_cloudwatch_log_group.api_lambda",
+      "type": "aws_cloudwatch_log_group",
+      "name": "api_lambda",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "/aws/lambda/notes-app-api-dev",
+          "retention_in_days": 7,
+          "tags": { "Name": "notes-app-api-logs-dev" },
+          "tags_all": {
+            "Name": "notes-app-api-logs-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_ecr_repository.api",
+      "type": "aws_ecr_repository",
+      "name": "api",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-api-dev",
+          "force_delete": true,
+          "image_scanning_configuration": [
+            { "scan_on_push": true }
+          ],
+          "tags": { "Name": "notes-app-api-dev" },
+          "tags_all": {
+            "Name": "notes-app-api-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_iam_role.backend",
+      "type": "aws_iam_role",
+      "name": "backend",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-backend-role-dev",
+          "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":[\"lambda.amazonaws.com\",\"ecs-tasks.amazonaws.com\"]}}]}",
+          "tags": { "Name": "notes-app-backend-role-dev" },
+          "tags_all": {
+            "Name": "notes-app-backend-role-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.bedrock_access",
+      "type": "aws_iam_role_policy",
+      "name": "bedrock_access",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "bedrock-access",
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"bedrock:InvokeModel\",\"bedrock:InvokeModelWithResponseStream\"],\"Resource\":[\"arn:aws:bedrock:*::foundation-model/anthropic.claude-*\"]},{\"Effect\":\"Allow\",\"Action\":[\"aws-marketplace:ViewSubscriptions\",\"aws-marketplace:Subscribe\"],\"Resource\":\"*\"}]}"
+        }
+      }
+    },
+    {
+      "address": "aws_cognito_user_pool_client.main",
+      "type": "aws_cognito_user_pool_client",
+      "name": "main",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-client-dev",
+          "prevent_user_existence_errors": "ENABLED",
+          "access_token_validity": 1,
+          "token_validity_units": [
+            { "access_token": "hours", "id_token": "hours", "refresh_token": "days" }
+          ],
+          "tags_all": {
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_cloudfront_distribution.main",
+      "type": "aws_cloudfront_distribution",
+      "name": "main",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "price_class": "PriceClass_200",
+          "origin": [
+            {
+              "domain_name": "notes-app-frontend-dev.s3.ap-northeast-1.amazonaws.com",
+              "origin_id": "S3Origin",
+              "origin_access_control_id": "ABCDEF123456"
+            }
+          ],
+          "viewer_certificate": [
+            {
+              "minimum_protocol_version": "TLSv1.2_2021",
+              "ssl_support_method": "sni-only",
+              "acm_certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/abc"
+            }
+          ],
+          "tags": { "Name": "notes-app-cdn-dev" },
+          "tags_all": {
+            "Name": "notes-app-cdn-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_sqs_queue.ai_edit_jobs",
+      "type": "aws_sqs_queue",
+      "name": "ai_edit_jobs",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-ai-edit-jobs-dev",
+          "redrive_policy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:ap-northeast-1:123456789012:notes-app-ai-edit-jobs-dlq-dev\",\"maxReceiveCount\":3}",
+          "tags": { "Name": "notes-app-ai-edit-jobs-dev" },
+          "tags_all": {
+            "Name": "notes-app-ai-edit-jobs-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_sqs_queue.ai_edit_jobs_dlq",
+      "type": "aws_sqs_queue",
+      "name": "ai_edit_jobs_dlq",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-ai-edit-jobs-dlq-dev",
+          "redrive_policy": "",
+          "tags": { "Name": "notes-app-ai-edit-jobs-dlq-dev" },
+          "tags_all": {
+            "Name": "notes-app-ai-edit-jobs-dlq-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.cache",
+      "type": "aws_s3_bucket",
+      "name": "cache",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "notes-app-cache-dev",
+          "tags": { "Name": "notes-app-cache-dev" },
+          "tags_all": {
+            "Name": "notes-app-cache-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_lifecycle_configuration.cache",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "cache",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "notes-app-cache-dev",
+          "rule": [
+            {
+              "id": "expire-cache",
+              "status": "Enabled",
+              "expiration": [{ "days": 30 }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "aws_dsql_cluster.main",
+      "type": "aws_dsql_cluster",
+      "name": "main",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "deletion_protection_enabled": false,
+          "tags": { "Name": "notes-app-dsql-dev" },
+          "tags_all": {
+            "Name": "notes-app-dsql-dev",
+            "Project": "notes-app",
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    }
+  ]
+}

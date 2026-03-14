@@ -10,6 +10,10 @@ export AWS_PAGER=
 # Disable Terraform interactive input prompts
 export TF_INPUT=0
 
+# conftest binary — resolve via mise shim so it works inside git hooks
+# (git hooks run in a non-interactive shell that may not have mise in PATH)
+CONFTEST ?= $(shell mise which conftest 2>/dev/null || echo conftest)
+
 # Use ENV as the default profile, but allow override from command line
 # Using '=' instead of '?=' to override environment variables like 'export AWS_PROFILE=dev'
 AWS_PROFILE = $(ENV)
@@ -242,8 +246,25 @@ tf-switch: ## Initialize backend and switch workspace based on ENV (dev/prd); sk
 tf-init: tf-switch ## Initialize Terraform for the current environment
 
 .PHONY: tf-plan
-tf-plan: tf-switch ## Run Terraform plan
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform plan
+tf-plan: tf-switch ## Run Terraform plan and validate with conftest policies
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform plan -out=tfplan.tfplan
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform show -json tfplan.tfplan > tfplan.json
+	$(CONFTEST) test terraform/tfplan.json --policy terraform/policies/
+
+.PHONY: tf-policy
+tf-policy: ## Run conftest policy checks on an existing plan (run tf-plan first)
+	$(CONFTEST) test terraform/tfplan.json --policy terraform/policies/
+
+.PHONY: conftest-verify
+conftest-verify: ## Check OPA policy syntax — fast, no AWS credentials needed
+	$(CONFTEST) verify --policy terraform/policies/
+
+.PHONY: conftest-test-fixtures
+conftest-test-fixtures: conftest-verify ## Verify policy behaviour: valid plan passes, violation plan fails
+	$(CONFTEST) test terraform/policies/testdata/valid_plan.json --policy terraform/policies/
+	@$(CONFTEST) test terraform/policies/testdata/violation_plan.json --policy terraform/policies/; \
+		rc=$$?; \
+		test $$rc -ne 0 || (echo "FAIL: violation_plan.json passed — policy regression detected" >&2; exit 1)
 
 .PHONY: tf-apply
 tf-apply: tf-switch ## Run Terraform apply
@@ -474,6 +495,8 @@ claude-post-tool-use: ## Run hook-safe format/lint steps for a single edited fil
 		terraform/*.tf|terraform/*.tfvars) \
 			rel_path="$${file_path#terraform/}"; \
 			$(MAKE) --no-print-directory format-terraform TERRAFORM_PATH="$$rel_path" ;; \
+		terraform/policies/*.rego|terraform/policies/**/*.rego) \
+			$(MAKE) --no-print-directory conftest-verify ;; \
 		*) \
 			true ;; \
 	esac

@@ -66,6 +66,12 @@ resource "aws_lambda_function" "mcp_server" {
   depends_on = [aws_ecr_repository.mcp_server]
 }
 
+# CloudWatch Log Group for MCP Server Lambda
+resource "aws_cloudwatch_log_group" "mcp_server_lambda" {
+  name              = "/aws/lambda/${aws_lambda_function.mcp_server.function_name}"
+  retention_in_days = 7
+}
+
 # API Gateway for MCP Server
 resource "aws_apigatewayv2_api" "mcp_server" {
   name          = "${var.project_name}-mcp-server-${terraform.workspace}"

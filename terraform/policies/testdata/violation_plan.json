@@ -1,0 +1,156 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.0",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.bad_bucket",
+      "type": "aws_s3_bucket",
+      "name": "bad_bucket",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "my-bucket-prod",
+          "tags": {},
+          "tags_all": {
+            "Environment": "production",
+            "ManagedBy": "manual"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_public_access_block.bad_bucket",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "bad_bucket",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "my-bucket-prod",
+          "block_public_acls": false,
+          "block_public_policy": true,
+          "ignore_public_acls": true,
+          "restrict_public_buckets": false
+        }
+      }
+    },
+    {
+      "address": "aws_lambda_function.bad_lambda",
+      "type": "aws_lambda_function",
+      "name": "bad_lambda",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "function_name": "notes-app-bad-dev",
+          "timeout": 1000,
+          "memory_size": 4096,
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.bad_policy",
+      "type": "aws_iam_role_policy",
+      "name": "bad_policy",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "bad-policy",
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+        }
+      }
+    },
+    {
+      "address": "aws_cognito_user_pool_client.bad_client",
+      "type": "aws_cognito_user_pool_client",
+      "name": "bad_client",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "prevent_user_existence_errors": "LEGACY",
+          "access_token_validity": 48,
+          "token_validity_units": [
+            { "access_token": "hours", "id_token": "hours", "refresh_token": "days" }
+          ],
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_cloudfront_distribution.bad_cf",
+      "type": "aws_cloudfront_distribution",
+      "name": "bad_cf",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "price_class": "PriceClass_All",
+          "origin": [
+            {
+              "domain_name": "notes-app-frontend-dev.s3.ap-northeast-1.amazonaws.com",
+              "origin_id": "S3Origin",
+              "origin_access_control_id": ""
+            }
+          ],
+          "viewer_certificate": [
+            {
+              "minimum_protocol_version": "TLSv1.2_2018",
+              "ssl_support_method": "sni-only"
+            }
+          ],
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_sqs_queue.no_dlq",
+      "type": "aws_sqs_queue",
+      "name": "no_dlq",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-jobs-dev",
+          "redrive_policy": "",
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    },
+    {
+      "address": "aws_ecr_repository.bad_ecr",
+      "type": "aws_ecr_repository",
+      "name": "bad_ecr",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "notes-app-api-dev",
+          "force_delete": false,
+          "image_scanning_configuration": [
+            { "scan_on_push": false }
+          ],
+          "tags_all": {
+            "Environment": "dev",
+            "ManagedBy": "terraform"
+          }
+        }
+      }
+    }
+  ]
+}

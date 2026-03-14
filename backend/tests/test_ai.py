@@ -5,10 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.features.assistant.edit_jobs import process_edit_job
 from app.main import app
 from app.models import AIEditJob, Folder, Note
 from app.services import AIService, AIServiceTimeoutError, get_ai_service
-from app.services.edit_jobs import process_edit_job
 
 
 # Mock AI Service
@@ -265,7 +265,9 @@ def test_create_edit_job_and_poll_result(
     async def noop_dispatch(*args, **kwargs):
         return None
 
-    monkeypatch.setattr("app.routers.ai.dispatch_edit_job", noop_dispatch)
+    monkeypatch.setattr(
+        "app.features.assistant.router.dispatch_edit_job", noop_dispatch
+    )
 
     response = client.post(
         "/api/ai/edit-jobs",
@@ -306,7 +308,9 @@ def test_edit_job_not_visible_to_other_user(
     async def noop_dispatch(*args, **kwargs):
         return None
 
-    monkeypatch.setattr("app.routers.ai.dispatch_edit_job", noop_dispatch)
+    monkeypatch.setattr(
+        "app.features.assistant.router.dispatch_edit_job", noop_dispatch
+    )
 
     other_client = make_client("other-user-456")
     job = AIEditJob(
@@ -352,7 +356,9 @@ def test_edit_job_failure_is_persisted(
     async def noop_dispatch(*args, **kwargs):
         return None
 
-    monkeypatch.setattr("app.routers.ai.dispatch_edit_job", noop_dispatch)
+    monkeypatch.setattr(
+        "app.features.assistant.router.dispatch_edit_job", noop_dispatch
+    )
 
     app.dependency_overrides[get_ai_service] = lambda: TimeoutAIService()
     try:

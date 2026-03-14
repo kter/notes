@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 
 from fastapi import HTTPException
 
+from app.features.assistant.router import _check_token_limit
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
-from app.routers.ai import _check_token_limit
 from app.services.token_usage import check_limit
 
 

@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.database import create_db_and_tables, get_session
 from app.features.admin.router import router as admin_router
 from app.features.assistant.router import router as assistant_router
+from app.features.images.router import router as images_router
 from app.features.mcp.router import router as mcp_router
 from app.features.settings.router import router as settings_router
 from app.features.share.router import router as share_router
@@ -16,7 +17,6 @@ from app.features.workspace.folders_router import router as folders_router
 from app.features.workspace.notes_router import router as notes_router
 from app.http_errors import to_http_exception
 from app.observability import init_sentry
-from app.routers import images
 from app.shared import DomainError
 
 settings_app = get_settings()
@@ -51,7 +51,7 @@ app.add_middleware(
 # Include routers
 app.include_router(folders_router, prefix="/api/folders", tags=["folders"])
 app.include_router(notes_router, prefix="/api/notes", tags=["notes"])
-app.include_router(images.router, prefix="/api/images", tags=["images"])
+app.include_router(images_router, prefix="/api/images", tags=["images"])
 app.include_router(assistant_router, prefix="/api/ai", tags=["ai"])
 app.include_router(mcp_router)
 app.include_router(settings_router, prefix="/api/settings", tags=["settings"])

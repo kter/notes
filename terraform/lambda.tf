@@ -78,6 +78,25 @@ resource "aws_lambda_function" "ai_edit_worker" {
   depends_on = [aws_ecr_repository.api]
 }
 
+# CloudWatch Log Groups for Lambda functions (explicit declaration for retention and policy compliance)
+resource "aws_cloudwatch_log_group" "api_lambda" {
+  name              = "/aws/lambda/${aws_lambda_function.api.function_name}"
+  retention_in_days = 7
+
+  tags = {
+    Name = "${var.project_name}-api-logs-${terraform.workspace}"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "ai_edit_worker_lambda" {
+  name              = "/aws/lambda/${aws_lambda_function.ai_edit_worker.function_name}"
+  retention_in_days = 7
+
+  tags = {
+    Name = "${var.project_name}-ai-edit-worker-logs-${terraform.workspace}"
+  }
+}
+
 # ECR Repository for Lambda container image
 resource "aws_ecr_repository" "api" {
   name                 = "${var.project_name}-api-${terraform.workspace}"

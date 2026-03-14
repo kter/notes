@@ -36,6 +36,7 @@ npm-debug.log*
 .terraform.lock.hcl
 tfplan
 *.tfplan
+terraform/tfplan.json
 crash.log
 
 # IDE

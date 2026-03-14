@@ -2,8 +2,8 @@ from uuid import UUID
 
 from sqlmodel import Session
 
+from app.features.workspace.folder_repository import FolderRepository
 from app.models import Folder, FolderCreate, FolderUpdate
-from app.repositories.folder_repository import FolderRepository
 
 
 class FolderService:

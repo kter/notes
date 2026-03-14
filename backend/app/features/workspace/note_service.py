@@ -6,9 +6,9 @@ from uuid import UUID
 
 from sqlmodel import Session
 
+from app.features.workspace.folder_repository import FolderRepository
+from app.features.workspace.note_repository import NoteRepository
 from app.models import Note, NoteCreate, NoteUpdate
-from app.repositories.folder_repository import FolderRepository
-from app.repositories.note_repository import NoteRepository
 
 
 @dataclass(frozen=True)

@@ -31,8 +31,16 @@ target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "S", "UP"]
 ignore = ["E501"]  # Line too long - existing code has many long lines
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",  # assert はテストコードでは正当
+    "S105",  # テスト用ハードコード文字列
+    "S106",  # テスト用ハードコードパスワード (test_database_connection.py)
+    "S107",  # テスト用ハードコードパスワード
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

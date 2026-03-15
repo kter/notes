@@ -231,7 +231,7 @@ class DatabaseSchemaBootstrapper:
             return None
 
         return connection.execute(
-            text(f"SELECT version_num FROM {ALEMBIC_VERSION_TABLE}")
+            text(f"SELECT version_num FROM {ALEMBIC_VERSION_TABLE}")  # noqa: S608
         ).scalar_one_or_none()
 
     @staticmethod

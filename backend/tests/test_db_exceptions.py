@@ -1,10 +1,10 @@
 from unittest.mock import Mock
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.exc import OperationalError
 
 from app.db_commit import commit_with_error_handling, commit_with_retry
+from app.shared import ConflictDetected
 
 
 def test_commit_with_retry_returns_recovered_resource_on_retryable_conflict():
@@ -30,7 +30,7 @@ def test_commit_with_retry_returns_recovered_resource_on_retryable_conflict():
     session.rollback.assert_called_once()
 
 
-def test_commit_with_error_handling_maps_retryable_conflict_to_http_409():
+def test_commit_with_error_handling_maps_retryable_conflict_to_domain_conflict():
     session = Mock()
     session.commit.side_effect = OperationalError(
         "UPDATE notes ...",
@@ -38,5 +38,5 @@ def test_commit_with_error_handling_maps_retryable_conflict_to_http_409():
         Exception("change conflicts with another transaction, please retry: (OC000)"),
     )
 
-    with pytest.raises(HTTPException, match="Concurrent update conflict"):
+    with pytest.raises(ConflictDetected, match="Concurrent update conflict"):
         commit_with_error_handling(session, "Note", max_retries=1)

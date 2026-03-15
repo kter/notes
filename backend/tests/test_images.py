@@ -66,7 +66,7 @@ class TestUploadImage:
         """Valid PNG upload should return 201 with a CDN URL."""
         png_bytes = make_png_bytes()
 
-        with patch("app.routers.images.boto3") as mock_boto3:
+        with patch("app.features.images.service.boto3") as mock_boto3:
             mock_s3 = MagicMock()
             mock_boto3.client.return_value = mock_s3
 
@@ -112,7 +112,7 @@ class TestUploadImage:
         """File exactly at 10MB (not exceeding) should be accepted (boundary: > not >=)."""
         exact_content = b"A" * (10 * 1024 * 1024)
 
-        with patch("app.routers.images.boto3") as mock_boto3:
+        with patch("app.features.images.service.boto3") as mock_boto3:
             mock_s3 = MagicMock()
             mock_boto3.client.return_value = mock_s3
 
@@ -140,7 +140,7 @@ class TestUploadImage:
         """JPEG upload should result in a .jpg extension in the URL."""
         jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 10  # minimal JPEG header
 
-        with patch("app.routers.images.boto3") as mock_boto3:
+        with patch("app.features.images.service.boto3") as mock_boto3:
             mock_s3 = MagicMock()
             mock_boto3.client.return_value = mock_s3
 

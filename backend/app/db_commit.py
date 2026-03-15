@@ -3,9 +3,10 @@
 import time
 from collections.abc import Callable
 
-from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlmodel import Session
+
+from app.shared import ConflictDetected, ValidationFailed
 
 
 def is_retryable_commit_error(error: Exception) -> bool:
@@ -55,7 +56,7 @@ def commit_with_error_handling(
     *,
     max_retries: int = 1,
 ) -> None:
-    """Commit the session and convert database errors to appropriate HTTP errors."""
+    """Commit the session and convert database errors to domain errors."""
     try:
         commit_with_retry(session, max_retries=max_retries)
     except IntegrityError as e:
@@ -63,24 +64,16 @@ def commit_with_error_handling(
         error_message = str(e.orig).lower() if e.orig else str(e).lower()
 
         if "foreign key" in error_message or "fk_" in error_message:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{resource_name} references a non-existent resource",
+            raise ValidationFailed(
+                f"{resource_name} references a non-existent resource"
             )
         if "unique" in error_message or "duplicate" in error_message:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"{resource_name} already exists",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Database constraint violation for {resource_name}",
-        )
+            raise ConflictDetected(f"{resource_name} already exists")
+        raise ValidationFailed(f"Database constraint violation for {resource_name}")
     except OperationalError as e:
         session.rollback()
         if is_retryable_commit_error(e):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Concurrent update conflict for {resource_name}. Please retry.",
+            raise ConflictDetected(
+                f"Concurrent update conflict for {resource_name}. Please retry."
             )
         raise

@@ -4,8 +4,8 @@ import logging
 
 from app.bootstrap import run_cold_start_database_bootstrap
 from app.database import create_db_and_tables
+from app.features.assistant.edit_jobs import run_edit_job_queue_records
 from app.observability import init_sentry
-from app.services.edit_jobs import run_edit_job_queue_records
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

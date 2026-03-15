@@ -55,7 +55,7 @@ class CognitoJWTVerifier:
         # ----------------------------------------------------------------------
         # BYPASS FOR INTEGRATION TESTING IN DEV ENVIRONMENT
         # ----------------------------------------------------------------------
-        if settings.environment == "dev" and token == "dev-integration-test-token":
+        if settings.environment == "dev" and token == "dev-integration-test-token":  # noqa: S105
             return {
                 "sub": "integration-test-user-id",
                 "username": "integration-test-user",
@@ -64,7 +64,7 @@ class CognitoJWTVerifier:
                 "scope": "aws.cognito.signin.user.admin",
             }
 
-        if settings.environment == "dev" and token == "dev-integration-test-token-2":
+        if settings.environment == "dev" and token == "dev-integration-test-token-2":  # noqa: S105
             return {
                 "sub": "integration-test-user-id-2",
                 "username": "integration-test-user-2",

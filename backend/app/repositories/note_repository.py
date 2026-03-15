@@ -1,30 +1,3 @@
-from uuid import UUID
+from app.features.workspace.note_repository import NoteRepository
 
-from sqlmodel import select
-
-from app.core.persistence import UserScopedRepository
-from app.models import Note, NoteCreate, NoteUpdate
-
-
-class NoteRepository(UserScopedRepository[Note]):
-    """Repository for user-scoped note persistence."""
-
-    model = Note
-    resource_name = "Note"
-
-    def list(self, folder_id: UUID | None = None) -> list[Note]:
-        statement = select(Note).where(Note.user_id == self.user_id)
-        if folder_id is not None:
-            statement = statement.where(Note.folder_id == folder_id)
-        statement = statement.order_by(Note.updated_at.desc())
-        return self.session.exec(statement).all()
-
-    def create(self, note_in: NoteCreate) -> Note:
-        note = Note(**note_in.model_dump(), user_id=self.user_id)
-        return self.save(note)
-
-    def update(self, note_id: UUID, note_in: NoteUpdate) -> Note:
-        note = self.get_owned(note_id)
-        for key, value in note_in.model_dump(exclude_unset=True).items():
-            setattr(note, key, value)
-        return self.save(note, touch=True)
+__all__ = ["NoteRepository"]

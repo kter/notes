@@ -8,6 +8,10 @@ import type { Folder } from "@/types";
 
 const getApiMock = vi.fn();
 const dispatchWorkspaceSyncedMock = vi.fn();
+const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
+  device_id: "device-1",
+  base_cursor: "cursor-1",
+}));
 
 vi.mock("./useApi", () => ({
   useApi: () => ({
@@ -34,6 +38,7 @@ vi.mock("@/lib/syncQueue", () => ({
 vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
   dispatchWorkspaceSynced: (...args: unknown[]) => dispatchWorkspaceSyncedMock(...args),
+  getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
 }));
 
 import { useFolders } from "./useFolders";

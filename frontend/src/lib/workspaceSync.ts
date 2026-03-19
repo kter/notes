@@ -2,9 +2,19 @@ import { notesDB } from "@/lib/indexedDB";
 import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
 
 export const WORKSPACE_SYNCED_EVENT = "workspace:synced";
+const WORKSPACE_CURSOR_STORAGE_KEY = "notes-workspace-cursor";
+const WORKSPACE_DEVICE_ID_STORAGE_KEY = "notes-workspace-device-id";
 
 export interface WorkspaceSyncedEventDetail {
   snapshot: WorkspaceSnapshotResponse;
+}
+
+function getStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage;
 }
 
 export function isDeletedEntity<T extends { deleted_at: string | null }>(
@@ -38,6 +48,42 @@ export async function persistWorkspaceSnapshot(
       .filter(isDeletedEntity)
       .map((note) => notesDB.deleteNote(note.id)),
   ]);
+
+  setWorkspaceCursor(snapshot.cursor);
+}
+
+export function getWorkspaceCursor(): string | null {
+  return getStorage()?.getItem(WORKSPACE_CURSOR_STORAGE_KEY) ?? null;
+}
+
+export function setWorkspaceCursor(cursor: string): void {
+  getStorage()?.setItem(WORKSPACE_CURSOR_STORAGE_KEY, cursor);
+}
+
+export function getWorkspaceDeviceId(): string {
+  const storage = getStorage();
+  const existing = storage?.getItem(WORKSPACE_DEVICE_ID_STORAGE_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const deviceId =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  storage?.setItem(WORKSPACE_DEVICE_ID_STORAGE_KEY, deviceId);
+  return deviceId;
+}
+
+export function getWorkspaceSyncRequestMetadata(): {
+  device_id: string;
+  base_cursor?: string;
+} {
+  const cursor = getWorkspaceCursor();
+  return {
+    device_id: getWorkspaceDeviceId(),
+    ...(cursor ? { base_cursor: cursor } : {}),
+  };
 }
 
 export function dispatchWorkspaceSynced(

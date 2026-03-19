@@ -5,7 +5,10 @@
 
 import { notesDB, type PendingChange, type SyncOperationType } from "./indexedDB";
 import { ApiError } from "./api";
-import { persistWorkspaceSnapshot } from "./workspaceSync";
+import {
+  getWorkspaceSyncRequestMetadata,
+  persistWorkspaceSnapshot,
+} from "./workspaceSync";
 import type {
   Folder,
   Note,
@@ -114,7 +117,7 @@ class SyncQueueManager {
 
       try {
         const response = await apiClient.applyWorkspaceChanges({
-          device_id: "web",
+          ...getWorkspaceSyncRequestMetadata(),
           changes: changes.map((change) => this.toWorkspaceChangeRequest(change)),
         });
 

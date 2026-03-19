@@ -8,6 +8,10 @@ import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";
 
 const getApiMock = vi.fn();
+const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
+  device_id: "device-1",
+  base_cursor: "cursor-1",
+}));
 const translationMap = {
   "sync.serverSyncFailed": "Failed to sync with the server",
   "sync.offlineSyncUnavailable": "Cannot sync while offline",
@@ -45,6 +49,11 @@ vi.mock("@/lib/syncQueue", () => ({
 
 vi.mock("@/lib/utils", () => ({
   calculateHash: vi.fn(),
+}));
+
+vi.mock("@/lib/workspaceSync", () => ({
+  persistWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
+  getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
 }));
 
 import { useNoteSyncEngine } from "./useNoteSyncEngine";

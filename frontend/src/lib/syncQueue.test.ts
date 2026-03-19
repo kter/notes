@@ -33,6 +33,9 @@ describe("syncQueue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
+    window.localStorage.clear();
+    window.localStorage.setItem("notes-workspace-device-id", "device-1");
+    window.localStorage.setItem("notes-workspace-cursor", "cursor-1");
   });
 
   afterEach(() => {
@@ -177,7 +180,8 @@ describe("syncQueue", () => {
     const result = await syncQueue.processQueue(apiClient);
 
     expect(apiClient.applyWorkspaceChanges).toHaveBeenCalledWith({
-      device_id: "web",
+      device_id: "device-1",
+      base_cursor: "cursor-1",
       changes: [
         {
           entity: "note",

@@ -8,6 +8,11 @@ import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";
 
 const getApiMock = vi.fn();
+const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
+  device_id: "device-1",
+  base_cursor: "cursor-1",
+}));
+const persistWorkspaceSnapshotMock = vi.fn().mockResolvedValue(undefined);
 const translationMap = {
   "sync.offlineSyncUnavailable": "Cannot sync while offline",
 } as const;
@@ -43,6 +48,11 @@ vi.mock("@/lib/syncQueue", () => ({
 
 vi.mock("@/lib/utils", () => ({
   calculateHash: vi.fn(),
+}));
+
+vi.mock("@/lib/workspaceSync", () => ({
+  persistWorkspaceSnapshot: (...args: unknown[]) => persistWorkspaceSnapshotMock(...args),
+  getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
 }));
 
 import { useNotes } from "./useNotes";
@@ -127,12 +137,17 @@ describe("useNotes", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.notes).toEqual([serverNote]);
+    expect(result.current.notes).toEqual([serverNote]);
       expect(result.current.selectedNoteId).toBe("server-note-1");
     });
 
     expect(notesDB.saveNote).toHaveBeenCalledTimes(1);
-    expect(notesDB.saveNotes).toHaveBeenCalledWith([serverNote]);
+    expect(persistWorkspaceSnapshotMock).toHaveBeenCalledWith({
+      folders: [],
+      notes: [serverNote],
+      cursor: "cursor-1",
+      server_time: "2024-01-01T00:00:00.000Z",
+    });
     expect(notesDB.deleteNote).toHaveBeenCalledWith(expect.stringMatching(/^temp-/));
     expect(result.current.syncStatus.remote).toBe("synced");
     expect(result.current.savedHashes).toEqual({ "server-note-1": "hash-123" });
@@ -189,6 +204,8 @@ describe("useNotes", () => {
     });
 
     expect(applyWorkspaceChangesMock).toHaveBeenCalledWith({
+      device_id: "device-1",
+      base_cursor: "cursor-1",
       changes: [
         {
           entity: "note",

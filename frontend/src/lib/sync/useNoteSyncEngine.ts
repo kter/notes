@@ -6,7 +6,10 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
-import { persistWorkspaceSnapshot } from "@/lib/workspaceSync";
+import {
+  getWorkspaceSyncRequestMetadata,
+  persistWorkspaceSnapshot,
+} from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
 import type { Note } from "@/types";
 
@@ -58,6 +61,7 @@ export function useNoteSyncEngine({
           try {
             const apiClient = await getApi();
             const response = await apiClient.applyWorkspaceChanges({
+              ...getWorkspaceSyncRequestMetadata(),
               changes: [
                 {
                   entity: "note",
@@ -152,6 +156,7 @@ export function useNoteSyncEngine({
       try {
         const apiClient = await getApi();
         const response = await apiClient.applyWorkspaceChanges({
+          ...getWorkspaceSyncRequestMetadata(),
           changes: [
             {
               entity: "note",
@@ -265,6 +270,7 @@ export function useNoteSyncEngine({
           try {
             const apiClient = await getApi();
             await apiClient.applyWorkspaceChanges({
+              ...getWorkspaceSyncRequestMetadata(),
               changes: [
                 {
                   entity: "note",

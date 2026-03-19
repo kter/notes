@@ -7,6 +7,7 @@ import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import {
   dispatchWorkspaceSynced,
+  getWorkspaceSyncRequestMetadata,
   persistWorkspaceSnapshot,
 } from "@/lib/workspaceSync";
 import type { Folder } from "@/types";
@@ -55,6 +56,7 @@ export function useFolders(
         try {
           const apiClient = await getApi();
           const response = await apiClient.applyWorkspaceChanges({
+            ...getWorkspaceSyncRequestMetadata(),
             changes: [
               {
                 entity: "folder",
@@ -105,6 +107,7 @@ export function useFolders(
         try {
           const apiClient = await getApi();
           const response = await apiClient.applyWorkspaceChanges({
+            ...getWorkspaceSyncRequestMetadata(),
             changes: [
               {
                 entity: "folder",
@@ -157,6 +160,7 @@ export function useFolders(
         try {
           const apiClient = await getApi();
           const response = await apiClient.applyWorkspaceChanges({
+            ...getWorkspaceSyncRequestMetadata(),
             changes: [
               {
                 entity: "folder",

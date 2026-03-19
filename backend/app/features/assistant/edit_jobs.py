@@ -10,12 +10,12 @@ from fastapi import BackgroundTasks
 from sqlmodel import Session
 
 from app.database import get_dsql_engine
-from app.features.assistant.ai_service import AIService, get_ai_service
 from app.features.assistant.errors import (
     AI_EDIT_JOB_TIMEOUT_MESSAGE,
     AIApplicationTimeoutError,
     AITokenLimitExceededError,
 )
+from app.features.assistant.gateway import AIGateway, get_ai_gateway
 from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
 from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
 from app.models import AIEditJob
@@ -54,10 +54,10 @@ async def process_edit_job(
     job_id: UUID | str,
     *,
     session_factory=_get_session,
-    ai_service: AIService | None = None,
+    ai_gateway: AIGateway | None = None,
 ) -> None:
     """Process an AI edit job and persist the result for polling clients."""
-    ai_service = ai_service or get_ai_service()
+    ai_gateway = ai_gateway or get_ai_gateway()
 
     with session_factory() as session:
         job = session.get(AIEditJob, job_id)
@@ -79,7 +79,7 @@ async def process_edit_job(
             interaction_use_cases = AIInteractionUseCases(
                 session=session,
                 user_id=job.user_id,
-                ai_service=ai_service,
+                ai_gateway=ai_gateway,
                 workspace_queries=workspace_queries,
             )
             edited_content, tokens_used = await interaction_use_cases.execute_edit(

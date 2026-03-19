@@ -4,7 +4,7 @@ from app.features.assistant.errors import (
     TOKEN_LIMIT_EXCEEDED_MESSAGE,
     AITokenLimitExceededError,
 )
-from app.features.assistant.token_usage_service import check_limit
+from app.features.assistant.usage_policy import check_limit
 from app.models import DEFAULT_LLM_MODEL_ID, UserSettings
 from app.shared import ValidationFailed
 

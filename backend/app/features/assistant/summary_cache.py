@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-class CacheService:
+class SummaryCache:
     def __init__(self):
         self.s3 = boto3.client("s3", region_name=settings.aws_region)
         self.bucket = settings.cache_bucket_name
@@ -51,8 +51,8 @@ class CacheService:
             logger.error(f"Error saving cache: {exc}")
 
 
-cache_service = CacheService()
+summary_cache = SummaryCache()
 
 
-def get_cache_service() -> CacheService:
-    return cache_service
+def get_summary_cache() -> SummaryCache:
+    return summary_cache

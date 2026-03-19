@@ -10,7 +10,7 @@ from app.features.admin.schemas import (
     AdminUsersListResponse,
     AdminUserUpdateRequest,
 )
-from app.features.assistant.token_usage_service import get_usage_snapshot
+from app.features.assistant.usage_policy import get_usage_snapshot
 from app.models import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,

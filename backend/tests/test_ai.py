@@ -5,18 +5,18 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.features.assistant.ai_service import (
-    AIService,
-    AIServiceTimeoutError,
-    get_ai_service,
-)
 from app.features.assistant.edit_jobs import process_edit_job
+from app.features.assistant.gateway import (
+    AIGateway,
+    AIGatewayTimeoutError,
+    get_ai_gateway,
+)
 from app.main import app
 from app.models import AIEditJob, Folder, Note
 
 
 # Mock AI Service
-class MockAIService(AIService):
+class MockAIGateway(AIGateway):
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
     ) -> tuple[str, int]:
@@ -44,10 +44,10 @@ class MockAIService(AIService):
 
 @pytest.fixture
 def mock_ai_service():
-    service = MockAIService()
-    app.dependency_overrides[get_ai_service] = lambda: service
+    service = MockAIGateway()
+    app.dependency_overrides[get_ai_gateway] = lambda: service
     yield service
-    app.dependency_overrides.pop(get_ai_service, None)
+    app.dependency_overrides.pop(get_ai_gateway, None)
 
 
 def test_summarize_note(client: TestClient, session: Session, mock_ai_service):
@@ -219,11 +219,11 @@ def test_edit_unowned_note(make_client, session: Session, mock_ai_service):
 
 
 def test_edit_timeout_returns_504(client: TestClient):
-    class TimeoutAIService(AIService):
+    class TimeoutAIGateway(AIGateway):
         async def summarize(
             self, content: str, model_id: str | None = None, language: str = "auto"
         ) -> tuple[str, int]:
-            raise AIServiceTimeoutError("timed out")
+            raise AIGatewayTimeoutError("timed out")
 
         async def chat(
             self,
@@ -233,7 +233,7 @@ def test_edit_timeout_returns_504(client: TestClient):
             model_id: str | None = None,
             language: str = "auto",
         ) -> tuple[str, int]:
-            raise AIServiceTimeoutError("timed out")
+            raise AIGatewayTimeoutError("timed out")
 
         async def edit(
             self,
@@ -242,9 +242,9 @@ def test_edit_timeout_returns_504(client: TestClient):
             model_id: str | None = None,
             language: str = "auto",
         ) -> tuple[str, int]:
-            raise AIServiceTimeoutError("timed out")
+            raise AIGatewayTimeoutError("timed out")
 
-    app.dependency_overrides[get_ai_service] = lambda: TimeoutAIService()
+    app.dependency_overrides[get_ai_gateway] = lambda: TimeoutAIGateway()
     try:
         response = client.post(
             "/api/ai/edit",
@@ -254,7 +254,7 @@ def test_edit_timeout_returns_504(client: TestClient):
             },
         )
     finally:
-        app.dependency_overrides.pop(get_ai_service, None)
+        app.dependency_overrides.pop(get_ai_gateway, None)
 
     assert response.status_code == 504
     assert "timed out" in response.json()["detail"].lower()
@@ -291,7 +291,7 @@ def test_create_edit_job_and_poll_result(
         process_edit_job(
             UUID(job["id"]),
             session_factory=lambda: Session(engine),
-            ai_service=mock_ai_service,
+            ai_gateway=mock_ai_service,
         )
     )
 
@@ -332,11 +332,11 @@ def test_edit_job_not_visible_to_other_user(
 def test_edit_job_failure_is_persisted(
     client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ):
-    class TimeoutAIService(AIService):
+    class TimeoutAIGateway(AIGateway):
         async def summarize(
             self, content: str, model_id: str | None = None, language: str = "auto"
         ) -> tuple[str, int]:
-            raise AIServiceTimeoutError("timed out")
+            raise AIGatewayTimeoutError("timed out")
 
         async def chat(
             self,
@@ -346,7 +346,7 @@ def test_edit_job_failure_is_persisted(
             model_id: str | None = None,
             language: str = "auto",
         ) -> tuple[str, int]:
-            raise AIServiceTimeoutError("timed out")
+            raise AIGatewayTimeoutError("timed out")
 
         async def edit(
             self,
@@ -355,7 +355,7 @@ def test_edit_job_failure_is_persisted(
             model_id: str | None = None,
             language: str = "auto",
         ) -> tuple[str, int]:
-            raise AIServiceTimeoutError("timed out")
+            raise AIGatewayTimeoutError("timed out")
 
     async def noop_dispatch(*args, **kwargs):
         return None
@@ -364,7 +364,7 @@ def test_edit_job_failure_is_persisted(
         "app.features.assistant.router.dispatch_edit_job", noop_dispatch
     )
 
-    app.dependency_overrides[get_ai_service] = lambda: TimeoutAIService()
+    app.dependency_overrides[get_ai_gateway] = lambda: TimeoutAIGateway()
     try:
         response = client.post(
             "/api/ai/edit-jobs",
@@ -374,7 +374,7 @@ def test_edit_job_failure_is_persisted(
             },
         )
     finally:
-        app.dependency_overrides.pop(get_ai_service, None)
+        app.dependency_overrides.pop(get_ai_gateway, None)
 
     assert response.status_code == 202
     job_id = response.json()["job"]["id"]
@@ -385,7 +385,7 @@ def test_edit_job_failure_is_persisted(
         process_edit_job(
             UUID(job_id),
             session_factory=lambda: Session(engine),
-            ai_service=TimeoutAIService(),
+            ai_gateway=TimeoutAIGateway(),
         )
     )
 

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock
 
 from app.features.assistant.errors import AITokenLimitExceededError
-from app.features.assistant.token_usage_service import check_limit
+from app.features.assistant.usage_policy import check_limit
 from app.features.assistant.use_cases.common import ensure_token_limit
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
 
@@ -26,7 +26,7 @@ def _make_session(tokens_used: int) -> MagicMock:
 
 
 class TestCheckLimit(unittest.TestCase):
-    """Tests for app.features.assistant.token_usage_service.check_limit."""
+    """Tests for app.features.assistant.usage_policy.check_limit."""
 
     def test_zero_usage_is_within_limit(self):
         session = _make_session(0)

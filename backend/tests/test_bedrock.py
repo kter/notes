@@ -5,12 +5,12 @@ from unittest.mock import Mock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from app.features.assistant.ai_service import EDIT_SINGLE_PASS_MAX_CHARS, BedrockService
+from app.features.assistant.gateway import EDIT_SINGLE_PASS_MAX_CHARS, BedrockGateway
 
 
 @pytest.fixture
 def mock_settings():
-    with patch("app.features.assistant.ai_service.settings") as mock_settings:
+    with patch("app.features.assistant.gateway.settings") as mock_settings:
         mock_settings.aws_region = "us-east-1"
         yield mock_settings
 
@@ -25,7 +25,7 @@ def mock_boto_client():
 
 @pytest.mark.asyncio
 async def test_summarize_success(mock_boto_client, mock_settings):
-    service = BedrockService()
+    service = BedrockGateway()
 
     # Mock response from Bedrock
     mock_response_body = json.dumps(
@@ -59,7 +59,7 @@ async def test_summarize_success(mock_boto_client, mock_settings):
 
 @pytest.mark.asyncio
 async def test_chat_success(mock_boto_client, mock_settings):
-    service = BedrockService()
+    service = BedrockGateway()
 
     mock_response_body = json.dumps(
         {
@@ -89,7 +89,7 @@ async def test_chat_success(mock_boto_client, mock_settings):
 
 @pytest.mark.asyncio
 async def test_edit_success(mock_boto_client, mock_settings):
-    service = BedrockService()
+    service = BedrockGateway()
 
     mock_response_body = json.dumps(
         {
@@ -118,7 +118,7 @@ async def test_edit_success(mock_boto_client, mock_settings):
 
 @pytest.mark.asyncio
 async def test_edit_fallback_no_tags(mock_boto_client, mock_settings):
-    service = BedrockService()
+    service = BedrockGateway()
 
     mock_response_body = json.dumps(
         {
@@ -139,7 +139,7 @@ async def test_edit_fallback_no_tags(mock_boto_client, mock_settings):
 
 
 def test_extract_edited_content():
-    service = BedrockService()
+    service = BedrockGateway()
 
     # With tags
     result = service._extract_edited_content(
@@ -165,7 +165,7 @@ def test_extract_edited_content():
 
 @pytest.mark.asyncio
 async def test_bedrock_error(mock_boto_client, mock_settings):
-    service = BedrockService()
+    service = BedrockGateway()
 
     mock_boto_client.invoke_model.side_effect = ClientError(
         {"Error": {"Code": "ValidationException", "Message": "Bad request"}},
@@ -177,7 +177,7 @@ async def test_bedrock_error(mock_boto_client, mock_settings):
 
 
 def test_chunk_content_for_edit_preserves_text():
-    service = BedrockService()
+    service = BedrockGateway()
     content = (
         "# Title\n\n"
         "Paragraph 1\n\n"
@@ -195,7 +195,7 @@ def test_chunk_content_for_edit_preserves_text():
 
 @pytest.mark.asyncio
 async def test_edit_large_content_uses_chunking(mock_boto_client, mock_settings):
-    service = BedrockService()
+    service = BedrockGateway()
     content = "# Title\n\n" + ("teh quick brown fox.\n\n" * 1200)
     calls: list[str] = []
 

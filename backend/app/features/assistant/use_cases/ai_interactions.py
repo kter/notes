@@ -3,10 +3,10 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.features.assistant.ai_service import AIService, AIServiceTimeoutError
 from app.features.assistant.context import ContextService
 from app.features.assistant.errors import AI_TIMEOUT_MESSAGE, AIApplicationTimeoutError
-from app.features.assistant.token_usage_service import record_usage
+from app.features.assistant.gateway import AIGateway, AIGatewayTimeoutError
+from app.features.assistant.usage_policy import record_usage
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     get_user_settings,
@@ -23,12 +23,12 @@ class AIInteractionUseCases:
         self,
         session: Session,
         user_id: str,
-        ai_service: AIService,
+        ai_gateway: AIGateway,
         workspace_queries: WorkspaceQueryUseCases,
     ):
         self.session = session
         self.user_id = user_id
-        self.ai_service = ai_service
+        self.ai_gateway = ai_gateway
         self.workspace_queries = workspace_queries
         self.context_service = ContextService(workspace_queries)
 
@@ -36,7 +36,7 @@ class AIInteractionUseCases:
         note = self.workspace_queries.get_owned_note(note_id)
         require_non_empty(note.content, "Note content is empty")
         return await self._run_ai_call(
-            lambda model_id, language: self.ai_service.summarize(
+            lambda model_id, language: self.ai_gateway.summarize(
                 note.content,
                 model_id=model_id,
                 language=language,
@@ -56,7 +56,7 @@ class AIInteractionUseCases:
             scope=scope, note_id=note_id, folder_id=folder_id
         )
         return await self._run_ai_call(
-            lambda model_id, language: self.ai_service.chat(
+            lambda model_id, language: self.ai_gateway.chat(
                 content=content,
                 question=question,
                 history=history,
@@ -80,7 +80,7 @@ class AIInteractionUseCases:
 
     async def execute_edit(self, *, content: str, instruction: str) -> tuple[str, int]:
         return await self._run_ai_call(
-            lambda model_id, language: self.ai_service.edit(
+            lambda model_id, language: self.ai_gateway.edit(
                 content=content,
                 instruction=instruction,
                 model_id=model_id,
@@ -97,7 +97,7 @@ class AIInteractionUseCases:
 
         try:
             response, tokens_used = await ai_call(model_id, language)
-        except AIServiceTimeoutError as exc:
+        except AIGatewayTimeoutError as exc:
             raise AIApplicationTimeoutError(AI_TIMEOUT_MESSAGE) from exc
 
         if tokens_used > 0:

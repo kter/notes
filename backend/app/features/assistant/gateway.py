@@ -10,7 +10,7 @@ from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError
 
 from app.config import get_settings
 from app.core.prompts import get_prompt
-from app.features.assistant.cache_service import get_cache_service
+from app.features.assistant.summary_cache import get_summary_cache
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -22,12 +22,12 @@ EDIT_CHUNK_MAX_CHARS = 6_000
 EDIT_MAX_CONCURRENCY = 3
 
 
-class AIServiceTimeoutError(Exception):
+class AIGatewayTimeoutError(Exception):
     """Raised when an upstream AI provider exceeds the service timeout."""
 
 
-class AIService(ABC):
-    """Abstract base class for AI services. Designed for future RAG extensibility."""
+class AIGateway(ABC):
+    """Abstract gateway for AI providers. Designed for future extensibility."""
 
     @abstractmethod
     async def summarize(
@@ -57,8 +57,8 @@ class AIService(ABC):
         """Edit content based on the given instruction."""
 
 
-class BedrockService(AIService):
-    """Amazon Bedrock service using Claude."""
+class BedrockGateway(AIGateway):
+    """Amazon Bedrock gateway using Claude."""
 
     def __init__(self):
         self.client = boto3.client(
@@ -102,7 +102,7 @@ class BedrockService(AIService):
             logger.warning(
                 "Bedrock invocation timed out for model %s", effective_model_id
             )
-            raise AIServiceTimeoutError(
+            raise AIGatewayTimeoutError(
                 f"Bedrock invocation timed out for model {effective_model_id}"
             ) from exc
 
@@ -125,8 +125,8 @@ class BedrockService(AIService):
         """Generate a summary of the note content."""
         resolved_lang = self._resolve_language(language)
 
-        cache_service = get_cache_service()
-        cached_summary = cache_service.get_cached_summary(content, model_id)
+        summary_cache = get_summary_cache()
+        cached_summary = summary_cache.get_cached_summary(content, model_id)
         if cached_summary:
             return cached_summary, 0
 
@@ -139,7 +139,7 @@ class BedrockService(AIService):
         ]
 
         summary, total_tokens = self._invoke_model(messages, system, model_id=model_id)
-        cache_service.save_summary(content, model_id, summary)
+        summary_cache.save_summary(content, model_id, summary)
         return summary, total_tokens
 
     async def chat(
@@ -373,9 +373,9 @@ class BedrockService(AIService):
         return edited_content, total_tokens
 
 
-bedrock_service = BedrockService()
+bedrock_gateway = BedrockGateway()
 
 
-def get_ai_service() -> AIService:
-    """Get the AI service instance."""
-    return bedrock_service
+def get_ai_gateway() -> AIGateway:
+    """Get the AI gateway instance."""
+    return bedrock_gateway

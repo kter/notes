@@ -1,9 +1,9 @@
 import pytest
 from sqlmodel import Session
 
-from app.features.assistant.ai_service import AIService
 from app.features.assistant.errors import AITokenLimitExceededError
-from app.features.assistant.token_usage_service import get_usage_info, record_usage
+from app.features.assistant.gateway import AIGateway
+from app.features.assistant.usage_policy import get_usage_info, record_usage
 from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
 from app.features.assistant.use_cases.edit_jobs import EditJobUseCases
 from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
@@ -12,7 +12,7 @@ from app.shared import NotFound
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID
 
 
-class CapturingAIService(AIService):
+class CapturingAIGateway(AIGateway):
     def __init__(self) -> None:
         self.calls: list[dict[str, str]] = []
 
@@ -78,11 +78,11 @@ async def test_summarize_note_uses_user_settings_and_records_usage(session: Sess
     )
     session.commit()
 
-    ai_service = CapturingAIService()
+    ai_gateway = CapturingAIGateway()
     use_cases = AIInteractionUseCases(
         session,
         TEST_USER_ID,
-        ai_service,
+        ai_gateway,
         WorkspaceQueryUseCases(session, TEST_USER_ID),
     )
 
@@ -90,7 +90,7 @@ async def test_summarize_note_uses_user_settings_and_records_usage(session: Sess
 
     assert summary == "summary"
     assert tokens_used == 12
-    assert ai_service.calls == [
+    assert ai_gateway.calls == [
         {
             "operation": "summarize",
             "content": "Hello world",
@@ -117,7 +117,7 @@ async def test_execute_edit_rejects_users_over_token_limit(session: Session):
     use_cases = AIInteractionUseCases(
         session,
         TEST_USER_ID,
-        CapturingAIService(),
+        CapturingAIGateway(),
         WorkspaceQueryUseCases(session, TEST_USER_ID),
     )
 

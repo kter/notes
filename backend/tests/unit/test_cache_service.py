@@ -2,7 +2,7 @@ import hashlib
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.features.assistant.cache_service import CacheService
+from app.features.assistant.summary_cache import SummaryCache
 
 
 class TestCacheService(unittest.TestCase):
@@ -14,7 +14,7 @@ class TestCacheService(unittest.TestCase):
         self.mock_boto3_client.return_value = self.mock_s3
 
         # Initialize service with mocked boto3
-        self.cache_service = CacheService()
+        self.cache_service = SummaryCache()
 
     def tearDown(self):
         self.boto3_client_patcher.stop()

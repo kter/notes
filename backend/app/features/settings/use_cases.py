@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from sqlmodel import Session
 
 from app.db_commit import commit_with_error_handling
-from app.features.assistant.token_usage_service import get_usage_info
+from app.features.assistant.usage_policy import get_usage_info
 from app.features.settings.schemas import SettingsResponse
 from app.models import (
     AVAILABLE_LANGUAGES,

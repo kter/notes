@@ -1,4 +1,4 @@
-"""Token usage tracking service."""
+"""Token usage policy and accounting."""
 
 import logging
 from datetime import UTC, datetime

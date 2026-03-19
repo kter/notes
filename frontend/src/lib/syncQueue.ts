@@ -8,6 +8,8 @@ import { ApiError } from "./api";
 import {
   getWorkspaceSyncRequestMetadata,
   persistWorkspaceSnapshot,
+  isConflictApiError,
+  refreshWorkspaceSnapshot,
 } from "./workspaceSync";
 import type {
   Folder,
@@ -24,6 +26,7 @@ interface SyncResult {
   failedCount: number;
   errors: Error[];
   snapshot?: WorkspaceChangesResponse["snapshot"];
+  errorCode?: "conflict";
 }
 
 type ApiClient = {
@@ -32,6 +35,7 @@ type ApiClient = {
     base_cursor?: string;
     changes: WorkspaceChangeRequest[];
   }) => Promise<WorkspaceChangesResponse>;
+  getWorkspaceSnapshot: () => Promise<WorkspaceChangesResponse["snapshot"]>;
 };
 
 class SyncQueueManager {
@@ -125,7 +129,15 @@ class SyncQueueManager {
         result.syncedCount = changes.length;
         result.snapshot = response.snapshot;
       } catch (error) {
-        if (this.isPermanentError(error)) {
+        if (isConflictApiError(error)) {
+          const snapshot = await refreshWorkspaceSnapshot(apiClient);
+          for (const change of changes) {
+            await notesDB.removePendingChange(change.id);
+          }
+          result.snapshot = snapshot;
+          result.errorCode = "conflict";
+          result.success = false;
+        } else if (this.isPermanentError(error)) {
           for (const change of changes) {
             await notesDB.removePendingChange(change.id);
           }

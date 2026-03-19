@@ -74,6 +74,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   const {
     isOnline,
     syncStatus: offlineSyncStatus,
+    lastErrorMessage: offlineSyncErrorMessage,
     pendingChangesCount,
   } = useOfflineSync();
 
@@ -149,6 +150,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     savedHashes,
     isOnline,
     offlineSyncStatus,
+    offlineSyncErrorMessage,
     pendingChangesCount,
     tokenUsage,
     chatMessages,

@@ -2,12 +2,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import type { Folder } from "@/types";
 
 const getApiMock = vi.fn();
 const dispatchWorkspaceSyncedMock = vi.fn();
+const refreshWorkspaceSnapshotMock = vi.fn();
 const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
   device_id: "device-1",
   base_cursor: "cursor-1",
@@ -38,6 +40,10 @@ vi.mock("@/lib/syncQueue", () => ({
 vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
   dispatchWorkspaceSynced: (...args: unknown[]) => dispatchWorkspaceSyncedMock(...args),
+  refreshWorkspaceSnapshot: (...args: unknown[]) =>
+    refreshWorkspaceSnapshotMock(...args),
+  isConflictApiError: (error: unknown) =>
+    error instanceof ApiError && error.status === 409,
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
 }));
 
@@ -176,5 +182,29 @@ describe("useFolders", () => {
       undefined,
       { expectedVersion: initialFolder.version }
     );
+  });
+
+  it("refreshes the workspace snapshot instead of queueing on rename conflicts", async () => {
+    const initialFolder = buildFolder();
+    const apiClient = {
+      applyWorkspaceChanges: vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(409, "Conflict", { detail: "stale version" })),
+      getWorkspaceSnapshot: vi.fn(),
+    };
+    getApiMock.mockResolvedValue(apiClient);
+    refreshWorkspaceSnapshotMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useFoldersHarness([initialFolder]));
+
+    await act(async () => {
+      await result.current.handleRenameFolder(initialFolder.id, "Renamed");
+    });
+
+    await waitFor(() => {
+      expect(refreshWorkspaceSnapshotMock).toHaveBeenCalledWith(apiClient);
+    });
+
+    expect(syncQueue.addChange).not.toHaveBeenCalled();
   });
 });

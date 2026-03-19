@@ -1,4 +1,5 @@
 import { notesDB } from "@/lib/indexedDB";
+import { ApiError } from "@/lib/api";
 import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
 
 export const WORKSPACE_SYNCED_EVENT = "workspace:synced";
@@ -84,6 +85,19 @@ export function getWorkspaceSyncRequestMetadata(): {
     device_id: getWorkspaceDeviceId(),
     ...(cursor ? { base_cursor: cursor } : {}),
   };
+}
+
+export function isConflictApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 409;
+}
+
+export async function refreshWorkspaceSnapshot(apiClient: {
+  getWorkspaceSnapshot: () => Promise<WorkspaceSnapshotResponse>;
+}): Promise<WorkspaceSnapshotResponse> {
+  const snapshot = await apiClient.getWorkspaceSnapshot();
+  await persistWorkspaceSnapshot(snapshot);
+  dispatchWorkspaceSynced({ snapshot });
+  return snapshot;
 }
 
 export function dispatchWorkspaceSynced(

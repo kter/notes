@@ -8,7 +8,9 @@ import { syncQueue } from "@/lib/syncQueue";
 import {
   dispatchWorkspaceSynced,
   getWorkspaceSyncRequestMetadata,
+  isConflictApiError,
   persistWorkspaceSnapshot,
+  refreshWorkspaceSnapshot,
 } from "@/lib/workspaceSync";
 import type { Folder } from "@/types";
 
@@ -71,6 +73,11 @@ export function useFolders(
           dispatchWorkspaceSynced({ snapshot: response.snapshot });
           return;
         } catch (error) {
+          if (isConflictApiError(error)) {
+            const apiClient = await getApi();
+            await refreshWorkspaceSnapshot(apiClient);
+            return;
+          }
           console.error("Failed to create folder:", error);
         }
       }
@@ -123,6 +130,11 @@ export function useFolders(
           dispatchWorkspaceSynced({ snapshot: response.snapshot });
           return;
         } catch (error) {
+          if (isConflictApiError(error)) {
+            const apiClient = await getApi();
+            await refreshWorkspaceSnapshot(apiClient);
+            return;
+          }
           console.error("Failed to rename folder:", error);
         }
       }
@@ -175,6 +187,11 @@ export function useFolders(
           dispatchWorkspaceSynced({ snapshot: response.snapshot });
           return;
         } catch (error) {
+          if (isConflictApiError(error)) {
+            const apiClient = await getApi();
+            await refreshWorkspaceSnapshot(apiClient);
+            return;
+          }
           console.error("Failed to delete folder:", error);
         }
       }

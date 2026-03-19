@@ -8,7 +8,9 @@ import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
 import {
   getWorkspaceSyncRequestMetadata,
+  isConflictApiError,
   persistWorkspaceSnapshot,
+  refreshWorkspaceSnapshot,
 } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
 import type { Note } from "@/types";
@@ -91,6 +93,13 @@ export function useNoteSyncEngine({
             setRemoteStatus("synced");
             setLocalStatus("saved");
           } catch (error) {
+            if (isConflictApiError(error)) {
+              const apiClient = await getApi();
+              await refreshWorkspaceSnapshot(apiClient);
+              setRemoteStatus("failed");
+              setLastError(t("sync.conflictReloaded"));
+              return;
+            }
             console.error("Failed to sync note to server:", error);
             await syncQueue.addChange("update", "note", id, updates, {
               expectedVersion,
@@ -186,6 +195,13 @@ export function useNoteSyncEngine({
         await persistWorkspaceSnapshot(response.snapshot);
         setRemoteStatus("synced");
       } catch (error) {
+        if (isConflictApiError(error)) {
+          const apiClient = await getApi();
+          await refreshWorkspaceSnapshot(apiClient);
+          setRemoteStatus("failed");
+          setLastError(t("sync.conflictReloaded"));
+          return;
+        }
         console.error("Failed to create note on server:", error);
         await syncQueue.addChange("create", "note", tempId, {
           title: "",
@@ -203,7 +219,7 @@ export function useNoteSyncEngine({
       folder_id: selectedFolderId,
     });
     setRemoteStatus("failed");
-  }, [getApi, selectedFolderId, setNotes, setSelectedNoteId]);
+  }, [getApi, selectedFolderId, setNotes, setSelectedNoteId, t]);
 
   const handleUpdateNote = useCallback(
     async (id: string, updates: NoteSyncUpdates) => {
@@ -281,6 +297,13 @@ export function useNoteSyncEngine({
               ],
             });
           } catch (error) {
+            if (isConflictApiError(error)) {
+              const apiClient = await getApi();
+              await refreshWorkspaceSnapshot(apiClient);
+              setRemoteStatus("failed");
+              setLastError(t("sync.conflictReloaded"));
+              return;
+            }
             console.error("Failed to delete note on server:", error);
             if (!id.startsWith("temp-")) {
               await syncQueue.addChange("delete", "note", id, undefined, {
@@ -300,7 +323,7 @@ export function useNoteSyncEngine({
         console.error("Failed to delete note:", error);
       }
     },
-    [cancelServerSync, getApi, selectedNoteId, setNotes, setSelectedNoteId]
+    [cancelServerSync, getApi, selectedNoteId, setNotes, setSelectedNoteId, t]
   );
 
   const triggerServerSync = useCallback(

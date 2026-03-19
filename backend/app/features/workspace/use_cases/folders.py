@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.features.workspace.repositories.folders import FolderRepository
+from app.features.workspace.repositories import FolderRepository
 from app.models import Folder, FolderCreate, FolderUpdate
 
 

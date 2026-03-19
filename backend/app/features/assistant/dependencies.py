@@ -6,10 +6,9 @@ from sqlmodel import Session
 from app.auth import UserId
 from app.database import get_session
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
-from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
-from app.features.assistant.use_cases.edit_jobs import EditJobUseCases
+from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
 from app.features.workspace.dependencies import get_workspace_query_use_cases
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 
 
 def get_ai_interaction_use_cases(

@@ -8,8 +8,7 @@ from app.features.workspace.dependencies import (
     get_note_export_use_case,
     get_note_use_cases,
 )
-from app.features.workspace.use_cases.note_exports import NoteExportUseCase
-from app.features.workspace.use_cases.notes import NoteUseCases
+from app.features.workspace.use_cases import NoteExportUseCase, NoteUseCases
 from app.models import NoteCreate, NoteRead, NoteUpdate
 
 router = APIRouter()

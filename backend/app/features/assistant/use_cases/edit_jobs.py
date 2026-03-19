@@ -6,7 +6,7 @@ from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     require_non_empty,
 )
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIEditJob, AIEditJobCreate
 from app.shared import NotFound
 

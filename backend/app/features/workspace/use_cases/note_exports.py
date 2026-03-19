@@ -5,8 +5,7 @@ from datetime import datetime
 
 from sqlmodel import Session
 
-from app.features.workspace.repositories.folders import FolderRepository
-from app.features.workspace.repositories.notes import NoteRepository
+from app.features.workspace.repositories import FolderRepository, NoteRepository
 
 
 @dataclass(frozen=True)

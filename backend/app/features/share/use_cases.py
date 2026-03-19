@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import Note, NoteShare, SharedNoteRead
 from app.shared import NotFound, ShareExpired, ValidationFailed
 

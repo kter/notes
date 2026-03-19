@@ -4,9 +4,8 @@ from sqlmodel import Session
 from app.features.assistant.errors import AITokenLimitExceededError
 from app.features.assistant.gateway import AIGateway
 from app.features.assistant.usage_policy import get_usage_info, record_usage
-from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
-from app.features.assistant.use_cases.edit_jobs import EditJobUseCases
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIEditJob, Note, UserSettings
 from app.shared import NotFound
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import Note
 from app.models.enums import ChatScope
 from app.shared import ValidationFailed

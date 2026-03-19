@@ -12,7 +12,7 @@ from app.features.assistant.use_cases.common import (
     get_user_settings,
     require_non_empty,
 )
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models.enums import ChatScope
 
 

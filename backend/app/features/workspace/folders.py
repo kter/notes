@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 
 from app.features.workspace.dependencies import get_folder_use_cases
-from app.features.workspace.use_cases.folders import FolderUseCases
+from app.features.workspace.use_cases import FolderUseCases
 from app.models import FolderCreate, FolderRead, FolderUpdate
 
 router = APIRouter()

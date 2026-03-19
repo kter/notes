@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.features.workspace.repositories.notes import NoteRepository
+from app.features.workspace.repositories import NoteRepository
 from app.models import Note, NoteCreate, NoteUpdate
 
 

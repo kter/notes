@@ -22,8 +22,7 @@ from app.features.assistant.schemas import (
     SummarizeRequest,
     SummarizeResponse,
 )
-from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
-from app.features.assistant.use_cases.edit_jobs import EditJobUseCases
+from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
 from app.models import AIEditJobCreate, AIEditJobRead
 
 router = APIRouter()

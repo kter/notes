@@ -16,8 +16,8 @@ from app.features.assistant.errors import (
     AITokenLimitExceededError,
 )
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
-from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.assistant.use_cases import AIInteractionUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIEditJob
 
 logger = logging.getLogger(__name__)

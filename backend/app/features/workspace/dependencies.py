@@ -5,10 +5,12 @@ from sqlmodel import Session
 
 from app.auth import UserId
 from app.database import get_session
-from app.features.workspace.use_cases.folders import FolderUseCases
-from app.features.workspace.use_cases.note_exports import NoteExportUseCase
-from app.features.workspace.use_cases.notes import NoteUseCases
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import (
+    FolderUseCases,
+    NoteExportUseCase,
+    NoteUseCases,
+    WorkspaceQueryUseCases,
+)
 
 
 def get_folder_use_cases(

@@ -7,7 +7,7 @@ from app.auth import UserId
 from app.database import get_session
 from app.features.share.use_cases import ShareUseCases
 from app.features.workspace.dependencies import get_workspace_query_use_cases
-from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.features.workspace.use_cases import WorkspaceQueryUseCases
 
 
 def get_share_use_cases(

@@ -28,6 +28,10 @@ vi.mock("@/lib/indexedDB", () => ({
   notesDB: {
     saveNote: vi.fn(),
     deleteNote: vi.fn(),
+    getNote: vi.fn(),
+    saveNotes: vi.fn(),
+    saveFolders: vi.fn(),
+    deleteFolder: vi.fn(),
   },
 }));
 
@@ -50,8 +54,10 @@ function buildNote(overrides: Partial<Note> = {}): Note {
     content: overrides.content ?? "Content",
     user_id: overrides.user_id ?? "user-1",
     folder_id: overrides.folder_id ?? null,
+    version: overrides.version ?? 1,
     created_at: overrides.created_at ?? "2024-01-01T00:00:00.000Z",
     updated_at: overrides.updated_at ?? "2024-01-01T00:00:00.000Z",
+    deleted_at: overrides.deleted_at ?? null,
   };
 }
 
@@ -64,7 +70,6 @@ function useNotesHarness(
   const [selectedNoteId, setSelectedNoteId] = useState(initialSelectedNoteId);
 
   return {
-    notes,
     selectedNoteId,
     ...useNotes(notes, setNotes, selectedFolderId, selectedNoteId, setSelectedNoteId),
   };
@@ -76,6 +81,10 @@ describe("useNotes", () => {
     vi.mocked(calculateHash).mockResolvedValue("hash-123");
     vi.mocked(notesDB.saveNote).mockResolvedValue();
     vi.mocked(notesDB.deleteNote).mockResolvedValue();
+    vi.mocked(notesDB.getNote).mockResolvedValue(undefined);
+    vi.mocked(notesDB.saveNotes).mockResolvedValue();
+    vi.mocked(notesDB.saveFolders).mockResolvedValue();
+    vi.mocked(notesDB.deleteFolder).mockResolvedValue();
     vi.mocked(syncQueue.addChange).mockResolvedValue();
     Object.defineProperty(window.navigator, "onLine", {
       configurable: true,
@@ -91,9 +100,24 @@ describe("useNotes", () => {
     });
 
     getApiMock.mockResolvedValue({
-      createNote: vi.fn().mockResolvedValue(serverNote),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
+      applyWorkspaceChanges: vi.fn().mockResolvedValue({
+        applied: [
+          {
+            entity: "note",
+            operation: "create",
+            entity_id: serverNote.id,
+            client_mutation_id: null,
+            folder: null,
+            note: serverNote,
+          },
+        ],
+        snapshot: {
+          folders: [],
+          notes: [serverNote],
+          cursor: "cursor-1",
+          server_time: "2024-01-01T00:00:00.000Z",
+        },
+      }),
     });
 
     const { result } = renderHook(() => useNotesHarness([], "folder-1"));
@@ -107,7 +131,8 @@ describe("useNotes", () => {
       expect(result.current.selectedNoteId).toBe("server-note-1");
     });
 
-    expect(notesDB.saveNote).toHaveBeenCalledTimes(2);
+    expect(notesDB.saveNote).toHaveBeenCalledTimes(1);
+    expect(notesDB.saveNotes).toHaveBeenCalledWith([serverNote]);
     expect(notesDB.deleteNote).toHaveBeenCalledWith(expect.stringMatching(/^temp-/));
     expect(result.current.syncStatus.remote).toBe("synced");
     expect(result.current.savedHashes).toEqual({ "server-note-1": "hash-123" });
@@ -121,12 +146,27 @@ describe("useNotes", () => {
       content: "Updated content",
       updated_at: "2024-01-02T00:00:00.000Z",
     });
-    const updateNoteMock = vi.fn().mockResolvedValue(serverNote);
+    const applyWorkspaceChangesMock = vi.fn().mockResolvedValue({
+      applied: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: initialNote.id,
+          client_mutation_id: null,
+          folder: null,
+          note: serverNote,
+        },
+      ],
+      snapshot: {
+        folders: [],
+        notes: [serverNote],
+        cursor: "cursor-1",
+        server_time: "2024-01-02T00:00:00.000Z",
+      },
+    });
 
     getApiMock.mockResolvedValue({
-      createNote: vi.fn(),
-      updateNote: updateNoteMock,
-      deleteNote: vi.fn(),
+      applyWorkspaceChanges: applyWorkspaceChangesMock,
     });
 
     const { result } = renderHook(() => useNotesHarness([initialNote], null, initialNote.id));
@@ -148,7 +188,17 @@ describe("useNotes", () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
 
-    expect(updateNoteMock).toHaveBeenCalledWith(initialNote.id, { content: "Updated content" });
+    expect(applyWorkspaceChangesMock).toHaveBeenCalledWith({
+      changes: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: initialNote.id,
+          expected_version: initialNote.version,
+          payload: { content: "Updated content" },
+        },
+      ],
+    });
     expect(result.current.syncStatus.remote).toBe("synced");
 
     expect(result.current.notes[0]?.updated_at).toBe("2024-01-02T00:00:00.000Z");
@@ -179,9 +229,13 @@ describe("useNotes", () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
 
-    expect(syncQueue.addChange).toHaveBeenCalledWith("update", "note", initialNote.id, {
-      content: "Offline update",
-    });
+    expect(syncQueue.addChange).toHaveBeenCalledWith(
+      "update",
+      "note",
+      initialNote.id,
+      { content: "Offline update" },
+      { expectedVersion: initialNote.version }
+    );
     expect(result.current.syncStatus.remote).toBe("failed");
     expect(result.current.syncStatus.lastError).toBe("Cannot sync while offline");
 

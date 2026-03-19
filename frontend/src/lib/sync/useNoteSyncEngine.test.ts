@@ -30,6 +30,10 @@ vi.mock("@/lib/indexedDB", () => ({
   notesDB: {
     saveNote: vi.fn(),
     deleteNote: vi.fn(),
+    getNote: vi.fn(),
+    saveNotes: vi.fn(),
+    saveFolders: vi.fn(),
+    deleteFolder: vi.fn(),
   },
 }));
 
@@ -52,8 +56,10 @@ function buildNote(overrides: Partial<Note> = {}): Note {
     content: overrides.content ?? "Content",
     user_id: overrides.user_id ?? "user-1",
     folder_id: overrides.folder_id ?? null,
+    version: overrides.version ?? 1,
     created_at: overrides.created_at ?? "2024-01-01T00:00:00.000Z",
     updated_at: overrides.updated_at ?? "2024-01-01T00:00:00.000Z",
+    deleted_at: overrides.deleted_at ?? null,
   };
 }
 
@@ -83,6 +89,10 @@ describe("useNoteSyncEngine", () => {
     vi.mocked(calculateHash).mockResolvedValue("hash-123");
     vi.mocked(notesDB.saveNote).mockResolvedValue();
     vi.mocked(notesDB.deleteNote).mockResolvedValue();
+    vi.mocked(notesDB.getNote).mockResolvedValue(undefined);
+    vi.mocked(notesDB.saveNotes).mockResolvedValue();
+    vi.mocked(notesDB.saveFolders).mockResolvedValue();
+    vi.mocked(notesDB.deleteFolder).mockResolvedValue();
     vi.mocked(syncQueue.addChange).mockResolvedValue();
     Object.defineProperty(window.navigator, "onLine", {
       configurable: true,
@@ -98,9 +108,24 @@ describe("useNoteSyncEngine", () => {
     });
 
     getApiMock.mockResolvedValue({
-      createNote: vi.fn().mockResolvedValue(serverNote),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
+      applyWorkspaceChanges: vi.fn().mockResolvedValue({
+        applied: [
+          {
+            entity: "note",
+            operation: "create",
+            entity_id: serverNote.id,
+            client_mutation_id: null,
+            folder: null,
+            note: serverNote,
+          },
+        ],
+        snapshot: {
+          folders: [],
+          notes: [serverNote],
+          cursor: "cursor-1",
+          server_time: "2024-01-01T00:00:00.000Z",
+        },
+      }),
     });
 
     const { result } = renderHook(() =>
@@ -144,6 +169,8 @@ describe("useNoteSyncEngine", () => {
 
     expect(syncQueue.addChange).toHaveBeenCalledWith("update", "note", initialNote.id, {
       content: "Offline update",
+    }, {
+      expectedVersion: 1,
     });
     expect(result.current.syncStatus.remote).toBe("failed");
     expect(result.current.syncStatus.lastError).toBe("Cannot sync while offline");

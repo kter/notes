@@ -9,8 +9,10 @@ describe('mergeNotes', () => {
     content: 'Content',
     user_id: 'u1',
     folder_id: null,
+    version: 1,
     created_at: '2023-01-01T10:00:00Z',
     updated_at: '2023-01-01T10:00:00Z',
+    deleted_at: null,
   };
 
   it('should prefer server note if timestamps are equal', () => {
@@ -30,8 +32,8 @@ describe('mergeNotes', () => {
   });
 
   it('should prefer local note if local is newer', () => {
-    const local = { ...baseNote, title: 'Local', updated_at: '2023-01-01T10:00:02Z' }; // Newer
-    const server = { ...baseNote, title: 'Server', updated_at: '2023-01-01T10:00:01Z' };
+    const local = { ...baseNote, title: 'Local', version: 2, updated_at: '2023-01-01T10:00:02Z' };
+    const server = { ...baseNote, title: 'Server', version: 1, updated_at: '2023-01-01T10:00:01Z' };
     
     const result = mergeNotes([local], [server]);
     expect(result[0].title).toBe('Local');
@@ -55,6 +57,14 @@ describe('mergeNotes', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('2');
   });
+
+  it('should remove notes deleted on the server', () => {
+    const local = { ...baseNote, title: 'Local' };
+    const server = { ...baseNote, deleted_at: '2023-01-01T10:00:03Z' };
+
+    const result = mergeNotes([local], [server]);
+    expect(result).toHaveLength(0);
+  });
 });
 
 describe('mergeFolders', () => {
@@ -62,8 +72,10 @@ describe('mergeFolders', () => {
     id: '1',
     name: 'Folder',
     user_id: 'u1',
+    version: 1,
     created_at: '2023-01-01T10:00:00Z',
     updated_at: '2023-01-01T10:00:00Z',
+    deleted_at: null,
   };
 
   it('should merge folders similar to notes', () => {

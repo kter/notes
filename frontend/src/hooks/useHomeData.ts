@@ -4,6 +4,13 @@ import { useAuth } from "@/lib/auth-context";
 import { useApi } from "./useApi";
 import { notesDB } from "@/lib/indexedDB";
 import { mergeNotes, mergeFolders } from "@/lib/merge";
+import {
+  WORKSPACE_SYNCED_EVENT,
+  getActiveFolders,
+  getActiveNotes,
+  persistWorkspaceSnapshot,
+  type WorkspaceSyncedEventDetail,
+} from "@/lib/workspaceSync";
 
 export function useHomeData(isAuthenticated: boolean) {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -41,23 +48,17 @@ export function useHomeData(isAuthenticated: boolean) {
         // 2. Fetch from API to get latest data
         if (navigator.onLine) {
           const apiClient = await getApi();
-          
-          const [serverFolders, serverNotes] = await Promise.all([
-            apiClient.listFolders(),
-            apiClient.listNotes(),
-          ]);
+          const snapshot = await apiClient.getWorkspaceSnapshot();
+          const serverFolders = getActiveFolders(snapshot);
+          const serverNotes = getActiveNotes(snapshot);
 
-          // 3. Merge strategy: Last Write Wins
-          // Use our merge utility to handle conflicts based on updated_at
           const mergedFolders = mergeFolders(localFolders, serverFolders);
           const mergedNotes = mergeNotes(localNotes, serverNotes);
-          
+
           setFolders(mergedFolders);
           setNotes(mergedNotes);
 
-          // 4. Update IndexedDB with server data
-          await notesDB.saveFolders(serverFolders);
-          await notesDB.saveNotes(serverNotes);
+          await persistWorkspaceSnapshot(snapshot);
         }
       } catch (error) {
         console.error("Failed to load data:", error);
@@ -72,6 +73,19 @@ export function useHomeData(isAuthenticated: boolean) {
       loadData();
     }
   }, [isAuthenticated, authLoading, getApi]);
+
+  useEffect(() => {
+    const handleWorkspaceSynced = (event: Event) => {
+      const { detail } = event as CustomEvent<WorkspaceSyncedEventDetail>;
+      setFolders(getActiveFolders(detail.snapshot));
+      setNotes(getActiveNotes(detail.snapshot));
+    };
+
+    window.addEventListener(WORKSPACE_SYNCED_EVENT, handleWorkspaceSynced);
+    return () => {
+      window.removeEventListener(WORKSPACE_SYNCED_EVENT, handleWorkspaceSynced);
+    };
+  }, []);
 
   // Reset fetch flag when authentication changes
   useEffect(() => {

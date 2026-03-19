@@ -10,6 +10,10 @@ vi.mock("./indexedDB", () => ({
     addPendingChange: vi.fn(),
     removePendingChange: vi.fn(),
     clearPendingChanges: vi.fn(),
+    deleteNote: vi.fn(),
+    deleteFolder: vi.fn(),
+    saveNotes: vi.fn(),
+    saveFolders: vi.fn(),
   },
 }));
 
@@ -20,6 +24,7 @@ function buildChange(overrides: Partial<PendingChange> = {}): PendingChange {
     entityType: overrides.entityType ?? "note",
     entityId: overrides.entityId ?? "note-1",
     data: overrides.data ?? { content: "content" },
+    expectedVersion: overrides.expectedVersion,
     timestamp: overrides.timestamp ?? 1,
   };
 }
@@ -86,11 +91,9 @@ describe("syncQueue", () => {
     ]);
 
     const apiClient = {
-      createNote: vi.fn(),
-      updateNote: vi
+      applyWorkspaceChanges: vi
         .fn()
         .mockRejectedValueOnce(new ApiError(404, "Not Found", { detail: "missing" })),
-      deleteNote: vi.fn().mockResolvedValue(undefined),
     };
 
     const result = await syncQueue.processQueue(apiClient);
@@ -99,7 +102,7 @@ describe("syncQueue", () => {
     expect(notesDB.removePendingChange).toHaveBeenNthCalledWith(2, "change-success");
     expect(result).toEqual({
       success: true,
-      syncedCount: 1,
+      syncedCount: 0,
       failedCount: 0,
       errors: [],
     });
@@ -115,11 +118,9 @@ describe("syncQueue", () => {
     ]);
 
     const apiClient = {
-      createNote: vi.fn(),
-      updateNote: vi
+      applyWorkspaceChanges: vi
         .fn()
         .mockRejectedValueOnce(new ApiError(429, "Too Many Requests", { detail: "retry later" })),
-      deleteNote: vi.fn(),
     };
 
     const result = await syncQueue.processQueue(apiClient);
@@ -128,5 +129,77 @@ describe("syncQueue", () => {
     expect(result.success).toBe(false);
     expect(result.failedCount).toBe(1);
     expect(result.errors).toHaveLength(1);
+  });
+
+  it("batches pending changes through workspace changes and persists the snapshot", async () => {
+    vi.mocked(notesDB.getPendingChanges).mockResolvedValue([
+      buildChange({
+        id: "change-create",
+        type: "create",
+        entityId: "temp-note-1",
+        data: { title: "Draft", content: "" },
+      }),
+      buildChange({
+        id: "change-update",
+        type: "update",
+        entityId: "note-1",
+        data: { content: "After" },
+        expectedVersion: 3,
+      }),
+    ]);
+
+    const snapshot = {
+      cursor: "cursor-1",
+      server_time: "2024-01-01T00:00:00.000Z",
+      folders: [],
+      notes: [
+        {
+          id: "note-1",
+          title: "Title",
+          content: "After",
+          user_id: "user-1",
+          folder_id: null,
+          version: 4,
+          created_at: "2024-01-01T00:00:00.000Z",
+          updated_at: "2024-01-01T00:00:01.000Z",
+          deleted_at: null,
+        },
+      ],
+    };
+
+    const apiClient = {
+      applyWorkspaceChanges: vi.fn().mockResolvedValue({
+        applied: [],
+        snapshot,
+      }),
+    };
+
+    const result = await syncQueue.processQueue(apiClient);
+
+    expect(apiClient.applyWorkspaceChanges).toHaveBeenCalledWith({
+      device_id: "web",
+      changes: [
+        {
+          entity: "note",
+          operation: "create",
+          entity_id: undefined,
+          client_mutation_id: "change-create",
+          expected_version: undefined,
+          payload: { title: "Draft", content: "" },
+        },
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: "note-1",
+          client_mutation_id: "change-update",
+          expected_version: 3,
+          payload: { content: "After" },
+        },
+      ],
+    });
+    expect(notesDB.deleteNote).toHaveBeenCalledWith("temp-note-1");
+    expect(notesDB.saveNotes).toHaveBeenCalledWith(snapshot.notes);
+    expect(result.snapshot).toEqual(snapshot);
+    expect(result.syncedCount).toBe(2);
   });
 });

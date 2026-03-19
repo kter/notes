@@ -6,6 +6,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
+import { persistWorkspaceSnapshot } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
 import type { Note } from "@/types";
 
@@ -49,24 +50,36 @@ export function useNoteSyncEngine({
   const activeSavePromiseRef = useRef<Promise<void> | null>(null);
 
   const syncNoteToServer = useCallback(
-    async (id: string, updates: NoteSyncUpdates) => {
+    async (id: string, updates: NoteSyncUpdates, expectedVersion?: number) => {
       if (navigator.onLine) {
         const task = async () => {
           setRemoteStatus("syncing");
           setLastError(undefined);
           try {
             const apiClient = await getApi();
-            const serverNote = await apiClient.updateNote(id, updates);
+            const response = await apiClient.applyWorkspaceChanges({
+              changes: [
+                {
+                  entity: "note",
+                  operation: "update",
+                  entity_id: id,
+                  expected_version: expectedVersion,
+                  payload: updates,
+                },
+              ],
+            });
+            const serverNote = response.applied[0]?.note;
+            if (!serverNote) {
+              throw new Error("Workspace changes response did not include the updated note");
+            }
 
             setNotes((prev) =>
               prev.map((note) =>
-                note.id === id
-                  ? { ...note, updated_at: serverNote.updated_at }
-                  : note
+                note.id === id ? serverNote : note
               )
             );
 
-            await notesDB.saveNote(serverNote);
+            await persistWorkspaceSnapshot(response.snapshot);
 
             const hash = await calculateHash(serverNote.content);
             setSavedHashes((prev) => ({ ...prev, [id]: hash }));
@@ -75,7 +88,9 @@ export function useNoteSyncEngine({
             setLocalStatus("saved");
           } catch (error) {
             console.error("Failed to sync note to server:", error);
-            await syncQueue.addChange("update", "note", id, updates);
+            await syncQueue.addChange("update", "note", id, updates, {
+              expectedVersion,
+            });
             setRemoteStatus("failed");
             setLastError(t("sync.serverSyncFailed"));
           } finally {
@@ -91,7 +106,9 @@ export function useNoteSyncEngine({
         return;
       }
 
-      await syncQueue.addChange("update", "note", id, updates);
+      await syncQueue.addChange("update", "note", id, updates, {
+        expectedVersion,
+      });
       setRemoteStatus("failed");
       setLastError(t("sync.offlineSyncUnavailable"));
     },
@@ -114,8 +131,10 @@ export function useNoteSyncEngine({
       content: "",
       folder_id: selectedFolderId,
       user_id: "",
+      version: 1,
       created_at: now,
       updated_at: now,
+      deleted_at: null,
     };
 
     setNotes((prev) => [newNote, ...prev]);
@@ -132,11 +151,23 @@ export function useNoteSyncEngine({
       setRemoteStatus("syncing");
       try {
         const apiClient = await getApi();
-        const serverNote = await apiClient.createNote({
-          title: "",
-          content: "",
-          folder_id: selectedFolderId,
+        const response = await apiClient.applyWorkspaceChanges({
+          changes: [
+            {
+              entity: "note",
+              operation: "create",
+              payload: {
+                title: "",
+                content: "",
+                folder_id: selectedFolderId,
+              },
+            },
+          ],
         });
+        const serverNote = response.applied[0]?.note;
+        if (!serverNote) {
+          throw new Error("Workspace changes response did not include the created note");
+        }
 
         const hash = await calculateHash(serverNote.content);
         setSavedHashes((prev) => ({ ...prev, [serverNote.id]: hash }));
@@ -147,7 +178,7 @@ export function useNoteSyncEngine({
         setSelectedNoteId(serverNote.id);
 
         await notesDB.deleteNote(tempId);
-        await notesDB.saveNote(serverNote);
+        await persistWorkspaceSnapshot(response.snapshot);
         setRemoteStatus("synced");
       } catch (error) {
         console.error("Failed to create note on server:", error);
@@ -174,7 +205,17 @@ export function useNoteSyncEngine({
       let noteForLocalSave: Note | undefined;
       setNotes((prev) => {
         noteForLocalSave = prev.find((note) => note.id === id);
-        return prev.map((note) => (note.id === id ? { ...note, ...updates } : note));
+        return prev.map((note) =>
+          note.id === id
+            ? {
+                ...note,
+                ...updates,
+                version: note.version + 1,
+                updated_at: new Date().toISOString(),
+                deleted_at: null,
+              }
+            : note
+        );
       });
 
       try {
@@ -182,7 +223,9 @@ export function useNoteSyncEngine({
           const updatedNote = {
             ...noteForLocalSave,
             ...updates,
+            version: noteForLocalSave.version + 1,
             updated_at: new Date().toISOString(),
+            deleted_at: null,
           };
           await notesDB.saveNote(updatedNote);
           setLocalStatus("saved");
@@ -194,7 +237,7 @@ export function useNoteSyncEngine({
       }
 
       setRemoteStatus("unsynced");
-      debouncedServerSync(id, updates);
+      debouncedServerSync(id, updates, noteForLocalSave?.version);
     },
     [debouncedServerSync, setNotes, t]
   );
@@ -203,6 +246,7 @@ export function useNoteSyncEngine({
     async (id: string) => {
       try {
         cancelServerSync();
+        const noteToDelete = await notesDB.getNote(id);
 
         setNotes((prev) => prev.filter((note) => note.id !== id));
         if (selectedNoteId === id) {
@@ -220,18 +264,31 @@ export function useNoteSyncEngine({
         if (navigator.onLine) {
           try {
             const apiClient = await getApi();
-            await apiClient.deleteNote(id);
+            await apiClient.applyWorkspaceChanges({
+              changes: [
+                {
+                  entity: "note",
+                  operation: "delete",
+                  entity_id: id,
+                  expected_version: noteToDelete?.version,
+                },
+              ],
+            });
           } catch (error) {
             console.error("Failed to delete note on server:", error);
             if (!id.startsWith("temp-")) {
-              await syncQueue.addChange("delete", "note", id);
+              await syncQueue.addChange("delete", "note", id, undefined, {
+                expectedVersion: noteToDelete?.version,
+              });
             }
           }
           return;
         }
 
         if (!id.startsWith("temp-")) {
-          await syncQueue.addChange("delete", "note", id);
+          await syncQueue.addChange("delete", "note", id, undefined, {
+            expectedVersion: noteToDelete?.version,
+          });
         }
       } catch (error) {
         console.error("Failed to delete note:", error);

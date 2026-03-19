@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue, type SyncStatus } from "@/lib/syncQueue";
+import { dispatchWorkspaceSynced } from "@/lib/workspaceSync";
 import { useApi } from "./useApi";
 
 interface UseOfflineSyncReturn {
@@ -52,6 +53,9 @@ export function useOfflineSync(): UseOfflineSyncReturn {
       const result = await syncQueue.processQueue(apiClient);
 
       if (result.success) {
+        if (result.snapshot) {
+          dispatchWorkspaceSynced({ snapshot: result.snapshot });
+        }
         setSyncStatus("idle");
         setLastSyncTime(new Date());
       } else if (result.failedCount > 0) {

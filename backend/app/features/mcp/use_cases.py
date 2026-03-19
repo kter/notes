@@ -5,7 +5,6 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import Response
 from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
@@ -24,8 +23,8 @@ logger = logging.getLogger(__name__)
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "")
 
 
-class MCPService:
-    """Application service for MCP token lifecycle flows."""
+class MCPUseCases:
+    """Application use cases for MCP token lifecycle flows."""
 
     def __init__(self, session: Session, user_id: str):
         self.session = session
@@ -98,7 +97,7 @@ class MCPService:
             ]
         )
 
-    def revoke_token(self, token_id: str) -> Response:
+    def revoke_token(self, token_id: str) -> dict[str, str]:
         token = self._get_token(token_id)
         if token.revoked_at:
             raise ValidationFailed("API key already revoked")
@@ -108,11 +107,9 @@ class MCPService:
         commit_with_error_handling(self.session, "MCPToken")
 
         logger.info("Revoked MCP API key %s for user %s", token_id, self.user_id)
-        return Response(
-            status_code=200, content='{"message":"API key revoked successfully"}'
-        )
+        return {"message": "API key revoked successfully"}
 
-    def restore_token(self, token_id: str) -> Response:
+    def restore_token(self, token_id: str) -> dict[str, str]:
         token = self._get_token(token_id)
         if not token.revoked_at:
             raise ValidationFailed("Can only restore revoked API keys")
@@ -122,19 +119,15 @@ class MCPService:
         commit_with_error_handling(self.session, "MCPToken")
 
         logger.info("Restored MCP API key %s for user %s", token_id, self.user_id)
-        return Response(
-            status_code=200, content='{"message":"API key restored successfully"}'
-        )
+        return {"message": "API key restored successfully"}
 
-    def delete_token(self, token_id: str) -> Response:
+    def delete_token(self, token_id: str) -> dict[str, str]:
         token = self._get_token(token_id)
         self.session.delete(token)
         commit_with_error_handling(self.session, "MCPToken")
 
         logger.info("Deleted MCP API key %s for user %s", token_id, self.user_id)
-        return Response(
-            status_code=200, content='{"message":"API key deleted successfully"}'
-        )
+        return {"message": "API key deleted successfully"}
 
     @staticmethod
     def get_settings() -> MCPSettingsResponse:

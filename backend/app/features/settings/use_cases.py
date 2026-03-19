@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from sqlmodel import Session
 
 from app.db_commit import commit_with_error_handling
+from app.features.assistant.token_usage_service import get_usage_info
+from app.features.settings.schemas import SettingsResponse
 from app.models import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
@@ -11,19 +13,40 @@ from app.models import (
     AvailableLanguage,
     AvailableModel,
     UserSettings,
+    UserSettingsRead,
     UserSettingsUpdate,
 )
 from app.shared import ValidationFailed
 
 
-class SettingsService:
-    """Application service for user settings flows."""
+class SettingsUseCases:
+    """Application use cases for user settings flows."""
 
     def __init__(self, session: Session, user_id: str):
         self.session = session
         self.user_id = user_id
 
-    def get_or_create_settings(self) -> UserSettings:
+    def get_settings_response(self) -> SettingsResponse:
+        settings = self._get_or_create_settings()
+        return SettingsResponse(
+            settings=self._to_settings_read(settings),
+            available_models=self.available_models(),
+            available_languages=self.available_languages(),
+            token_usage=get_usage_info(self.session, self.user_id),
+        )
+
+    def update_settings_response(
+        self, settings_in: UserSettingsUpdate
+    ) -> SettingsResponse:
+        settings = self._update_settings(settings_in)
+        return SettingsResponse(
+            settings=self._to_settings_read(settings),
+            available_models=self.available_models(),
+            available_languages=self.available_languages(),
+            token_usage=get_usage_info(self.session, self.user_id),
+        )
+
+    def _get_or_create_settings(self) -> UserSettings:
         settings = self.session.get(UserSettings, self.user_id)
         if settings is not None:
             return settings
@@ -37,7 +60,7 @@ class SettingsService:
         self.session.refresh(settings)
         return settings
 
-    def update_settings(self, settings_in: UserSettingsUpdate) -> UserSettings:
+    def _update_settings(self, settings_in: UserSettingsUpdate) -> UserSettings:
         settings = self.session.get(UserSettings, self.user_id)
 
         if settings is None:
@@ -69,6 +92,16 @@ class SettingsService:
         commit_with_error_handling(self.session, "UserSettings")
         self.session.refresh(settings)
         return settings
+
+    def _to_settings_read(self, settings: UserSettings) -> UserSettingsRead:
+        return UserSettingsRead(
+            user_id=settings.user_id,
+            llm_model_id=settings.llm_model_id,
+            language=settings.language,
+            token_limit=settings.token_limit,
+            created_at=settings.created_at,
+            updated_at=settings.updated_at,
+        )
 
     @staticmethod
     def available_models() -> list[AvailableModel]:

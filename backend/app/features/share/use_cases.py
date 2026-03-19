@@ -9,8 +9,8 @@ from app.models import Note, NoteShare, SharedNoteRead
 from app.shared import NotFound, ShareExpired, ValidationFailed
 
 
-class ShareService:
-    """Application service for note sharing flows."""
+class ShareUseCases:
+    """Application use cases for note sharing flows."""
 
     def __init__(self, session: Session, user_id: str | None = None):
         self.session = session

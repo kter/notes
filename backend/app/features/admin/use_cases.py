@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
+from app.db_commit import commit_with_error_handling
 from app.features.admin.schemas import (
     AdminUserDetailResponse,
     AdminUserListItem,
@@ -25,8 +26,8 @@ from app.models.user_settings import DEFAULT_LANGUAGE, DEFAULT_LLM_MODEL_ID
 from app.shared import NotFound, ValidationFailed
 
 
-class AdminService:
-    """Application service for admin console user management."""
+class AdminUseCases:
+    """Application use cases for admin console user management."""
 
     def __init__(self, session: Session):
         self.session = session
@@ -85,7 +86,9 @@ class AdminService:
             available_languages=AVAILABLE_LANGUAGES,
         )
 
-    def update_user(self, user_id: str, payload: AdminUserUpdateRequest) -> None:
+    def update_user(
+        self, user_id: str, payload: AdminUserUpdateRequest
+    ) -> AdminUserDetailResponse:
         app_user = self.session.get(AppUser, user_id)
         if app_user is None:
             raise NotFound("User not found")
@@ -128,6 +131,9 @@ class AdminService:
 
             settings.updated_at = now
             self.session.add(settings)
+
+        commit_with_error_handling(self.session, "AdminUserUpdate")
+        return self.get_user_detail(user_id)
 
     def _count_for_user(
         self, model: type[Note | Folder | MCPToken], user_id: str

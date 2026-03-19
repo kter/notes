@@ -2,11 +2,10 @@ import pytest
 from sqlmodel import Session
 
 from app.features.assistant.ai_service import AIService
-from app.features.assistant.service import (
-    AIApplicationService,
-    AITokenLimitExceededError,
-)
+from app.features.assistant.errors import AITokenLimitExceededError
 from app.features.assistant.token_usage_service import get_usage_info, record_usage
+from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
+from app.features.assistant.use_cases.edit_jobs import EditJobUseCases
 from app.models import AIEditJob, Note, UserSettings
 from app.shared import NotFound
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID
@@ -79,9 +78,9 @@ async def test_summarize_note_uses_user_settings_and_records_usage(session: Sess
     session.commit()
 
     ai_service = CapturingAIService()
-    service = AIApplicationService(session, TEST_USER_ID, ai_service)
+    use_cases = AIInteractionUseCases(session, TEST_USER_ID, ai_service)
 
-    summary, tokens_used = await service.summarize_note(note.id)
+    summary, tokens_used = await use_cases.summarize_note(note.id)
 
     assert summary == "summary"
     assert tokens_used == 12
@@ -109,10 +108,10 @@ async def test_execute_edit_rejects_users_over_token_limit(session: Session):
     session.commit()
     record_usage(session, TEST_USER_ID, 1)
 
-    service = AIApplicationService(session, TEST_USER_ID, CapturingAIService())
+    use_cases = AIInteractionUseCases(session, TEST_USER_ID, CapturingAIService())
 
     with pytest.raises(AITokenLimitExceededError):
-        await service.execute_edit(content="Hello", instruction="Fix typos")
+        await use_cases.execute_edit(content="Hello", instruction="Fix typos")
 
 
 def test_get_edit_job_enforces_user_scope(session: Session):
@@ -120,9 +119,9 @@ def test_get_edit_job_enforces_user_scope(session: Session):
     session.add(job)
     session.commit()
 
-    service = AIApplicationService(session, TEST_USER_ID)
+    use_cases = EditJobUseCases(session, TEST_USER_ID)
 
     with pytest.raises(NotFound) as exc_info:
-        service.get_edit_job(job.id)
+        use_cases.get_job(job.id)
 
     assert exc_info.value.detail == "Edit job not found"

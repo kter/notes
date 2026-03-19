@@ -11,12 +11,12 @@ from sqlmodel import Session
 
 from app.database import get_dsql_engine
 from app.features.assistant.ai_service import AIService, get_ai_service
-from app.features.assistant.service import (
+from app.features.assistant.errors import (
     AI_EDIT_JOB_TIMEOUT_MESSAGE,
-    AIApplicationService,
     AIApplicationTimeoutError,
     AITokenLimitExceededError,
 )
+from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
 from app.models import AIEditJob
 
 logger = logging.getLogger(__name__)
@@ -74,12 +74,12 @@ async def process_edit_job(
         session.commit()
 
         try:
-            application_service = AIApplicationService(
+            interaction_use_cases = AIInteractionUseCases(
                 session=session,
                 user_id=job.user_id,
                 ai_service=ai_service,
             )
-            edited_content, tokens_used = await application_service.execute_edit(
+            edited_content, tokens_used = await interaction_use_cases.execute_edit(
                 content=job.content,
                 instruction=job.instruction,
             )

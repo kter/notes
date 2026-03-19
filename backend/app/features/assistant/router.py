@@ -2,12 +2,17 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlmodel import Session
 
 from app.auth import UserId
-from app.database import get_session
-from app.features.assistant.ai_service import AIService, get_ai_service
+from app.features.assistant.dependencies import (
+    get_ai_interaction_use_cases,
+    get_edit_job_use_cases,
+)
 from app.features.assistant.edit_jobs import dispatch_edit_job
+from app.features.assistant.errors import (
+    AIApplicationTimeoutError,
+    AITokenLimitExceededError,
+)
 from app.features.assistant.schemas import (
     ChatRequest,
     ChatResponse,
@@ -17,22 +22,11 @@ from app.features.assistant.schemas import (
     SummarizeRequest,
     SummarizeResponse,
 )
-from app.features.assistant.service import (
-    TOKEN_LIMIT_EXCEEDED_MESSAGE,
-    AIApplicationService,
-    AIApplicationTimeoutError,
-    AITokenLimitExceededError,
-)
-from app.features.assistant.token_usage_service import check_limit
+from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
+from app.features.assistant.use_cases.edit_jobs import EditJobUseCases
 from app.models import AIEditJobCreate, AIEditJobRead
 
 router = APIRouter()
-
-
-def _get_ai_application_service(
-    session: Session, user_id: str, ai_service: AIService | None = None
-) -> AIApplicationService:
-    return AIApplicationService(session=session, user_id=user_id, ai_service=ai_service)
 
 
 def _raise_ai_http_error(exc: Exception) -> None:
@@ -51,22 +45,15 @@ def _raise_ai_http_error(exc: Exception) -> None:
     raise exc
 
 
-def _check_token_limit(session: Session, user_id: str) -> None:
-    if not check_limit(session, user_id):
-        _raise_ai_http_error(AITokenLimitExceededError(TOKEN_LIMIT_EXCEEDED_MESSAGE))
-
-
 @router.post("/summarize", response_model=SummarizeResponse)
 async def summarize_note(
     request: SummarizeRequest,
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
-    ai_service: Annotated[AIService, Depends(get_ai_service)],
+    use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
 ):
     """Summarize a note's content using AI."""
-    application_service = _get_ai_application_service(session, user_id, ai_service)
     try:
-        summary, tokens_used = await application_service.summarize_note(request.note_id)
+        summary, tokens_used = await use_cases.summarize_note(request.note_id)
     except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
         _raise_ai_http_error(exc)
 
@@ -77,13 +64,11 @@ async def summarize_note(
 async def chat_with_context(
     request: ChatRequest,
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
-    ai_service: Annotated[AIService, Depends(get_ai_service)],
+    use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
 ):
     """Chat with AI about notes' content."""
-    application_service = _get_ai_application_service(session, user_id, ai_service)
     try:
-        answer, tokens_used = await application_service.chat_with_context(
+        answer, tokens_used = await use_cases.chat_with_context(
             scope=request.scope,
             question=request.question,
             history=request.history,
@@ -100,13 +85,11 @@ async def chat_with_context(
 async def edit_note_content(
     request: EditRequest,
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
-    ai_service: Annotated[AIService, Depends(get_ai_service)],
+    use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
 ):
     """Edit note content using AI based on user instructions."""
-    application_service = _get_ai_application_service(session, user_id, ai_service)
     try:
-        edited_content, tokens_used = await application_service.edit_content(
+        edited_content, tokens_used = await use_cases.edit_content(
             content=request.content,
             instruction=request.instruction,
             note_id=request.note_id,
@@ -126,12 +109,11 @@ async def create_edit_job(
     request: AIEditJobCreate,
     background_tasks: BackgroundTasks,
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    use_cases: Annotated[EditJobUseCases, Depends(get_edit_job_use_cases)],
 ):
     """Queue a long-running AI edit request and return a pollable job resource."""
-    application_service = _get_ai_application_service(session, user_id)
     try:
-        job = application_service.create_edit_job(request)
+        job = use_cases.create_job(request)
     except AITokenLimitExceededError as exc:
         _raise_ai_http_error(exc)
 
@@ -144,9 +126,8 @@ async def create_edit_job(
 async def get_edit_job(
     job_id: UUID,
     user_id: UserId,
-    session: Annotated[Session, Depends(get_session)],
+    use_cases: Annotated[EditJobUseCases, Depends(get_edit_job_use_cases)],
 ):
     """Poll an AI edit job."""
-    application_service = _get_ai_application_service(session, user_id)
-    job = application_service.get_edit_job(job_id)
+    job = use_cases.get_job(job_id)
     return AIEditJobRead.model_validate(job)

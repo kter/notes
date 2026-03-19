@@ -8,7 +8,7 @@ from app.bootstrap import RequestDatabaseInitializer
 from app.config import get_settings
 from app.database import create_db_and_tables, get_session
 from app.features import admin, assistant, images, mcp, settings, share
-from app.features.workspace import folders_router, notes_router
+from app.features.workspace import folders_router, notes_router, snapshot_router
 from app.http_errors import to_http_exception
 from app.observability import init_sentry
 from app.shared import DomainError
@@ -45,6 +45,7 @@ app.add_middleware(
 # Include routers
 app.include_router(folders_router, prefix="/api/folders", tags=["folders"])
 app.include_router(notes_router, prefix="/api/notes", tags=["notes"])
+app.include_router(snapshot_router, prefix="/api/workspace", tags=["workspace"])
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(assistant.router, prefix="/api/ai", tags=["ai"])
 app.include_router(mcp.router)

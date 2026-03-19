@@ -19,6 +19,9 @@ class WorkspaceQueryUseCases:
     def get_owned_folder(self, folder_id: UUID) -> Folder:
         return self.folder_repository.get_owned(folder_id)
 
+    def list_folders(self) -> list[Folder]:
+        return self.folder_repository.list()
+
     def list_folder_notes(self, folder_id: UUID) -> list[Note]:
         return self.note_repository.list(folder_id)
 

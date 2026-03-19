@@ -10,6 +10,7 @@ from app.features.workspace.use_cases import (
     NoteExportUseCase,
     NoteUseCases,
     WorkspaceQueryUseCases,
+    WorkspaceSnapshotUseCase,
 )
 
 
@@ -39,3 +40,10 @@ def get_workspace_query_use_cases(
     user_id: UserId,
 ) -> WorkspaceQueryUseCases:
     return WorkspaceQueryUseCases(session, user_id)
+
+
+def get_workspace_snapshot_use_case(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> WorkspaceSnapshotUseCase:
+    return WorkspaceSnapshotUseCase(session, user_id)

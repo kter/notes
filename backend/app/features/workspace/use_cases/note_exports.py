@@ -2,13 +2,11 @@ import io
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
 from sqlmodel import Session
 
 from app.features.workspace.folder_repository import FolderRepository
 from app.features.workspace.note_repository import NoteRepository
-from app.models import Note, NoteCreate, NoteUpdate
 
 
 @dataclass(frozen=True)
@@ -17,33 +15,18 @@ class NoteExportArchive:
     data: bytes
 
 
-class NoteService:
-    """Application service for note CRUD flows."""
+class NoteExportUseCase:
+    """Build a ZIP archive for all notes owned by the current user."""
 
     def __init__(self, session: Session, user_id: str):
-        self.repository = NoteRepository(session, user_id)
+        self.note_repository = NoteRepository(session, user_id)
         self.folder_repository = FolderRepository(session, user_id)
 
-    def list_notes(self, folder_id: UUID | None = None) -> list[Note]:
-        return self.repository.list(folder_id)
-
-    def create_note(self, note_in: NoteCreate) -> Note:
-        return self.repository.create(note_in)
-
-    def get_note(self, note_id: UUID) -> Note:
-        return self.repository.get_owned(note_id)
-
-    def update_note(self, note_id: UUID, note_in: NoteUpdate) -> Note:
-        return self.repository.update(note_id, note_in)
-
-    def delete_note(self, note_id: UUID) -> None:
-        self.repository.delete_owned(note_id)
-
-    def export_notes_archive(self) -> NoteExportArchive:
+    def export_archive(self) -> NoteExportArchive:
         folders = self.folder_repository.list()
         folder_map = {folder.id: folder.name for folder in folders}
         notes = sorted(
-            self.repository.list(),
+            self.note_repository.list(),
             key=lambda note: (
                 folder_map.get(note.folder_id, ""),
                 note.title,

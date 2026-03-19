@@ -1,0 +1,31 @@
+from typing import Annotated
+
+from fastapi import Depends
+from sqlmodel import Session
+
+from app.auth import UserId
+from app.database import get_session
+from app.features.workspace.use_cases.folders import FolderUseCases
+from app.features.workspace.use_cases.note_exports import NoteExportUseCase
+from app.features.workspace.use_cases.notes import NoteUseCases
+
+
+def get_folder_use_cases(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> FolderUseCases:
+    return FolderUseCases(session, user_id)
+
+
+def get_note_use_cases(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> NoteUseCases:
+    return NoteUseCases(session, user_id)
+
+
+def get_note_export_use_case(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+) -> NoteExportUseCase:
+    return NoteExportUseCase(session, user_id)

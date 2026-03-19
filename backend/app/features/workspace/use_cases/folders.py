@@ -6,8 +6,8 @@ from app.features.workspace.folder_repository import FolderRepository
 from app.models import Folder, FolderCreate, FolderUpdate
 
 
-class FolderService:
-    """Application service for folder CRUD flows."""
+class FolderUseCases:
+    """Application use cases for folder CRUD flows."""
 
     def __init__(self, session: Session, user_id: str):
         self.repository = FolderRepository(session, user_id)

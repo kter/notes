@@ -1,0 +1,112 @@
+from sqlmodel import Session
+
+from app.features.workspace.schemas import (
+    WorkspaceAppliedChange,
+    WorkspaceChangesRequest,
+    WorkspaceChangesResponse,
+)
+from app.features.workspace.use_cases.folders import FolderUseCases
+from app.features.workspace.use_cases.notes import NoteUseCases
+from app.features.workspace.use_cases.snapshot import WorkspaceSnapshotUseCase
+from app.models import (
+    FolderCreate,
+    FolderRead,
+    FolderUpdate,
+    NoteCreate,
+    NoteRead,
+    NoteUpdate,
+)
+from app.shared import ValidationFailed
+
+
+class WorkspaceChangesUseCase:
+    """Apply a batch of workspace mutations and return an updated snapshot."""
+
+    def __init__(self, session: Session, user_id: str):
+        self.folder_use_cases = FolderUseCases(session, user_id)
+        self.note_use_cases = NoteUseCases(session, user_id)
+        self.snapshot_use_case = WorkspaceSnapshotUseCase(session, user_id)
+
+    def apply_changes(
+        self, request: WorkspaceChangesRequest
+    ) -> WorkspaceChangesResponse:
+        applied = [self._apply_change(change) for change in request.changes]
+        return WorkspaceChangesResponse(
+            applied=applied,
+            snapshot=self.snapshot_use_case.get_snapshot(),
+        )
+
+    def _apply_change(self, change) -> WorkspaceAppliedChange:
+        if change.entity == "folder":
+            return self._apply_folder_change(change)
+        if change.entity == "note":
+            return self._apply_note_change(change)
+        raise ValidationFailed(f"Unsupported workspace entity: {change.entity}")
+
+    def _apply_folder_change(self, change) -> WorkspaceAppliedChange:
+        if change.operation == "create":
+            folder = self.folder_use_cases.create_folder(
+                FolderCreate.model_validate(change.payload)
+            )
+            return WorkspaceAppliedChange(
+                entity="folder",
+                operation="create",
+                entity_id=folder.id,
+                client_mutation_id=change.client_mutation_id,
+                folder=FolderRead.model_validate(folder),
+            )
+
+        if change.operation == "update":
+            folder = self.folder_use_cases.update_folder(
+                change.entity_id,
+                FolderUpdate.model_validate(change.payload),
+            )
+            return WorkspaceAppliedChange(
+                entity="folder",
+                operation="update",
+                entity_id=folder.id,
+                client_mutation_id=change.client_mutation_id,
+                folder=FolderRead.model_validate(folder),
+            )
+
+        self.folder_use_cases.delete_folder(change.entity_id)
+        return WorkspaceAppliedChange(
+            entity="folder",
+            operation="delete",
+            entity_id=change.entity_id,
+            client_mutation_id=change.client_mutation_id,
+        )
+
+    def _apply_note_change(self, change) -> WorkspaceAppliedChange:
+        if change.operation == "create":
+            note = self.note_use_cases.create_note(
+                NoteCreate.model_validate(change.payload)
+            )
+            return WorkspaceAppliedChange(
+                entity="note",
+                operation="create",
+                entity_id=note.id,
+                client_mutation_id=change.client_mutation_id,
+                note=NoteRead.model_validate(note),
+            )
+
+        if change.operation == "update":
+            note = self.note_use_cases.update_note(
+                change.entity_id,
+                NoteUpdate.model_validate(change.payload),
+            )
+            return WorkspaceAppliedChange(
+                entity="note",
+                operation="update",
+                entity_id=note.id,
+                client_mutation_id=change.client_mutation_id,
+                note=NoteRead.model_validate(note),
+            )
+
+        self.note_use_cases.delete_note(change.entity_id)
+        return WorkspaceAppliedChange(
+            entity="note",
+            operation="delete",
+            entity_id=change.entity_id,
+            client_mutation_id=change.client_mutation_id,
+        )

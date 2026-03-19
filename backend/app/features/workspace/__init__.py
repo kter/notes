@@ -9,6 +9,7 @@ if TYPE_CHECKING:
         FolderUseCases,
         NoteExportUseCase,
         NoteUseCases,
+        WorkspaceChangesUseCase,
         WorkspaceQueryUseCases,
         WorkspaceSnapshotUseCase,
     )
@@ -19,9 +20,11 @@ __all__ = [
     "NoteExportUseCase",
     "NoteRepository",
     "NoteUseCases",
+    "WorkspaceChangesUseCase",
     "WorkspaceSnapshotResponse",
     "WorkspaceQueryUseCases",
     "WorkspaceSnapshotUseCase",
+    "changes_router",
     "folders_router",
     "notes_router",
     "snapshot_router",
@@ -29,6 +32,10 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
+    if name == "changes_router":
+        from app.features.workspace.changes import router
+
+        return router
     if name == "folders_router":
         from app.features.workspace.folders import router
 
@@ -50,6 +57,7 @@ def __getattr__(name: str) -> Any:
 
         return getattr(repositories, name)
     if name in {
+        "WorkspaceChangesUseCase",
         "FolderUseCases",
         "NoteExportUseCase",
         "NoteUseCases",

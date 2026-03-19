@@ -13,8 +13,8 @@ from app.features.images.router import router as images_router
 from app.features.mcp.router import router as mcp_router
 from app.features.settings.router import router as settings_router
 from app.features.share.router import router as share_router
-from app.features.workspace.folders_router import router as folders_router
-from app.features.workspace.notes_router import router as notes_router
+from app.features.workspace.folders import router as folders_router
+from app.features.workspace.notes import router as notes_router
 from app.http_errors import to_http_exception
 from app.observability import init_sentry
 from app.shared import DomainError

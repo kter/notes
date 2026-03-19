@@ -6,7 +6,7 @@ from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     require_non_empty,
 )
-from app.features.workspace.query_service import WorkspaceQueryService
+from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
 from app.models import AIEditJob, AIEditJobCreate
 from app.shared import NotFound
 
@@ -14,10 +14,15 @@ from app.shared import NotFound
 class EditJobUseCases:
     """Application use cases for creating and fetching AI edit jobs."""
 
-    def __init__(self, session: Session, user_id: str):
+    def __init__(
+        self,
+        session: Session,
+        user_id: str,
+        workspace_queries: WorkspaceQueryUseCases,
+    ):
         self.session = session
         self.user_id = user_id
-        self.workspace_queries = WorkspaceQueryService(session, user_id)
+        self.workspace_queries = workspace_queries
 
     def create_job(self, job_in: AIEditJobCreate) -> AIEditJob:
         require_non_empty(job_in.content, "Content is empty")

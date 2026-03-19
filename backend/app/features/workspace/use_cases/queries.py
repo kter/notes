@@ -7,8 +7,8 @@ from app.features.workspace.note_repository import NoteRepository
 from app.models import Folder, Note
 
 
-class WorkspaceQueryService:
-    """Read-oriented access to workspace resources for other features."""
+class WorkspaceQueryUseCases:
+    """Read-oriented workspace access for same-feature and cross-feature flows."""
 
     def __init__(self, session: Session, user_id: str):
         self.note_repository = NoteRepository(session, user_id)

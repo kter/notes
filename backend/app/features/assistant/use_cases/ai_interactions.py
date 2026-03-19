@@ -12,19 +12,25 @@ from app.features.assistant.use_cases.common import (
     get_user_settings,
     require_non_empty,
 )
-from app.features.workspace.query_service import WorkspaceQueryService
+from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
 from app.models.enums import ChatScope
 
 
 class AIInteractionUseCases:
     """Application use cases for AI-backed note interactions."""
 
-    def __init__(self, session: Session, user_id: str, ai_service: AIService):
+    def __init__(
+        self,
+        session: Session,
+        user_id: str,
+        ai_service: AIService,
+        workspace_queries: WorkspaceQueryUseCases,
+    ):
         self.session = session
         self.user_id = user_id
         self.ai_service = ai_service
-        self.context_service = ContextService(session, user_id)
-        self.workspace_queries = WorkspaceQueryService(session, user_id)
+        self.workspace_queries = workspace_queries
+        self.context_service = ContextService(workspace_queries)
 
     async def summarize_note(self, note_id: UUID) -> tuple[str, int]:
         note = self.workspace_queries.get_owned_note(note_id)

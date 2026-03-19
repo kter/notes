@@ -1,18 +1,15 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlmodel import Session
-
-from app.auth import UserId
-from app.features.workspace.query_service import WorkspaceQueryService
+from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
 from app.models import Note
 from app.models.enums import ChatScope
 from app.shared import ValidationFailed
 
 
 class ContextService:
-    def __init__(self, session: Session, user_id: UserId):
-        self.workspace_queries = WorkspaceQueryService(session, user_id)
+    def __init__(self, workspace_queries: WorkspaceQueryUseCases):
+        self.workspace_queries = workspace_queries
 
     def _format_notes(self, notes: Sequence[Note]) -> str:
         return "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])

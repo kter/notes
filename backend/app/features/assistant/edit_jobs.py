@@ -17,6 +17,7 @@ from app.features.assistant.errors import (
     AITokenLimitExceededError,
 )
 from app.features.assistant.use_cases.ai_interactions import AIInteractionUseCases
+from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
 from app.models import AIEditJob
 
 logger = logging.getLogger(__name__)
@@ -74,10 +75,12 @@ async def process_edit_job(
         session.commit()
 
         try:
+            workspace_queries = WorkspaceQueryUseCases(session, job.user_id)
             interaction_use_cases = AIInteractionUseCases(
                 session=session,
                 user_id=job.user_id,
                 ai_service=ai_service,
+                workspace_queries=workspace_queries,
             )
             edited_content, tokens_used = await interaction_use_cases.execute_edit(
                 content=job.content,

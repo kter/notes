@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
-from app.features.workspace.query_service import WorkspaceQueryService
+from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
 from app.models import Note, NoteShare, SharedNoteRead
 from app.shared import NotFound, ShareExpired, ValidationFailed
 
@@ -12,12 +12,13 @@ from app.shared import NotFound, ShareExpired, ValidationFailed
 class ShareUseCases:
     """Application use cases for note sharing flows."""
 
-    def __init__(self, session: Session, user_id: str | None = None):
+    def __init__(
+        self,
+        session: Session,
+        workspace_queries: WorkspaceQueryUseCases | None = None,
+    ):
         self.session = session
-        self.user_id = user_id
-        self.workspace_queries = (
-            WorkspaceQueryService(session, user_id) if user_id is not None else None
-        )
+        self.workspace_queries = workspace_queries
 
     def create_share(self, note_id: UUID) -> NoteShare:
         self._ensure_owned_note(note_id)
@@ -73,5 +74,7 @@ class ShareUseCases:
 
     def _ensure_owned_note(self, note_id: UUID) -> Note:
         if self.workspace_queries is None:
-            raise ValidationFailed("user_id is required for authenticated share flows")
+            raise ValidationFailed(
+                "workspace queries are required for authenticated share flows"
+            )
         return self.workspace_queries.get_owned_note(note_id)

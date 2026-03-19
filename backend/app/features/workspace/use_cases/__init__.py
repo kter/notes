@@ -1,1 +1,1 @@
-"""Workspace write-side use cases."""
+"""Workspace feature use cases."""

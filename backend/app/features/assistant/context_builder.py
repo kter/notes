@@ -7,14 +7,14 @@ from app.models.enums import ChatScope
 from app.shared import ValidationFailed
 
 
-class ContextService:
+class ContextBuilder:
     def __init__(self, workspace_queries: WorkspaceQueryUseCases):
         self.workspace_queries = workspace_queries
 
     def _format_notes(self, notes: Sequence[Note]) -> str:
         return "\n\n".join([f"Note: {n.title}\n{n.content}" for n in notes])
 
-    def get_context(
+    def build(
         self,
         scope: ChatScope,
         note_id: UUID | None = None,

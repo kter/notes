@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.features.assistant.context import ContextService
+from app.features.assistant.context_builder import ContextBuilder
 from app.features.assistant.errors import AI_TIMEOUT_MESSAGE, AIApplicationTimeoutError
 from app.features.assistant.gateway import AIGateway, AIGatewayTimeoutError
 from app.features.assistant.usage_policy import record_usage
@@ -30,7 +30,7 @@ class AIInteractionUseCases:
         self.user_id = user_id
         self.ai_gateway = ai_gateway
         self.workspace_queries = workspace_queries
-        self.context_service = ContextService(workspace_queries)
+        self.context_builder = ContextBuilder(workspace_queries)
 
     async def summarize_note(self, note_id: UUID) -> tuple[str, int]:
         note = self.workspace_queries.get_owned_note(note_id)
@@ -52,7 +52,7 @@ class AIInteractionUseCases:
         note_id: UUID | None = None,
         folder_id: UUID | None = None,
     ) -> tuple[str, int]:
-        content = self.context_service.get_context(
+        content = self.context_builder.build(
             scope=scope, note_id=note_id, folder_id=folder_id
         )
         return await self._run_ai_call(

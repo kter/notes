@@ -1,17 +1,16 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const useHomeDataMock = vi.fn();
+const useWorkspaceSyncStateMock = vi.fn();
 const useFoldersMock = vi.fn();
 const useNotesMock = vi.fn();
-const useOfflineSyncMock = vi.fn();
 const useTokenUsageMock = vi.fn();
 const useAIChatMock = vi.fn();
 const useResizableMock = vi.fn();
 const useNoteFilterMock = vi.fn();
 
-vi.mock("@/hooks/useHomeData", () => ({
-  useHomeData: (...args: unknown[]) => useHomeDataMock(...args),
+vi.mock("./useWorkspaceSyncState", () => ({
+  useWorkspaceSyncState: (...args: unknown[]) => useWorkspaceSyncStateMock(...args),
 }));
 
 vi.mock("@/hooks/useFolders", () => ({
@@ -20,10 +19,6 @@ vi.mock("@/hooks/useFolders", () => ({
 
 vi.mock("@/hooks/useNotes", () => ({
   useNotes: (...args: unknown[]) => useNotesMock(...args),
-}));
-
-vi.mock("@/hooks/useOfflineSync", () => ({
-  useOfflineSync: (...args: unknown[]) => useOfflineSyncMock(...args),
 }));
 
 vi.mock("@/hooks/useTokenUsage", () => ({
@@ -48,7 +43,7 @@ describe("useWorkspaceState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    useHomeDataMock.mockReturnValue({
+    useWorkspaceSyncStateMock.mockReturnValue({
       folders: [{ id: "folder-1", name: "Folder 1" }],
       setFolders: vi.fn(),
       notes: [
@@ -64,6 +59,10 @@ describe("useWorkspaceState", () => {
       ],
       setNotes: vi.fn(),
       isLoading: false,
+      isOnline: true,
+      syncStatus: "idle",
+      lastErrorMessage: null,
+      pendingChangesCount: 0,
     });
     useFoldersMock.mockReturnValue({
       handleCreateFolder: vi.fn(),
@@ -77,11 +76,6 @@ describe("useWorkspaceState", () => {
       handleDeleteNote: vi.fn(),
       triggerServerSync: vi.fn(),
       savedHashes: { "note-1": "hash-1" },
-    });
-    useOfflineSyncMock.mockReturnValue({
-      isOnline: true,
-      syncStatus: "synced",
-      pendingChangesCount: 0,
     });
     useTokenUsageMock.mockReturnValue({
       tokenUsage: null,

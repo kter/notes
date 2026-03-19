@@ -5,12 +5,12 @@ import { useCallback, useRef, useState } from "react";
 import type { MobileView } from "@/components/layout";
 import { useAIChat } from "@/hooks/useAIChat";
 import { useFolders } from "@/hooks/useFolders";
-import { useHomeData } from "@/hooks/useHomeData";
 import { useNoteFilter } from "@/hooks/useNoteFilter";
 import { useNotes } from "@/hooks/useNotes";
-import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useResizable } from "@/hooks/useResizable";
 import { useTokenUsage } from "@/hooks/useTokenUsage";
+
+import { useWorkspaceSyncState } from "./useWorkspaceSyncState";
 
 export function useWorkspaceState(isAuthenticated: boolean) {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -34,7 +34,11 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     notes,
     setNotes,
     isLoading: isDataLoading,
-  } = useHomeData(isAuthenticated);
+    isOnline,
+    syncStatus: offlineSyncStatus,
+    lastErrorMessage: offlineSyncErrorMessage,
+    pendingChangesCount,
+  } = useWorkspaceSyncState(isAuthenticated);
 
   const { handleCreateFolder, handleRenameFolder, handleDeleteFolder } = useFolders(
     folders,
@@ -70,13 +74,6 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     selectedNoteId,
     handleSelectNote
   );
-
-  const {
-    isOnline,
-    syncStatus: offlineSyncStatus,
-    lastErrorMessage: offlineSyncErrorMessage,
-    pendingChangesCount,
-  } = useOfflineSync();
 
   const { tokenUsage, recordUsage } = useTokenUsage(isAuthenticated);
   const {

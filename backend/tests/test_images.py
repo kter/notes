@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app.auth.dependencies import get_current_user, get_user_id
+from app.auth import get_current_user, get_user_id
 from app.database import get_session
 from app.main import app
 

@@ -150,6 +150,6 @@ class TestGetSharedNote:
 
 
 # Note: Authorization tests (test_create_share_not_owner, test_cannot_get_share_of_others_note,
-# test_cannot_delete_share_of_others_note) are verified through the get_owned_resource pattern
-# which is tested in test_notes.py. The test fixture's make_client sharing global state prevents
+# test_cannot_delete_share_of_others_note) are covered by the shared ownership validation path
+# and tested in test_notes.py. The test fixture's make_client sharing global state prevents
 # reliable multi-user authorization tests in this context.

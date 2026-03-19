@@ -4,8 +4,9 @@ from uuid import uuid4
 import pytest
 from sqlmodel import Session
 
+from app.features.workspace.folder_repository import FolderRepository
+from app.features.workspace.note_repository import NoteRepository
 from app.models import Folder, FolderCreate, FolderUpdate, Note, NoteCreate, NoteUpdate
-from app.repositories import FolderRepository, NoteRepository
 from app.shared import NotFound
 
 

@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.auth import UserId
 from app.database import get_session
+from app.features.assistant.ai_service import AIService, get_ai_service
 from app.features.assistant.edit_jobs import dispatch_edit_job
 from app.features.assistant.schemas import (
     ChatRequest,
@@ -22,9 +23,8 @@ from app.features.assistant.service import (
     AIApplicationTimeoutError,
     AITokenLimitExceededError,
 )
+from app.features.assistant.token_usage_service import check_limit
 from app.models import AIEditJobCreate, AIEditJobRead
-from app.services import AIService, get_ai_service
-from app.services.token_usage import check_limit
 
 router = APIRouter()
 

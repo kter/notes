@@ -1,4 +1,4 @@
-from app.services.bedrock import (
+from app.features.assistant.ai_service import (
     AIService,
     AIServiceTimeoutError,
     BedrockService,

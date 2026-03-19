@@ -2,7 +2,7 @@ import hashlib
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.services.cache import CacheService
+from app.features.assistant.cache_service import CacheService
 
 
 class TestCacheService(unittest.TestCase):

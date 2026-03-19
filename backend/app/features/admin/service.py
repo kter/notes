@@ -9,6 +9,7 @@ from app.features.admin.schemas import (
     AdminUsersListResponse,
     AdminUserUpdateRequest,
 )
+from app.features.assistant.token_usage_service import get_usage_snapshot
 from app.models import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
@@ -21,7 +22,6 @@ from app.models import (
     UserSettingsRead,
 )
 from app.models.user_settings import DEFAULT_LANGUAGE, DEFAULT_LLM_MODEL_ID
-from app.services.token_usage import get_usage_snapshot
 from app.shared import NotFound, ValidationFailed
 
 

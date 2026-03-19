@@ -6,16 +6,16 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.main import app
-from app.models import Note
-from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
-from app.services import AIService, get_ai_service
-from app.services.token_usage import (
+from app.features.assistant.ai_service import AIService, get_ai_service
+from app.features.assistant.token_usage_service import (
     check_limit,
     get_or_create_current_period,
     get_usage_info,
     record_usage,
 )
+from app.main import app
+from app.models import Note
+from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
 from tests.conftest import TEST_USER_ID
 
 

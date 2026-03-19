@@ -5,12 +5,12 @@ from unittest.mock import Mock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from app.services.bedrock import EDIT_SINGLE_PASS_MAX_CHARS, BedrockService
+from app.features.assistant.ai_service import EDIT_SINGLE_PASS_MAX_CHARS, BedrockService
 
 
 @pytest.fixture
 def mock_settings():
-    with patch("app.services.bedrock.settings") as mock_settings:
+    with patch("app.features.assistant.ai_service.settings") as mock_settings:
         mock_settings.aws_region = "us-east-1"
         yield mock_settings
 

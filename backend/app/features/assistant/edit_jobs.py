@@ -10,6 +10,7 @@ from fastapi import BackgroundTasks
 from sqlmodel import Session
 
 from app.database import get_dsql_engine
+from app.features.assistant.ai_service import AIService, get_ai_service
 from app.features.assistant.service import (
     AI_EDIT_JOB_TIMEOUT_MESSAGE,
     AIApplicationService,
@@ -17,7 +18,6 @@ from app.features.assistant.service import (
     AITokenLimitExceededError,
 )
 from app.models import AIEditJob
-from app.services import AIService, get_ai_service
 
 logger = logging.getLogger(__name__)
 

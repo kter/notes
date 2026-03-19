@@ -5,10 +5,10 @@ from sqlmodel import Session
 
 from app.auth import UserId
 from app.database import get_session
+from app.features.assistant.token_usage_service import get_usage_info
 from app.features.settings.schemas import SettingsResponse
 from app.features.settings.service import SettingsService
 from app.models import UserSettingsRead, UserSettingsUpdate
-from app.services.token_usage import get_usage_info
 
 router = APIRouter()
 

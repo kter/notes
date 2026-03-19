@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 from fastapi import HTTPException
 
 from app.features.assistant.router import _check_token_limit
+from app.features.assistant.token_usage_service import check_limit
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
-from app.services.token_usage import check_limit
 
 
 def _make_session(tokens_used: int) -> MagicMock:
@@ -33,7 +33,7 @@ def _make_session(tokens_used: int) -> MagicMock:
 
 
 class TestCheckLimit(unittest.TestCase):
-    """Tests for app.services.token_usage.check_limit."""
+    """Tests for app.features.assistant.token_usage_service.check_limit."""
 
     def test_zero_usage_is_within_limit(self):
         session = _make_session(0)
@@ -58,7 +58,7 @@ class TestCheckLimit(unittest.TestCase):
 
 
 class TestCheckTokenLimitRouter(unittest.TestCase):
-    """Tests for the _check_token_limit helper in app.routers.ai.
+    """Tests for the _check_token_limit helper in app.features.assistant.router.
 
     This verifies that the router raises HTTP 429 when check_limit returns False
     and does nothing when check_limit returns True.

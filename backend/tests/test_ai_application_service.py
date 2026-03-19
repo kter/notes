@@ -1,13 +1,13 @@
 import pytest
 from sqlmodel import Session
 
+from app.features.assistant.ai_service import AIService
 from app.features.assistant.service import (
     AIApplicationService,
     AITokenLimitExceededError,
 )
+from app.features.assistant.token_usage_service import get_usage_info, record_usage
 from app.models import AIEditJob, Note, UserSettings
-from app.services import AIService
-from app.services.token_usage import get_usage_info, record_usage
 from app.shared import NotFound
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID
 

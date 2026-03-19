@@ -3,7 +3,9 @@ from uuid import UUID
 
 from sqlmodel import Session
 
+from app.features.assistant.ai_service import AIService, AIServiceTimeoutError
 from app.features.assistant.context import ContextService
+from app.features.assistant.token_usage_service import check_limit, record_usage
 from app.features.workspace.query_service import WorkspaceQueryService
 from app.models import (
     DEFAULT_LLM_MODEL_ID,
@@ -12,8 +14,6 @@ from app.models import (
     UserSettings,
 )
 from app.models.enums import ChatScope
-from app.services import AIService, AIServiceTimeoutError
-from app.services.token_usage import check_limit, record_usage
 from app.shared import NotFound, ValidationFailed
 
 TOKEN_LIMIT_EXCEEDED_MESSAGE = "Monthly token limit exceeded. Your usage will reset at the beginning of next month."  # noqa: S105

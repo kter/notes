@@ -5,10 +5,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.features.assistant.ai_service import (
+    AIService,
+    AIServiceTimeoutError,
+    get_ai_service,
+)
 from app.features.assistant.edit_jobs import process_edit_job
 from app.main import app
 from app.models import AIEditJob, Folder, Note
-from app.services import AIService, AIServiceTimeoutError, get_ai_service
 
 
 # Mock AI Service

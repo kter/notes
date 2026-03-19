@@ -125,3 +125,62 @@ class TestWorkspaceChanges:
 
         assert response.status_code == 409
         assert "version mismatch" in response.json()["detail"]
+
+    def test_replays_client_mutation_id_without_creating_duplicates(
+        self, client: TestClient
+    ):
+        request = {
+            "changes": [
+                {
+                    "entity": "note",
+                    "operation": "create",
+                    "client_mutation_id": "m-replay-note",
+                    "payload": {"title": "Replay Note", "content": "Body"},
+                }
+            ]
+        }
+
+        first_response = client.post("/api/workspace/changes", json=request)
+        second_response = client.post("/api/workspace/changes", json=request)
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+
+        first_data = first_response.json()
+        second_data = second_response.json()
+        assert first_data["applied"] == second_data["applied"]
+
+        notes_response = client.get("/api/notes")
+        assert notes_response.status_code == 200
+        replay_notes = [
+            note
+            for note in notes_response.json()
+            if note["title"] == "Replay Note" and note["deleted_at"] is None
+        ]
+        assert len(replay_notes) == 1
+
+    def test_replays_delete_client_mutation_id_with_same_result(
+        self, client: TestClient
+    ):
+        note = client.post(
+            "/api/notes", json={"title": "Delete Replay", "content": "Body"}
+        ).json()
+        request = {
+            "changes": [
+                {
+                    "entity": "note",
+                    "operation": "delete",
+                    "entity_id": note["id"],
+                    "client_mutation_id": "m-replay-delete",
+                    "expected_version": note["version"],
+                    "payload": {},
+                }
+            ]
+        }
+
+        first_response = client.post("/api/workspace/changes", json=request)
+        second_response = client.post("/api/workspace/changes", json=request)
+
+        assert first_response.status_code == 200
+        assert second_response.status_code == 200
+        assert first_response.json()["applied"] == second_response.json()["applied"]

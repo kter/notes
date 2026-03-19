@@ -1,5 +1,6 @@
 from sqlmodel import Session
 
+from app.features.workspace.repositories import AppliedMutationRepository
 from app.features.workspace.schemas import (
     WorkspaceAppliedChange,
     WorkspaceChangesRequest,
@@ -23,6 +24,7 @@ class WorkspaceChangesUseCase:
     """Apply a batch of workspace mutations and return an updated snapshot."""
 
     def __init__(self, session: Session, user_id: str):
+        self.mutation_repository = AppliedMutationRepository(session, user_id)
         self.folder_use_cases = FolderUseCases(session, user_id)
         self.note_use_cases = NoteUseCases(session, user_id)
         self.snapshot_use_case = WorkspaceSnapshotUseCase(session, user_id)
@@ -37,11 +39,28 @@ class WorkspaceChangesUseCase:
         )
 
     def _apply_change(self, change) -> WorkspaceAppliedChange:
+        if change.client_mutation_id is not None:
+            applied_mutation = self.mutation_repository.get_by_client_mutation_id(
+                change.client_mutation_id
+            )
+            if applied_mutation is not None:
+                return WorkspaceAppliedChange.model_validate(
+                    applied_mutation.get_response_payload()
+                )
+
         if change.entity == "folder":
-            return self._apply_folder_change(change)
-        if change.entity == "note":
-            return self._apply_note_change(change)
-        raise ValidationFailed(f"Unsupported workspace entity: {change.entity}")
+            applied_change = self._apply_folder_change(change)
+        elif change.entity == "note":
+            applied_change = self._apply_note_change(change)
+        else:
+            raise ValidationFailed(f"Unsupported workspace entity: {change.entity}")
+
+        if change.client_mutation_id is not None:
+            self.mutation_repository.record(
+                client_mutation_id=change.client_mutation_id,
+                applied_change=applied_change,
+            )
+        return applied_change
 
     def _apply_folder_change(self, change) -> WorkspaceAppliedChange:
         if change.operation == "create":

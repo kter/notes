@@ -3,7 +3,11 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from app.features.workspace.repositories import FolderRepository, NoteRepository
+    from app.features.workspace.repositories import (
+        AppliedMutationRepository,
+        FolderRepository,
+        NoteRepository,
+    )
     from app.features.workspace.schemas import WorkspaceSnapshotResponse
     from app.features.workspace.use_cases import (
         FolderUseCases,
@@ -15,6 +19,7 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AppliedMutationRepository",
     "FolderRepository",
     "FolderUseCases",
     "NoteExportUseCase",
@@ -52,7 +57,7 @@ def __getattr__(name: str) -> Any:
         from app.features.workspace.schemas import WorkspaceSnapshotResponse
 
         return WorkspaceSnapshotResponse
-    if name in {"FolderRepository", "NoteRepository"}:
+    if name in {"AppliedMutationRepository", "FolderRepository", "NoteRepository"}:
         from app.features.workspace import repositories
 
         return getattr(repositories, name)

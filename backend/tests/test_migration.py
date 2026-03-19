@@ -118,6 +118,7 @@ def test_migration_applies_initial_revision_to_fresh_db():
     expected_tables = {
         "alembic_version",
         "ai_edit_jobs",
+        "applied_mutations",
         "app_users",
         "folders",
         "mcp_tokens",
@@ -202,6 +203,7 @@ def test_migration_bootstraps_existing_dsql_revision_to_head():
 
     inspector = inspect(engine)
     assert "ai_edit_jobs" in inspector.get_table_names()
+    assert "applied_mutations" in inspector.get_table_names()
     folder_columns = {column["name"] for column in inspector.get_columns("folders")}
     note_columns = {column["name"] for column in inspector.get_columns("notes")}
     assert "version" in folder_columns

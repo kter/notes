@@ -19,11 +19,11 @@ class WorkspaceQueryUseCases:
     def get_owned_folder(self, folder_id: UUID) -> Folder:
         return self.folder_repository.get_owned(folder_id)
 
-    def list_folders(self) -> list[Folder]:
-        return self.folder_repository.list()
+    def list_folders(self, *, include_deleted: bool = False) -> list[Folder]:
+        return self.folder_repository.list(include_deleted=include_deleted)
 
     def list_folder_notes(self, folder_id: UUID) -> list[Note]:
         return self.note_repository.list(folder_id)
 
-    def list_all_notes(self) -> list[Note]:
-        return self.note_repository.list()
+    def list_all_notes(self, *, include_deleted: bool = False) -> list[Note]:
+        return self.note_repository.list(include_deleted=include_deleted)

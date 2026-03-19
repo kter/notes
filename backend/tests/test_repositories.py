@@ -60,6 +60,7 @@ def test_note_repository_update_touches_timestamp(session: Session):
     repository = NoteRepository(session, "test-user-123")
     note = repository.create(NoteCreate(title="before", content="before"))
     original_updated_at = note.updated_at
+    original_version = note.version
 
     updated = repository.update(
         note.id,
@@ -69,6 +70,7 @@ def test_note_repository_update_touches_timestamp(session: Session):
     assert updated.title == "after"
     assert updated.content == "after"
     assert updated.updated_at > original_updated_at
+    assert updated.version == original_version + 1
 
 
 def test_folder_repository_get_owned_enforces_user_scope(session: Session):
@@ -88,8 +90,34 @@ def test_folder_repository_update_touches_timestamp(session: Session):
     repository = FolderRepository(session, "test-user-123")
     folder = repository.create(FolderCreate(name="before"))
     original_updated_at = folder.updated_at
+    original_version = folder.version
 
     updated = repository.update(folder.id, FolderUpdate(name="after"))
 
     assert updated.name == "after"
     assert updated.updated_at > original_updated_at
+    assert updated.version == original_version + 1
+
+
+def test_note_repository_soft_delete_hides_from_default_queries(session: Session):
+    repository = NoteRepository(session, "test-user-123")
+    note = repository.create(NoteCreate(title="before", content="before"))
+
+    deleted = repository.soft_delete(note.id)
+
+    assert deleted.deleted_at is not None
+    assert deleted.version == 2
+    assert repository.list() == []
+    assert repository.list(include_deleted=True)[0].id == note.id
+
+
+def test_folder_repository_soft_delete_hides_from_default_queries(session: Session):
+    repository = FolderRepository(session, "test-user-123")
+    folder = repository.create(FolderCreate(name="before"))
+
+    deleted = repository.soft_delete(folder.id)
+
+    assert deleted.deleted_at is not None
+    assert deleted.version == 2
+    assert repository.list() == []
+    assert repository.list(include_deleted=True)[0].id == folder.id

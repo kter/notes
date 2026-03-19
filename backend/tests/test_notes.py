@@ -54,6 +54,8 @@ class TestCreateNote:
         assert note["title"] == ""
         assert note["content"] == ""
         assert note["user_id"] == TEST_USER_ID
+        assert note["version"] == 1
+        assert note["deleted_at"] is None
         assert note["folder_id"] is None
 
     def test_create_note_full(self, client: TestClient):
@@ -108,6 +110,7 @@ class TestUpdateNote:
         response = client.patch(f"/api/notes/{note_id}", json={"title": "Updated"})
         assert response.status_code == 200
         assert response.json()["title"] == "Updated"
+        assert response.json()["version"] == 2
         assert response.json()["content"] == "Content"  # unchanged
 
     def test_update_note_content(self, client: TestClient):
@@ -156,6 +159,13 @@ class TestDeleteNote:
         # Verify it's deleted
         get_response = client.get(f"/api/notes/{note_id}")
         assert get_response.status_code == 404
+
+        snapshot_response = client.get("/api/workspace/snapshot")
+        assert snapshot_response.status_code == 200
+        tombstone = next(
+            item for item in snapshot_response.json()["notes"] if item["id"] == note_id
+        )
+        assert tombstone["deleted_at"] is not None
 
     def test_delete_note_not_found(self, client: TestClient):
         """Test deleting a non-existent note."""

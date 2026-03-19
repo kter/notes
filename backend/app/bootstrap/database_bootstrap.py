@@ -217,6 +217,32 @@ class DatabaseSchemaBootstrapper:
             column_name="last_used_at",
             alter_sql="ALTER TABLE mcp_tokens ADD COLUMN last_used_at TIMESTAMP WITH TIME ZONE",
         )
+        self._ensure_legacy_column_portable(
+            connection,
+            table_name="folders",
+            column_name="version",
+            alter_sql="ALTER TABLE folders ADD COLUMN version INTEGER",
+            update_sql="UPDATE folders SET version = 1 WHERE version IS NULL",
+        )
+        self._ensure_legacy_column_portable(
+            connection,
+            table_name="folders",
+            column_name="deleted_at",
+            alter_sql="ALTER TABLE folders ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE",
+        )
+        self._ensure_legacy_column_portable(
+            connection,
+            table_name="notes",
+            column_name="version",
+            alter_sql="ALTER TABLE notes ADD COLUMN version INTEGER",
+            update_sql="UPDATE notes SET version = 1 WHERE version IS NULL",
+        )
+        self._ensure_legacy_column_portable(
+            connection,
+            table_name="notes",
+            column_name="deleted_at",
+            alter_sql="ALTER TABLE notes ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE",
+        )
 
     def _get_alembic_head_revision(self) -> str:
         script = ScriptDirectory.from_config(self._get_alembic_config())

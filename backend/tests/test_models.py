@@ -25,9 +25,11 @@ class TestFolderModels:
 
         assert folder.name == "Test"
         assert folder.user_id == "user-123"
+        assert folder.version == 1
         assert folder.id is not None
         assert folder.created_at is not None
         assert folder.updated_at is not None
+        assert folder.deleted_at is None
 
 
 class TestNoteModels:
@@ -69,10 +71,12 @@ class TestNoteModels:
         assert note.title == ""
         assert note.content == ""
         assert note.user_id == "user-123"
+        assert note.version == 1
         assert note.folder_id is None
         assert note.id is not None
         assert note.created_at is not None
         assert note.updated_at is not None
+        assert note.deleted_at is None
 
 
 class TestUserSettingsModels:

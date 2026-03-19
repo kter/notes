@@ -63,7 +63,7 @@ class ShareUseCases:
             raise ShareExpired("Share link has expired")
 
         note = self.session.get(Note, share.note_id)
-        if note is None:
+        if note is None or note.deleted_at is not None:
             raise NotFound("Shared note not found")
 
         return SharedNoteRead(

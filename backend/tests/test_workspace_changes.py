@@ -31,7 +31,9 @@ class TestWorkspaceChanges:
         data = response.json()
         assert len(data["applied"]) == 2
         assert data["applied"][0]["folder"]["name"] == "Batch Folder"
+        assert data["applied"][0]["folder"]["version"] == 1
         assert data["applied"][1]["note"]["title"] == "Batch Note"
+        assert data["applied"][1]["note"]["version"] == 1
         assert any(
             folder["name"] == "Batch Folder" for folder in data["snapshot"]["folders"]
         )
@@ -56,12 +58,14 @@ class TestWorkspaceChanges:
                         "entity": "folder",
                         "operation": "update",
                         "entity_id": folder["id"],
+                        "expected_version": folder["version"],
                         "payload": {"name": "Updated Folder"},
                     },
                     {
                         "entity": "note",
                         "operation": "delete",
                         "entity_id": note["id"],
+                        "expected_version": note["version"],
                         "payload": {},
                     },
                 ]
@@ -71,8 +75,13 @@ class TestWorkspaceChanges:
         assert response.status_code == 200
         data = response.json()
         assert data["applied"][0]["folder"]["name"] == "Updated Folder"
+        assert data["applied"][0]["folder"]["version"] == 2
         assert data["applied"][1]["entity_id"] == note["id"]
-        assert all(item["id"] != note["id"] for item in data["snapshot"]["notes"])
+        tombstone = next(
+            item for item in data["snapshot"]["notes"] if item["id"] == note["id"]
+        )
+        assert tombstone["deleted_at"] is not None
+        assert tombstone["version"] == 2
 
     def test_rejects_invalid_change_shape(self, client: TestClient):
         response = client.post(
@@ -89,3 +98,30 @@ class TestWorkspaceChanges:
         )
 
         assert response.status_code == 422
+
+    def test_rejects_stale_expected_version(self, client: TestClient):
+        note = client.post(
+            "/api/notes", json={"title": "Original", "content": "Body"}
+        ).json()
+        updated = client.patch(
+            f"/api/notes/{note['id']}", json={"title": "Updated"}
+        ).json()
+        assert updated["version"] == 2
+
+        response = client.post(
+            "/api/workspace/changes",
+            json={
+                "changes": [
+                    {
+                        "entity": "note",
+                        "operation": "update",
+                        "entity_id": note["id"],
+                        "expected_version": 1,
+                        "payload": {"title": "Stale"},
+                    }
+                ]
+            },
+        )
+
+        assert response.status_code == 409
+        assert "version mismatch" in response.json()["detail"]

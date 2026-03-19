@@ -16,11 +16,11 @@ class WorkspaceSnapshotUseCase:
     def get_snapshot(self) -> WorkspaceSnapshotResponse:
         folders = [
             FolderRead.model_validate(folder)
-            for folder in self.workspace_queries.list_folders()
+            for folder in self.workspace_queries.list_folders(include_deleted=True)
         ]
         notes = [
             NoteRead.model_validate(note)
-            for note in self.workspace_queries.list_all_notes()
+            for note in self.workspace_queries.list_all_notes(include_deleted=True)
         ]
         server_time = datetime.now(UTC)
         cursor = self._build_cursor(folders, notes, server_time)

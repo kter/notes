@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlmodel import select
@@ -12,12 +13,11 @@ class FolderRepository(UserScopedRepository[Folder]):
     model = Folder
     resource_name = "Folder"
 
-    def list(self) -> list[Folder]:
-        statement = (
-            select(Folder)
-            .where(Folder.user_id == self.user_id)
-            .order_by(Folder.updated_at.desc())
-        )
+    def list(self, *, include_deleted: bool = False) -> list[Folder]:
+        statement = select(Folder).where(Folder.user_id == self.user_id)
+        if not include_deleted:
+            statement = statement.where(Folder.deleted_at.is_(None))
+        statement = statement.order_by(Folder.updated_at.desc())
         return self.session.exec(statement).all()
 
     def create(self, folder_in: FolderCreate) -> Folder:
@@ -28,4 +28,9 @@ class FolderRepository(UserScopedRepository[Folder]):
         folder = self.get_owned(folder_id)
         for key, value in folder_in.model_dump(exclude_unset=True).items():
             setattr(folder, key, value)
-        return self.save(folder, touch=True)
+        return self.save(folder, touch=True, bump=True)
+
+    def soft_delete(self, folder_id: UUID) -> Folder:
+        folder = self.get_owned(folder_id)
+        folder.deleted_at = datetime.now(UTC)
+        return self.save(folder, touch=True, bump=True)

@@ -30,6 +30,7 @@ class WorkspaceChangeRequest(BaseModel):
     operation: Literal["create", "update", "delete"]
     entity_id: UUID | None = None
     client_mutation_id: str | None = None
+    expected_version: int | None = Field(default=None, ge=1)
     payload: dict[str, object] = Field(default_factory=dict)
 
     @model_validator(mode="after")

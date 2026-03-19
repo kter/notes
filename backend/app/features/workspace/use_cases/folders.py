@@ -25,4 +25,4 @@ class FolderUseCases:
         return self.repository.update(folder_id, folder_in)
 
     def delete_folder(self, folder_id: UUID) -> None:
-        self.repository.delete_owned(folder_id)
+        self.repository.soft_delete(folder_id)

@@ -16,7 +16,7 @@ from app.models import (
     NoteRead,
     NoteUpdate,
 )
-from app.shared import ValidationFailed
+from app.shared import ConflictDetected, ValidationFailed
 
 
 class WorkspaceChangesUseCase:
@@ -57,6 +57,7 @@ class WorkspaceChangesUseCase:
             )
 
         if change.operation == "update":
+            self._ensure_expected_version(folder_id=change.entity_id, change=change)
             folder = self.folder_use_cases.update_folder(
                 change.entity_id,
                 FolderUpdate.model_validate(change.payload),
@@ -69,6 +70,7 @@ class WorkspaceChangesUseCase:
                 folder=FolderRead.model_validate(folder),
             )
 
+        self._ensure_expected_version(folder_id=change.entity_id, change=change)
         self.folder_use_cases.delete_folder(change.entity_id)
         return WorkspaceAppliedChange(
             entity="folder",
@@ -91,6 +93,7 @@ class WorkspaceChangesUseCase:
             )
 
         if change.operation == "update":
+            self._ensure_expected_version(note_id=change.entity_id, change=change)
             note = self.note_use_cases.update_note(
                 change.entity_id,
                 NoteUpdate.model_validate(change.payload),
@@ -103,6 +106,7 @@ class WorkspaceChangesUseCase:
                 note=NoteRead.model_validate(note),
             )
 
+        self._ensure_expected_version(note_id=change.entity_id, change=change)
         self.note_use_cases.delete_note(change.entity_id)
         return WorkspaceAppliedChange(
             entity="note",
@@ -110,3 +114,26 @@ class WorkspaceChangesUseCase:
             entity_id=change.entity_id,
             client_mutation_id=change.client_mutation_id,
         )
+
+    def _ensure_expected_version(
+        self,
+        change,
+        *,
+        folder_id=None,
+        note_id=None,
+    ) -> None:
+        if change.expected_version is None:
+            return
+
+        if folder_id is not None:
+            resource = self.folder_use_cases.get_folder(folder_id)
+        elif note_id is not None:
+            resource = self.note_use_cases.get_note(note_id)
+        else:
+            raise ValidationFailed("expected_version check requires a target resource")
+
+        if resource.version != change.expected_version:
+            raise ConflictDetected(
+                f"{change.entity.capitalize()} version mismatch: "
+                f"expected {change.expected_version}, found {resource.version}"
+            )

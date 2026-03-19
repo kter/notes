@@ -79,10 +79,16 @@ def test_migration_bootstraps_legacy_schema_and_stamps_head():
     mcp_tokens_columns = {
         column["name"] for column in inspector.get_columns("mcp_tokens")
     }
+    folder_columns = {column["name"] for column in inspector.get_columns("folders")}
+    note_columns = {column["name"] for column in inspector.get_columns("notes")}
 
     assert "language" in user_settings_columns
     assert "token_limit" in user_settings_columns
     assert "last_used_at" in mcp_tokens_columns
+    assert "version" in folder_columns
+    assert "deleted_at" in folder_columns
+    assert "version" in note_columns
+    assert "deleted_at" in note_columns
     assert "alembic_version" in inspector.get_table_names()
 
     with engine.connect() as conn:
@@ -122,6 +128,12 @@ def test_migration_applies_initial_revision_to_fresh_db():
     }
 
     assert expected_tables.issubset(set(inspector.get_table_names()))
+    folder_columns = {column["name"] for column in inspector.get_columns("folders")}
+    note_columns = {column["name"] for column in inspector.get_columns("notes")}
+    assert "version" in folder_columns
+    assert "deleted_at" in folder_columns
+    assert "version" in note_columns
+    assert "deleted_at" in note_columns
 
     with engine.connect() as conn:
         version = conn.execute(
@@ -190,6 +202,12 @@ def test_migration_bootstraps_existing_dsql_revision_to_head():
 
     inspector = inspect(engine)
     assert "ai_edit_jobs" in inspector.get_table_names()
+    folder_columns = {column["name"] for column in inspector.get_columns("folders")}
+    note_columns = {column["name"] for column in inspector.get_columns("notes")}
+    assert "version" in folder_columns
+    assert "deleted_at" in folder_columns
+    assert "version" in note_columns
+    assert "deleted_at" in note_columns
 
     with engine.connect() as conn:
         version = conn.execute(

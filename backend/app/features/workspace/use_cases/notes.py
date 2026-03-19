@@ -25,4 +25,4 @@ class NoteUseCases:
         return self.repository.update(note_id, note_in)
 
     def delete_note(self, note_id: UUID) -> None:
-        self.repository.delete_owned(note_id)
+        self.repository.soft_delete(note_id)

@@ -5,8 +5,8 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy.exc import OperationalError
 
+from app.auth.app_user_service import AppUserService
 from app.models import AppUser
-from app.services.app_user_service import AppUserService
 
 
 def make_settings(**overrides):

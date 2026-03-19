@@ -6,10 +6,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlmodel import Session, SQLModel
 
+from app.auth.app_user_service import AppUserService
 from app.auth.cognito import cognito_verifier
 from app.database import get_session
 from app.models import AppUser
-from app.services.app_user_service import AppUserService
 from app.shared import NotFound
 
 # Bearer token security scheme

@@ -11,6 +11,11 @@ import { syncQueue, type SyncStatus } from "@/lib/syncQueue";
 import { dispatchWorkspaceSynced } from "@/lib/workspaceSync";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useApi } from "./useApi";
+import type { WorkspaceSnapshotResponse } from "@/types";
+
+interface UseOfflineSyncOptions {
+  onSnapshotSynced?: (snapshot: WorkspaceSnapshotResponse) => void;
+}
 
 interface UseOfflineSyncReturn {
   isOnline: boolean;
@@ -21,7 +26,9 @@ interface UseOfflineSyncReturn {
   lastSyncTime: Date | null;
 }
 
-export function useOfflineSync(): UseOfflineSyncReturn {
+export function useOfflineSync(
+  options: UseOfflineSyncOptions = {}
+): UseOfflineSyncReturn {
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
@@ -32,6 +39,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   const { getApi } = useApi();
   const { t } = useTranslation();
   const syncInProgressRef = useRef(false);
+  const onSnapshotSynced = options.onSnapshotSynced;
 
   // Update pending changes count
   const updatePendingCount = useCallback(async () => {
@@ -58,14 +66,22 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
       if (result.success) {
         if (result.snapshot) {
-          dispatchWorkspaceSynced({ snapshot: result.snapshot });
+          if (onSnapshotSynced) {
+            onSnapshotSynced(result.snapshot);
+          } else {
+            dispatchWorkspaceSynced({ snapshot: result.snapshot });
+          }
         }
         setSyncStatus("idle");
         setLastErrorMessage(null);
         setLastSyncTime(new Date());
       } else if (result.errorCode === "conflict") {
         if (result.snapshot) {
-          dispatchWorkspaceSynced({ snapshot: result.snapshot });
+          if (onSnapshotSynced) {
+            onSnapshotSynced(result.snapshot);
+          } else {
+            dispatchWorkspaceSynced({ snapshot: result.snapshot });
+          }
         }
         setSyncStatus("error");
         setLastErrorMessage(t("sync.conflictReloaded"));
@@ -83,7 +99,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     } finally {
       syncInProgressRef.current = false;
     }
-  }, [getApi, t, updatePendingCount]);
+  }, [getApi, onSnapshotSynced, t, updatePendingCount]);
 
   // Force sync exposed to consumers
   const forceSync = useCallback(async () => {

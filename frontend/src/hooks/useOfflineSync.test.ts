@@ -110,4 +110,30 @@ describe('useOfflineSync', () => {
     expect(result.current.syncStatus).toBe('error')
     expect(result.current.lastErrorMessage).toBe('Conflict reloaded')
   })
+
+  it('calls the provided snapshot callback when sync returns a snapshot', async () => {
+    const onSnapshotSynced = vi.fn()
+    const snapshot = {
+      folders: [],
+      notes: [],
+      cursor: 'cursor-1',
+      server_time: '2024-01-01T00:00:00.000Z',
+    }
+
+    vi.mocked(syncQueue.processQueue).mockResolvedValueOnce({
+      success: true,
+      syncedCount: 1,
+      failedCount: 0,
+      errors: [],
+      snapshot,
+    })
+
+    const { result } = renderHook(() => useOfflineSync({ onSnapshotSynced }))
+
+    await act(async () => {
+      await result.current.forceSync()
+    })
+
+    expect(onSnapshotSynced).toHaveBeenCalledWith(snapshot)
+  })
 })

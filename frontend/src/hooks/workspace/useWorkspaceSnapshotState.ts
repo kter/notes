@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import { notesDB } from "@/lib/indexedDB";
@@ -23,6 +23,11 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
   const { isLoading: authLoading } = useAuth();
   const { getApi } = useApi();
   const hasFetchedRef = useRef(false);
+
+  const applySnapshot = useCallback((snapshot: WorkspaceSyncedEventDetail["snapshot"]) => {
+    setFolders(getActiveFolders(snapshot));
+    setNotes(getActiveNotes(snapshot));
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -74,15 +79,14 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
   useEffect(() => {
     const handleWorkspaceSynced = (event: Event) => {
       const { detail } = event as CustomEvent<WorkspaceSyncedEventDetail>;
-      setFolders(getActiveFolders(detail.snapshot));
-      setNotes(getActiveNotes(detail.snapshot));
+      applySnapshot(detail.snapshot);
     };
 
     window.addEventListener(WORKSPACE_SYNCED_EVENT, handleWorkspaceSynced);
     return () => {
       window.removeEventListener(WORKSPACE_SYNCED_EVENT, handleWorkspaceSynced);
     };
-  }, []);
+  }, [applySnapshot]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -90,5 +94,5 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
     }
   }, [isAuthenticated]);
 
-  return { folders, setFolders, notes, setNotes, isLoading };
+  return { folders, setFolders, notes, setNotes, isLoading, applySnapshot };
 }

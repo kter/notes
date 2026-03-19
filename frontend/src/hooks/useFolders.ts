@@ -1,7 +1,14 @@
 "use client";
 
+import { useCallback } from "react";
 
 import { useApi } from "./useApi";
+import { notesDB } from "@/lib/indexedDB";
+import { syncQueue } from "@/lib/syncQueue";
+import {
+  dispatchWorkspaceSynced,
+  persistWorkspaceSnapshot,
+} from "@/lib/workspaceSync";
 import type { Folder } from "@/types";
 
 interface UseFoldersReturn {
@@ -20,38 +27,160 @@ export function useFolders(
 ): UseFoldersReturn {
   const { getApi } = useApi();
 
-  const handleCreateFolder = async (name: string) => {
-    try {
-      const apiClient = await getApi();
-      const folder = await apiClient.createFolder({ name });
-      setFolders((prev) => [folder, ...prev]);
-    } catch (error) {
-      console.error("Failed to create folder:", error);
-    }
-  };
+  const handleCreateFolder = useCallback(
+    async (name: string) => {
+      const tempId = `temp-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
+      const now = new Date().toISOString();
+      const tempFolder: Folder = {
+        id: tempId,
+        name,
+        user_id: "",
+        version: 1,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      };
 
-  const handleRenameFolder = async (id: string, name: string) => {
-    try {
-      const apiClient = await getApi();
-      const folder = await apiClient.updateFolder(id, { name });
-      setFolders((prev) => prev.map((f) => (f.id === id ? folder : f)));
-    } catch (error) {
-      console.error("Failed to rename folder:", error);
-    }
-  };
+      setFolders((prev) => [tempFolder, ...prev]);
 
-  const handleDeleteFolder = async (id: string) => {
-    try {
-      const apiClient = await getApi();
-      await apiClient.deleteFolder(id);
-      setFolders((prev) => prev.filter((f) => f.id !== id));
+      try {
+        await notesDB.saveFolder(tempFolder);
+      } catch (error) {
+        console.error("Failed to save folder locally:", error);
+      }
+
+      if (navigator.onLine) {
+        try {
+          const apiClient = await getApi();
+          const response = await apiClient.applyWorkspaceChanges({
+            changes: [
+              {
+                entity: "folder",
+                operation: "create",
+                payload: { name },
+              },
+            ],
+          });
+
+          await notesDB.deleteFolder(tempId);
+          await persistWorkspaceSnapshot(response.snapshot);
+          dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          return;
+        } catch (error) {
+          console.error("Failed to create folder:", error);
+        }
+      }
+
+      await syncQueue.addChange("create", "folder", tempId, { name });
+    },
+    [getApi, setFolders]
+  );
+
+  const handleRenameFolder = useCallback(
+    async (id: string, name: string) => {
+      const existingFolder = folders.find((folder) => folder.id === id);
+      if (!existingFolder) {
+        return;
+      }
+
+      const updatedFolder: Folder = {
+        ...existingFolder,
+        name,
+        version: existingFolder.version + 1,
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+
+      setFolders((prev) => prev.map((folder) => (folder.id === id ? updatedFolder : folder)));
+
+      try {
+        await notesDB.saveFolder(updatedFolder);
+      } catch (error) {
+        console.error("Failed to save folder locally:", error);
+      }
+
+      if (navigator.onLine) {
+        try {
+          const apiClient = await getApi();
+          const response = await apiClient.applyWorkspaceChanges({
+            changes: [
+              {
+                entity: "folder",
+                operation: "update",
+                entity_id: id,
+                expected_version: existingFolder.version,
+                payload: { name },
+              },
+            ],
+          });
+
+          await persistWorkspaceSnapshot(response.snapshot);
+          dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          return;
+        } catch (error) {
+          console.error("Failed to rename folder:", error);
+        }
+      }
+
+      await syncQueue.addChange("update", "folder", id, { name }, {
+        expectedVersion: existingFolder.version,
+      });
+    },
+    [folders, getApi, setFolders]
+  );
+
+  const handleDeleteFolder = useCallback(
+    async (id: string) => {
+      const existingFolder = folders.find((folder) => folder.id === id);
+      if (!existingFolder) {
+        return;
+      }
+
+      setFolders((prev) => prev.filter((folder) => folder.id !== id));
       if (selectedFolderId === id) {
         setSelectedFolderId(null);
       }
-    } catch (error) {
-      console.error("Failed to delete folder:", error);
-    }
-  };
+
+      try {
+        await notesDB.deleteFolder(id);
+      } catch (error) {
+        console.error("Failed to delete folder locally:", error);
+      }
+
+      if (id.startsWith("temp-")) {
+        return;
+      }
+
+      if (navigator.onLine) {
+        try {
+          const apiClient = await getApi();
+          const response = await apiClient.applyWorkspaceChanges({
+            changes: [
+              {
+                entity: "folder",
+                operation: "delete",
+                entity_id: id,
+                expected_version: existingFolder.version,
+              },
+            ],
+          });
+
+          await persistWorkspaceSnapshot(response.snapshot);
+          dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          return;
+        } catch (error) {
+          console.error("Failed to delete folder:", error);
+        }
+      }
+
+      await syncQueue.addChange("delete", "folder", id, undefined, {
+        expectedVersion: existingFolder.version,
+      });
+    },
+    [folders, getApi, selectedFolderId, setFolders, setSelectedFolderId]
+  );
 
   return {
     folders,

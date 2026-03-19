@@ -5,12 +5,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.features.assistant.edit_jobs import process_edit_job
 from app.features.assistant.gateway import (
     AIGateway,
     AIGatewayTimeoutError,
     get_ai_gateway,
 )
+from app.features.assistant.job_runner import process_edit_job
 from app.main import app
 from app.models import AIEditJob, Folder, Note
 

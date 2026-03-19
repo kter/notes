@@ -8,11 +8,11 @@ from app.features.assistant.dependencies import (
     get_ai_interaction_use_cases,
     get_edit_job_use_cases,
 )
-from app.features.assistant.edit_jobs import dispatch_edit_job
 from app.features.assistant.errors import (
     AIApplicationTimeoutError,
     AITokenLimitExceededError,
 )
+from app.features.assistant.job_runner import dispatch_edit_job
 from app.features.assistant.schemas import (
     ChatRequest,
     ChatResponse,

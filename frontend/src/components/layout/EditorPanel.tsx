@@ -10,9 +10,12 @@ import { DiffView } from "@/components/ai/DiffView";
 import { useApi, useTranslation } from "@/hooks";
 import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
 import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon, Maximize2Icon, Minimize2Icon } from "lucide-react";
-import { useEffect, useState, useRef, useCallback, KeyboardEvent, useDeferredValue } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, KeyboardEvent, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkSourceLine } from "@/lib/remark-source-line";
+import { toggleMarkdownCheckbox } from "@/lib/markdownCheckboxToggle";
 import type { SyncStatus } from "@/hooks/useNotes";
 import { calculateHash } from "@/lib/utils";
 import {
@@ -215,6 +218,32 @@ export function EditorPanel({
     currentContentRef.current = value;
     onContentChange?.(value);
   }, [onContentChange]);
+
+  const markdownComponents = useMemo((): Components => ({
+    input(props) {
+      const { disabled: _disabled, checked, ...rest } = props as React.InputHTMLAttributes<HTMLInputElement>;
+      if (rest.type !== "checkbox") return <input {...rest} />;
+      return (
+        <input
+          {...rest}
+          type="checkbox"
+          defaultChecked={!!checked}
+          onChange={(e) => {
+            // closest("[data-source-line]") works for both the <li> (production, via
+            // remarkSourceLine) and the <input> itself (tests, where the mock passes
+            // data-source-line directly as a prop).
+            const lineSource = (e.target as HTMLElement).closest("[data-source-line]");
+            if (!lineSource) return;
+            const lineNumber = parseInt(lineSource.getAttribute("data-source-line") ?? "0", 10);
+            if (!lineNumber) return;
+            const newContent = toggleMarkdownCheckbox(currentContentRef.current, lineNumber);
+            if (newContent !== currentContentRef.current) handleContentChange(newContent);
+          }}
+          style={{ cursor: "pointer" }}
+        />
+      );
+    },
+  }), [handleContentChange]);
 
   const handleBlur = () => {
     // Use refs to check for changes to ensure we have the latest values
@@ -951,7 +980,8 @@ export function EditorPanel({
                   >
                     <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
+                        remarkPlugins={[remarkGfm, remarkSourceLine]}
+                        components={markdownComponents}
                       >
                         {deferredContent || `*${t("editor.previewPlaceholder")}*`}
                       </ReactMarkdown>

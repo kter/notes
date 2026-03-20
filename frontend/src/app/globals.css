@@ -263,6 +263,16 @@
 }
 
 /* Task list styles for GFM */
+.markdown-preview .task-list-item {
+  list-style-type: none;
+}
+.markdown-preview .task-list-item input[type="checkbox"] {
+  cursor: pointer;
+  margin-right: 0.4em;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
 
 /* Search Highlight */
 .search-highlight {

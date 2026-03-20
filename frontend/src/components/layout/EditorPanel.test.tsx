@@ -8,7 +8,36 @@ import { useApi } from '@/hooks/useApi'
 
 // Mock react-markdown
 vi.mock('react-markdown', () => ({
-  default: ({ children }: { children: string }) => <div data-testid="markdown-preview">{children}</div>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  default: ({ children, components }: { children: string; components?: { input?: React.ComponentType<any> } }) => {
+    const InputComp = components?.input
+    if (InputComp) {
+      const lines = String(children).split('\n')
+      const hasTask = lines.some(l => /^\s*[-*+]\s+\[[ x]\]/i.test(l))
+      if (hasTask) {
+        return (
+          <div data-testid="markdown-preview">
+            <ul>
+              {lines.map((line, i) => {
+                const isChecked = /^\s*[-*+]\s+\[x\]/i.test(line)
+                const isUnchecked = /^\s*[-*+]\s+\[ \]/.test(line)
+                if (isChecked || isUnchecked) {
+                  return (
+                    <li key={i} data-source-line={i + 1} className="task-list-item">
+                      {/* Pass data-source-line to the input so closest("[data-source-line]") resolves on the input itself */}
+                      <InputComp type="checkbox" checked={isChecked} data-source-line={i + 1} />
+                    </li>
+                  )
+                }
+                return <span key={i}>{line}</span>
+              })}
+            </ul>
+          </div>
+        )
+      }
+    }
+    return <div data-testid="markdown-preview">{children}</div>
+  },
 }))
 
 // Mock DiffView
@@ -24,6 +53,11 @@ vi.mock('@/components/ai/DiffView', () => ({
 // Mock remark-gfm
 vi.mock('remark-gfm', () => ({
   default: () => {},
+}))
+
+// Mock remark-source-line
+vi.mock('@/lib/remark-source-line', () => ({
+  remarkSourceLine: () => {},
 }))
 
 // Mock useTranslation
@@ -547,6 +581,77 @@ describe('EditorPanel', () => {
         unmount()
         expect(mockCaf).not.toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('Interactive checkboxes in preview', () => {
+    const taskNote: Note = {
+      id: '2',
+      title: 'Task note',
+      content: '- [ ] task item\n- [x] done item',
+      user_id: 'u1',
+      folder_id: null,
+      version: 1,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    }
+
+    it('clicking unchecked checkbox marks it as checked in textarea', async () => {
+      render(<EditorPanel {...defaultProps} note={taskNote} />)
+
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      const checkboxes = screen.getAllByRole('checkbox')
+      // fireEvent.click triggers happy-dom's activation behavior (toggle + change),
+      // which React 19 picks up as the onChange event.
+      await act(async () => {
+        fireEvent.click(checkboxes[0])
+      })
+
+      const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
+      expect(textarea.value).toBe('- [x] task item\n- [x] done item')
+    })
+
+    it('clicking checked checkbox marks it as unchecked in textarea', async () => {
+      render(<EditorPanel {...defaultProps} note={taskNote} />)
+
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      const checkboxes = screen.getAllByRole('checkbox')
+      await act(async () => {
+        fireEvent.click(checkboxes[1])
+      })
+
+      const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
+      expect(textarea.value).toBe('- [ ] task item\n- [ ] done item')
+    })
+
+    it('calls onUpdateNote after 500ms debounce following checkbox toggle', async () => {
+      vi.useFakeTimers()
+      const onUpdateNote = vi.fn()
+      render(<EditorPanel {...defaultProps} note={taskNote} onUpdateNote={onUpdateNote} />)
+
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      const checkboxes = screen.getAllByRole('checkbox')
+      await act(async () => {
+        fireEvent.click(checkboxes[0])
+      })
+
+      // Debounce not yet fired
+      expect(onUpdateNote).not.toHaveBeenCalledWith(
+        '2',
+        expect.objectContaining({ content: '- [x] task item\n- [x] done item' }),
+      )
+
+      act(() => { vi.runAllTimers() })
+
+      expect(onUpdateNote).toHaveBeenCalledWith('2', {
+        title: 'Task note',
+        content: '- [x] task item\n- [x] done item',
+      })
+      vi.useRealTimers()
     })
   })
 })

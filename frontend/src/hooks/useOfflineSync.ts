@@ -12,6 +12,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useApi } from "./useApi";
 import type { WorkspaceSnapshotResponse } from "@/types";
 
+const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceSnapshotResponse) => void = () => {};
+
 interface UseOfflineSyncOptions {
   onSnapshotSynced?: (snapshot: WorkspaceSnapshotResponse) => void;
 }
@@ -38,7 +40,7 @@ export function useOfflineSync(
   const { getApi } = useApi();
   const { t } = useTranslation();
   const syncInProgressRef = useRef(false);
-  const onSnapshotSynced = options.onSnapshotSynced;
+  const onSnapshotSynced = options.onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
 
   // Update pending changes count
   const updatePendingCount = useCallback(async () => {

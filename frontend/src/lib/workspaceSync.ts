@@ -2,16 +2,11 @@ import { notesDB } from "@/lib/indexedDB";
 import { ApiError } from "@/lib/api";
 import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
 
-export const WORKSPACE_SYNCED_EVENT = "workspace:synced";
 const WORKSPACE_CURSOR_STORAGE_KEY = "notes-workspace-cursor";
 const WORKSPACE_DEVICE_ID_STORAGE_KEY = "notes-workspace-device-id";
 
-export interface WorkspaceSyncedEventDetail {
-  snapshot: WorkspaceSnapshotResponse;
-}
-
 interface SnapshotSyncOptions {
-  onSnapshotSynced?: (snapshot: WorkspaceSnapshotResponse) => void;
+  onSnapshotSynced: (snapshot: WorkspaceSnapshotResponse) => void;
 }
 
 function getStorage(): Storage | null {
@@ -97,27 +92,9 @@ export function isConflictApiError(error: unknown): error is ApiError {
 
 export async function refreshWorkspaceSnapshot(apiClient: {
   getWorkspaceSnapshot: () => Promise<WorkspaceSnapshotResponse>;
-}, options: SnapshotSyncOptions = {}): Promise<WorkspaceSnapshotResponse> {
+}, options: SnapshotSyncOptions): Promise<WorkspaceSnapshotResponse> {
   const snapshot = await apiClient.getWorkspaceSnapshot();
   await persistWorkspaceSnapshot(snapshot);
-  if (options.onSnapshotSynced) {
-    options.onSnapshotSynced(snapshot);
-  } else {
-    dispatchWorkspaceSynced({ snapshot });
-  }
+  options.onSnapshotSynced(snapshot);
   return snapshot;
-}
-
-export function dispatchWorkspaceSynced(
-  detail: WorkspaceSyncedEventDetail
-): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.dispatchEvent(
-    new CustomEvent<WorkspaceSyncedEventDetail>(WORKSPACE_SYNCED_EVENT, {
-      detail,
-    })
-  );
 }

@@ -3,8 +3,10 @@ export interface Folder {
   id: string;
   name: string;
   user_id: string;
+  version: number;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface FolderCreate {
@@ -52,8 +54,10 @@ export interface Note {
   content: string;
   user_id: string;
   folder_id: string | null;
+  version: number;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface NoteCreate {
@@ -66,6 +70,45 @@ export interface NoteUpdate {
   title?: string;
   content?: string;
   folder_id?: string | null;
+}
+
+export interface WorkspaceSnapshotResponse {
+  folders: Folder[];
+  notes: Note[];
+  cursor: string;
+  server_time: string;
+}
+
+export type WorkspaceEntityType = "folder" | "note";
+export type WorkspaceOperationType = "create" | "update" | "delete";
+
+export interface WorkspaceChangeRequest {
+  entity: WorkspaceEntityType;
+  operation: WorkspaceOperationType;
+  entity_id?: string;
+  client_mutation_id?: string;
+  expected_version?: number;
+  payload?: Record<string, unknown>;
+}
+
+export interface WorkspaceChangesRequest {
+  device_id?: string;
+  base_cursor?: string;
+  changes: WorkspaceChangeRequest[];
+}
+
+export interface WorkspaceAppliedChange {
+  entity: WorkspaceEntityType;
+  operation: WorkspaceOperationType;
+  entity_id: string;
+  client_mutation_id: string | null;
+  folder: Folder | null;
+  note: Note | null;
+}
+
+export interface WorkspaceChangesResponse {
+  applied: WorkspaceAppliedChange[];
+  snapshot: WorkspaceSnapshotResponse;
 }
 
 // AI types

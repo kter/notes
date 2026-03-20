@@ -1,42 +1,38 @@
 import { test, expect } from '@playwright/test';
 
+import { createFolderFixture, createNoteFixture } from './helpers/apiFixtures';
+
 test.describe('Sharing Functionality', () => {
   test('should perform full share cycle', async ({ page, context, isMobile }) => {
     test.setTimeout(90000);
 
-    // Navigate to the app
+    const folderName = `Share Test Folder ${Date.now()}`;
+    const noteTitle = `Shared Note ${Date.now()}`;
+    const noteContent = '# Hello World\n\nThis is a shared note for E2E testing.\n\n- Item 1\n- Item 2';
+
     await page.goto('/');
     console.log('[Share E2E] Starting share test');
-
-    // Create a folder first
-    const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
-    const createFolderPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
-      { timeout: 30000 }
-    );
-    await sidebar.getByTestId('sidebar-add-folder-button').click();
-    const folderName = `Share Test Folder ${Date.now()}`;
-    await sidebar.getByTestId('sidebar-new-folder-input').fill(folderName);
-    await page.keyboard.press('Enter');
-    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
+    const createdFolder = await createFolderFixture(page, folderName);
+    await createNoteFixture(page, {
+      title: noteTitle,
+      content: noteContent,
+      folder_id: createdFolder.id,
+    });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
 
     // Select the folder
     console.log(`[Share E2E] Created folder: ${folderName}`);
+    const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
     const folderButton = sidebar.getByTestId(`sidebar-folder-item-${createdFolder.id}`);
     await expect(folderButton).toBeVisible({ timeout: 15000 });
     await folderButton.click();
 
-    // Create a note
-    console.log('[Share E2E] Creating note');
-    const createPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
-      { timeout: 30000 }
-    );
-
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
-    await noteList.getByTestId('note-list-add-note-button').click();
-    const createdNote = await createPromise.then(resp => resp.json() as Promise<{ id: string }>);
-    console.log('[Share E2E] Note created');
+    const existingNoteItem = noteList.locator('[data-testid^="note-list-item-"]').filter({ hasText: noteTitle }).first();
+    await expect(existingNoteItem).toBeVisible({ timeout: 30000 });
+    await existingNoteItem.click();
+    console.log('[Share E2E] Note ready');
 
     // Wait for editor. On mobile, note creation can leave the view on the list,
     // so open the created note explicitly if the editor is not visible yet.
@@ -48,28 +44,15 @@ test.describe('Sharing Functionality', () => {
       try {
         await expect(titleInput).toBeVisible({ timeout: 5000 });
       } catch {
-        const createdNoteItem = noteList.getByTestId(`note-list-item-${createdNote.id}`);
-        await expect(createdNoteItem).toBeVisible({ timeout: 15000 });
-        await createdNoteItem.click();
+        await expect(existingNoteItem).toBeVisible({ timeout: 15000 });
+        await existingNoteItem.click();
         await expect(titleInput).toBeVisible({ timeout: 20000 });
       }
     } else {
       await expect(titleInput).toBeVisible({ timeout: 20000 });
     }
-
-    const noteTitle = `Shared Note ${Date.now()}`;
-    const noteContent = '# Hello World\n\nThis is a shared note for E2E testing.\n\n- Item 1\n- Item 2';
-
-    await titleInput.fill(noteTitle);
-    await contentTextarea.fill(noteContent);
-
-    // Wait for auto-save
-    console.log('[Share E2E] Waiting for auto-save');
-    await page.waitForResponse(
-      resp => resp.url().includes('/api/notes/') && resp.request().method() === 'PATCH' && resp.status() < 400,
-      { timeout: 30000 }
-    );
-    console.log('[Share E2E] Note saved');
+    await expect(titleInput).toHaveValue(noteTitle, { timeout: 30000 });
+    await expect(contentTextarea).toHaveValue(noteContent, { timeout: 30000 });
 
     // Click the Share button
     console.log('[Share E2E] Opening share dialog');
@@ -127,7 +110,7 @@ test.describe('Sharing Functionality', () => {
 
     // Verify the shared note page displays correctly
     await expect(sharedPage.getByText('Read-only')).toBeVisible();
-    await expect(sharedPage.getByRole('heading', { name: noteTitle })).toBeVisible({ timeout: 10000 });
+    await expect(sharedPage.getByText(noteTitle).first()).toBeVisible({ timeout: 10000 });
 
     // Verify content is rendered
     await expect(sharedPage.getByText('Hello World')).toBeVisible();

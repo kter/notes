@@ -8,25 +8,39 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue, type SyncStatus } from "@/lib/syncQueue";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useApi } from "./useApi";
+import type { WorkspaceSnapshotResponse } from "@/types";
+
+const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceSnapshotResponse) => void = () => {};
+
+interface UseOfflineSyncOptions {
+  onSnapshotSynced?: (snapshot: WorkspaceSnapshotResponse) => void;
+}
 
 interface UseOfflineSyncReturn {
   isOnline: boolean;
   syncStatus: SyncStatus;
+  lastErrorMessage: string | null;
   pendingChangesCount: number;
   forceSync: () => Promise<void>;
   lastSyncTime: Date | null;
 }
 
-export function useOfflineSync(): UseOfflineSyncReturn {
+export function useOfflineSync(
+  options: UseOfflineSyncOptions = {}
+): UseOfflineSyncReturn {
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   const [pendingChangesCount, setPendingChangesCount] = useState(0);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const { getApi } = useApi();
+  const { t } = useTranslation();
   const syncInProgressRef = useRef(false);
+  const onSnapshotSynced = options.onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
 
   // Update pending changes count
   const updatePendingCount = useCallback(async () => {
@@ -49,13 +63,18 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
     try {
       const apiClient = await getApi();
-      const result = await syncQueue.processQueue(apiClient);
+      const result = await syncQueue.processQueue(apiClient, { onSnapshotSynced });
 
       if (result.success) {
         setSyncStatus("idle");
+        setLastErrorMessage(null);
         setLastSyncTime(new Date());
+      } else if (result.errorCode === "conflict") {
+        setSyncStatus("error");
+        setLastErrorMessage(t("sync.conflictReloaded"));
       } else if (result.failedCount > 0) {
         setSyncStatus("error");
+        setLastErrorMessage(t("sync.serverSyncFailed"));
         console.error("Sync errors:", result.errors);
       }
 
@@ -63,10 +82,11 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     } catch (error) {
       console.error("Sync failed:", error);
       setSyncStatus("error");
+      setLastErrorMessage(t("sync.serverSyncFailed"));
     } finally {
       syncInProgressRef.current = false;
     }
-  }, [getApi, updatePendingCount]);
+  }, [getApi, onSnapshotSynced, t, updatePendingCount]);
 
   // Force sync exposed to consumers
   const forceSync = useCallback(async () => {
@@ -80,6 +100,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     const handleOnline = () => {
       setIsOnline(true);
       setSyncStatus("idle");
+      setLastErrorMessage(null);
       // Trigger sync when coming back online
       performSync();
     };
@@ -87,6 +108,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     const handleOffline = () => {
       setIsOnline(false);
       setSyncStatus("offline");
+      setLastErrorMessage(null);
     };
 
     window.addEventListener("online", handleOnline);
@@ -119,6 +141,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   return {
     isOnline,
     syncStatus,
+    lastErrorMessage,
     pendingChangesCount,
     forceSync,
     lastSyncTime,

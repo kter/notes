@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.features.assistant.edit_jobs import (
+from app.features.assistant.job_runner import (
     EDIT_JOB_TOPIC_ARN_ENV,
     PROCESS_EDIT_JOB_TASK,
     dispatch_edit_job,
@@ -37,7 +37,7 @@ async def test_dispatch_edit_job_publishes_to_sns(monkeypatch: pytest.MonkeyPatc
         EDIT_JOB_TOPIC_ARN_ENV, "arn:aws:sns:ap-northeast-1:123456789012:edit-jobs"
     )
     monkeypatch.setattr(
-        "app.features.assistant.edit_jobs.boto3.client",
+        "app.features.assistant.job_runner.boto3.client",
         lambda service_name: sns_client,
     )
 

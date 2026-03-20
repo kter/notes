@@ -17,18 +17,24 @@ interface UseNotesReturn {
   savedHashes: Record<string, string>;
 }
 
+interface UseNotesOptions {
+  onSnapshotSynced?: (snapshot: import("@/types").WorkspaceSnapshotResponse) => void;
+}
+
 export function useNotes(
   notes: Note[],
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>,
   selectedFolderId: string | null,
   selectedNoteId: string | null,
-  setSelectedNoteId: (id: string | null) => void
+  setSelectedNoteId: (id: string | null) => void,
+  options: UseNotesOptions = {}
 ): UseNotesReturn {
   const syncEngine = useNoteSyncEngine({
     setNotes,
     selectedFolderId,
     selectedNoteId,
     setSelectedNoteId,
+    onSnapshotSynced: options.onSnapshotSynced,
   });
 
   return {

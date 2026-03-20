@@ -21,6 +21,7 @@ export interface PendingChange {
   entityType: "note" | "folder";
   entityId: string;
   data?: Partial<Note> | Partial<Folder>;
+  expectedVersion?: number;
   timestamp: number;
 }
 

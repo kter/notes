@@ -1,19 +1,12 @@
-"""Unit tests for token usage limit checking logic.
-
-The 429 rate-limit behaviour cannot easily be exercised through the real API
-(the monthly limit is 1,000,000 tokens), so these unit tests mock the database
-session to drive check_limit into both the under-limit and over-limit code paths
-and verify the AI router raises the correct HTTPException.
-"""
+"""Unit tests for token usage limit checking logic."""
 
 import unittest
 from unittest.mock import MagicMock
 
-from fastapi import HTTPException
-
-from app.features.assistant.router import _check_token_limit
+from app.features.assistant.errors import AITokenLimitExceededError
+from app.features.assistant.usage_policy import check_limit
+from app.features.assistant.use_cases.common import ensure_token_limit
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
-from app.services.token_usage import check_limit
 
 
 def _make_session(tokens_used: int) -> MagicMock:
@@ -33,7 +26,7 @@ def _make_session(tokens_used: int) -> MagicMock:
 
 
 class TestCheckLimit(unittest.TestCase):
-    """Tests for app.services.token_usage.check_limit."""
+    """Tests for app.features.assistant.usage_policy.check_limit."""
 
     def test_zero_usage_is_within_limit(self):
         session = _make_session(0)
@@ -57,20 +50,15 @@ class TestCheckLimit(unittest.TestCase):
         self.assertFalse(check_limit(session, "user-a"))
 
 
-class TestCheckTokenLimitRouter(unittest.TestCase):
-    """Tests for the _check_token_limit helper in app.routers.ai.
+class TestEnsureTokenLimit(unittest.TestCase):
+    """Tests for the assistant token limit policy helper."""
 
-    This verifies that the router raises HTTP 429 when check_limit returns False
-    and does nothing when check_limit returns True.
-    """
-
-    def test_raises_429_when_limit_exceeded(self):
+    def test_raises_domain_error_when_limit_exceeded(self):
         session = _make_session(MONTHLY_TOKEN_LIMIT)
-        with self.assertRaises(HTTPException) as ctx:
-            _check_token_limit(session, "user-b")
-        self.assertEqual(ctx.exception.status_code, 429)
+        with self.assertRaises(AITokenLimitExceededError):
+            ensure_token_limit(session, "user-b")
 
     def test_no_exception_when_within_limit(self):
         session = _make_session(0)
         # Should not raise
-        _check_token_limit(session, "user-b")
+        ensure_token_limit(session, "user-b")

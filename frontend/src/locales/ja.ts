@@ -226,6 +226,7 @@ export const ja = {
     serverSyncFailed: "サーバー同期に失敗しました",
     offlineSyncUnavailable: "オフラインのため同期できません",
     localSaveFailed: "ローカル保存に失敗しました",
+    conflictReloaded: "競合を検出したため最新状態を再読み込みしました",
   },
 
   // Share
@@ -454,6 +455,7 @@ export type TranslationKeys = {
     serverSyncFailed: string;
     offlineSyncUnavailable: string;
     localSaveFailed: string;
+    conflictReloaded: string;
   };
   share: {
     title: string;

@@ -5,12 +5,12 @@ import { useCallback, useRef, useState } from "react";
 import type { MobileView } from "@/components/layout";
 import { useAIChat } from "@/hooks/useAIChat";
 import { useFolders } from "@/hooks/useFolders";
-import { useHomeData } from "@/hooks/useHomeData";
 import { useNoteFilter } from "@/hooks/useNoteFilter";
 import { useNotes } from "@/hooks/useNotes";
-import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useResizable } from "@/hooks/useResizable";
 import { useTokenUsage } from "@/hooks/useTokenUsage";
+
+import { useWorkspaceSyncState } from "./useWorkspaceSyncState";
 
 export function useWorkspaceState(isAuthenticated: boolean) {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -34,13 +34,19 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     notes,
     setNotes,
     isLoading: isDataLoading,
-  } = useHomeData(isAuthenticated);
+    isOnline,
+    syncStatus: offlineSyncStatus,
+    lastErrorMessage: offlineSyncErrorMessage,
+    pendingChangesCount,
+    applySnapshot,
+  } = useWorkspaceSyncState(isAuthenticated);
 
   const { handleCreateFolder, handleRenameFolder, handleDeleteFolder } = useFolders(
     folders,
     setFolders,
     selectedFolderId,
-    setSelectedFolderId
+    setSelectedFolderId,
+    { onSnapshotSynced: applySnapshot }
   );
 
   const handleSelectFolder = useCallback((id: string | null) => {
@@ -68,14 +74,9 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     setNotes,
     selectedFolderId,
     selectedNoteId,
-    handleSelectNote
+    handleSelectNote,
+    { onSnapshotSynced: applySnapshot }
   );
-
-  const {
-    isOnline,
-    syncStatus: offlineSyncStatus,
-    pendingChangesCount,
-  } = useOfflineSync();
 
   const { tokenUsage, recordUsage } = useTokenUsage(isAuthenticated);
   const {
@@ -149,6 +150,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     savedHashes,
     isOnline,
     offlineSyncStatus,
+    offlineSyncErrorMessage,
     pendingChangesCount,
     tokenUsage,
     chatMessages,

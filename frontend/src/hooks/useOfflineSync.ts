@@ -8,7 +8,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue, type SyncStatus } from "@/lib/syncQueue";
-import { dispatchWorkspaceSynced } from "@/lib/workspaceSync";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useApi } from "./useApi";
 import type { WorkspaceSnapshotResponse } from "@/types";
@@ -62,27 +61,13 @@ export function useOfflineSync(
 
     try {
       const apiClient = await getApi();
-      const result = await syncQueue.processQueue(apiClient);
+      const result = await syncQueue.processQueue(apiClient, { onSnapshotSynced });
 
       if (result.success) {
-        if (result.snapshot) {
-          if (onSnapshotSynced) {
-            onSnapshotSynced(result.snapshot);
-          } else {
-            dispatchWorkspaceSynced({ snapshot: result.snapshot });
-          }
-        }
         setSyncStatus("idle");
         setLastErrorMessage(null);
         setLastSyncTime(new Date());
       } else if (result.errorCode === "conflict") {
-        if (result.snapshot) {
-          if (onSnapshotSynced) {
-            onSnapshotSynced(result.snapshot);
-          } else {
-            dispatchWorkspaceSynced({ snapshot: result.snapshot });
-          }
-        }
         setSyncStatus("error");
         setLastErrorMessage(t("sync.conflictReloaded"));
       } else if (result.failedCount > 0) {

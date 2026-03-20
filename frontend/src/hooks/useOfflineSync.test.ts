@@ -134,6 +134,9 @@ describe('useOfflineSync', () => {
       await result.current.forceSync()
     })
 
-    expect(onSnapshotSynced).toHaveBeenCalledWith(snapshot)
+    expect(syncQueue.processQueue).toHaveBeenCalledWith(undefined, {
+      onSnapshotSynced,
+    })
+    expect(onSnapshotSynced).not.toHaveBeenCalled()
   })
 })

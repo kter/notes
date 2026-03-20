@@ -29,6 +29,10 @@ interface SyncResult {
   errorCode?: "conflict";
 }
 
+interface ProcessQueueOptions {
+  onSnapshotSynced?: (snapshot: WorkspaceChangesResponse["snapshot"]) => void;
+}
+
 type ApiClient = {
   applyWorkspaceChanges: (request: {
     device_id?: string;
@@ -100,7 +104,10 @@ class SyncQueueManager {
     return changes.length;
   }
 
-  async processQueue(apiClient: ApiClient): Promise<SyncResult> {
+  async processQueue(
+    apiClient: ApiClient,
+    options: ProcessQueueOptions = {}
+  ): Promise<SyncResult> {
     if (this.isSyncing) {
       return { success: false, syncedCount: 0, failedCount: 0, errors: [] };
     }
@@ -125,12 +132,12 @@ class SyncQueueManager {
           changes: changes.map((change) => this.toWorkspaceChangeRequest(change)),
         });
 
-        await this.persistSuccessfulSync(changes, response);
+        await this.persistSuccessfulSync(changes, response, options);
         result.syncedCount = changes.length;
         result.snapshot = response.snapshot;
       } catch (error) {
         if (isConflictApiError(error)) {
-          const snapshot = await refreshWorkspaceSnapshot(apiClient);
+          const snapshot = await refreshWorkspaceSnapshot(apiClient, options);
           for (const change of changes) {
             await notesDB.removePendingChange(change.id);
           }
@@ -175,7 +182,8 @@ class SyncQueueManager {
 
   private async persistSuccessfulSync(
     changes: PendingChange[],
-    response: WorkspaceChangesResponse
+    response: WorkspaceChangesResponse,
+    options: ProcessQueueOptions
   ): Promise<void> {
     for (const change of changes) {
       if (change.type === "create" && change.entityId.startsWith("temp-")) {
@@ -188,6 +196,7 @@ class SyncQueueManager {
     }
 
     await persistWorkspaceSnapshot(response.snapshot);
+    options.onSnapshotSynced?.(response.snapshot);
 
     for (const change of changes) {
       await notesDB.removePendingChange(change.id);

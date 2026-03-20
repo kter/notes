@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
 import { syncQueue } from "./syncQueue";
 import { notesDB, type PendingChange } from "./indexedDB";
+import { refreshWorkspaceSnapshot } from "./workspaceSync";
 
 vi.mock("./indexedDB", () => ({
   notesDB: {
@@ -35,7 +36,18 @@ vi.mock("./workspaceSync", () => ({
       folders: [];
       notes: [];
     }>;
-  }) => apiClient.getWorkspaceSnapshot()),
+  }, options?: {
+    onSnapshotSynced?: (snapshot: {
+      cursor: string;
+      server_time: string;
+      folders: [];
+      notes: [];
+    }) => void;
+  }) => {
+    const snapshot = await apiClient.getWorkspaceSnapshot();
+    options?.onSnapshotSynced?.(snapshot);
+    return snapshot;
+  }),
 }));
 
 function buildChange(overrides: Partial<PendingChange> = {}): PendingChange {
@@ -231,6 +243,38 @@ describe("syncQueue", () => {
     expect(result.syncedCount).toBe(2);
   });
 
+  it("calls the provided snapshot callback after a successful sync", async () => {
+    vi.mocked(notesDB.getPendingChanges).mockResolvedValue([
+      buildChange({
+        id: "change-update",
+        type: "update",
+        entityId: "note-1",
+        data: { content: "After" },
+        expectedVersion: 3,
+      }),
+    ]);
+
+    const snapshot = {
+      cursor: "cursor-1",
+      server_time: "2024-01-01T00:00:00.000Z",
+      folders: [],
+      notes: [],
+    };
+
+    const apiClient = {
+      applyWorkspaceChanges: vi.fn().mockResolvedValue({
+        applied: [],
+        snapshot,
+      }),
+      getWorkspaceSnapshot: vi.fn(),
+    };
+    const onSnapshotSynced = vi.fn();
+
+    await syncQueue.processQueue(apiClient, { onSnapshotSynced });
+
+    expect(onSnapshotSynced).toHaveBeenCalledWith(snapshot);
+  });
+
   it("refreshes the snapshot and clears queued changes on conflict", async () => {
     vi.mocked(notesDB.getPendingChanges).mockResolvedValue([
       buildChange({
@@ -262,6 +306,7 @@ describe("syncQueue", () => {
     const result = await syncQueue.processQueue(apiClient);
 
     expect(apiClient.getWorkspaceSnapshot).toHaveBeenCalledTimes(1);
+    expect(refreshWorkspaceSnapshot).toHaveBeenCalledWith(apiClient, {});
     expect(notesDB.removePendingChange).toHaveBeenNthCalledWith(1, "change-409");
     expect(notesDB.removePendingChange).toHaveBeenNthCalledWith(2, "change-409-folder");
     expect(result).toEqual({
@@ -272,5 +317,37 @@ describe("syncQueue", () => {
       errorCode: "conflict",
       snapshot,
     });
+  });
+
+  it("forwards the snapshot callback when refreshing after conflicts", async () => {
+    vi.mocked(notesDB.getPendingChanges).mockResolvedValue([
+      buildChange({
+        id: "change-409",
+        type: "update",
+        entityId: "note-1",
+      }),
+    ]);
+
+    const snapshot = {
+      cursor: "cursor-2",
+      server_time: "2024-01-01T00:00:02.000Z",
+      folders: [],
+      notes: [],
+    };
+
+    const apiClient = {
+      applyWorkspaceChanges: vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(409, "Conflict", { detail: "stale version" })),
+      getWorkspaceSnapshot: vi.fn().mockResolvedValue(snapshot),
+    };
+    const onSnapshotSynced = vi.fn();
+
+    await syncQueue.processQueue(apiClient, { onSnapshotSynced });
+
+    expect(refreshWorkspaceSnapshot).toHaveBeenCalledWith(apiClient, {
+      onSnapshotSynced,
+    });
+    expect(onSnapshotSynced).toHaveBeenCalledWith(snapshot);
   });
 });

@@ -306,7 +306,12 @@ describe("syncQueue", () => {
     const result = await syncQueue.processQueue(apiClient);
 
     expect(apiClient.getWorkspaceSnapshot).toHaveBeenCalledTimes(1);
-    expect(refreshWorkspaceSnapshot).toHaveBeenCalledWith(apiClient, {});
+    expect(refreshWorkspaceSnapshot).toHaveBeenCalledWith(
+      apiClient,
+      expect.objectContaining({
+        onSnapshotSynced: expect.any(Function),
+      })
+    );
     expect(notesDB.removePendingChange).toHaveBeenNthCalledWith(1, "change-409");
     expect(notesDB.removePendingChange).toHaveBeenNthCalledWith(2, "change-409-folder");
     expect(result).toEqual({

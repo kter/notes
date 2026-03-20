@@ -35,7 +35,7 @@ export function useFolders(
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>,
   selectedFolderId: string | null,
   setSelectedFolderId: (id: string | null) => void,
-  options: UseFoldersOptions = {}
+  options: UseFoldersOptions
 ): UseFoldersReturn {
   const { getApi } = useApi();
   const onSnapshotSynced = options.onSnapshotSynced;

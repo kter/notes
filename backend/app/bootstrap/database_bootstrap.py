@@ -100,6 +100,10 @@ class DatabaseSchemaBootstrapper:
         import app.models  # noqa: F401
 
     @staticmethod
+    def _sorted_tables():
+        return SQLModel.metadata.sorted_tables
+
+    @staticmethod
     def _get_backend_root() -> Path:
         return Path(__file__).resolve().parent.parent.parent
 
@@ -116,6 +120,10 @@ class DatabaseSchemaBootstrapper:
     def _is_duplicate_column_error(error: Exception) -> bool:
         message = str(error).lower()
         return "already exists" in message or "duplicate column" in message
+
+    def _commit_if_dsql_runtime(self, connection) -> None:
+        if self._uses_dsql_runtime():
+            connection.commit()
 
     def _ensure_legacy_column(
         self,
@@ -138,9 +146,11 @@ class DatabaseSchemaBootstrapper:
             if self._is_duplicate_column_error(error):
                 return
             raise
+        self._commit_if_dsql_runtime(connection)
 
         if update_sql is not None:
             connection.execute(text(update_sql), params or {})
+            self._commit_if_dsql_runtime(connection)
 
     def _ensure_legacy_column_portable(
         self,
@@ -184,17 +194,20 @@ class DatabaseSchemaBootstrapper:
             if self._is_duplicate_column_error(error):
                 return
             raise
+        self._commit_if_dsql_runtime(connection)
 
         if update_sql is not None:
             connection.execute(text(update_sql), params or {})
+            self._commit_if_dsql_runtime(connection)
 
     def _bootstrap_legacy_schema(self, connection) -> None:
         from app.models.token_usage import MONTHLY_TOKEN_LIMIT
 
         self.logger.info("Bootstrapping legacy schema before Alembic stamp")
 
-        for table in SQLModel.metadata.sorted_tables:
+        for table in self._sorted_tables():
             table.create(bind=connection, checkfirst=True)
+            self._commit_if_dsql_runtime(connection)
 
         self._ensure_legacy_column_portable(
             connection,

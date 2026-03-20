@@ -20,6 +20,8 @@ import type {
 
 export type SyncStatus = "idle" | "syncing" | "error" | "offline";
 
+const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceChangesResponse["snapshot"]) => void = () => {};
+
 interface SyncResult {
   success: boolean;
   syncedCount: number;
@@ -137,7 +139,9 @@ class SyncQueueManager {
         result.snapshot = response.snapshot;
       } catch (error) {
         if (isConflictApiError(error)) {
-          const snapshot = await refreshWorkspaceSnapshot(apiClient, options);
+          const snapshot = await refreshWorkspaceSnapshot(apiClient, {
+            onSnapshotSynced: options.onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC,
+          });
           for (const change of changes) {
             await notesDB.removePendingChange(change.id);
           }

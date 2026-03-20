@@ -22,13 +22,24 @@ interface UseFoldersReturn {
   handleDeleteFolder: (id: string) => Promise<void>;
 }
 
+interface UseFoldersOptions {
+  onSnapshotSynced?: (snapshot: {
+    folders: Folder[];
+    notes: import("@/types").Note[];
+    cursor: string;
+    server_time: string;
+  }) => void;
+}
+
 export function useFolders(
   folders: Folder[],
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>,
   selectedFolderId: string | null,
-  setSelectedFolderId: (id: string | null) => void
+  setSelectedFolderId: (id: string | null) => void,
+  options: UseFoldersOptions = {}
 ): UseFoldersReturn {
   const { getApi } = useApi();
+  const onSnapshotSynced = options.onSnapshotSynced;
 
   const handleCreateFolder = useCallback(
     async (name: string) => {
@@ -70,12 +81,16 @@ export function useFolders(
 
           await notesDB.deleteFolder(tempId);
           await persistWorkspaceSnapshot(response.snapshot);
-          dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          if (onSnapshotSynced) {
+            onSnapshotSynced(response.snapshot);
+          } else {
+            dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          }
           return;
         } catch (error) {
           if (isConflictApiError(error)) {
             const apiClient = await getApi();
-            await refreshWorkspaceSnapshot(apiClient);
+            await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
           console.error("Failed to create folder:", error);
@@ -84,7 +99,7 @@ export function useFolders(
 
       await syncQueue.addChange("create", "folder", tempId, { name });
     },
-    [getApi, setFolders]
+    [getApi, onSnapshotSynced, setFolders]
   );
 
   const handleRenameFolder = useCallback(
@@ -127,12 +142,16 @@ export function useFolders(
           });
 
           await persistWorkspaceSnapshot(response.snapshot);
-          dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          if (onSnapshotSynced) {
+            onSnapshotSynced(response.snapshot);
+          } else {
+            dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          }
           return;
         } catch (error) {
           if (isConflictApiError(error)) {
             const apiClient = await getApi();
-            await refreshWorkspaceSnapshot(apiClient);
+            await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
           console.error("Failed to rename folder:", error);
@@ -143,7 +162,7 @@ export function useFolders(
         expectedVersion: existingFolder.version,
       });
     },
-    [folders, getApi, setFolders]
+    [folders, getApi, onSnapshotSynced, setFolders]
   );
 
   const handleDeleteFolder = useCallback(
@@ -184,12 +203,16 @@ export function useFolders(
           });
 
           await persistWorkspaceSnapshot(response.snapshot);
-          dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          if (onSnapshotSynced) {
+            onSnapshotSynced(response.snapshot);
+          } else {
+            dispatchWorkspaceSynced({ snapshot: response.snapshot });
+          }
           return;
         } catch (error) {
           if (isConflictApiError(error)) {
             const apiClient = await getApi();
-            await refreshWorkspaceSnapshot(apiClient);
+            await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
           console.error("Failed to delete folder:", error);
@@ -200,7 +223,7 @@ export function useFolders(
         expectedVersion: existingFolder.version,
       });
     },
-    [folders, getApi, selectedFolderId, setFolders, setSelectedFolderId]
+    [folders, getApi, onSnapshotSynced, selectedFolderId, setFolders, setSelectedFolderId]
   );
 
   return {

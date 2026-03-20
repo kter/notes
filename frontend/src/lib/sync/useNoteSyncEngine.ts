@@ -13,7 +13,7 @@ import {
   refreshWorkspaceSnapshot,
 } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
-import type { Note } from "@/types";
+import type { Note, WorkspaceSnapshotResponse } from "@/types";
 
 import { useDebouncedAsync } from "./useDebouncedAsync";
 import type { LocalSyncStatus, RemoteSyncStatus, SyncStatus } from "./types";
@@ -23,6 +23,7 @@ interface NoteSyncEngineParams {
   selectedFolderId: string | null;
   selectedNoteId: string | null;
   setSelectedNoteId: (id: string | null) => void;
+  onSnapshotSynced?: (snapshot: WorkspaceSnapshotResponse) => void;
 }
 
 interface NoteSyncEngineResult {
@@ -45,6 +46,7 @@ export function useNoteSyncEngine({
   selectedFolderId,
   selectedNoteId,
   setSelectedNoteId,
+  onSnapshotSynced,
 }: NoteSyncEngineParams): NoteSyncEngineResult {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -86,6 +88,7 @@ export function useNoteSyncEngine({
             );
 
             await persistWorkspaceSnapshot(response.snapshot);
+            onSnapshotSynced?.(response.snapshot);
 
             const hash = await calculateHash(serverNote.content);
             setSavedHashes((prev) => ({ ...prev, [id]: hash }));
@@ -95,7 +98,7 @@ export function useNoteSyncEngine({
           } catch (error) {
             if (isConflictApiError(error)) {
               const apiClient = await getApi();
-              await refreshWorkspaceSnapshot(apiClient);
+              await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
               setRemoteStatus("failed");
               setLastError(t("sync.conflictReloaded"));
               return;
@@ -125,7 +128,7 @@ export function useNoteSyncEngine({
       setRemoteStatus("failed");
       setLastError(t("sync.offlineSyncUnavailable"));
     },
-    [getApi, setNotes, t]
+    [getApi, onSnapshotSynced, setNotes, t]
   );
 
   const {
@@ -193,11 +196,12 @@ export function useNoteSyncEngine({
 
         await notesDB.deleteNote(tempId);
         await persistWorkspaceSnapshot(response.snapshot);
+        onSnapshotSynced?.(response.snapshot);
         setRemoteStatus("synced");
       } catch (error) {
         if (isConflictApiError(error)) {
           const apiClient = await getApi();
-          await refreshWorkspaceSnapshot(apiClient);
+          await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
           setRemoteStatus("failed");
           setLastError(t("sync.conflictReloaded"));
           return;
@@ -219,7 +223,7 @@ export function useNoteSyncEngine({
       folder_id: selectedFolderId,
     });
     setRemoteStatus("failed");
-  }, [getApi, selectedFolderId, setNotes, setSelectedNoteId, t]);
+  }, [getApi, onSnapshotSynced, selectedFolderId, setNotes, setSelectedNoteId, t]);
 
   const handleUpdateNote = useCallback(
     async (id: string, updates: NoteSyncUpdates) => {
@@ -285,7 +289,7 @@ export function useNoteSyncEngine({
         if (navigator.onLine) {
           try {
             const apiClient = await getApi();
-            await apiClient.applyWorkspaceChanges({
+            const response = await apiClient.applyWorkspaceChanges({
               ...getWorkspaceSyncRequestMetadata(),
               changes: [
                 {
@@ -296,10 +300,12 @@ export function useNoteSyncEngine({
                 },
               ],
             });
+            await persistWorkspaceSnapshot(response.snapshot);
+            onSnapshotSynced?.(response.snapshot);
           } catch (error) {
             if (isConflictApiError(error)) {
               const apiClient = await getApi();
-              await refreshWorkspaceSnapshot(apiClient);
+              await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
               setRemoteStatus("failed");
               setLastError(t("sync.conflictReloaded"));
               return;
@@ -323,7 +329,7 @@ export function useNoteSyncEngine({
         console.error("Failed to delete note:", error);
       }
     },
-    [cancelServerSync, getApi, selectedNoteId, setNotes, setSelectedNoteId, t]
+    [cancelServerSync, getApi, onSnapshotSynced, selectedNoteId, setNotes, setSelectedNoteId, t]
   );
 
   const triggerServerSync = useCallback(

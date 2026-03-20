@@ -10,6 +10,7 @@ import type { Folder } from "@/types";
 const getApiMock = vi.fn();
 const dispatchWorkspaceSyncedMock = vi.fn();
 const refreshWorkspaceSnapshotMock = vi.fn();
+const onSnapshotSyncedMock = vi.fn();
 const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
   device_id: "device-1",
   base_cursor: "cursor-1",
@@ -71,7 +72,9 @@ function useFoldersHarness(
   return {
     folders,
     selectedFolderId,
-    ...useFolders(folders, setFolders, selectedFolderId, setSelectedFolderId),
+    ...useFolders(folders, setFolders, selectedFolderId, setSelectedFolderId, {
+      onSnapshotSynced: onSnapshotSyncedMock,
+    }),
   };
 }
 
@@ -84,6 +87,7 @@ describe("useFolders", () => {
     vi.mocked(notesDB.saveNotes).mockResolvedValue();
     vi.mocked(notesDB.deleteNote).mockResolvedValue();
     vi.mocked(syncQueue.addChange).mockResolvedValue();
+    onSnapshotSyncedMock.mockReset();
     Object.defineProperty(window.navigator, "onLine", {
       configurable: true,
       value: true,
@@ -121,15 +125,15 @@ describe("useFolders", () => {
     });
 
     await waitFor(() => {
-      expect(dispatchWorkspaceSyncedMock).toHaveBeenCalledWith({
-        snapshot: {
-          folders: [serverFolder],
-          notes: [],
-          cursor: "cursor-1",
-          server_time: "2024-01-01T00:00:00.000Z",
-        },
+      expect(onSnapshotSyncedMock).toHaveBeenCalledWith({
+        folders: [serverFolder],
+        notes: [],
+        cursor: "cursor-1",
+        server_time: "2024-01-01T00:00:00.000Z",
       });
     });
+
+    expect(dispatchWorkspaceSyncedMock).not.toHaveBeenCalled();
 
     expect(result.current.folders[0]?.name).toBe("Projects");
     expect(notesDB.deleteFolder).toHaveBeenCalledWith(expect.stringMatching(/^temp-/));
@@ -202,7 +206,9 @@ describe("useFolders", () => {
     });
 
     await waitFor(() => {
-      expect(refreshWorkspaceSnapshotMock).toHaveBeenCalledWith(apiClient);
+      expect(refreshWorkspaceSnapshotMock).toHaveBeenCalledWith(apiClient, {
+        onSnapshotSynced: onSnapshotSyncedMock,
+      });
     });
 
     expect(syncQueue.addChange).not.toHaveBeenCalled();

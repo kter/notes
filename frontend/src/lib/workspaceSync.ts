@@ -10,6 +10,10 @@ export interface WorkspaceSyncedEventDetail {
   snapshot: WorkspaceSnapshotResponse;
 }
 
+interface SnapshotSyncOptions {
+  onSnapshotSynced?: (snapshot: WorkspaceSnapshotResponse) => void;
+}
+
 function getStorage(): Storage | null {
   if (typeof window === "undefined") {
     return null;
@@ -93,10 +97,14 @@ export function isConflictApiError(error: unknown): error is ApiError {
 
 export async function refreshWorkspaceSnapshot(apiClient: {
   getWorkspaceSnapshot: () => Promise<WorkspaceSnapshotResponse>;
-}): Promise<WorkspaceSnapshotResponse> {
+}, options: SnapshotSyncOptions = {}): Promise<WorkspaceSnapshotResponse> {
   const snapshot = await apiClient.getWorkspaceSnapshot();
   await persistWorkspaceSnapshot(snapshot);
-  dispatchWorkspaceSynced({ snapshot });
+  if (options.onSnapshotSynced) {
+    options.onSnapshotSynced(snapshot);
+  } else {
+    dispatchWorkspaceSynced({ snapshot });
+  }
   return snapshot;
 }
 

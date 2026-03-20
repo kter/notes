@@ -20,6 +20,7 @@ const translationMap = {
   "sync.conflictReloaded": "Conflict reloaded",
 } as const;
 const refreshWorkspaceSnapshotMock = vi.fn();
+const onSnapshotSyncedMock = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   useApi: () => ({
@@ -95,6 +96,7 @@ function useNoteSyncEngineHarness(
       selectedFolderId,
       selectedNoteId,
       setSelectedNoteId,
+      onSnapshotSynced: onSnapshotSyncedMock,
     }),
   };
 }
@@ -110,6 +112,7 @@ describe("useNoteSyncEngine", () => {
     vi.mocked(notesDB.saveFolders).mockResolvedValue();
     vi.mocked(notesDB.deleteFolder).mockResolvedValue();
     vi.mocked(syncQueue.addChange).mockResolvedValue();
+    onSnapshotSyncedMock.mockReset();
     Object.defineProperty(window.navigator, "onLine", {
       configurable: true,
       value: true,
@@ -157,6 +160,12 @@ describe("useNoteSyncEngine", () => {
       expect(result.current.selectedNoteId).toBe("server-note-1");
     });
 
+    expect(onSnapshotSyncedMock).toHaveBeenCalledWith({
+      folders: [],
+      notes: [serverNote],
+      cursor: "cursor-1",
+      server_time: "2024-01-01T00:00:00.000Z",
+    });
     expect(result.current.savedHashes).toEqual({ "server-note-1": "hash-123" });
     expect(result.current.syncStatus.remote).toBe("synced");
   });
@@ -190,6 +199,59 @@ describe("useNoteSyncEngine", () => {
     });
     expect(result.current.syncStatus.remote).toBe("failed");
     expect(result.current.syncStatus.lastError).toBe("Cannot sync while offline");
+
+    vi.useRealTimers();
+  });
+
+  it("applies the synced snapshot after an online update succeeds", async () => {
+    vi.useFakeTimers();
+
+    const initialNote = buildNote();
+    const updatedServerNote = buildNote({
+      content: "Server update",
+      version: 2,
+      updated_at: "2024-01-02T00:00:00.000Z",
+    });
+    const snapshot = {
+      folders: [],
+      notes: [updatedServerNote],
+      cursor: "cursor-2",
+      server_time: "2024-01-02T00:00:00.000Z",
+    };
+
+    getApiMock.mockResolvedValue({
+      applyWorkspaceChanges: vi.fn().mockResolvedValue({
+        applied: [
+          {
+            entity: "note",
+            operation: "update",
+            entity_id: updatedServerNote.id,
+            client_mutation_id: null,
+            folder: null,
+            note: updatedServerNote,
+          },
+        ],
+        snapshot,
+      }),
+    });
+
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, {
+        content: "Local update",
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+      await result.current.triggerServerSync(initialNote.id);
+    });
+
+    expect(onSnapshotSyncedMock).toHaveBeenCalledWith(snapshot);
+    expect(result.current.syncStatus.remote).toBe("synced");
 
     vi.useRealTimers();
   });
@@ -239,7 +301,9 @@ describe("useNoteSyncEngine", () => {
     });
 
     await waitFor(() => {
-      expect(refreshWorkspaceSnapshotMock).toHaveBeenCalledWith(apiClient);
+      expect(refreshWorkspaceSnapshotMock).toHaveBeenCalledWith(apiClient, {
+        onSnapshotSynced: onSnapshotSyncedMock,
+      });
     });
 
     expect(syncQueue.addChange).not.toHaveBeenCalled();

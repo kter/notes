@@ -38,13 +38,15 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     syncStatus: offlineSyncStatus,
     lastErrorMessage: offlineSyncErrorMessage,
     pendingChangesCount,
+    applySnapshot,
   } = useWorkspaceSyncState(isAuthenticated);
 
   const { handleCreateFolder, handleRenameFolder, handleDeleteFolder } = useFolders(
     folders,
     setFolders,
     selectedFolderId,
-    setSelectedFolderId
+    setSelectedFolderId,
+    { onSnapshotSynced: applySnapshot }
   );
 
   const handleSelectFolder = useCallback((id: string | null) => {
@@ -72,7 +74,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     setNotes,
     selectedFolderId,
     selectedNoteId,
-    handleSelectNote
+    handleSelectNote,
+    { onSnapshotSynced: applySnapshot }
   );
 
   const { tokenUsage, recordUsage } = useTokenUsage(isAuthenticated);

@@ -591,8 +591,10 @@ describe('EditorPanel', () => {
       content: '- [ ] task item\n- [x] done item',
       user_id: 'u1',
       folder_id: null,
+      version: 1,
       created_at: '',
       updated_at: '',
+      deleted_at: null,
     }
 
     it('clicking unchecked checkbox marks it as checked in textarea', async () => {

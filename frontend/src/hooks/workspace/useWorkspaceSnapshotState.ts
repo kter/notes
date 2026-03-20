@@ -6,14 +6,12 @@ import { useAuth } from "@/lib/auth-context";
 import { notesDB } from "@/lib/indexedDB";
 import { mergeFolders, mergeNotes } from "@/lib/merge";
 import {
-  WORKSPACE_SYNCED_EVENT,
   getActiveFolders,
   getActiveNotes,
   persistWorkspaceSnapshot,
-  type WorkspaceSyncedEventDetail,
 } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
-import type { Folder, Note } from "@/types";
+import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
 
 export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -24,7 +22,7 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
   const { getApi } = useApi();
   const hasFetchedRef = useRef(false);
 
-  const applySnapshot = useCallback((snapshot: WorkspaceSyncedEventDetail["snapshot"]) => {
+  const applySnapshot = useCallback((snapshot: WorkspaceSnapshotResponse) => {
     setFolders(getActiveFolders(snapshot));
     setNotes(getActiveNotes(snapshot));
   }, []);
@@ -75,18 +73,6 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
       void loadData();
     }
   }, [authLoading, getApi, isAuthenticated]);
-
-  useEffect(() => {
-    const handleWorkspaceSynced = (event: Event) => {
-      const { detail } = event as CustomEvent<WorkspaceSyncedEventDetail>;
-      applySnapshot(detail.snapshot);
-    };
-
-    window.addEventListener(WORKSPACE_SYNCED_EVENT, handleWorkspaceSynced);
-    return () => {
-      window.removeEventListener(WORKSPACE_SYNCED_EVENT, handleWorkspaceSynced);
-    };
-  }, [applySnapshot]);
 
   useEffect(() => {
     if (!isAuthenticated) {

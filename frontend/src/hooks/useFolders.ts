@@ -6,7 +6,6 @@ import { useApi } from "./useApi";
 import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import {
-  dispatchWorkspaceSynced,
   getWorkspaceSyncRequestMetadata,
   isConflictApiError,
   persistWorkspaceSnapshot,
@@ -23,7 +22,7 @@ interface UseFoldersReturn {
 }
 
 interface UseFoldersOptions {
-  onSnapshotSynced?: (snapshot: {
+  onSnapshotSynced: (snapshot: {
     folders: Folder[];
     notes: import("@/types").Note[];
     cursor: string;
@@ -81,11 +80,7 @@ export function useFolders(
 
           await notesDB.deleteFolder(tempId);
           await persistWorkspaceSnapshot(response.snapshot);
-          if (onSnapshotSynced) {
-            onSnapshotSynced(response.snapshot);
-          } else {
-            dispatchWorkspaceSynced({ snapshot: response.snapshot });
-          }
+          onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
           if (isConflictApiError(error)) {
@@ -142,11 +137,7 @@ export function useFolders(
           });
 
           await persistWorkspaceSnapshot(response.snapshot);
-          if (onSnapshotSynced) {
-            onSnapshotSynced(response.snapshot);
-          } else {
-            dispatchWorkspaceSynced({ snapshot: response.snapshot });
-          }
+          onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
           if (isConflictApiError(error)) {
@@ -203,11 +194,7 @@ export function useFolders(
           });
 
           await persistWorkspaceSnapshot(response.snapshot);
-          if (onSnapshotSynced) {
-            onSnapshotSynced(response.snapshot);
-          } else {
-            dispatchWorkspaceSynced({ snapshot: response.snapshot });
-          }
+          onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
           if (isConflictApiError(error)) {

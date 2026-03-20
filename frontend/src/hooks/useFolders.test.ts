@@ -8,7 +8,6 @@ import { syncQueue } from "@/lib/syncQueue";
 import type { Folder } from "@/types";
 
 const getApiMock = vi.fn();
-const dispatchWorkspaceSyncedMock = vi.fn();
 const refreshWorkspaceSnapshotMock = vi.fn();
 const onSnapshotSyncedMock = vi.fn();
 const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
@@ -40,7 +39,6 @@ vi.mock("@/lib/syncQueue", () => ({
 
 vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
-  dispatchWorkspaceSynced: (...args: unknown[]) => dispatchWorkspaceSyncedMock(...args),
   refreshWorkspaceSnapshot: (...args: unknown[]) =>
     refreshWorkspaceSnapshotMock(...args),
   isConflictApiError: (error: unknown) =>
@@ -132,8 +130,6 @@ describe("useFolders", () => {
         server_time: "2024-01-01T00:00:00.000Z",
       });
     });
-
-    expect(dispatchWorkspaceSyncedMock).not.toHaveBeenCalled();
 
     expect(result.current.folders[0]?.name).toBe("Projects");
     expect(notesDB.deleteFolder).toHaveBeenCalledWith(expect.stringMatching(/^temp-/));

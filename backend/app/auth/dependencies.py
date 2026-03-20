@@ -1,21 +1,17 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session
 
+from app.auth.app_user_service import AppUserService
 from app.auth.cognito import cognito_verifier
 from app.database import get_session
 from app.models import AppUser
-from app.services.app_user_service import AppUserService
-from app.shared import NotFound
 
 # Bearer token security scheme
 security = HTTPBearer()
-
-# Type variable for models with user_id attribute
 
 
 async def get_current_user(
@@ -76,35 +72,6 @@ def require_admin(
             detail="Admin access required",
         )
     return app_user
-
-
-def get_owned_resource[T: SQLModel](
-    session: Session,
-    model: type[T],
-    resource_id: UUID,
-    user_id: str,
-    resource_name: str = "Resource",
-) -> T:
-    """
-    Fetch a resource by ID and validate user ownership.
-
-    Args:
-        session: Database session
-        model: SQLModel class to query
-        resource_id: UUID of the resource
-        user_id: ID of the current user
-        resource_name: Name of the resource for error messages
-
-    Returns:
-        The resource if found and owned by the user
-
-    Raises:
-        NotFound: If the resource is missing or not owned by the user
-    """
-    resource = session.get(model, resource_id)
-    if not resource or resource.user_id != user_id:
-        raise NotFound(f"{resource_name} not found")
-    return resource
 
 
 # Type alias for dependency injection

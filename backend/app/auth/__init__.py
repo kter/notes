@@ -1,3 +1,4 @@
+from app.auth.app_user_service import AppUserService
 from app.auth.cognito import cognito_verifier
 from app.auth.dependencies import (
     AdminUser,
@@ -6,16 +7,15 @@ from app.auth.dependencies import (
     UserId,
     get_current_app_user,
     get_current_user,
-    get_owned_resource,
     get_user_id,
     require_admin,
 )
 
 __all__ = [
+    "AppUserService",
     "cognito_verifier",
     "get_current_app_user",
     "get_current_user",
-    "get_owned_resource",
     "get_user_id",
     "require_admin",
     "AdminUser",

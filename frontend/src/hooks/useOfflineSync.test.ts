@@ -19,6 +19,16 @@ vi.mock('./useApi', () => ({
   }),
 }))
 
+vi.mock('@/hooks/useTranslation', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      if (key === 'sync.conflictReloaded') return 'Conflict reloaded'
+      if (key === 'sync.serverSyncFailed') return 'Server sync failed'
+      return key
+    },
+  }),
+}))
+
 describe('useOfflineSync', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -74,5 +84,59 @@ describe('useOfflineSync', () => {
     await waitFor(() => {
         expect(syncQueue.processQueue).toHaveBeenCalled()
     })
+  })
+
+  it('surfaces conflict reload messages', async () => {
+    vi.mocked(syncQueue.processQueue).mockResolvedValueOnce({
+      success: false,
+      syncedCount: 0,
+      failedCount: 0,
+      errors: [],
+      errorCode: 'conflict',
+      snapshot: {
+        folders: [],
+        notes: [],
+        cursor: 'cursor-1',
+        server_time: '2024-01-01T00:00:00.000Z',
+      },
+    })
+
+    const { result } = renderHook(() => useOfflineSync())
+
+    await act(async () => {
+      await result.current.forceSync()
+    })
+
+    expect(result.current.syncStatus).toBe('error')
+    expect(result.current.lastErrorMessage).toBe('Conflict reloaded')
+  })
+
+  it('calls the provided snapshot callback when sync returns a snapshot', async () => {
+    const onSnapshotSynced = vi.fn()
+    const snapshot = {
+      folders: [],
+      notes: [],
+      cursor: 'cursor-1',
+      server_time: '2024-01-01T00:00:00.000Z',
+    }
+
+    vi.mocked(syncQueue.processQueue).mockResolvedValueOnce({
+      success: true,
+      syncedCount: 1,
+      failedCount: 0,
+      errors: [],
+      snapshot,
+    })
+
+    const { result } = renderHook(() => useOfflineSync({ onSnapshotSynced }))
+
+    await act(async () => {
+      await result.current.forceSync()
+    })
+
+    expect(syncQueue.processQueue).toHaveBeenCalledWith(undefined, {
+      onSnapshotSynced,
+    })
+    expect(onSnapshotSynced).not.toHaveBeenCalled()
   })
 })

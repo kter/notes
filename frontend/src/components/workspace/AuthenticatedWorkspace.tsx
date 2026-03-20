@@ -156,6 +156,7 @@ export function AuthenticatedWorkspace({
       <SyncStatusIndicator
         isOnline={workspace.isOnline}
         syncStatus={workspace.offlineSyncStatus}
+        lastErrorMessage={workspace.offlineSyncErrorMessage}
         pendingChangesCount={workspace.pendingChangesCount}
         savedLocally={false}
         className="fixed bottom-20 md:bottom-4 right-4 z-50"

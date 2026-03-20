@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+import { createNoteFixture } from './helpers/apiFixtures';
+import { getAppliedEntityId, waitForWorkspaceChange } from './helpers/workspaceSync';
+
 test.describe('Mobile Comprehensive Scenario', () => {
   // Mobile testing requires isMobile to be true
   test.skip(({ isMobile }) => !isMobile, 'This test is only for mobile viewports');
@@ -14,79 +17,52 @@ test.describe('Mobile Comprehensive Scenario', () => {
     console.log('[Mobile Test] Creating folder');
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 25000 });
     const foldersLayout = page.getByTestId('mobile-layout-folders');
-    const createFolderPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
-      { timeout: 30000 }
-    );
+    const createFolderPromise = waitForWorkspaceChange(page, 'folder', 'create');
     await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
     
     const folderName = `Mobile Project ${Date.now()}`;
     await page.getByPlaceholder(/Folder name|フォルダ名/i).fill(folderName);
     await page.keyboard.press('Enter');
-    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
+    const createdFolderId = await createFolderPromise.then(resp => getAppliedEntityId(resp, 'folder', 'create'));
 
     // 2. Select Folder
     console.log(`[Mobile Test] Selecting folder: ${folderName}`);
-    await foldersLayout.getByTestId(`sidebar-folder-item-${createdFolder.id}`).click();
+    await foldersLayout.getByTestId(`sidebar-folder-item-${createdFolderId}`).click();
     // Verify transition to Notes view
     await expect(page.getByRole('heading', { level: 2, name: new RegExp(folderName, 'i') })).toBeVisible({ timeout: 20000 });
 
-    // 3. Create Note -> Auto transition to Editor View
-    console.log('[Mobile Test] Creating note');
-    
-    // Start listening for the note creation API call
-    const createPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/notes') && resp.request().method() === 'POST' && resp.status() < 400,
-      { timeout: 30000 }
-    );
-    
-    await page.getByRole('button', { name: /Add note|ノートを追加/i }).click();
-    
-    // Wait for the note to be created on server (this gives it a real ID)
-    console.log('[Mobile Test] Waiting for note creation on server');
-    await createPromise;
-    console.log('[Mobile Test] Note created on server');
-    
-    // Small delay for UI to update with server note
-    await page.waitForTimeout(500);
-    
+    // 3. Create Note fixture and open it in the mobile editor
+    console.log('[Mobile Test] Creating note fixture');
     const noteTitle = 'Mobile Note';
     const noteContent = 'Content created on a mobile device.';
-    
+
+    const createdNote = await createNoteFixture(page, {
+      title: noteTitle,
+      content: noteContent,
+      folder_id: createdFolderId,
+    });
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const reloadedFoldersLayout = page.getByTestId('mobile-layout-folders');
+    await expect(reloadedFoldersLayout.getByTestId(`sidebar-folder-item-${createdFolderId}`)).toBeVisible({ timeout: 20000 });
+    await reloadedFoldersLayout.getByTestId(`sidebar-folder-item-${createdFolderId}`).click();
+    await expect(page.getByRole('heading', { level: 2, name: new RegExp(folderName, 'i') })).toBeVisible({ timeout: 20000 });
+
+    const notesLayout = page.getByTestId('mobile-layout-notes');
+    const noteItem = notesLayout.locator('[data-testid^="note-list-item-"]').filter({ hasText: noteTitle }).first();
+    await expect(noteItem).toBeVisible({ timeout: 20000 });
+    await noteItem.click();
+
     // Wait for editor view elements using placeholder patterns
     const layout = page.getByTestId('mobile-layout-editor');
     const titleInput = layout.getByPlaceholder(/Note title|ノートのタイトル/i).first();
     await expect(titleInput).toBeVisible({ timeout: 20000 });
-    
-    await titleInput.fill(noteTitle);
-    const contentInput = layout.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).first();
-    await contentInput.fill(noteContent);
-    
-    // Trigger blur to ensure content is registered
-    await contentInput.blur();
-    
-    // Wait for auto-save to complete
-    console.log('[Mobile Test] Waiting for auto-save');
-    
-    // Wait for the save API call (PUT or PATCH to /api/notes/{id})
-    const updatePromise = page.waitForResponse(
-      resp => /\/api\/notes\/[^/]+$/.test(resp.url()) && (resp.request().method() === 'PUT' || resp.request().method() === 'PATCH') && resp.status() < 400,
-      { timeout: 30000 }
-    ).catch(e => console.log('[Mobile Test] Update API response not detected:', e.message));
-    
-    // Wait a bit for debounced save to trigger
-    await page.waitForTimeout(1000);
-    
-    const savedIndicator = layout.locator('span').filter({ hasText: /Saved|保存しました/i }).first();
-    await expect(savedIndicator).toBeVisible({ timeout: 35000 });
-    
-    // Wait for update API to complete
-    console.log('[Mobile Test] Waiting for content sync to server');
-    await updatePromise;
-    console.log('[Mobile Test] Content synced');
-    
-    // Extra wait for backend consistency
-    await page.waitForTimeout(2000);
+    await expect(titleInput).toHaveValue(createdNote.title, { timeout: 20000 });
+    await expect(
+      layout.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).first()
+    ).toHaveValue(createdNote.content, { timeout: 20000 });
 
     // 4. Summarize -> Auto transition to Chat/Summary view
     console.log('[Mobile Test] Summarizing');
@@ -101,6 +77,7 @@ test.describe('Mobile Comprehensive Scenario', () => {
         { timeout: 30000 }
       );
 
+      await summarizeButton.scrollIntoViewIfNeeded();
       await summarizeButton.click();
       const summarizeResponse = await summarizeResponsePromise;
 

@@ -43,8 +43,10 @@ describe("useHomeData", () => {
         id: "folder-1",
         name: "Local folder",
         user_id: "user-1",
+        version: 1,
         created_at: "2024-01-01T00:00:00.000Z",
         updated_at: "2024-01-01T00:00:00.000Z",
+        deleted_at: null,
       },
     ];
     const localNotes = [
@@ -54,8 +56,10 @@ describe("useHomeData", () => {
         content: "Local content",
         user_id: "user-1",
         folder_id: "folder-1",
+        version: 1,
         created_at: "2024-01-01T00:00:00.000Z",
         updated_at: "2024-01-01T00:00:00.000Z",
+        deleted_at: null,
       },
     ];
     const serverFolders = [
@@ -78,8 +82,12 @@ describe("useHomeData", () => {
     vi.mocked(notesDB.saveFolders).mockResolvedValue();
     vi.mocked(notesDB.saveNotes).mockResolvedValue();
     getApiMock.mockResolvedValue({
-      listFolders: vi.fn().mockResolvedValue(serverFolders),
-      listNotes: vi.fn().mockResolvedValue(serverNotes),
+      getWorkspaceSnapshot: vi.fn().mockResolvedValue({
+        folders: serverFolders,
+        notes: serverNotes,
+        cursor: "cursor-1",
+        server_time: "2024-01-02T00:00:00.000Z",
+      }),
     });
 
     const { result, rerender } = renderHook(

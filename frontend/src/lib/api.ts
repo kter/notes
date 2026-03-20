@@ -27,6 +27,9 @@ import type {
   AdminUserDetailResponse,
   AdminUsersListResponse,
   AdminUserUpdateRequest,
+  WorkspaceChangesRequest,
+  WorkspaceChangesResponse,
+  WorkspaceSnapshotResponse,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -141,6 +144,20 @@ class ApiClient {
   async deleteNote(id: string): Promise<void> {
     return this.request<void>(`/api/notes/${id}`, {
       method: "DELETE",
+    });
+  }
+
+  // Workspace Sync API
+  async getWorkspaceSnapshot(): Promise<WorkspaceSnapshotResponse> {
+    return this.request<WorkspaceSnapshotResponse>("/api/workspace/snapshot");
+  }
+
+  async applyWorkspaceChanges(
+    data: WorkspaceChangesRequest
+  ): Promise<WorkspaceChangesResponse> {
+    return this.request<WorkspaceChangesResponse>("/api/workspace/changes", {
+      method: "POST",
+      body: JSON.stringify(data),
     });
   }
 

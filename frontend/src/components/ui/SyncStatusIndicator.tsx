@@ -8,6 +8,7 @@ import type { SyncStatus } from "@/lib/syncQueue";
 interface SyncStatusIndicatorProps {
   isOnline: boolean;
   syncStatus: SyncStatus;
+  lastErrorMessage?: string | null;
   pendingChangesCount: number;
   savedLocally?: boolean;
   className?: string;
@@ -16,6 +17,7 @@ interface SyncStatusIndicatorProps {
 export function SyncStatusIndicator({
   isOnline,
   syncStatus,
+  lastErrorMessage,
   pendingChangesCount,
   savedLocally = false,
   className,
@@ -43,7 +45,7 @@ export function SyncStatusIndicator({
     if (syncStatus === "error") {
       return {
         icon: <AlertCircleIcon className="h-4 w-4 text-red-500" />,
-        message: t("sync.syncError"),
+        message: lastErrorMessage ?? t("sync.syncError"),
         showPending: true,
       };
     }

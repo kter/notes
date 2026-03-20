@@ -226,6 +226,7 @@ export const en = {
     serverSyncFailed: "Failed to sync with the server",
     offlineSyncUnavailable: "Cannot sync while offline",
     localSaveFailed: "Failed to save locally",
+    conflictReloaded: "A sync conflict was detected, so the latest server state was reloaded",
   },
 
   // Share
@@ -457,6 +458,7 @@ export type TranslationKeys = {
     serverSyncFailed: string;
     offlineSyncUnavailable: string;
     localSaveFailed: string;
+    conflictReloaded: string;
   };
   share: {
     title: string;

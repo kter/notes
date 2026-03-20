@@ -37,6 +37,8 @@ class TestCreateFolder:
         folder = response.json()
         assert folder["name"] == "My Folder"
         assert folder["user_id"] == TEST_USER_ID
+        assert folder["version"] == 1
+        assert folder["deleted_at"] is None
         assert "id" in folder
         assert "created_at" in folder
         assert "updated_at" in folder
@@ -77,6 +79,7 @@ class TestUpdateFolder:
         )
         assert response.status_code == 200
         assert response.json()["name"] == "Updated"
+        assert response.json()["version"] == 2
 
     def test_update_folder_not_found(self, client: TestClient):
         """Test updating a non-existent folder."""
@@ -100,6 +103,15 @@ class TestDeleteFolder:
         # Verify it's deleted
         get_response = client.get(f"/api/folders/{folder_id}")
         assert get_response.status_code == 404
+
+        snapshot_response = client.get("/api/workspace/snapshot")
+        assert snapshot_response.status_code == 200
+        tombstone = next(
+            item
+            for item in snapshot_response.json()["folders"]
+            if item["id"] == folder_id
+        )
+        assert tombstone["deleted_at"] is not None
 
     def test_delete_folder_not_found(self, client: TestClient):
         """Test deleting a non-existent folder."""

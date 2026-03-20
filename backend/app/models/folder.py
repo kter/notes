@@ -18,8 +18,10 @@ class Folder(FolderBase, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: str = Field()  # Cognito user sub (no index for DSQL compatibility)
+    version: int = Field(default=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    deleted_at: datetime | None = Field(default=None)
 
 
 class FolderCreate(FolderBase):
@@ -39,12 +41,14 @@ class FolderRead(FolderBase):
 
     id: UUID
     user_id: str
+    version: int
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None
 
-    @field_validator("created_at", "updated_at", mode="before")
+    @field_validator("created_at", "updated_at", "deleted_at", mode="before")
     @classmethod
-    def ensure_utc_timezone(cls, v: datetime) -> datetime:
+    def ensure_utc_timezone(cls, v: datetime | None) -> datetime | None:
         """Ensure datetime has UTC timezone info for proper JSON serialization."""
         if isinstance(v, datetime) and v.tzinfo is None:
             return v.replace(tzinfo=UTC)

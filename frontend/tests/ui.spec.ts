@@ -1,18 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+import { getAppliedEntityId, isWorkspaceChangeRequest, waitForWorkspaceChange } from './helpers/workspaceSync';
+
 test.describe('UI Loading States', () => {
 
   test('should show loading state when creating a folder', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Desktop only');
     await page.goto('/');
     const desktopLayout = page.getByTestId('desktop-layout');
-    const createFolderPromise = page.waitForResponse(
-      resp => resp.url().includes('/api/folders') && resp.request().method() === 'POST' && resp.status() < 400,
-      { timeout: 30000 }
-    );
 
     // 1. Open create folder input
-    await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
+    const addFolderButton = desktopLayout.getByTestId('sidebar-add-folder-button');
+    await expect(addFolderButton).toBeVisible({ timeout: 15000 });
+    const createFolderPromise = waitForWorkspaceChange(page, 'folder', 'create');
+    await addFolderButton.click();
 
     // 2. Fill folder name
     const folderName = `Loading Test Folder ${Date.now()}`;
@@ -27,11 +28,11 @@ test.describe('UI Loading States', () => {
 
     // 4. Click confirm
     await confirmButton.click();
-    const createdFolder = await createFolderPromise.then(resp => resp.json() as Promise<{ id: string }>);
+    const createdFolderId = await createFolderPromise.then(resp => getAppliedEntityId(resp, 'folder', 'create'));
 
     // Ideally we would check for the loader, but it might disappear too fast.
     // At least verify the folder is created.
-    await expect(desktopLayout.getByTestId(`sidebar-folder-item-${createdFolder.id}`)).toBeVisible();
+    await expect(desktopLayout.getByTestId(`sidebar-folder-item-${createdFolderId}`)).toBeVisible();
   });
 
   test('should show loading state when creating a note', async ({ page, isMobile, browserName }) => {
@@ -50,8 +51,8 @@ test.describe('UI Loading States', () => {
     
     // We want to verify the disabled state.
     // We can intercept the request and delay it.
-    await page.route(/\/api\/notes/, async route => {
-      if (route.request().method() === 'POST') {
+    await page.route(/\/api\/workspace\/changes/, async route => {
+      if (isWorkspaceChangeRequest(route.request(), 'note', 'create')) {
         // Delay response
         await new Promise(r => setTimeout(r, 1000));
         await route.continue();

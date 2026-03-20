@@ -92,8 +92,10 @@ describe('EditorPanel', () => {
         content: 'Initial content',
         user_id: 'u1',
         folder_id: null,
+        version: 1,
         created_at: '',
-        updated_at: ''
+        updated_at: '',
+        deleted_at: null,
     }
 
   const defaultProps = {

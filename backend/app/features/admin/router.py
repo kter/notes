@@ -1,17 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session
 
-from app.auth.dependencies import AdminUser
-from app.database import get_session
-from app.db_commit import commit_with_error_handling
+from app.auth import AdminUser
+from app.features.admin.dependencies import get_admin_use_cases
 from app.features.admin.schemas import (
     AdminUserDetailResponse,
     AdminUsersListResponse,
     AdminUserUpdateRequest,
 )
-from app.features.admin.service import AdminService
+from app.features.admin.use_cases import AdminUseCases
 from app.models import AppUserRead
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -26,7 +24,7 @@ def get_admin_me(admin_user: AdminUser):
 @router.get("/users", response_model=AdminUsersListResponse)
 def list_admin_users(
     admin_user: AdminUser,
-    session: Annotated[Session, Depends(get_session)],
+    use_cases: Annotated[AdminUseCases, Depends(get_admin_use_cases)],
     q: str | None = Query(default=None, min_length=1),
     admin_only: bool | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
@@ -34,20 +32,18 @@ def list_admin_users(
 ):
     """List application users for the admin console."""
     del admin_user
-    service = AdminService(session)
-    return service.list_users(q=q, admin_only=admin_only, limit=limit, offset=offset)
+    return use_cases.list_users(q=q, admin_only=admin_only, limit=limit, offset=offset)
 
 
 @router.get("/users/{user_id}", response_model=AdminUserDetailResponse)
 def get_admin_user_detail(
     user_id: str,
     admin_user: AdminUser,
-    session: Annotated[Session, Depends(get_session)],
+    use_cases: Annotated[AdminUseCases, Depends(get_admin_use_cases)],
 ):
     """Get the details for a specific application user."""
     del admin_user
-    service = AdminService(session)
-    return service.get_user_detail(user_id)
+    return use_cases.get_user_detail(user_id)
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserDetailResponse)
@@ -55,11 +51,8 @@ def update_admin_user(
     user_id: str,
     payload: AdminUserUpdateRequest,
     admin_user: AdminUser,
-    session: Annotated[Session, Depends(get_session)],
+    use_cases: Annotated[AdminUseCases, Depends(get_admin_use_cases)],
 ):
     """Update admin-controlled fields for a user."""
     del admin_user
-    service = AdminService(session)
-    service.update_user(user_id, payload)
-    commit_with_error_handling(session, "AdminUserUpdate")
-    return service.get_user_detail(user_id)
+    return use_cases.update_user(user_id, payload)

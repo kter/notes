@@ -6,21 +6,21 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.main import app
-from app.models import Note
-from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
-from app.services import AIService, get_ai_service
-from app.services.token_usage import (
+from app.features.assistant.gateway import AIGateway, get_ai_gateway
+from app.features.assistant.usage_policy import (
     check_limit,
     get_or_create_current_period,
     get_usage_info,
     record_usage,
 )
+from app.main import app
+from app.models import Note
+from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
 from tests.conftest import TEST_USER_ID
 
 
 # Mock AI Service that returns token counts
-class MockAIServiceWithTokens(AIService):
+class MockAIGatewayWithTokens(AIGateway):
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
     ) -> tuple[str, int]:
@@ -48,10 +48,10 @@ class MockAIServiceWithTokens(AIService):
 
 @pytest.fixture
 def mock_ai_service():
-    service = MockAIServiceWithTokens()
-    app.dependency_overrides[get_ai_service] = lambda: service
+    service = MockAIGatewayWithTokens()
+    app.dependency_overrides[get_ai_gateway] = lambda: service
     yield service
-    app.dependency_overrides.pop(get_ai_service, None)
+    app.dependency_overrides.pop(get_ai_gateway, None)
 
 
 class TestTokenUsageService:

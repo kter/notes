@@ -273,9 +273,6 @@
   position: relative;
   top: -1px;
 }
-.markdown-preview ul:has(.task-list-item) {
-  padding-left: 0.5rem;
-}
 
 /* Search Highlight */
 .search-highlight {

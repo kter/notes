@@ -3,13 +3,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { useApi } from "./useApi";
 import type { TokenUsageRead } from "@/types";
+import { useAuth } from "@/lib/auth-context";
 
 export function useTokenUsage(isAuthenticated: boolean) {
     const { getApi } = useApi();
+    const { isLoading: authLoading } = useAuth();
     const [tokenUsage, setTokenUsage] = useState<TokenUsageRead | null>(null);
 
     const fetchTokenUsage = useCallback(async () => {
-        if (!isAuthenticated) return;
+        if (authLoading || !isAuthenticated) return;
         try {
             const apiClient = await getApi();
             const response = await apiClient.getSettings();
@@ -19,12 +21,11 @@ export function useTokenUsage(isAuthenticated: boolean) {
         } catch (error) {
             console.error("Failed to fetch token usage:", error);
         }
-    }, [isAuthenticated, getApi]);
+    }, [authLoading, isAuthenticated, getApi]);
 
     useEffect(() => {
-        fetchTokenUsage();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAuthenticated, getApi]);
+        void fetchTokenUsage();
+    }, [fetchTokenUsage]);
 
     const recordUsage = useCallback((tokens: number) => {
         setTokenUsage((prev) =>

@@ -119,4 +119,35 @@ describe("useHomeData", () => {
     expect(notesDB.getAllFolders).not.toHaveBeenCalled();
     expect(notesDB.getAllNotes).not.toHaveBeenCalled();
   });
+
+  it("does not log snapshot failures after the hook unmounts", async () => {
+    const getWorkspaceSnapshotMock = vi.fn();
+    let rejectSnapshot: (error: unknown) => void = () => undefined;
+
+    vi.mocked(notesDB.getAllFolders).mockResolvedValue([]);
+    vi.mocked(notesDB.getAllNotes).mockResolvedValue([]);
+    getWorkspaceSnapshotMock.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectSnapshot = reject;
+      })
+    );
+    getApiMock.mockResolvedValue({
+      getWorkspaceSnapshot: getWorkspaceSnapshotMock,
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { unmount } = renderHook(() => useHomeData(true));
+
+    await waitFor(() => {
+      expect(getWorkspaceSnapshotMock).toHaveBeenCalledTimes(1);
+    });
+
+    unmount();
+    rejectSnapshot(new TypeError("Failed to fetch"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
 });

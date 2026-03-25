@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { ja, en, type TranslationKeys, type Language } from "@/locales";
 import { useApi } from "@/hooks";
+import { useAuth } from "@/lib/auth-context";
 
 interface LanguageContextType {
   language: Language;
@@ -26,27 +27,58 @@ function getTranslations(effectiveLanguage: "ja" | "en"): TranslationKeys {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { getApi } = useApi();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [language, setLanguageState] = useState<Language>("auto");
   const [isLoading, setIsLoading] = useState(true);
 
   // Load language setting from backend on mount
   useEffect(() => {
+    let isActive = true;
+
     async function loadLanguage() {
+      if (authLoading) {
+        return;
+      }
+
+      if (!isAuthenticated) {
+        if (!isActive) {
+          return;
+        }
+
+        setLanguageState("auto");
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const apiClient = await getApi();
         const response = await apiClient.getSettings();
+        if (!isActive) {
+          return;
+        }
+
         setLanguageState(response.settings.language as Language);
       } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
         console.error("Failed to load language settings:", error);
         // Fall back to auto
         setLanguageState("auto");
       } finally {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
       }
     }
 
-    loadLanguage();
-  }, [getApi]);
+    void loadLanguage();
+
+    return () => {
+      isActive = false;
+    };
+  }, [authLoading, getApi, isAuthenticated]);
 
   const setLanguage = useCallback((newLanguage: Language) => {
     setLanguageState(newLanguage);

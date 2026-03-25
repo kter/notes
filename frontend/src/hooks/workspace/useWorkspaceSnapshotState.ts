@@ -28,9 +28,13 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
+
     async function loadData() {
       if (!isAuthenticated) {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -46,6 +50,10 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
         ]);
 
         if (localFolders.length > 0 || localNotes.length > 0) {
+          if (!isActive) {
+            return;
+          }
+
           setFolders(localFolders);
           setNotes(localNotes);
           setIsLoading(false);
@@ -54,6 +62,10 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
         if (navigator.onLine) {
           const apiClient = await getApi();
           const snapshot = await apiClient.getWorkspaceSnapshot();
+          if (!isActive) {
+            return;
+          }
+
           const serverFolders = getActiveFolders(snapshot);
           const serverNotes = getActiveNotes(snapshot);
 
@@ -63,15 +75,23 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
           await persistWorkspaceSnapshot(snapshot);
         }
       } catch (error) {
-        console.error("Failed to load data:", error);
+        if (isActive) {
+          console.error("Failed to load data:", error);
+        }
       } finally {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
       }
     }
 
     if (!authLoading) {
       void loadData();
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [authLoading, getApi, isAuthenticated]);
 
   useEffect(() => {

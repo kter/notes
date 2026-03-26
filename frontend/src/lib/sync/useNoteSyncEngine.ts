@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/hooks/useTranslation";
 import { notesDB } from "@/lib/indexedDB";
@@ -16,6 +16,7 @@ import { useApi } from "@/hooks/useApi";
 import type { Note, WorkspaceSnapshotResponse } from "@/types";
 
 import { useDebouncedAsync } from "./useDebouncedAsync";
+import { SYNC_RETRY_CONFIG } from "./syncConfig";
 import type { LocalSyncStatus, RemoteSyncStatus, SyncStatus } from "./types";
 
 const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceSnapshotResponse) => void = () => {};
@@ -56,7 +57,13 @@ export function useNoteSyncEngine({
   const [remoteStatus, setRemoteStatus] = useState<RemoteSyncStatus>("synced");
   const [lastError, setLastError] = useState<string | undefined>(undefined);
   const [savedHashes, setSavedHashes] = useState<Record<string, string>>({});
+  const [retryCountdown, setRetryCountdown] = useState<number | undefined>(undefined);
   const activeSavePromiseRef = useRef<Promise<void> | null>(null);
+  const retryAttemptRef = useRef<number>(0);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryArgsRef = useRef<{ id: string; updates: NoteSyncUpdates; expectedVersion?: number } | null>(null);
+  const syncNoteToServerRef = useRef<((id: string, updates: NoteSyncUpdates, expectedVersion?: number) => Promise<void>) | null>(null);
   const handleSnapshotSynced = onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
 
   const syncNoteToServer = useCallback(
@@ -96,6 +103,9 @@ export function useNoteSyncEngine({
             const hash = await calculateHash(serverNote.content);
             setSavedHashes((prev) => ({ ...prev, [id]: hash }));
 
+            retryAttemptRef.current = 0;
+            retryArgsRef.current = null;
+            setRetryCountdown(undefined);
             setRemoteStatus("synced");
             setLocalStatus("saved");
           } catch (error) {
@@ -114,6 +124,43 @@ export function useNoteSyncEngine({
             });
             setRemoteStatus("failed");
             setLastError(t("sync.serverSyncFailed"));
+
+            const attempt = retryAttemptRef.current;
+            if (attempt < SYNC_RETRY_CONFIG.maxRetryAttempts) {
+              const delayMs = Math.min(
+                SYNC_RETRY_CONFIG.retryBaseDelayMs * Math.pow(2, attempt),
+                SYNC_RETRY_CONFIG.retryMaxDelayMs
+              );
+              const delaySec = Math.round(delayMs / 1000);
+              retryArgsRef.current = { id, updates, expectedVersion };
+              setRetryCountdown(delaySec);
+
+              retryIntervalRef.current = setInterval(() => {
+                setRetryCountdown((prev) => {
+                  if (prev === undefined || prev <= 1) {
+                    clearInterval(retryIntervalRef.current!);
+                    retryIntervalRef.current = null;
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
+
+              retryTimeoutRef.current = setTimeout(() => {
+                retryTimeoutRef.current = null;
+                clearInterval(retryIntervalRef.current!);
+                retryIntervalRef.current = null;
+                setRetryCountdown(undefined);
+                const args = retryArgsRef.current;
+                retryArgsRef.current = null;
+                if (args && syncNoteToServerRef.current) {
+                  retryAttemptRef.current += 1;
+                  void syncNoteToServerRef.current(args.id, args.updates, args.expectedVersion);
+                }
+              }, delayMs);
+            } else {
+              setRetryCountdown(undefined); // exhausted, stay failed
+            }
           } finally {
             if (activeSavePromiseRef.current === currentPromise) {
               activeSavePromiseRef.current = null;
@@ -135,6 +182,10 @@ export function useNoteSyncEngine({
     },
     [getApi, handleSnapshotSynced, setNotes, t]
   );
+
+  useEffect(() => {
+    syncNoteToServerRef.current = syncNoteToServer;
+  }, [syncNoteToServer]);
 
   const {
     debounced: debouncedServerSync,
@@ -234,6 +285,14 @@ export function useNoteSyncEngine({
 
   const handleUpdateNote = useCallback(
     async (id: string, updates: NoteSyncUpdates) => {
+      clearTimeout(retryTimeoutRef.current ?? undefined);
+      clearInterval(retryIntervalRef.current ?? undefined);
+      retryTimeoutRef.current = null;
+      retryIntervalRef.current = null;
+      retryAttemptRef.current = 0;
+      retryArgsRef.current = null;
+      setRetryCountdown(undefined);
+
       let noteForLocalSave: Note | undefined;
       setNotes((prev) => {
         noteForLocalSave = prev.find((note) => note.id === id);
@@ -355,12 +414,32 @@ export function useNoteSyncEngine({
     [flushServerSync]
   );
 
+  // Cancel retry on note switch
+  useEffect(() => {
+    clearTimeout(retryTimeoutRef.current ?? undefined);
+    clearInterval(retryIntervalRef.current ?? undefined);
+    retryTimeoutRef.current = null;
+    retryIntervalRef.current = null;
+    retryAttemptRef.current = 0;
+    retryArgsRef.current = null;
+    setRetryCountdown(undefined);
+  }, [selectedNoteId]);
+
+  // Cancel retry on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+    };
+  }, []);
+
   return {
     syncStatus: {
       local: localStatus,
       remote: remoteStatus,
       lastError,
       isSaving: remoteStatus === "syncing",
+      retryCountdown,
     },
     savedHashes,
     handleCreateNote,

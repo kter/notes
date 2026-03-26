@@ -6,4 +6,5 @@ export interface SyncStatus {
   remote: RemoteSyncStatus;
   lastError?: string;
   isSaving: boolean;
+  retryCountdown?: number; // seconds until next retry; undefined = not retrying
 }

@@ -227,6 +227,7 @@ export const en = {
     offlineSyncUnavailable: "Cannot sync while offline",
     localSaveFailed: "Failed to save locally",
     conflictReloaded: "A sync conflict was detected, so the latest server state was reloaded",
+    retryingIn: "Retrying in {{seconds}}s...",
   },
 
   // Share
@@ -459,6 +460,7 @@ export type TranslationKeys = {
     offlineSyncUnavailable: string;
     localSaveFailed: string;
     conflictReloaded: string;
+    retryingIn: string;
   };
   share: {
     title: string;

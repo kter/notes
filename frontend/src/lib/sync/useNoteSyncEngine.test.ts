@@ -18,6 +18,7 @@ const translationMap = {
   "sync.offlineSyncUnavailable": "Cannot sync while offline",
   "sync.localSaveFailed": "Failed to save locally",
   "sync.conflictReloaded": "Conflict reloaded",
+  "sync.retryingIn": "Retrying in {{seconds}}s...",
 } as const;
 const refreshWorkspaceSnapshotMock = vi.fn();
 const onSnapshotSyncedMock = vi.fn();
@@ -91,6 +92,7 @@ function useNoteSyncEngineHarness(
   return {
     notes,
     selectedNoteId,
+    setSelectedNoteId,
     ...useNoteSyncEngine({
       setNotes,
       selectedFolderId,
@@ -309,5 +311,280 @@ describe("useNoteSyncEngine", () => {
     expect(syncQueue.addChange).not.toHaveBeenCalled();
     expect(result.current.syncStatus.remote).toBe("failed");
     expect(result.current.syncStatus.lastError).toBe("Conflict reloaded");
+  });
+
+  describe("retry behavior", () => {
+    it("fires a first retry after 2s on server failure, then succeeds", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const updatedServerNote = buildNote({ content: "Synced", version: 2 });
+      const snapshot = {
+        folders: [],
+        notes: [updatedServerNote],
+        cursor: "cursor-2",
+        server_time: "2024-01-02T00:00:00.000Z",
+      };
+      const applyWorkspaceChanges = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockResolvedValueOnce({
+          applied: [{ entity: "note", operation: "update", entity_id: initialNote.id, client_mutation_id: null, folder: null, note: updatedServerNote }],
+          snapshot,
+        });
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "New content" });
+      });
+
+      // Advance past debounce (5s) to trigger first sync attempt
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+
+      // After failure, retryCountdown should be set to 2
+      expect(result.current.syncStatus.remote).toBe("failed");
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+
+      // Advance 1s — countdown ticks to 1
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(result.current.syncStatus.retryCountdown).toBe(1);
+
+      // Advance another 1s — retry fires, countdown clears
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      expect(result.current.syncStatus.remote).toBe("synced");
+      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it("countdown decrements each second after failure", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const applyWorkspaceChanges = vi.fn().mockRejectedValue(new Error("Server error"));
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(1);
+
+      // At 2s: retry fires, fails, sets countdown for next attempt (4s)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(4);
+
+      vi.useRealTimers();
+    });
+
+    it("uses exponential backoff delays: 2s, 4s, 8s", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const applyWorkspaceChanges = vi.fn().mockRejectedValue(new Error("Server error"));
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
+      });
+
+      // First call via debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+
+      // Retry attempt 0 → fires after 2s, next delay 4s
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(4);
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(2);
+
+      // Retry attempt 1 → fires after 4s, next delay 8s
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(8);
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(3);
+
+      vi.useRealTimers();
+    });
+
+    it("exhausts after maxRetryAttempts and stays failed with no countdown", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const applyWorkspaceChanges = vi.fn().mockRejectedValue(new Error("Server error"));
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
+      });
+
+      // Initial call
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+
+      // Attempt 0 (2s delay)
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(4);
+
+      // Attempt 1 (4s delay)
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(8);
+
+      // Attempt 2 (8s delay) — last attempt (maxRetryAttempts = 3)
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      expect(result.current.syncStatus.remote).toBe("failed");
+      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
+
+      // 1 initial + 3 retries = 4 total calls
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(4);
+
+      vi.useRealTimers();
+    });
+
+    it("cancels pending retry when a new edit is made", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const updatedServerNote = buildNote({ content: "New edit synced", version: 2 });
+      const applyWorkspaceChanges = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockResolvedValue({
+          applied: [{ entity: "note", operation: "update", entity_id: initialNote.id, client_mutation_id: null, folder: null, note: updatedServerNote }],
+          snapshot: { folders: [], notes: [updatedServerNote], cursor: "cursor-2", server_time: "2024-01-02T00:00:00.000Z" },
+        });
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      // First edit → debounce → fail → countdown starts
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit 1" });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+
+      // New edit cancels retry
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit 2" });
+      });
+
+      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
+
+      // Advance well past the old retry delay — old retry should NOT fire
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      // Only the initial failed call; no retry from old countdown
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it("cancels pending retry on note switch", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote({ id: "note-1" });
+      const applyWorkspaceChanges = vi.fn().mockRejectedValue(new Error("Server error"));
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, "note-1")
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+
+      // Switch note — triggers useEffect([selectedNoteId]) which cancels retry
+      await act(async () => {
+        result.current.setSelectedNoteId("note-2");
+      });
+      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
+
+      // Advance past retry delay — retry should NOT fire
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it("does not retry on conflict errors (409)", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const applyWorkspaceChanges = vi
+        .fn()
+        .mockRejectedValueOnce(new ApiError(409, "Conflict", { detail: "stale version" }));
+      const apiClient = {
+        applyWorkspaceChanges,
+        getWorkspaceSnapshot: vi.fn(),
+      };
+      getApiMock.mockResolvedValue(apiClient);
+      refreshWorkspaceSnapshotMock.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+
+      expect(result.current.syncStatus.remote).toBe("failed");
+      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
   });
 });

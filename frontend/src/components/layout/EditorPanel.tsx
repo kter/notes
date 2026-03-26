@@ -665,7 +665,7 @@ export function EditorPanel({
   let statusColorClass = "";
 
   // Destructure syncStatus
-  const { remote: remoteStatus, lastError, isSaving } = syncStatus;
+  const { remote: remoteStatus, lastError, isSaving, retryCountdown } = syncStatus;
 
   // Hash-based Verification Logic
   // If no savedHash is available yet (initial load), fall back to remoteStatus checks temporarily
@@ -684,6 +684,9 @@ export function EditorPanel({
     // Remote Failed
     statusIcon = <CheckIcon className="h-3 w-3" />;
     statusText = t("sync.failedSavedLocally");
+    if (retryCountdown !== undefined) {
+      statusText += " " + t("sync.retryingIn").replace("{{seconds}}", String(retryCountdown));
+    }
     statusTooltip = t("sync.remoteSaveFailed");
     statusColorClass = "text-orange-500";
   } else if (isStrictlyMismatch || isLooselyMismatch) {

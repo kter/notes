@@ -9,7 +9,7 @@ import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
 import { DiffView } from "@/components/ai/DiffView";
 import { useApi, useTranslation } from "@/hooks";
 import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon, Maximize2Icon, Minimize2Icon } from "lucide-react";
+import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon, Maximize2Icon, Minimize2Icon, PrinterIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo, KeyboardEvent, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
@@ -33,6 +33,7 @@ const MIN_PREVIEW_WIDTH_PX = 280;
 const PREVIEW_RESIZE_HANDLE_WIDTH_PX = 8;
 const EDITOR_PREVIEW_WIDTH_STORAGE_KEY = "notes-editor-preview-width";
 const EDITOR_PREVIEW_LAST_WIDTH_STORAGE_KEY = "notes-editor-preview-last-width";
+const PRINT_MODE_BODY_CLASS = "printing-note-preview";
 
 interface EditorPanelProps {
   note: Note | null;
@@ -869,6 +870,33 @@ export function EditorPanel({
     downloadFile(text, filename, "text/plain");
   };
 
+  const handlePrintPreview = useCallback(() => {
+    if (!note) {
+      return;
+    }
+
+    let isCleanedUp = false;
+
+    const cleanupPrintMode = () => {
+      if (isCleanedUp) {
+        return;
+      }
+
+      isCleanedUp = true;
+      document.body.classList.remove(PRINT_MODE_BODY_CLASS);
+      window.removeEventListener("afterprint", cleanupPrintMode);
+    };
+
+    document.body.classList.add(PRINT_MODE_BODY_CLASS);
+    window.addEventListener("afterprint", cleanupPrintMode);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+      });
+    });
+  }, [note]);
+
   const currentFolder = folders.find((f) => f.id === note?.folder_id);
 
   if (!note) {
@@ -935,7 +963,29 @@ export function EditorPanel({
   // --- SAVE STATUS LOGIC END ---
 
   return (
-    <div ref={fullscreenContainerRef} className={isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"}>
+    <div
+      ref={fullscreenContainerRef}
+      className={cn(
+        "note-print-root",
+        isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"
+      )}
+    >
+      <div
+        className="note-print-content"
+        aria-hidden="true"
+        data-testid="editor-print-preview"
+      >
+        <h1 className="note-print-title">{title || t("noteList.untitled")}</h1>
+        <div className="markdown-preview prose prose-sm max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkSourceLine]}
+            components={markdownComponents}
+          >
+            {content || `*${t("editor.previewPlaceholder")}*`}
+          </ReactMarkdown>
+        </div>
+      </div>
+      <div className="note-print-screen flex flex-1 flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">
@@ -1076,14 +1126,25 @@ export function EditorPanel({
               data-testid={isDesktopViewport
                 ? (isEditorCollapsed ? "editor-show-button" : "editor-hide-button")
                 : "editor-show-button"}
-            >
-              <span>
+          >
+            <span>
                 {isDesktopViewport
                   ? (isEditorCollapsed ? t("editor.showEditor") : t("editor.hideEditor"))
                   : t("editor.showEditor")}
               </span>
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handlePrintPreview}
+            className="gap-1 md:gap-2"
+            aria-label={t("editor.printPreview")}
+            data-testid="editor-print-button"
+          >
+            <PrinterIcon className="h-4 w-4" />
+            <span className="hidden md:inline">{t("editor.print")}</span>
+          </Button>
           {/* Share Button */}
           <Button
             variant="ghost"
@@ -1349,6 +1410,7 @@ export function EditorPanel({
           }
         }}
       />
+      </div>
     </div>
   );
 }

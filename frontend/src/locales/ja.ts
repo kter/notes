@@ -123,6 +123,7 @@ export const ja = {
     chat: "チャット",
     export: "エクスポート",
     preview: "プレビュー",
+    print: "印刷",
     markdown: "Markdown (.md)",
     plainText: "プレーンテキスト (.txt)",
     previewPlaceholder: "プレビューを見るには書き始めてください...",
@@ -134,6 +135,7 @@ export const ja = {
     summarizeNote: "ノートを要約",
     toggleChat: "チャットを切り替え",
     exportNote: "ノートをエクスポート",
+    printPreview: "プレビューを印刷",
     share: "共有",
     shareNote: "ノートを共有",
     uploading: "アップロード中...",
@@ -370,6 +372,7 @@ export type TranslationKeys = {
     chat: string;
     export: string;
     preview: string;
+    print: string;
     markdown: string;
     plainText: string;
     previewPlaceholder: string;
@@ -381,6 +384,7 @@ export type TranslationKeys = {
     summarizeNote: string;
     toggleChat: string;
     exportNote: string;
+    printPreview: string;
     share: string;
     shareNote: string;
     uploading: string;

@@ -1285,6 +1285,7 @@ export function EditorPanel({
                   <Textarea
                     id="note-content"
                     ref={textareaRef}
+                    fieldSizing="fixed"
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
                     onKeyDown={handleKeyDown}

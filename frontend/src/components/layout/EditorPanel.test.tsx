@@ -1,5 +1,5 @@
 
-import { render, screen, fireEvent, act, createEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act, createEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EditorPanel } from './EditorPanel'
 import type { Note } from '@/types'
@@ -131,6 +131,7 @@ describe('EditorPanel', () => {
   afterEach(() => {
     localStorage.clear()
     setViewportWidth(1280)
+    document.body.classList.remove('printing-note-preview')
   })
 
   it('renders with initial content', () => {
@@ -232,7 +233,65 @@ describe('EditorPanel', () => {
     fireEvent.click(previewButton)
 
     // Preview should be visible with the content
-    expect(screen.getByTestId('markdown-preview')).toBeInTheDocument()
+    expect(screen.getAllByTestId('markdown-preview')).toHaveLength(2)
+  })
+
+  it('prints the rendered preview content and cleans up print mode', async () => {
+    const printMock = vi.fn()
+    const originalPrint = window.print
+    const originalRequestAnimationFrame = window.requestAnimationFrame
+    const originalCancelAnimationFrame = window.cancelAnimationFrame
+
+    Object.defineProperty(window, 'print', {
+      value: printMock,
+      writable: true,
+      configurable: true,
+    })
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      value: vi.fn((callback: FrameRequestCallback) => {
+        callback(0)
+        return 1
+      }),
+      writable: true,
+      configurable: true,
+    })
+    Object.defineProperty(window, 'cancelAnimationFrame', {
+      value: vi.fn(),
+      writable: true,
+      configurable: true,
+    })
+
+    render(<EditorPanel {...defaultProps} />)
+
+    fireEvent.change(screen.getByTestId('editor-title-input'), { target: { value: 'Printed title' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /content/i }), { target: { value: '# Printed body' } })
+    fireEvent.click(screen.getByTestId('editor-print-button'))
+
+    const printPreview = screen.getByTestId('editor-print-preview')
+    expect(within(printPreview).getByText('Printed title')).toBeInTheDocument()
+    expect(within(printPreview).getByText('# Printed body')).toBeInTheDocument()
+    expect(document.body).toHaveClass('printing-note-preview')
+    expect(printMock).toHaveBeenCalledTimes(1)
+
+    fireEvent(window, new Event('afterprint'))
+
+    expect(document.body).not.toHaveClass('printing-note-preview')
+
+    Object.defineProperty(window, 'print', {
+      value: originalPrint,
+      writable: true,
+      configurable: true,
+    })
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      value: originalRequestAnimationFrame,
+      writable: true,
+      configurable: true,
+    })
+    Object.defineProperty(window, 'cancelAnimationFrame', {
+      value: originalCancelAnimationFrame,
+      writable: true,
+      configurable: true,
+    })
   })
 
   it('shows a resize handle for desktop preview mode', () => {

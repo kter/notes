@@ -123,6 +123,7 @@ export const en = {
     chat: "Chat",
     export: "Export",
     preview: "Preview",
+    print: "Print",
     markdown: "Markdown (.md)",
     plainText: "Plain Text (.txt)",
     previewPlaceholder: "Start writing to see the preview...",
@@ -134,6 +135,7 @@ export const en = {
     summarizeNote: "Summarize note",
     toggleChat: "Toggle chat",
     exportNote: "Export note",
+    printPreview: "Print preview",
     share: "Share",
     shareNote: "Share note",
     uploading: "Uploading...",
@@ -371,6 +373,7 @@ export type TranslationKeys = {
     chat: string;
     export: string;
     preview: string;
+    print: string;
     markdown: string;
     plainText: string;
     previewPlaceholder: string;
@@ -382,6 +385,7 @@ export type TranslationKeys = {
     summarizeNote: string;
     toggleChat: string;
     exportNote: string;
+    printPreview: string;
     share: string;
     shareNote: string;
     uploading: string;

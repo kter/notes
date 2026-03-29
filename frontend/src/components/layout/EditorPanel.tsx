@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/ui/ShareDialog";
 import type { NoteShare } from "@/types";
+import { flushSync } from "react-dom";
 
 const DESKTOP_BREAKPOINT = 768;
 const DEFAULT_EDITOR_PREVIEW_WIDTH = 50;
@@ -98,6 +99,7 @@ export function EditorPanel({
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
+  const [printSnapshot, setPrintSnapshot] = useState<{ title: string; content: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -109,6 +111,7 @@ export function EditorPanel({
   const scrollRafRef = useRef<number | null>(null);
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
   const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
+  const printCleanupRef = useRef<(() => void) | null>(null);
 
   // Cache line count whenever content changes (cheap ref update, avoids O(n) split in scroll handlers)
   useEffect(() => {
@@ -193,6 +196,7 @@ export function EditorPanel({
       if (scrollRafRef.current !== null) {
         cancelAnimationFrame(scrollRafRef.current);
       }
+      printCleanupRef.current?.();
     };
   }, []);
 
@@ -875,6 +879,8 @@ export function EditorPanel({
       return;
     }
 
+    printCleanupRef.current?.();
+
     let isCleanedUp = false;
 
     const cleanupPrintMode = () => {
@@ -885,8 +891,17 @@ export function EditorPanel({
       isCleanedUp = true;
       document.body.classList.remove(PRINT_MODE_BODY_CLASS);
       window.removeEventListener("afterprint", cleanupPrintMode);
+      printCleanupRef.current = null;
+      setPrintSnapshot(null);
     };
 
+    printCleanupRef.current = cleanupPrintMode;
+    flushSync(() => {
+      setPrintSnapshot({
+        title: currentTitleRef.current,
+        content: currentContentRef.current,
+      });
+    });
     document.body.classList.add(PRINT_MODE_BODY_CLASS);
     window.addEventListener("afterprint", cleanupPrintMode);
 
@@ -970,21 +985,20 @@ export function EditorPanel({
         isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"
       )}
     >
-      <div
-        className="note-print-content"
-        aria-hidden="true"
-        data-testid="editor-print-preview"
-      >
-        <h1 className="note-print-title">{title || t("noteList.untitled")}</h1>
-        <div className="markdown-preview prose prose-sm max-w-none">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkSourceLine]}
-            components={markdownComponents}
-          >
-            {content || `*${t("editor.previewPlaceholder")}*`}
-          </ReactMarkdown>
+      {printSnapshot && (
+        <div
+          className="note-print-content"
+          aria-hidden="true"
+          data-testid="editor-print-preview"
+        >
+          <h1 className="note-print-title">{printSnapshot.title || t("noteList.untitled")}</h1>
+          <div className="markdown-preview prose prose-sm max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {printSnapshot.content || `*${t("editor.previewPlaceholder")}*`}
+            </ReactMarkdown>
+          </div>
         </div>
-      </div>
+      )}
       <div className="note-print-screen flex flex-1 flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">

@@ -141,6 +141,12 @@ describe('EditorPanel', () => {
     expect(textarea.value).toBe('Initial content')
   })
 
+  it('disables content field sizing for the editor textarea', () => {
+    render(<EditorPanel {...defaultProps} />)
+
+    expect(screen.getByRole('textbox', { name: /content/i })).not.toHaveClass('field-sizing-content')
+  })
+
   describe('onContentChange callback', () => {
     it('calls onContentChange with note content on mount', () => {
       // Regression test: EditorPanel must notify the parent of its initial content on

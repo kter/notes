@@ -233,7 +233,13 @@ describe('EditorPanel', () => {
     fireEvent.click(previewButton)
 
     // Preview should be visible with the content
-    expect(screen.getAllByTestId('markdown-preview')).toHaveLength(2)
+    expect(screen.getAllByTestId('markdown-preview')).toHaveLength(1)
+  })
+
+  it('does not render the print preview during normal editing', () => {
+    render(<EditorPanel {...defaultProps} />)
+
+    expect(screen.queryByTestId('editor-print-preview')).not.toBeInTheDocument()
   })
 
   it('prints the rendered preview content and cleans up print mode', async () => {
@@ -276,6 +282,7 @@ describe('EditorPanel', () => {
     fireEvent(window, new Event('afterprint'))
 
     expect(document.body).not.toHaveClass('printing-note-preview')
+    expect(screen.queryByTestId('editor-print-preview')).not.toBeInTheDocument()
 
     Object.defineProperty(window, 'print', {
       value: originalPrint,

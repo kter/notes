@@ -64,7 +64,47 @@ export function useNoteSyncEngine({
   const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const retryArgsRef = useRef<{ id: string; updates: NoteSyncUpdates; expectedVersion?: number } | null>(null);
   const syncNoteToServerRef = useRef<((id: string, updates: NoteSyncUpdates, expectedVersion?: number) => Promise<void>) | null>(null);
+  const serverVersionByNoteIdRef = useRef<Record<string, number>>({});
   const handleSnapshotSynced = onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
+
+  const getExpectedVersion = useCallback(
+    (noteId: string, fallbackVersion?: number) => {
+      const knownVersion = serverVersionByNoteIdRef.current[noteId];
+      if (knownVersion !== undefined) {
+        return knownVersion;
+      }
+
+      if (fallbackVersion !== undefined) {
+        serverVersionByNoteIdRef.current[noteId] = fallbackVersion;
+      }
+
+      return fallbackVersion;
+    },
+    []
+  );
+
+  const setServerVersion = useCallback((noteId: string, version: number) => {
+    serverVersionByNoteIdRef.current[noteId] = version;
+  }, []);
+
+  const syncServerVersionsFromSnapshot = useCallback(
+    (snapshot?: WorkspaceSnapshotResponse) => {
+      if (!snapshot) {
+        return;
+      }
+
+      const nextVersions = { ...serverVersionByNoteIdRef.current };
+      for (const note of snapshot.notes) {
+        if (note.deleted_at) {
+          delete nextVersions[note.id];
+          continue;
+        }
+        nextVersions[note.id] = note.version;
+      }
+      serverVersionByNoteIdRef.current = nextVersions;
+    },
+    []
+  );
 
   const syncNoteToServer = useCallback(
     async (id: string, updates: NoteSyncUpdates, expectedVersion?: number) => {
@@ -98,8 +138,10 @@ export function useNoteSyncEngine({
             );
 
             await persistWorkspaceSnapshot(response.snapshot);
+            syncServerVersionsFromSnapshot(response.snapshot);
             handleSnapshotSynced(response.snapshot);
 
+            setServerVersion(serverNote.id, serverNote.version);
             const hash = await calculateHash(serverNote.content);
             setSavedHashes((prev) => ({ ...prev, [id]: hash }));
 
@@ -111,9 +153,10 @@ export function useNoteSyncEngine({
           } catch (error) {
             if (isConflictApiError(error)) {
               const apiClient = await getApi();
-              await refreshWorkspaceSnapshot(apiClient, {
+              const snapshot = await refreshWorkspaceSnapshot(apiClient, {
                 onSnapshotSynced: handleSnapshotSynced,
               });
+              syncServerVersionsFromSnapshot(snapshot);
               setRemoteStatus("failed");
               setLastError(t("sync.conflictReloaded"));
               return;
@@ -180,7 +223,14 @@ export function useNoteSyncEngine({
       setRemoteStatus("failed");
       setLastError(t("sync.offlineSyncUnavailable"));
     },
-    [getApi, handleSnapshotSynced, setNotes, t]
+    [
+      getApi,
+      handleSnapshotSynced,
+      setNotes,
+      setServerVersion,
+      syncServerVersionsFromSnapshot,
+      t,
+    ]
   );
 
   useEffect(() => {
@@ -249,17 +299,21 @@ export function useNoteSyncEngine({
           prev.map((note) => (note.id === tempId ? serverNote : note))
         );
         setSelectedNoteId(serverNote.id);
+        setServerVersion(serverNote.id, serverNote.version);
+        delete serverVersionByNoteIdRef.current[tempId];
 
         await notesDB.deleteNote(tempId);
         await persistWorkspaceSnapshot(response.snapshot);
+        syncServerVersionsFromSnapshot(response.snapshot);
         handleSnapshotSynced(response.snapshot);
         setRemoteStatus("synced");
       } catch (error) {
         if (isConflictApiError(error)) {
           const apiClient = await getApi();
-          await refreshWorkspaceSnapshot(apiClient, {
+          const snapshot = await refreshWorkspaceSnapshot(apiClient, {
             onSnapshotSynced: handleSnapshotSynced,
           });
+          syncServerVersionsFromSnapshot(snapshot);
           setRemoteStatus("failed");
           setLastError(t("sync.conflictReloaded"));
           return;
@@ -281,7 +335,16 @@ export function useNoteSyncEngine({
       folder_id: selectedFolderId,
     });
     setRemoteStatus("failed");
-  }, [getApi, handleSnapshotSynced, selectedFolderId, setNotes, setSelectedNoteId, t]);
+  }, [
+    getApi,
+    handleSnapshotSynced,
+    selectedFolderId,
+    setNotes,
+    setSelectedNoteId,
+    setServerVersion,
+    syncServerVersionsFromSnapshot,
+    t,
+  ]);
 
   const handleUpdateNote = useCallback(
     async (id: string, updates: NoteSyncUpdates) => {
@@ -327,10 +390,11 @@ export function useNoteSyncEngine({
         setLastError(t("sync.localSaveFailed"));
       }
 
+      const expectedVersion = getExpectedVersion(id, noteForLocalSave?.version);
       setRemoteStatus("unsynced");
-      debouncedServerSync(id, updates, noteForLocalSave?.version);
+      debouncedServerSync(id, updates, expectedVersion);
     },
-    [debouncedServerSync, setNotes, t]
+    [debouncedServerSync, getExpectedVersion, setNotes, t]
   );
 
   const handleDeleteNote = useCallback(
@@ -338,6 +402,7 @@ export function useNoteSyncEngine({
       try {
         cancelServerSync();
         const noteToDelete = await notesDB.getNote(id);
+        const expectedVersion = getExpectedVersion(id, noteToDelete?.version);
 
         setNotes((prev) => prev.filter((note) => note.id !== id));
         if (selectedNoteId === id) {
@@ -362,18 +427,21 @@ export function useNoteSyncEngine({
                   entity: "note",
                   operation: "delete",
                   entity_id: id,
-                  expected_version: noteToDelete?.version,
+                  expected_version: expectedVersion,
                 },
               ],
             });
             await persistWorkspaceSnapshot(response.snapshot);
+            syncServerVersionsFromSnapshot(response.snapshot);
+            delete serverVersionByNoteIdRef.current[id];
             handleSnapshotSynced(response.snapshot);
           } catch (error) {
             if (isConflictApiError(error)) {
               const apiClient = await getApi();
-              await refreshWorkspaceSnapshot(apiClient, {
+              const snapshot = await refreshWorkspaceSnapshot(apiClient, {
                 onSnapshotSynced: handleSnapshotSynced,
               });
+              syncServerVersionsFromSnapshot(snapshot);
               setRemoteStatus("failed");
               setLastError(t("sync.conflictReloaded"));
               return;
@@ -381,7 +449,7 @@ export function useNoteSyncEngine({
             console.error("Failed to delete note on server:", error);
             if (!id.startsWith("temp-")) {
               await syncQueue.addChange("delete", "note", id, undefined, {
-                expectedVersion: noteToDelete?.version,
+                expectedVersion,
               });
             }
           }
@@ -390,14 +458,24 @@ export function useNoteSyncEngine({
 
         if (!id.startsWith("temp-")) {
           await syncQueue.addChange("delete", "note", id, undefined, {
-            expectedVersion: noteToDelete?.version,
+            expectedVersion,
           });
         }
       } catch (error) {
         console.error("Failed to delete note:", error);
       }
     },
-    [cancelServerSync, getApi, handleSnapshotSynced, selectedNoteId, setNotes, setSelectedNoteId, t]
+    [
+      cancelServerSync,
+      getApi,
+      getExpectedVersion,
+      handleSnapshotSynced,
+      selectedNoteId,
+      setNotes,
+      setSelectedNoteId,
+      syncServerVersionsFromSnapshot,
+      t,
+    ]
   );
 
   const triggerServerSync = useCallback(

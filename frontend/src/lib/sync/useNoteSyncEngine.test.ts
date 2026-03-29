@@ -258,6 +258,75 @@ describe("useNoteSyncEngine", () => {
     vi.useRealTimers();
   });
 
+  it("keeps the last acknowledged version across rapid debounced edits", async () => {
+    vi.useFakeTimers();
+
+    const initialNote = buildNote();
+    const serverNote = buildNote({
+      content: "second draft",
+      version: 2,
+      updated_at: "2024-01-02T00:00:00.000Z",
+    });
+    const applyWorkspaceChanges = vi.fn().mockResolvedValue({
+      applied: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: serverNote.id,
+          client_mutation_id: null,
+          folder: null,
+          note: serverNote,
+        },
+      ],
+      snapshot: {
+        folders: [],
+        notes: [serverNote],
+        cursor: "cursor-2",
+        server_time: "2024-01-02T00:00:00.000Z",
+      },
+    });
+    getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, {
+        content: "first draft",
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, {
+        content: "second draft",
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+      await result.current.triggerServerSync(initialNote.id);
+    });
+
+    expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+    expect(applyWorkspaceChanges).toHaveBeenCalledWith({
+      device_id: "device-1",
+      base_cursor: "cursor-1",
+      changes: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: initialNote.id,
+          expected_version: 1,
+          payload: { content: "second draft" },
+        },
+      ],
+    });
+    expect(result.current.syncStatus.remote).toBe("synced");
+
+    vi.useRealTimers();
+  });
+
   it("surfaces translated local save failures", async () => {
     const initialNote = buildNote();
     vi.mocked(notesDB.saveNote).mockRejectedValueOnce(new Error("indexeddb unavailable"));

@@ -17,7 +17,7 @@ import remarkGfm from "remark-gfm";
 import { remarkSourceLine } from "@/lib/remark-source-line";
 import { toggleMarkdownCheckbox } from "@/lib/markdownCheckboxToggle";
 import type { SyncStatus } from "@/hooks/useNotes";
-import { calculateHash } from "@/lib/utils";
+import { calculateHash, cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +26,13 @@ import {
 } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/ui/ShareDialog";
 import type { NoteShare } from "@/types";
+
+const DESKTOP_BREAKPOINT = 768;
+const DEFAULT_EDITOR_PREVIEW_WIDTH = 50;
+const MIN_PREVIEW_WIDTH_PX = 280;
+const PREVIEW_RESIZE_HANDLE_WIDTH_PX = 8;
+const EDITOR_PREVIEW_WIDTH_STORAGE_KEY = "notes-editor-preview-width";
+const EDITOR_PREVIEW_LAST_WIDTH_STORAGE_KEY = "notes-editor-preview-last-width";
 
 interface EditorPanelProps {
   note: Note | null;
@@ -77,6 +84,12 @@ export function EditorPanel({
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(
+    () => typeof window === "undefined" || window.innerWidth >= DESKTOP_BREAKPOINT
+  );
+  const [editorPreviewWidth, setEditorPreviewWidth] = useState(DEFAULT_EDITOR_PREVIEW_WIDTH);
+  const [lastExpandedEditorPreviewWidth, setLastExpandedEditorPreviewWidth] = useState(DEFAULT_EDITOR_PREVIEW_WIDTH);
+  const [isPreviewResizing, setIsPreviewResizing] = useState(false);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -89,9 +102,12 @@ export function EditorPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const editorPreviewLayoutRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
   const contentLinesRef = useRef(1);
   const scrollRafRef = useRef<number | null>(null);
+  const editorPreviewWidthRef = useRef(editorPreviewWidth);
+  const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
 
   // Cache line count whenever content changes (cheap ref update, avoids O(n) split in scroll handlers)
   useEffect(() => {
@@ -101,6 +117,24 @@ export function EditorPanel({
     }
     contentLinesRef.current = count;
   }, [content]);
+
+  useEffect(() => {
+    editorPreviewWidthRef.current = editorPreviewWidth;
+  }, [editorPreviewWidth]);
+
+  useEffect(() => {
+    lastExpandedEditorPreviewWidthRef.current = lastExpandedEditorPreviewWidth;
+  }, [lastExpandedEditorPreviewWidth]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktopViewport(window.innerWidth >= DESKTOP_BREAKPOINT);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Hash-based Verification Logic
   const [currentHash, setCurrentHash] = useState("");
@@ -160,6 +194,193 @@ export function EditorPanel({
       }
     };
   }, []);
+
+  const clampEditorPreviewWidth = useCallback((nextWidth: number) => {
+    const normalizedWidth = Math.max(0, Math.min(100, nextWidth));
+    const layoutWidth = editorPreviewLayoutRef.current?.clientWidth;
+
+    if (!layoutWidth || !isDesktopViewport) {
+      return normalizedWidth;
+    }
+
+    const maxEditorWidthPx = Math.max(
+      0,
+      layoutWidth - MIN_PREVIEW_WIDTH_PX - PREVIEW_RESIZE_HANDLE_WIDTH_PX
+    );
+
+    if (maxEditorWidthPx <= 0) {
+      return 0;
+    }
+
+    const maxEditorWidthPercent = (maxEditorWidthPx / layoutWidth) * 100;
+    return Math.min(normalizedWidth, maxEditorWidthPercent);
+  }, [isDesktopViewport]);
+
+  const persistEditorPreviewWidths = useCallback((width: number, lastExpandedWidth: number) => {
+    localStorage.setItem(EDITOR_PREVIEW_WIDTH_STORAGE_KEY, String(width));
+    localStorage.setItem(EDITOR_PREVIEW_LAST_WIDTH_STORAGE_KEY, String(lastExpandedWidth));
+  }, []);
+
+  const applyEditorPreviewWidth = useCallback((nextWidth: number) => {
+    const clampedWidth = clampEditorPreviewWidth(nextWidth);
+
+    setEditorPreviewWidth(clampedWidth);
+    editorPreviewWidthRef.current = clampedWidth;
+
+    if (clampedWidth > 0) {
+      setLastExpandedEditorPreviewWidth(clampedWidth);
+      lastExpandedEditorPreviewWidthRef.current = clampedWidth;
+    }
+
+    return clampedWidth;
+  }, [clampEditorPreviewWidth]);
+
+  const handleHideEditorPane = useCallback(() => {
+    const currentWidth = editorPreviewWidthRef.current;
+    if (currentWidth > 0) {
+      setLastExpandedEditorPreviewWidth(currentWidth);
+      lastExpandedEditorPreviewWidthRef.current = currentWidth;
+    }
+
+    setEditorPreviewWidth(0);
+    editorPreviewWidthRef.current = 0;
+    persistEditorPreviewWidths(0, lastExpandedEditorPreviewWidthRef.current);
+  }, [persistEditorPreviewWidths]);
+
+  const handleShowEditorPane = useCallback(() => {
+    const fallbackWidth = lastExpandedEditorPreviewWidthRef.current > 0
+      ? lastExpandedEditorPreviewWidthRef.current
+      : DEFAULT_EDITOR_PREVIEW_WIDTH;
+    const restoredWidth = applyEditorPreviewWidth(fallbackWidth);
+    const lastWidth = restoredWidth > 0 ? restoredWidth : fallbackWidth;
+    persistEditorPreviewWidths(restoredWidth, lastWidth);
+  }, [applyEditorPreviewWidth, persistEditorPreviewWidths]);
+
+  const handlePreviewToggle = useCallback(() => {
+    if (!isPreviewOpen && isDesktopViewport && editorPreviewWidthRef.current === 0) {
+      handleShowEditorPane();
+    }
+
+    setIsPreviewOpen((previouslyOpen) => !previouslyOpen);
+  }, [handleShowEditorPane, isDesktopViewport, isPreviewOpen]);
+
+  const handlePreviewResizeStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDesktopViewport || !editorPreviewLayoutRef.current) {
+      return;
+    }
+
+    e.preventDefault();
+    setIsPreviewResizing(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const startX = e.clientX;
+    const initialLayoutWidth = editorPreviewLayoutRef.current.clientWidth;
+    const startWidthPx = (editorPreviewWidthRef.current / 100) * initialLayoutWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const currentLayoutWidth = editorPreviewLayoutRef.current?.clientWidth ?? initialLayoutWidth;
+      const delta = moveEvent.clientX - startX;
+      const nextWidthPx = startWidthPx + delta;
+      const nextWidthPercent = currentLayoutWidth > 0
+        ? (nextWidthPx / currentLayoutWidth) * 100
+        : 0;
+
+      applyEditorPreviewWidth(nextWidthPercent);
+    };
+
+    const handleMouseUp = () => {
+      setIsPreviewResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      persistEditorPreviewWidths(
+        editorPreviewWidthRef.current,
+        lastExpandedEditorPreviewWidthRef.current
+      );
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [applyEditorPreviewWidth, isDesktopViewport, persistEditorPreviewWidths]);
+
+  const handlePreviewResizeKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (!isDesktopViewport || !isPreviewOpen) {
+      return;
+    }
+
+    let nextWidth = editorPreviewWidthRef.current;
+
+    if (e.key === "ArrowLeft") {
+      nextWidth -= 5;
+    } else if (e.key === "ArrowRight") {
+      nextWidth += 5;
+    } else if (e.key === "Home") {
+      nextWidth = 0;
+    } else if (e.key === "End") {
+      nextWidth = 100;
+    } else {
+      return;
+    }
+
+    e.preventDefault();
+    const appliedWidth = applyEditorPreviewWidth(nextWidth);
+    persistEditorPreviewWidths(
+      appliedWidth,
+      appliedWidth > 0 ? appliedWidth : lastExpandedEditorPreviewWidthRef.current
+    );
+  }, [applyEditorPreviewWidth, isDesktopViewport, isPreviewOpen, persistEditorPreviewWidths]);
+
+  const handlePreviewResizeDoubleClick = useCallback(() => {
+    if (!isDesktopViewport || !isPreviewOpen) {
+      return;
+    }
+
+    const restoredWidth = applyEditorPreviewWidth(DEFAULT_EDITOR_PREVIEW_WIDTH);
+    const lastWidth = restoredWidth > 0 ? restoredWidth : DEFAULT_EDITOR_PREVIEW_WIDTH;
+    persistEditorPreviewWidths(restoredWidth, lastWidth);
+  }, [applyEditorPreviewWidth, isDesktopViewport, isPreviewOpen, persistEditorPreviewWidths]);
+
+  useEffect(() => {
+    const savedWidth = parseFloat(localStorage.getItem(EDITOR_PREVIEW_WIDTH_STORAGE_KEY) ?? "");
+    const savedLastExpandedWidth = parseFloat(
+      localStorage.getItem(EDITOR_PREVIEW_LAST_WIDTH_STORAGE_KEY) ?? ""
+    );
+
+    if (!Number.isNaN(savedWidth)) {
+      setEditorPreviewWidth(Math.max(0, Math.min(100, savedWidth)));
+      editorPreviewWidthRef.current = Math.max(0, Math.min(100, savedWidth));
+    }
+
+    if (!Number.isNaN(savedLastExpandedWidth) && savedLastExpandedWidth > 0) {
+      setLastExpandedEditorPreviewWidth(Math.min(100, savedLastExpandedWidth));
+      lastExpandedEditorPreviewWidthRef.current = Math.min(100, savedLastExpandedWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isPreviewOpen || !isDesktopViewport) {
+      return;
+    }
+
+    const clampedWidth = applyEditorPreviewWidth(editorPreviewWidthRef.current);
+    persistEditorPreviewWidths(clampedWidth, lastExpandedEditorPreviewWidthRef.current);
+  }, [applyEditorPreviewWidth, isDesktopViewport, isPreviewOpen, persistEditorPreviewWidths]);
+
+  useEffect(() => {
+    if (!isPreviewOpen || !isDesktopViewport || !editorPreviewLayoutRef.current || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      const clampedWidth = applyEditorPreviewWidth(editorPreviewWidthRef.current);
+      persistEditorPreviewWidths(clampedWidth, lastExpandedEditorPreviewWidthRef.current);
+    });
+
+    observer.observe(editorPreviewLayoutRef.current);
+    return () => observer.disconnect();
+  }, [applyEditorPreviewWidth, isDesktopViewport, isPreviewOpen, persistEditorPreviewWidths]);
 
   useEffect(() => {
     return () => {
@@ -539,9 +760,13 @@ export function EditorPanel({
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   }, [toggleFullscreen]);
 
+  const isDesktopSplitPreview = isPreviewOpen && isDesktopViewport;
+  const isEditorCollapsed = isDesktopSplitPreview && editorPreviewWidth <= 0;
+  const isSplitPreviewVisible = isDesktopSplitPreview && !isEditorCollapsed;
+
   // Scroll Sync Handlers (throttled with requestAnimationFrame, no content dependency)
   const handleEditorScroll = useCallback(() => {
-    if (isScrollingRef.current || !isPreviewOpen || !textareaRef.current || !previewContainerRef.current) return;
+    if (isScrollingRef.current || !isSplitPreviewVisible || !textareaRef.current || !previewContainerRef.current) return;
     if (scrollRafRef.current !== null) return;
 
     scrollRafRef.current = requestAnimationFrame(() => {
@@ -578,10 +803,10 @@ export function EditorPanel({
         isScrollingRef.current = false;
       }, 50);
     });
-  }, [isPreviewOpen]);
+  }, [isSplitPreviewVisible]);
 
   const handlePreviewScroll = useCallback(() => {
-    if (isScrollingRef.current || !textareaRef.current || !previewContainerRef.current) return;
+    if (isScrollingRef.current || !isSplitPreviewVisible || !textareaRef.current || !previewContainerRef.current) return;
     if (scrollRafRef.current !== null) return;
 
     scrollRafRef.current = requestAnimationFrame(() => {
@@ -614,7 +839,7 @@ export function EditorPanel({
         isScrollingRef.current = false;
       }, 50);
     });
-  }, []);
+  }, [isSplitPreviewVisible]);
 
   // JSON export handlers
   const downloadFile = (content: string, filename: string, mimeType: string) => {
@@ -826,7 +1051,7 @@ export function EditorPanel({
           <Button
             variant={isPreviewOpen ? "secondary" : "ghost"}
             size="sm"
-            onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+            onClick={handlePreviewToggle}
             className="gap-1 md:gap-2"
             data-testid="editor-preview-toggle"
             disabled={!!pendingEditProposal}
@@ -838,6 +1063,27 @@ export function EditorPanel({
             )}
             <span className="hidden md:inline">{t("editor.preview")}</span>
           </Button>
+          {isPreviewOpen && !pendingEditProposal && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={
+                isDesktopViewport
+                  ? (isEditorCollapsed ? handleShowEditorPane : handleHideEditorPane)
+                  : () => setIsPreviewOpen(false)
+              }
+              className="gap-1"
+              data-testid={isDesktopViewport
+                ? (isEditorCollapsed ? "editor-show-button" : "editor-hide-button")
+                : "editor-show-button"}
+            >
+              <span>
+                {isDesktopViewport
+                  ? (isEditorCollapsed ? t("editor.showEditor") : t("editor.hideEditor"))
+                  : t("editor.showEditor")}
+              </span>
+            </Button>
+          )}
           {/* Share Button */}
           <Button
             variant="ghost"
@@ -915,7 +1161,11 @@ export function EditorPanel({
         </div>
 
         {/* Editor and Preview Layout */}
-        <div className={`relative flex-1 flex min-h-0 ${isPreviewOpen ? "gap-4" : ""} px-4 md:px-6 pb-4`}>
+        <div
+          ref={editorPreviewLayoutRef}
+          className="relative flex-1 flex min-h-0 px-4 md:px-6 pb-4"
+          data-testid={isDesktopSplitPreview ? "editor-preview-desktop-layout" : "editor-preview-layout"}
+        >
           {/* Image upload error message */}
           {imageUploadError && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground text-sm px-4 py-2 rounded shadow-md">
@@ -937,49 +1187,75 @@ export function EditorPanel({
           ) : (
             <>
               {/* Markdown Editor Column */}
-              <div
-                className={`flex-1 min-h-0 ${isPreviewOpen ? "min-w-0" : ""} ${isDraggingOver ? "ring-2 ring-primary rounded" : ""}`}
-                ref={editorContainerRef}
-                data-testid="editor-drop-zone"
-                onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
-                onDragLeave={() => setIsDraggingOver(false)}
-                onDrop={async (e) => {
-                  e.preventDefault();
-                  setIsDraggingOver(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file) await handleImageUpload(file);
-                }}
-              >
-                <label htmlFor="note-content" className="sr-only">Note content</label>
-                <Textarea
-                  id="note-content"
-                  ref={textareaRef}
-                  value={content}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onScroll={handleEditorScroll}
-                  onBlur={handleBlur}
-                  onPaste={async (e) => {
-                    const file = e.clipboardData.files[0];
-                    if (file?.type.startsWith("image/")) {
-                      e.preventDefault();
-                      await handleImageUpload(file);
-                    }
+              {(!isPreviewOpen || (isDesktopViewport && !isEditorCollapsed)) && (
+                <div
+                  className={cn(
+                    "min-h-0",
+                    isPreviewOpen ? "flex-none min-w-0" : "flex-1",
+                    isDraggingOver && "ring-2 ring-primary rounded"
+                  )}
+                  style={isDesktopSplitPreview ? { width: `${editorPreviewWidth}%` } : undefined}
+                  ref={editorContainerRef}
+                  data-testid="editor-drop-zone"
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+                  onDragLeave={() => setIsDraggingOver(false)}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    setIsDraggingOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) await handleImageUpload(file);
                   }}
-                  placeholder={t("editor.noteContentPlaceholder")}
-                  className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
-                  data-testid="editor-content-input"
-                />
-              </div>
+                >
+                  <label htmlFor="note-content" className="sr-only">Note content</label>
+                  <Textarea
+                    id="note-content"
+                    ref={textareaRef}
+                    value={content}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onScroll={handleEditorScroll}
+                    onBlur={handleBlur}
+                    onPaste={async (e) => {
+                      const file = e.clipboardData.files[0];
+                      if (file?.type.startsWith("image/")) {
+                        e.preventDefault();
+                        await handleImageUpload(file);
+                      }
+                    }}
+                    placeholder={t("editor.noteContentPlaceholder")}
+                    className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
+                    data-testid="editor-content-input"
+                  />
+                </div>
+              )}
 
               {/* Markdown Preview Column */}
               {isPreviewOpen && (
                 <>
-                  <Separator orientation="vertical" />
+                  {isDesktopViewport && (
+                    <div
+                      role="separator"
+                      tabIndex={0}
+                      aria-orientation="vertical"
+                      aria-label={t("editor.resizeEditorPreview")}
+                      onMouseDown={handlePreviewResizeStart}
+                      onDoubleClick={handlePreviewResizeDoubleClick}
+                      onKeyDown={handlePreviewResizeKeyDown}
+                      data-testid="editor-preview-resize-handle"
+                      className={cn(
+                        "flex-shrink-0 w-2 rounded-full cursor-col-resize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                        isPreviewResizing ? "bg-primary/70" : "bg-border/30 hover:bg-primary/50"
+                      )}
+                    />
+                  )}
                   <div
-                    className="flex-1 min-w-0 overflow-y-auto"
+                    className={cn(
+                      "min-w-0 overflow-y-auto",
+                      isDesktopViewport ? "flex-1" : "w-full"
+                    )}
                     ref={previewContainerRef}
-                    onScroll={handlePreviewScroll}
+                    onScroll={isSplitPreviewVisible ? handlePreviewScroll : undefined}
+                    data-testid="editor-preview-pane"
                   >
                     <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown

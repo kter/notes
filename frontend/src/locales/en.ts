@@ -126,6 +126,9 @@ export const en = {
     markdown: "Markdown (.md)",
     plainText: "Plain Text (.txt)",
     previewPlaceholder: "Start writing to see the preview...",
+    showEditor: "Show editor",
+    hideEditor: "Hide editor",
+    resizeEditorPreview: "Resize editor and preview panes",
     noteTitlePlaceholder: "Note title",
     noteContentPlaceholder: "Start writing your note in Markdown...",
     summarizeNote: "Summarize note",
@@ -371,6 +374,9 @@ export type TranslationKeys = {
     markdown: string;
     plainText: string;
     previewPlaceholder: string;
+    showEditor: string;
+    hideEditor: string;
+    resizeEditorPreview: string;
     noteTitlePlaceholder: string;
     noteContentPlaceholder: string;
     summarizeNote: string;

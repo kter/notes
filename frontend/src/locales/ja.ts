@@ -126,6 +126,9 @@ export const ja = {
     markdown: "Markdown (.md)",
     plainText: "プレーンテキスト (.txt)",
     previewPlaceholder: "プレビューを見るには書き始めてください...",
+    showEditor: "エディタを表示",
+    hideEditor: "エディタを隠す",
+    resizeEditorPreview: "エディタとプレビューの幅を変更",
     noteTitlePlaceholder: "ノートのタイトル",
     noteContentPlaceholder: "Markdownでノートを書き始めましょう...",
     summarizeNote: "ノートを要約",
@@ -370,6 +373,9 @@ export type TranslationKeys = {
     markdown: string;
     plainText: string;
     previewPlaceholder: string;
+    showEditor: string;
+    hideEditor: string;
+    resizeEditorPreview: string;
     noteTitlePlaceholder: string;
     noteContentPlaceholder: string;
     summarizeNote: string;

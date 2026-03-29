@@ -86,6 +86,15 @@ vi.mock('@/lib/utils', () => ({
 }))
 
 describe('EditorPanel', () => {
+    const setViewportWidth = (width: number) => {
+      Object.defineProperty(window, 'innerWidth', {
+        value: width,
+        writable: true,
+        configurable: true,
+      })
+      window.dispatchEvent(new Event('resize'))
+    }
+
     const mockNote: Note = {
         id: '1',
         title: 'Initial content',
@@ -112,7 +121,17 @@ describe('EditorPanel', () => {
         remote: 'synced',
         isSaving: false
     } as const
-  } 
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    setViewportWidth(1280)
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+    setViewportWidth(1280)
+  })
 
   it('renders with initial content', () => {
     render(<EditorPanel {...defaultProps} />)
@@ -214,6 +233,84 @@ describe('EditorPanel', () => {
 
     // Preview should be visible with the content
     expect(screen.getByTestId('markdown-preview')).toBeInTheDocument()
+  })
+
+  it('shows a resize handle for desktop preview mode', () => {
+    render(<EditorPanel {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+    expect(screen.getByTestId('editor-preview-resize-handle')).toBeInTheDocument()
+  })
+
+  it('resizes the editor pane when dragging the preview separator on desktop', () => {
+    render(<EditorPanel {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+    const layout = screen.getByTestId('editor-preview-desktop-layout')
+    Object.defineProperty(layout, 'clientWidth', { value: 1000, configurable: true })
+
+    const resizeHandle = screen.getByTestId('editor-preview-resize-handle')
+    fireEvent.mouseDown(resizeHandle, { clientX: 500 })
+    fireEvent.mouseMove(document, { clientX: 200 })
+    fireEvent.mouseUp(document)
+
+    expect(screen.getByTestId('editor-drop-zone')).toHaveStyle({ width: '20%' })
+    expect(localStorage.getItem('notes-editor-preview-width')).toBe('20')
+  })
+
+  it('resets the editor and preview panes to 50:50 on resize handle double click', () => {
+    render(<EditorPanel {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+    const layout = screen.getByTestId('editor-preview-desktop-layout')
+    Object.defineProperty(layout, 'clientWidth', { value: 1000, configurable: true })
+
+    const resizeHandle = screen.getByTestId('editor-preview-resize-handle')
+    fireEvent.mouseDown(resizeHandle, { clientX: 500 })
+    fireEvent.mouseMove(document, { clientX: 200 })
+    fireEvent.mouseUp(document)
+    expect(screen.getByTestId('editor-drop-zone')).toHaveStyle({ width: '20%' })
+
+    fireEvent.doubleClick(resizeHandle)
+
+    expect(screen.getByTestId('editor-drop-zone')).toHaveStyle({ width: '50%' })
+    expect(localStorage.getItem('notes-editor-preview-width')).toBe('50')
+  })
+
+  it('collapses to preview-only on desktop and restores the editor without closing preview', () => {
+    render(<EditorPanel {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+    expect(screen.getByTestId('editor-hide-button')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('editor-hide-button'))
+    expect(screen.queryByTestId('editor-content-input')).toBeNull()
+    expect(screen.getByTestId('editor-show-button')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-preview-pane')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('editor-show-button'))
+    expect(screen.getByTestId('editor-content-input')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-hide-button')).toBeInTheDocument()
+  })
+
+  it('uses preview-only mode on mobile and returns to the editor', () => {
+    setViewportWidth(375)
+    render(<EditorPanel {...defaultProps} />)
+
+    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+    expect(screen.queryByTestId('editor-content-input')).toBeNull()
+    expect(screen.getByTestId('editor-preview-pane')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-preview-resize-handle')).toBeNull()
+    expect(screen.getByTestId('editor-show-button')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('editor-show-button'))
+    expect(screen.getByTestId('editor-content-input')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-preview-pane')).toBeNull()
   })
 
   describe('Fullscreen mode', () => {

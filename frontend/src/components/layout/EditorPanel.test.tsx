@@ -280,6 +280,8 @@ describe('EditorPanel', () => {
     fireEvent.click(screen.getByTestId('editor-print-button'))
 
     const printPreview = screen.getByTestId('editor-print-preview')
+    expect(printPreview).toHaveClass('note-print-portal')
+    expect(document.body).toContainElement(printPreview)
     expect(within(printPreview).getByText('Printed title')).toBeInTheDocument()
     expect(within(printPreview).getByText('# Printed body')).toBeInTheDocument()
     expect(document.body).toHaveClass('printing-note-preview')

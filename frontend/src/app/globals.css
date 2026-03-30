@@ -274,7 +274,7 @@
   top: -1px;
 }
 
-.note-print-content {
+.note-print-portal {
   display: none;
 }
 
@@ -283,28 +283,21 @@
     visibility: hidden !important;
   }
 
-  body.printing-note-preview .note-print-root,
-  body.printing-note-preview .note-print-root * {
+  body.printing-note-preview .note-print-portal,
+  body.printing-note-preview .note-print-portal * {
     visibility: visible !important;
   }
 
-  body.printing-note-preview .note-print-root {
-    position: absolute;
-    inset: 0;
+  body.printing-note-preview .note-print-portal {
+    display: block !important;
+    position: relative;
     width: 100%;
-    height: auto;
+    min-height: 100vh;
     overflow: visible !important;
     background: white !important;
     color: black !important;
-  }
-
-  body.printing-note-preview .note-print-screen {
-    display: none !important;
-  }
-
-  body.printing-note-preview .note-print-content {
-    display: block !important;
     padding: 24px 32px 32px;
+    box-sizing: border-box;
   }
 
   body.printing-note-preview .note-print-title {
@@ -315,22 +308,22 @@
     color: black;
   }
 
-  body.printing-note-preview .note-print-content .markdown-preview {
+  body.printing-note-preview .note-print-portal .markdown-preview {
     color: black;
   }
 
-  body.printing-note-preview .note-print-content .markdown-preview table {
+  body.printing-note-preview .note-print-portal .markdown-preview table {
     width: 100%;
     border-collapse: collapse;
   }
 
-  body.printing-note-preview .note-print-content .markdown-preview th,
-  body.printing-note-preview .note-print-content .markdown-preview td {
+  body.printing-note-preview .note-print-portal .markdown-preview th,
+  body.printing-note-preview .note-print-portal .markdown-preview td {
     border: 1px solid black !important;
     padding: 0.5rem;
   }
 
-  body.printing-note-preview .note-print-content .markdown-preview th {
+  body.printing-note-preview .note-print-portal .markdown-preview th {
     background: #f3f4f6 !important;
     color: black;
     font-weight: 600;
@@ -338,10 +331,10 @@
     print-color-adjust: exact;
   }
 
-  body.printing-note-preview .note-print-content .markdown-preview pre,
-  body.printing-note-preview .note-print-content .markdown-preview blockquote,
-  body.printing-note-preview .note-print-content .markdown-preview table,
-  body.printing-note-preview .note-print-content .markdown-preview img {
+  body.printing-note-preview .note-print-portal .markdown-preview pre,
+  body.printing-note-preview .note-print-portal .markdown-preview blockquote,
+  body.printing-note-preview .note-print-portal .markdown-preview table,
+  body.printing-note-preview .note-print-portal .markdown-preview img {
     break-inside: avoid;
   }
 }

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ShareDialog } from "@/components/ui/ShareDialog";
 import type { NoteShare } from "@/types";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 const DESKTOP_BREAKPOINT = 768;
 const DEFAULT_EDITOR_PREVIEW_WIDTH = 50;
@@ -913,6 +913,24 @@ export function EditorPanel({
   }, [note]);
 
   const currentFolder = folders.find((f) => f.id === note?.folder_id);
+  const printPreview =
+    printSnapshot && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="note-print-portal"
+            aria-hidden="true"
+            data-testid="editor-print-preview"
+          >
+            <h1 className="note-print-title">{printSnapshot.title || t("noteList.untitled")}</h1>
+            <div className="markdown-preview prose prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {printSnapshot.content || `*${t("editor.previewPlaceholder")}*`}
+              </ReactMarkdown>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   if (!note) {
     return (
@@ -978,28 +996,16 @@ export function EditorPanel({
   // --- SAVE STATUS LOGIC END ---
 
   return (
-    <div
-      ref={fullscreenContainerRef}
-      className={cn(
-        "note-print-root",
-        isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"
-      )}
-    >
-      {printSnapshot && (
-        <div
-          className="note-print-content"
-          aria-hidden="true"
-          data-testid="editor-print-preview"
-        >
-          <h1 className="note-print-title">{printSnapshot.title || t("noteList.untitled")}</h1>
-          <div className="markdown-preview prose prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {printSnapshot.content || `*${t("editor.previewPlaceholder")}*`}
-            </ReactMarkdown>
-          </div>
-        </div>
-      )}
-      <div className="note-print-screen flex flex-1 flex-col overflow-hidden">
+    <>
+      {printPreview}
+      <div
+        ref={fullscreenContainerRef}
+        className={cn(
+          "note-print-root",
+          isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"
+        )}
+      >
+        <div className="note-print-screen flex flex-1 flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">
@@ -1425,7 +1431,8 @@ export function EditorPanel({
           }
         }}
       />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

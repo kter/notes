@@ -18,6 +18,7 @@ from app.features.assistant.errors import (
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
 from app.features.assistant.use_cases import AIInteractionUseCases
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
+from app.logging_utils import log_event
 from app.models import AIEditJob
 
 logger = logging.getLogger(__name__)
@@ -41,12 +42,36 @@ async def dispatch_edit_job(
             TopicArn=topic_arn,
             Message=json.dumps({"task": PROCESS_EDIT_JOB_TASK, "job_id": str(job_id)}),
         )
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.ai_edit_job.dispatched",
+            job_id=job_id,
+            dispatch_mode="sns",
+            outcome="queued",
+        )
         return
 
     if background_tasks is not None:
         background_tasks.add_task(process_edit_job, job_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.ai_edit_job.dispatched",
+            job_id=job_id,
+            dispatch_mode="background_tasks",
+            outcome="queued",
+        )
         return
 
+    log_event(
+        logger,
+        logging.INFO,
+        "ops.ai_edit_job.dispatched",
+        job_id=job_id,
+        dispatch_mode="inline",
+        outcome="running",
+    )
     await process_edit_job(job_id)
 
 
@@ -62,7 +87,13 @@ async def process_edit_job(
     with session_factory() as session:
         job = session.get(AIEditJob, job_id)
         if job is None:
-            logger.warning("AI edit job %s not found", job_id)
+            log_event(
+                logger,
+                logging.WARNING,
+                "ops.ai_edit_job.not_found",
+                job_id=job_id,
+                outcome="failure",
+            )
             return
 
         if job.status in {"running", "completed"}:
@@ -73,6 +104,13 @@ async def process_edit_job(
         job.updated_at = job.started_at
         session.add(job)
         session.commit()
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.ai_edit_job.started",
+            job_id=job.id,
+            outcome="running",
+        )
 
         try:
             workspace_queries = WorkspaceQueryUseCases(session, job.user_id)
@@ -91,14 +129,46 @@ async def process_edit_job(
             job.edited_content = edited_content
             job.tokens_used = tokens_used
             job.error_message = None
+            log_event(
+                logger,
+                logging.INFO,
+                "ops.ai_edit_job.completed",
+                job_id=job.id,
+                tokens_used=tokens_used,
+                outcome="success",
+            )
         except AIApplicationTimeoutError:
             job.status = "failed"
             job.error_message = AI_EDIT_JOB_TIMEOUT_MESSAGE
+            log_event(
+                logger,
+                logging.ERROR,
+                "ops.ai_edit_job.failed",
+                job_id=job.id,
+                outcome="timeout",
+                reason="ai_timeout",
+            )
         except AITokenLimitExceededError as exc:
             job.status = "failed"
             job.error_message = str(exc)
+            log_event(
+                logger,
+                logging.WARNING,
+                "ops.ai_edit_job.failed",
+                job_id=job.id,
+                outcome="failure",
+                reason="token_limit_exceeded",
+            )
         except Exception as exc:
-            logger.exception("AI edit job %s failed", job_id)
+            log_event(
+                logger,
+                logging.ERROR,
+                "ops.ai_edit_job.failed",
+                job_id=job_id,
+                outcome="error",
+                reason=exc.__class__.__name__,
+                exc_info=True,
+            )
             job.status = "failed"
             job.error_message = str(exc)
         finally:
@@ -145,8 +215,13 @@ async def process_edit_job_queue_records(
 
             await process_job_fn(job_id)
         except Exception:
-            logger.exception(
-                "Failed to process AI edit job queue record %s", message_id
+            log_event(
+                logger,
+                logging.ERROR,
+                "ops.ai_edit_job.queue_record_failed",
+                queue_message_id=message_id,
+                outcome="error",
+                exc_info=True,
             )
             failures.append({"itemIdentifier": message_id})
 

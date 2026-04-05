@@ -11,6 +11,7 @@ from sqlmodel import Session, create_engine
 
 from app.bootstrap.database_bootstrap import create_database_schema
 from app.config import get_settings
+from app.logging_utils import log_event
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,15 +25,25 @@ def get_dsql_engine():
     """Create database engine for DSQL or local PostgreSQL."""
     global _engine
     if _engine is not None:
-        logger.info("Reusing cached database engine")
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.db.engine.reused",
+            outcome="success",
+        )
         return _engine
 
     dsql_endpoint = os.environ.get("DSQL_CLUSTER_ENDPOINT")
 
     if dsql_endpoint:
         region = os.environ.get("AWS_REGION", "ap-northeast-1")
-        logger.info(
-            f"Initializing DSQL engine: endpoint={dsql_endpoint}, region={region}"
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.db.engine.initializing",
+            database_mode="dsql",
+            region=region,
+            outcome="running",
         )
 
         def get_connection():
@@ -41,13 +52,6 @@ def get_dsql_engine():
 
             for attempt in range(max_retries):
                 try:
-                    import datetime
-
-                    now = datetime.datetime.now()
-                    logger.info(
-                        f"Attempt {attempt + 1}/{max_retries}: Generating auth token at {now} (timestamp: {now.timestamp()})"
-                    )
-
                     client = boto3.client("dsql", region_name=region)
                     token = client.generate_db_connect_admin_auth_token(
                         Hostname=f"{dsql_endpoint}.dsql.{region}.on.aws",
@@ -69,21 +73,41 @@ def get_dsql_engine():
                         "Signature expired" in error_message
                         or "Signature not yet current" in error_message
                     ):
-                        logger.warning(
-                            f"DSQL connection failed with signature error (likely clock skew): {exc}"
+                        log_event(
+                            logger,
+                            logging.WARNING,
+                            "ops.db.connection.retrying",
+                            database_mode="dsql",
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            outcome="retry",
+                            reason="signature_time_skew",
                         )
                         if attempt < max_retries - 1:
                             sleep_time = base_delay * (attempt + 1)
-                            logger.info(
-                                f"Sleeping for {sleep_time}s to allow clock synchronization..."
-                            )
                             time.sleep(sleep_time)
                             continue
 
-                    logger.error(f"Failed to create DSQL connection: {exc}")
+                    log_event(
+                        logger,
+                        logging.ERROR,
+                        "ops.db.connection.failed",
+                        database_mode="dsql",
+                        attempt=attempt + 1,
+                        outcome="error",
+                        reason=exc.__class__.__name__,
+                    )
                     raise
                 except Exception as exc:
-                    logger.error(f"Unexpected error connecting to DSQL: {exc}")
+                    log_event(
+                        logger,
+                        logging.ERROR,
+                        "ops.db.connection.failed",
+                        database_mode="dsql",
+                        attempt=attempt + 1,
+                        outcome="error",
+                        reason=exc.__class__.__name__,
+                    )
                     raise
 
         try:
@@ -96,18 +120,44 @@ def get_dsql_engine():
                 max_overflow=10,
                 pool_recycle=300,
             )
-            logger.info("DSQL engine created successfully")
+            log_event(
+                logger,
+                logging.INFO,
+                "ops.db.engine.created",
+                database_mode="dsql",
+                outcome="success",
+            )
         except Exception as exc:
-            logger.error(f"Failed to initialize DSQL engine: {exc}", exc_info=True)
+            log_event(
+                logger,
+                logging.ERROR,
+                "ops.db.engine.failed",
+                database_mode="dsql",
+                outcome="error",
+                reason=exc.__class__.__name__,
+                exc_info=True,
+            )
             raise
     else:
-        logger.info("Initializing local PostgreSQL engine")
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.db.engine.initializing",
+            database_mode="postgresql",
+            outcome="running",
+        )
         _engine = create_engine(
             settings.database_url,
             echo=settings.debug,
             pool_pre_ping=True,
         )
-        logger.info("Local PostgreSQL engine created successfully")
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.db.engine.created",
+            database_mode="postgresql",
+            outcome="success",
+        )
 
     return _engine
 

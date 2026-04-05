@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -5,8 +6,11 @@ from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
+from app.logging_utils import log_event
 from app.models import Note, NoteShare, SharedNoteRead
 from app.shared import NotFound, ShareExpired, ValidationFailed
+
+logger = logging.getLogger(__name__)
 
 
 class ShareUseCases:
@@ -27,12 +31,28 @@ class ShareUseCases:
             select(NoteShare).where(NoteShare.note_id == note_id)
         ).first()
         if existing is not None:
+            log_event(
+                logger,
+                logging.INFO,
+                "audit.share.created",
+                note_id=note_id,
+                share_id=existing.id,
+                outcome="success",
+            )
             return existing
 
         share = NoteShare(note_id=note_id)
         self.session.add(share)
         commit_with_error_handling(self.session, "NoteShare")
         self.session.refresh(share)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.share.created",
+            note_id=note_id,
+            share_id=share.id,
+            outcome="success",
+        )
         return share
 
     def get_share(self, note_id: UUID) -> NoteShare | None:
@@ -51,6 +71,14 @@ class ShareUseCases:
 
         self.session.delete(share)
         commit_with_error_handling(self.session, "NoteShare")
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.share.revoked",
+            note_id=note_id,
+            share_id=share.id,
+            outcome="success",
+        )
 
     def get_shared_note(self, token: UUID) -> SharedNoteRead:
         share = self.session.exec(
@@ -66,6 +94,14 @@ class ShareUseCases:
         if note is None or note.deleted_at is not None:
             raise NotFound("Shared note not found")
 
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.share.accessed",
+            note_id=note.id,
+            share_id=share.id,
+            outcome="success",
+        )
         return SharedNoteRead(
             title=note.title,
             content=note.content,

@@ -11,6 +11,7 @@ from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError
 from app.config import get_settings
 from app.core.prompts import get_prompt
 from app.features.assistant.summary_cache import get_summary_cache
+from app.logging_utils import log_event
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -99,8 +100,12 @@ class BedrockGateway(AIGateway):
                 accept="application/json",
             )
         except (ConnectTimeoutError, ReadTimeoutError) as exc:
-            logger.warning(
-                "Bedrock invocation timed out for model %s", effective_model_id
+            log_event(
+                logger,
+                logging.WARNING,
+                "ops.ai.bedrock.timeout",
+                model_id=effective_model_id,
+                outcome="timeout",
             )
             raise AIGatewayTimeoutError(
                 f"Bedrock invocation timed out for model {effective_model_id}"

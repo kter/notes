@@ -69,7 +69,7 @@ resource "aws_lambda_function" "mcp_server" {
 # CloudWatch Log Group for MCP Server Lambda
 resource "aws_cloudwatch_log_group" "mcp_server_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.mcp_server.function_name}"
-  retention_in_days = 7
+  retention_in_days = 90
 }
 
 # API Gateway for MCP Server
@@ -108,7 +108,7 @@ resource "aws_apigatewayv2_stage" "mcp_server" {
 
 resource "aws_cloudwatch_log_group" "mcp_api_gateway" {
   name              = "/aws/api-gateway/${aws_apigatewayv2_api.mcp_server.name}"
-  retention_in_days = 7
+  retention_in_days = 90
 }
 
 # Default route for MCP server (catch-all)

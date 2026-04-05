@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
+from app.logging_utils import log_event
 from app.models.mcp import (
     MCPSettingsResponse,
     MCPTokenCreateRequest,
@@ -48,11 +49,13 @@ class MCPUseCases:
         commit_with_error_handling(self.session, "MCPToken")
         self.session.refresh(new_token)
 
-        logger.info(
-            "Generated MCP API key for user %s: %s, expires_in_days=%s",
-            self.user_id,
-            new_token.name,
-            expires_in_days,
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.mcp.token.created",
+            token_id=new_token.id,
+            expires_in_days=expires_in_days,
+            outcome="success",
         )
 
         return MCPTokenResponse(
@@ -68,11 +71,15 @@ class MCPUseCases:
         )
 
     def list_tokens(self) -> MCPTokensListResponse:
-        logger.info("Listing MCP tokens for user_id: %s", self.user_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.mcp.tokens.listed",
+            outcome="success",
+        )
         tokens = self.session.exec(
             select(MCPToken).where(MCPToken.user_id == self.user_id)
         ).all()
-        logger.info("Found %s MCP tokens for user %s", len(tokens), self.user_id)
         return MCPTokensListResponse(
             tokens=[
                 MCPTokenListItem(
@@ -106,7 +113,13 @@ class MCPUseCases:
         self.session.add(token)
         commit_with_error_handling(self.session, "MCPToken")
 
-        logger.info("Revoked MCP API key %s for user %s", token_id, self.user_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.mcp.token.revoked",
+            token_id=token_id,
+            outcome="success",
+        )
         return {"message": "API key revoked successfully"}
 
     def restore_token(self, token_id: str) -> dict[str, str]:
@@ -118,7 +131,13 @@ class MCPUseCases:
         self.session.add(token)
         commit_with_error_handling(self.session, "MCPToken")
 
-        logger.info("Restored MCP API key %s for user %s", token_id, self.user_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.mcp.token.restored",
+            token_id=token_id,
+            outcome="success",
+        )
         return {"message": "API key restored successfully"}
 
     def delete_token(self, token_id: str) -> dict[str, str]:
@@ -126,7 +145,13 @@ class MCPUseCases:
         self.session.delete(token)
         commit_with_error_handling(self.session, "MCPToken")
 
-        logger.info("Deleted MCP API key %s for user %s", token_id, self.user_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.mcp.token.deleted",
+            token_id=token_id,
+            outcome="success",
+        )
         return {"message": "API key deleted successfully"}
 
     @staticmethod

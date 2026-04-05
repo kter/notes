@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApi } from "./useApi";
 import { useTranslation } from "./useTranslation";
+import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/types";
 
 export type ChatScope = "note" | "folder" | "all";
@@ -58,7 +59,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
       };
       setChatMessages((prev) => [...prev, summaryMessage]);
     } catch (error: unknown) {
-      console.error("Failed to summarize:", error);
+      logger.error("Failed to summarize", error);
       if ((error as { status?: number })?.status === 429) {
         setChatMessages((prev) => [...prev, { role: "assistant", content: t("aiEdit.tokenLimitExceeded") }]);
       }
@@ -97,7 +98,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
       };
       setChatMessages((prev) => [...prev, assistantMessage]);
     } catch (error: unknown) {
-      console.error("Failed to chat:", error);
+      logger.error("Failed to chat", error);
       if ((error as { status?: number })?.status === 429) {
         setChatMessages((prev) => [...prev, { role: "assistant", content: t("aiEdit.tokenLimitExceeded") }]);
       }
@@ -172,7 +173,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
         setChatMessages((prev) => [...prev, assistantMessage]);
       }
     } catch (error: unknown) {
-      console.error("Failed to edit:", error);
+      logger.error("Failed to edit", error);
       if ((error as { status?: number })?.status === 429) {
         setChatMessages((prev) => [
           ...prev,

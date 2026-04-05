@@ -5,6 +5,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 from app.config import get_settings
+from app.logging_utils import log_event
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -26,14 +27,34 @@ class SummaryCache:
 
         try:
             response = self.s3.get_object(Bucket=self.bucket, Key=s3_key)
-            logger.info(f"Cache hit (S3) for hash: {content_hash}")
+            log_event(
+                logger,
+                logging.INFO,
+                "ops.ai.summary_cache.hit",
+                cache_key=content_hash,
+                outcome="success",
+            )
             return response["Body"].read().decode("utf-8")
 
         except ClientError as exc:
             if exc.response["Error"]["Code"] == "NoSuchKey":
+                log_event(
+                    logger,
+                    logging.DEBUG,
+                    "ops.ai.summary_cache.miss",
+                    cache_key=content_hash,
+                    outcome="miss",
+                )
                 return None
 
-            logger.error(f"Error retrieving cache: {exc}")
+            log_event(
+                logger,
+                logging.ERROR,
+                "ops.ai.summary_cache.read_failed",
+                cache_key=content_hash,
+                outcome="error",
+                reason=exc.response["Error"]["Code"],
+            )
             return None
 
     def save_summary(self, content: str, model_id: str, summary: str):
@@ -45,10 +66,23 @@ class SummaryCache:
             self.s3.put_object(
                 Bucket=self.bucket, Key=s3_key, Body=summary.encode("utf-8")
             )
-            logger.info(f"Cache saved to S3 for hash: {content_hash}")
+            log_event(
+                logger,
+                logging.INFO,
+                "ops.ai.summary_cache.saved",
+                cache_key=content_hash,
+                outcome="success",
+            )
 
         except ClientError as exc:
-            logger.error(f"Error saving cache: {exc}")
+            log_event(
+                logger,
+                logging.ERROR,
+                "ops.ai.summary_cache.write_failed",
+                cache_key=content_hash,
+                outcome="error",
+                reason=exc.response["Error"]["Code"],
+            )
 
 
 summary_cache = SummaryCache()

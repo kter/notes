@@ -4,6 +4,7 @@
  */
 
 import type { Note, Folder } from "@/types";
+import { logger } from "@/lib/logger";
 
 const DB_NAME = "notes-app-db";
 const DB_VERSION = 1;
@@ -44,7 +45,7 @@ class NotesDB {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.error("Failed to open IndexedDB:", request.error);
+        logger.error("Failed to open IndexedDB", request.error);
         reject(request.error);
       };
 

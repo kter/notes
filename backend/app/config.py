@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     app_name: str = "Notes API"
     environment: str = "local"
     debug: bool = False
+    log_level: str = ""
     sentry_dsn: str = ""
     sentry_dsn_parameter_name: str = ""
     sentry_traces_sample_rate: float | None = None
@@ -68,6 +69,12 @@ class Settings(BaseSettings):
         if self.sentry_traces_sample_rate is not None:
             return self.sentry_traces_sample_rate
         return 1.0 if self.environment in {"local", "dev"} else 0.1
+
+    @property
+    def effective_log_level(self) -> str:
+        if self.log_level:
+            return self.log_level.upper()
+        return "DEBUG" if self.environment in {"local", "dev"} else "INFO"
 
 
 @lru_cache

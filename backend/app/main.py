@@ -1,5 +1,9 @@
+import logging
 from contextlib import asynccontextmanager
+from time import perf_counter
+from uuid import uuid4
 
+import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,11 +19,23 @@ from app.features.workspace import (
     snapshot_router,
 )
 from app.http_errors import to_http_exception
-from app.observability import init_sentry
+from app.logging_utils import (
+    bind_log_context,
+    configure_logging,
+    log_event,
+    reset_log_context,
+)
+from app.observability import (
+    init_sentry,
+    set_sentry_request_context,
+    set_sentry_user_context,
+)
 from app.shared import DomainError
 
 settings_app = get_settings()
+configure_logging()
 init_sentry(with_fastapi=True)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -74,14 +90,83 @@ database_initializer = RequestDatabaseInitializer(create_db_and_tables)
 
 
 @app.middleware("http")
-async def db_init_middleware(request: Request, call_next):
-    """Ensure database migrations have run on the first request."""
-    database_initializer.ensure_ready(
+async def request_logging_middleware(request: Request, call_next):
+    """Bind request context, ensure DB readiness, and emit one access log record."""
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    sentry_trace = request.headers.get("sentry-trace", "")
+    traceparent = request.headers.get("traceparent", "")
+    trace_id = None
+
+    if sentry_trace:
+        trace_id = sentry_trace.split("-", maxsplit=1)[0] or None
+    elif traceparent:
+        segments = traceparent.split("-")
+        if len(segments) >= 2:
+            trace_id = segments[1] or None
+
+    context_tokens = bind_log_context(
+        request_id=request_id,
+        trace_id=trace_id,
+        method=request.method,
         path=request.url.path,
-        dependency_overrides=app.dependency_overrides,
-        session_dependency=get_session,
     )
-    return await call_next(request)
+    request.state.request_id = request_id
+    request.state.trace_id = trace_id
+    set_sentry_user_context(None)
+    set_sentry_request_context(
+        request_id=request_id,
+        route=request.url.path,
+        method=request.method,
+        trace_id=trace_id,
+    )
+
+    started = perf_counter()
+    outcome = "success"
+    reason = None
+
+    try:
+        database_initializer.ensure_ready(
+            path=request.url.path,
+            dependency_overrides=app.dependency_overrides,
+            session_dependency=get_session,
+        )
+        response = await call_next(request)
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
+        outcome = "error"
+        reason = "unhandled_exception"
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error"},
+        )
+
+    latency_ms = round((perf_counter() - started) * 1000, 2)
+    response.headers["X-Request-ID"] = request_id
+
+    status_code = response.status_code
+    if request.url.path == "/health":
+        level = logging.DEBUG
+    elif status_code >= 500:
+        level = logging.ERROR
+    elif status_code >= 400:
+        level = logging.WARNING
+        outcome = "failure"
+    else:
+        level = logging.INFO
+
+    log_event(
+        logger,
+        level,
+        "ops.http.request.completed",
+        method=request.method,
+        path=request.url.path,
+        status_code=status_code,
+        latency_ms=latency_ms,
+        outcome=outcome,
+        reason=reason,
+    )
+    reset_log_context(context_tokens)
+    return response
 
 
 @app.get("/health")

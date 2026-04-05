@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import func, or_
@@ -11,6 +12,7 @@ from app.features.admin.schemas import (
     AdminUserUpdateRequest,
 )
 from app.features.assistant.usage_policy import get_usage_snapshot
+from app.logging_utils import log_event
 from app.models import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
@@ -24,6 +26,8 @@ from app.models import (
 )
 from app.models.user_settings import DEFAULT_LANGUAGE, DEFAULT_LLM_MODEL_ID
 from app.shared import NotFound, ValidationFailed
+
+logger = logging.getLogger(__name__)
 
 
 class AdminUseCases:
@@ -133,6 +137,14 @@ class AdminUseCases:
             self.session.add(settings)
 
         commit_with_error_handling(self.session, "AdminUserUpdate")
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.admin.user.updated",
+            target_user_id=user_id,
+            changed_fields=sorted(payload.model_dump(exclude_unset=True).keys()),
+            outcome="success",
+        )
         return self.get_user_detail(user_id)
 
     def _count_for_user(

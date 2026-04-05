@@ -19,6 +19,7 @@ import {
   type SignUpInput,
   type ConfirmSignUpInput,
 } from "aws-amplify/auth";
+import { logger } from "@/lib/logger";
 
 interface User {
   userId: string;
@@ -61,6 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     checkUser();
   }, [checkUser]);
+
+  useEffect(() => {
+    logger.setUser(user?.userId ?? null);
+  }, [user]);
 
   const handleSignIn = async (email: string, password: string) => {
     const input: SignInInput = { username: email, password };

@@ -81,7 +81,7 @@ resource "aws_lambda_function" "ai_edit_worker" {
 # CloudWatch Log Groups for Lambda functions (explicit declaration for retention and policy compliance)
 resource "aws_cloudwatch_log_group" "api_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.api.function_name}"
-  retention_in_days = 7
+  retention_in_days = 90
 
   tags = {
     Name = "${var.project_name}-api-logs-${terraform.workspace}"
@@ -90,10 +90,19 @@ resource "aws_cloudwatch_log_group" "api_lambda" {
 
 resource "aws_cloudwatch_log_group" "ai_edit_worker_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.ai_edit_worker.function_name}"
-  retention_in_days = 7
+  retention_in_days = 90
 
   tags = {
     Name = "${var.project_name}-ai-edit-worker-logs-${terraform.workspace}"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "api_gateway" {
+  name              = "/aws/api-gateway/${aws_apigatewayv2_api.api.name}"
+  retention_in_days = 90
+
+  tags = {
+    Name = "${var.project_name}-api-gateway-logs-${terraform.workspace}"
   }
 }
 
@@ -154,6 +163,21 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.api.id
   name        = "$default"
   auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId               = "$context.requestId"
+      ip                      = "$context.identity.sourceIp"
+      requestTime             = "$context.requestTime"
+      httpMethod              = "$context.httpMethod"
+      routeKey                = "$context.routeKey"
+      status                  = "$context.status"
+      protocol                = "$context.protocol"
+      integrationLatency      = "$context.integrationLatency"
+      integrationErrorMessage = "$context.integrationErrorMessage"
+    })
+  }
 
   tags = {
     Name = "${var.project_name}-api-${terraform.workspace}"

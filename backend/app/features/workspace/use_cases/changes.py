@@ -1,3 +1,5 @@
+import logging
+
 from sqlmodel import Session
 
 from app.features.workspace.repositories import AppliedMutationRepository
@@ -9,6 +11,7 @@ from app.features.workspace.schemas import (
 from app.features.workspace.use_cases.folders import FolderUseCases
 from app.features.workspace.use_cases.notes import NoteUseCases
 from app.features.workspace.use_cases.snapshot import WorkspaceSnapshotUseCase
+from app.logging_utils import log_event
 from app.models import (
     FolderCreate,
     FolderRead,
@@ -18,6 +21,8 @@ from app.models import (
     NoteUpdate,
 )
 from app.shared import ConflictDetected, ValidationFailed
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceChangesUseCase:
@@ -33,6 +38,13 @@ class WorkspaceChangesUseCase:
         self, request: WorkspaceChangesRequest
     ) -> WorkspaceChangesResponse:
         applied = [self._apply_change(change) for change in request.changes]
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.workspace.changes.applied",
+            change_count=len(request.changes),
+            outcome="success",
+        )
         return WorkspaceChangesResponse(
             applied=applied,
             snapshot=self.snapshot_use_case.get_snapshot(),

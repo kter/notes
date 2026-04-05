@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { logger } from "@/lib/logger";
 import { Loader2Icon, CheckIcon, Trash2Icon, RefreshCwIcon, KeyIcon } from "lucide-react";
 import { useApi, useTranslation } from "@/hooks";
 import type { AvailableModel, AvailableLanguage, TokenUsageRead, MCPTokenListItem, MCPSettingsResponse } from "@/types";
@@ -61,7 +62,7 @@ function NewTokenDialog({ open, onOpenChange, onTokenCreated }: NewTokenDialogPr
       });
       onTokenCreated();
     } catch (err) {
-      console.error("Failed to create API key:", err);
+      logger.error("Failed to create API key", err);
       const errorMsg = err instanceof Error ? err.message : t("common.error");
       setError(errorMsg);
     } finally {
@@ -230,7 +231,7 @@ export function SettingsDialog({
       const response = await apiClient.listMcpTokens();
       setApiKeys(response.tokens || []);
     } catch (err) {
-      console.error("Failed to load API keys:", err);
+      logger.error("Failed to load API keys", err);
       setError(t("common.error"));
     } finally {
       setIsApiKeysLoading(false);
@@ -249,7 +250,7 @@ export function SettingsDialog({
         await apiClient.restoreMcpToken(tokenId);
         await loadApiKeys();
       } catch (err) {
-        console.error("Failed to restore API key:", err);
+        logger.error("Failed to restore API key", err);
         setError(t("common.error"));
       } finally {
         setIsRestoring(null);
@@ -262,7 +263,7 @@ export function SettingsDialog({
         await apiClient.revokeMcpToken(tokenId);
         await loadApiKeys();
       } catch (err) {
-        console.error("Failed to revoke API key:", err);
+        logger.error("Failed to revoke API key", err);
         setError(t("common.error"));
       } finally {
         setIsRevoking(null);
@@ -281,7 +282,7 @@ export function SettingsDialog({
       await apiClient.deleteMcpToken(tokenId);
       await loadApiKeys();
     } catch (err) {
-      console.error("Failed to delete API key:", err);
+      logger.error("Failed to delete API key", err);
       setError(t("common.error"));
     } finally {
       setIsDeleting(null);
@@ -299,7 +300,11 @@ export function SettingsDialog({
       try {
         const apiClient = await getApi();
         const response = await apiClient.getSettings();
-        console.log("Settings API response:", response);
+        logger.debug("Settings API response received", {
+          has_settings: Boolean(response?.settings),
+          available_model_count: response?.available_models?.length ?? 0,
+          available_language_count: response?.available_languages?.length ?? 0,
+        });
 
         if (response?.settings) {
           setSelectedModelId(response.settings.llm_model_id);
@@ -320,7 +325,7 @@ export function SettingsDialog({
         const mcpSettingsResponse = await apiClient.getMcpSettings();
         setMcpSettings(mcpSettingsResponse);
       } catch (err) {
-        console.error("Failed to load settings:", err);
+        logger.error("Failed to load settings", err);
         setError(t("settings.loadError"));
       } finally {
         setIsLoading(false);
@@ -344,7 +349,7 @@ export function SettingsDialog({
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
-      console.error("Failed to save settings:", err);
+      logger.error("Failed to save settings", err);
       setError(t("settings.saveError"));
     } finally {
       setIsSaving(false);
@@ -367,7 +372,7 @@ export function SettingsDialog({
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to export notes:", err);
+      logger.error("Failed to export notes", err);
       setError(t("common.error"));
     } finally {
       setIsExporting(false);

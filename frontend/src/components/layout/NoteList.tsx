@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { logger } from "@/lib/logger";
 import type { Note } from "@/types";
 import { cn } from "@/lib/utils";
 import { 
@@ -57,7 +58,7 @@ export function NoteList({
     try {
       await onCreateNote();
     } catch (error) {
-      console.error("Failed to create note:", error);
+      logger.error("Failed to create note", error);
     } finally {
       setIsCreating(false);
     }
@@ -305,4 +306,3 @@ export function NoteList({
     </div>
   );
 }
-

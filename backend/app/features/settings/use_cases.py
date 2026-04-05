@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from sqlmodel import Session
@@ -5,6 +6,7 @@ from sqlmodel import Session
 from app.db_commit import commit_with_error_handling
 from app.features.assistant.usage_policy import get_usage_info
 from app.features.settings.schemas import SettingsResponse
+from app.logging_utils import log_event
 from app.models import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
@@ -17,6 +19,8 @@ from app.models import (
     UserSettingsUpdate,
 )
 from app.shared import ValidationFailed
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsUseCases:
@@ -39,6 +43,13 @@ class SettingsUseCases:
         self, settings_in: UserSettingsUpdate
     ) -> SettingsResponse:
         settings = self._update_settings(settings_in)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.settings.updated",
+            changed_fields=sorted(settings_in.model_dump(exclude_unset=True).keys()),
+            outcome="success",
+        )
         return SettingsResponse(
             settings=self._to_settings_read(settings),
             available_models=self.available_models(),

@@ -52,7 +52,7 @@ def test_init_sentry_configures_lambda_and_fastapi_integrations():
     kwargs = mock_init.call_args.kwargs
     assert kwargs["dsn"] == settings.sentry_dsn
     assert kwargs["environment"] == "dev"
-    assert kwargs["send_default_pii"] is True
+    assert kwargs["send_default_pii"] is False
     assert kwargs["traces_sample_rate"] == 1.0
     assert isinstance(kwargs["integrations"][0], AwsLambdaIntegration)
     assert kwargs["integrations"][0].timeout_warning is True

@@ -1,4 +1,5 @@
 import io
+import logging
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,6 +7,9 @@ from datetime import datetime
 from sqlmodel import Session
 
 from app.features.workspace.repositories import FolderRepository, NoteRepository
+from app.logging_utils import log_event
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,14 @@ class NoteExportUseCase:
                 zip_file.writestr(rel_path, note.content)
 
         filename = f"notes_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.notes.exported",
+            note_count=len(notes),
+            folder_count=len(folders),
+            outcome="success",
+        )
         return NoteExportArchive(filename=filename, data=zip_buffer.getvalue())
 
     @staticmethod

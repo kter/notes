@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import { notesDB } from "@/lib/indexedDB";
+import { logger } from "@/lib/logger";
 import { mergeFolders, mergeNotes } from "@/lib/merge";
 import {
   getActiveFolders,
@@ -76,7 +77,7 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
         }
       } catch (error) {
         if (isActive) {
-          console.error("Failed to load data:", error);
+          logger.error("Failed to load workspace data", error);
         }
       } finally {
         if (isActive) {

@@ -116,7 +116,7 @@ resource "aws_lambda_function" "cost_report" {
 # CloudWatch Log Group
 resource "aws_cloudwatch_log_group" "cost_report" {
   name              = "/aws/lambda/${aws_lambda_function.cost_report.function_name}"
-  retention_in_days = 14
+  retention_in_days = 90
 
   tags = {
     Name = "${var.project_name}-cost-report-${terraform.workspace}"

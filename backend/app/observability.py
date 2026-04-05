@@ -11,6 +11,7 @@ from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.config import get_settings
+from app.logging_utils import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,12 @@ def get_sentry_dsn() -> str:
             WithDecryption=True,
         )
     except Exception:
-        logger.warning(
-            "Failed to load Sentry DSN from SSM parameter %s",
-            settings.sentry_dsn_parameter_name,
+        log_event(
+            logger,
+            logging.WARNING,
+            "ops.sentry.dsn_load_failed",
+            parameter_name=settings.sentry_dsn_parameter_name,
+            outcome="failure",
             exc_info=True,
         )
         return ""
@@ -72,18 +76,51 @@ def init_sentry(*, with_fastapi: bool = False) -> bool:
     sentry_sdk.init(
         dsn=dsn,
         environment=settings.environment,
-        send_default_pii=True,
+        send_default_pii=False,
         traces_sample_rate=settings.effective_sentry_traces_sample_rate,
         integrations=integrations,
     )
 
     _sentry_initialized = True
     _fastapi_integration_enabled = _fastapi_integration_enabled or with_fastapi
-    logger.info(
-        "Sentry initialized",
-        extra={
-            "environment": settings.environment,
-            "with_fastapi": with_fastapi,
-        },
+    log_event(
+        logger,
+        logging.INFO,
+        "ops.sentry.initialized",
+        with_fastapi=with_fastapi,
+        outcome="success",
     )
     return True
+
+
+def set_sentry_request_context(
+    *,
+    request_id: str,
+    route: str,
+    method: str,
+    trace_id: str | None = None,
+) -> None:
+    """Bind request-scoped metadata to the active Sentry scope."""
+    if not _sentry_initialized:
+        return
+
+    sentry_sdk.set_tag("request_id", request_id)
+    sentry_sdk.set_tag("route", route)
+    if trace_id:
+        sentry_sdk.set_tag("trace_id", trace_id)
+    sentry_sdk.set_context(
+        "request",
+        {
+            "request_id": request_id,
+            "route": route,
+            "method": method,
+        },
+    )
+
+
+def set_sentry_user_context(user_id: str | None) -> None:
+    """Bind the authenticated user to the active Sentry scope."""
+    if not _sentry_initialized:
+        return
+
+    sentry_sdk.set_user({"id": user_id} if user_id else None)

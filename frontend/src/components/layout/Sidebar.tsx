@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import type { Folder } from "@/types";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon, CheckIcon, XIcon, Loader2Icon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/hooks";
@@ -43,7 +44,7 @@ export function Sidebar({
         setNewFolderName("");
         setIsCreating(false);
       } catch (error) {
-        console.error("Failed to create folder", error);
+        logger.error("Failed to create folder", error);
       } finally {
         setIsSubmitting(false);
       }

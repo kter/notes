@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/hooks/useTranslation";
 import { notesDB } from "@/lib/indexedDB";
+import { logger } from "@/lib/logger";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
 import {
@@ -161,7 +162,7 @@ export function useNoteSyncEngine({
               setLastError(t("sync.conflictReloaded"));
               return;
             }
-            console.error("Failed to sync note to server:", error);
+            logger.error("Failed to sync note to server", error);
             await syncQueue.addChange("update", "note", id, updates, {
               expectedVersion,
             });
@@ -318,7 +319,7 @@ export function useNoteSyncEngine({
           setLastError(t("sync.conflictReloaded"));
           return;
         }
-        console.error("Failed to create note on server:", error);
+        logger.error("Failed to create note on server", error);
         await syncQueue.addChange("create", "note", tempId, {
           title: "",
           content: "",
@@ -385,7 +386,7 @@ export function useNoteSyncEngine({
           setLocalStatus("saved");
         }
       } catch (error) {
-        console.error("Failed to save locally", error);
+        logger.error("Failed to save locally", error);
         setLocalStatus("failed");
         setLastError(t("sync.localSaveFailed"));
       }
@@ -446,7 +447,7 @@ export function useNoteSyncEngine({
               setLastError(t("sync.conflictReloaded"));
               return;
             }
-            console.error("Failed to delete note on server:", error);
+            logger.error("Failed to delete note on server", error);
             if (!id.startsWith("temp-")) {
               await syncQueue.addChange("delete", "note", id, undefined, {
                 expectedVersion,
@@ -462,7 +463,7 @@ export function useNoteSyncEngine({
           });
         }
       } catch (error) {
-        console.error("Failed to delete note:", error);
+        logger.error("Failed to delete note", error);
       }
     },
     [

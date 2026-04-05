@@ -2,6 +2,7 @@
 
 import { useEffect, useState, ReactNode } from "react";
 import { Amplify, ResourcesConfig } from "aws-amplify";
+import { logger } from "@/lib/logger";
 
 // Cognito configuration from environment variables
 const amplifyConfig: ResourcesConfig = {
@@ -40,9 +41,7 @@ export function AmplifyProvider({ children }: { children: ReactNode }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConfigured(true);
     } catch (error) {
-      console.error("Failed to configure Amplify:", error);
-
-
+      logger.error("Failed to configure Amplify", error);
       setIsConfigured(true); // Still render children
     }
   }, []);

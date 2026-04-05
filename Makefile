@@ -290,6 +290,21 @@ tf-validate: ## Validate Terraform configuration
 logs: ## Tail Lambda logs
 	aws logs tail /aws/lambda/notes-app-api-$(ENV) --follow --profile $(AWS_PROFILE)
 
+.PHONY: api-gateway-logs
+api-gateway-logs: ## Tail API Gateway access logs for the main API
+	aws logs tail /aws/api-gateway/notes-app-api-$(ENV) --follow --profile $(AWS_PROFILE)
+
+.PHONY: logs-request
+logs-request: ## Show API Gateway and Lambda log lines that match REQUEST_ID=<id>
+	@if [ -z "$(REQUEST_ID)" ]; then \
+		echo "REQUEST_ID is required"; \
+		exit 1; \
+	fi
+	@echo "== API Gateway =="
+	@aws logs tail /aws/api-gateway/notes-app-api-$(ENV) --since 1h --profile $(AWS_PROFILE) --format short | grep -F "$(REQUEST_ID)" || true
+	@echo "== Lambda =="
+	@aws logs tail /aws/lambda/notes-app-api-$(ENV) --since 1h --profile $(AWS_PROFILE) --format short | grep -F "$(REQUEST_ID)" || true
+
 # =============================================================================
 # Cost Report Lambda
 # =============================================================================

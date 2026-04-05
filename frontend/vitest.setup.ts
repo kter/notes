@@ -5,6 +5,8 @@ vi.mock('@sentry/nextjs', () => ({
   init: vi.fn(),
   setUser: vi.fn(),
   captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
   captureRouterTransitionStart: vi.fn(),
   browserTracingIntegration: vi.fn((options?: unknown) => ({
     name: 'browserTracingIntegration',

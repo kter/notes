@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -8,10 +9,13 @@ from sqlmodel import Session
 from app.auth.app_user_service import AppUserService
 from app.auth.cognito import cognito_verifier
 from app.database import get_session
+from app.logging_utils import bind_user_id, log_event
 from app.models import AppUser
+from app.observability import set_sentry_user_context
 
 # Bearer token security scheme
 security = HTTPBearer()
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(
@@ -33,11 +37,28 @@ async def get_current_user(
 
     try:
         claims = await cognito_verifier.verify_token(token)
+        user_id = claims.get("sub", "")
+        if user_id:
+            bind_user_id(user_id)
+            set_sentry_user_context(user_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "security.auth.authenticated",
+            outcome="success",
+        )
         return claims
-    except JWTError as e:
+    except JWTError as exc:
+        log_event(
+            logger,
+            logging.WARNING,
+            "security.auth.failed",
+            outcome="failure",
+            reason=exc.__class__.__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
+            detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -49,6 +70,13 @@ def get_current_app_user(
     """Ensure the authenticated user has an app-local profile."""
     user_id = current_user.get("sub", "")
     if not user_id:
+        log_event(
+            logger,
+            logging.WARNING,
+            "security.auth.failed",
+            outcome="failure",
+            reason="missing_user_subject",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing user subject",
@@ -67,6 +95,13 @@ def require_admin(
 ) -> AppUser:
     """Require the current user to have admin privileges."""
     if not app_user.admin:
+        log_event(
+            logger,
+            logging.WARNING,
+            "security.authorization.denied",
+            outcome="failure",
+            reason="admin_required",
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { notesDB } from "@/lib/indexedDB";
+import { logger } from "@/lib/logger";
 import { syncQueue, type SyncStatus } from "@/lib/syncQueue";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useApi } from "./useApi";
@@ -48,7 +49,7 @@ export function useOfflineSync(
       const count = await syncQueue.getPendingCount();
       setPendingChangesCount(count);
     } catch (error) {
-      console.error("Failed to get pending count:", error);
+      logger.error("Failed to get pending count", error);
     }
   }, []);
 
@@ -75,12 +76,12 @@ export function useOfflineSync(
       } else if (result.failedCount > 0) {
         setSyncStatus("error");
         setLastErrorMessage(t("sync.serverSyncFailed"));
-        console.error("Sync errors:", result.errors);
+        logger.warn("Sync errors", { errors: result.errors });
       }
 
       await updatePendingCount();
     } catch (error) {
-      console.error("Sync failed:", error);
+      logger.error("Sync failed", error);
       setSyncStatus("error");
       setLastErrorMessage(t("sync.serverSyncFailed"));
     } finally {
@@ -121,7 +122,9 @@ export function useOfflineSync(
     }
 
     // Initialize IndexedDB
-    notesDB.init().catch(console.error);
+    notesDB.init().catch((error) => {
+      logger.error("Failed to initialize IndexedDB", error);
+    });
 
     // Initial pending count
     updatePendingCount();

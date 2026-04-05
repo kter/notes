@@ -6,9 +6,11 @@ from mangum import Mangum
 
 from app.bootstrap import run_cold_start_database_bootstrap
 from app.database import create_db_and_tables
+from app.logging_utils import configure_logging
 from app.main import app
 
 # Configure logging
+configure_logging()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 

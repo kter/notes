@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useApi } from "./useApi";
 import type { TokenUsageRead } from "@/types";
 import { useAuth } from "@/lib/auth-context";
+import { logger } from "@/lib/logger";
 
 export function useTokenUsage(isAuthenticated: boolean) {
     const { getApi } = useApi();
@@ -19,7 +20,7 @@ export function useTokenUsage(isAuthenticated: boolean) {
                 setTokenUsage(response.token_usage);
             }
         } catch (error) {
-            console.error("Failed to fetch token usage:", error);
+            logger.error("Failed to fetch token usage", error);
         }
     }, [authLoading, isAuthenticated, getApi]);
 

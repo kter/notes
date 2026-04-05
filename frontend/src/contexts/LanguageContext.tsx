@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { ja, en, type TranslationKeys, type Language } from "@/locales";
 import { useApi } from "@/hooks";
 import { useAuth } from "@/lib/auth-context";
+import { logger } from "@/lib/logger";
 
 interface LanguageContextType {
   language: Language;
@@ -63,7 +64,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        console.error("Failed to load language settings:", error);
+        logger.error("Failed to load language settings", error);
         // Fall back to auto
         setLanguageState("auto");
       } finally {

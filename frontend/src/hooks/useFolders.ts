@@ -4,6 +4,7 @@ import { useCallback } from "react";
 
 import { useApi } from "./useApi";
 import { notesDB } from "@/lib/indexedDB";
+import { logger } from "@/lib/logger";
 import { syncQueue } from "@/lib/syncQueue";
 import {
   getWorkspaceSyncRequestMetadata,
@@ -61,7 +62,7 @@ export function useFolders(
       try {
         await notesDB.saveFolder(tempFolder);
       } catch (error) {
-        console.error("Failed to save folder locally:", error);
+        logger.error("Failed to save folder locally", error);
       }
 
       if (navigator.onLine) {
@@ -88,7 +89,7 @@ export function useFolders(
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
-          console.error("Failed to create folder:", error);
+          logger.error("Failed to create folder", error);
         }
       }
 
@@ -117,7 +118,7 @@ export function useFolders(
       try {
         await notesDB.saveFolder(updatedFolder);
       } catch (error) {
-        console.error("Failed to save folder locally:", error);
+        logger.error("Failed to save folder locally", error);
       }
 
       if (navigator.onLine) {
@@ -145,7 +146,7 @@ export function useFolders(
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
-          console.error("Failed to rename folder:", error);
+          logger.error("Failed to rename folder", error);
         }
       }
 
@@ -171,7 +172,7 @@ export function useFolders(
       try {
         await notesDB.deleteFolder(id);
       } catch (error) {
-        console.error("Failed to delete folder locally:", error);
+        logger.error("Failed to delete folder locally", error);
       }
 
       if (id.startsWith("temp-")) {
@@ -202,7 +203,7 @@ export function useFolders(
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
-          console.error("Failed to delete folder:", error);
+          logger.error("Failed to delete folder", error);
         }
       }
 

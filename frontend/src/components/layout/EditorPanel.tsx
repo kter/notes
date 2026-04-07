@@ -114,7 +114,6 @@ export function EditorPanel({
   const printCleanupRef = useRef<(() => void) | null>(null);
   const [showIndentGuides, setShowIndentGuides] = useState(false);
   const [indentGuideCount, setIndentGuideCount] = useState(0);
-  const indentGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const charMeasureRef = useRef<HTMLSpanElement>(null);
 
   // Cache line count whenever content changes (cheap ref update, avoids O(n) split in scroll handlers)
@@ -201,9 +200,6 @@ export function EditorPanel({
         cancelAnimationFrame(scrollRafRef.current);
       }
       printCleanupRef.current?.();
-      if (indentGuideTimerRef.current !== null) {
-        clearTimeout(indentGuideTimerRef.current);
-      }
     };
   }, []);
 
@@ -582,13 +578,8 @@ export function EditorPanel({
       setShowIndentGuides(false);
       return;
     }
-    if (indentGuideTimerRef.current !== null) clearTimeout(indentGuideTimerRef.current);
     setIndentGuideCount(level);
     setShowIndentGuides(true);
-    indentGuideTimerRef.current = setTimeout(() => {
-      setShowIndentGuides(false);
-      indentGuideTimerRef.current = null;
-    }, 1000);
   }, [getCurrentLineIndentLevel]);
 
   // Handle Tab/Shift+Tab for indentation
@@ -789,10 +780,6 @@ export function EditorPanel({
     if (isCursorAtLineStart(value, selectionStart)) {
       showIndentGuidesForCurrentPosition(value, selectionStart);
     } else {
-      if (indentGuideTimerRef.current !== null) {
-        clearTimeout(indentGuideTimerRef.current);
-        indentGuideTimerRef.current = null;
-      }
       setShowIndentGuides(false);
     }
   }, [isCursorAtLineStart, showIndentGuidesForCurrentPosition]);

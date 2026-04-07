@@ -880,41 +880,27 @@ describe('EditorPanel', () => {
       expect(screen.queryByTestId('indent-guide-overlay')).not.toBeInTheDocument()
     })
 
-    it('hides indent guide overlay after 1 second', async () => {
+    it('keeps indent guide overlay visible over time (no auto-hide)', async () => {
       vi.useFakeTimers()
       try {
         render(<EditorPanel {...defaultProps} note={indentedNote} />)
         const textarea = screen.getByTestId('editor-content-input') as HTMLTextAreaElement
         textarea.setSelectionRange(3, 3)
         fireEvent.keyDown(textarea, { key: 'Tab' })
-        await act(async () => { vi.advanceTimersByTime(1001) })
-        expect(screen.queryByTestId('indent-guide-overlay')).not.toBeInTheDocument()
+        await act(async () => { vi.advanceTimersByTime(5000) })
+        expect(screen.queryByTestId('indent-guide-overlay')).toBeInTheDocument()
       } finally {
         vi.useRealTimers()
       }
     })
 
-    it('resets the 1-second timer on each Tab press', async () => {
-      vi.useFakeTimers()
-      try {
-        render(<EditorPanel {...defaultProps} note={indentedNote} />)
-        const textarea = screen.getByTestId('editor-content-input') as HTMLTextAreaElement
-        textarea.setSelectionRange(3, 3)
-        // First Tab at t=0ms
-        fireEvent.keyDown(textarea, { key: 'Tab' })
-        await act(async () => { vi.advanceTimersByTime(900) })
-        // Second Tab at t=900ms resets the timer
-        fireEvent.keyDown(textarea, { key: 'Tab' })
-        // Advance to t=1800ms (only 900ms since second Tab)
-        await act(async () => { vi.advanceTimersByTime(900) })
-        // Overlay still visible (second timer fires at t=1900ms)
-        expect(screen.queryByTestId('indent-guide-overlay')).toBeInTheDocument()
-        // Advance past second timer (t=1901ms)
-        await act(async () => { vi.advanceTimersByTime(101) })
-        expect(screen.queryByTestId('indent-guide-overlay')).not.toBeInTheDocument()
-      } finally {
-        vi.useRealTimers()
-      }
+    it('keeps overlay visible after multiple Tab presses', async () => {
+      render(<EditorPanel {...defaultProps} note={indentedNote} />)
+      const textarea = screen.getByTestId('editor-content-input') as HTMLTextAreaElement
+      textarea.setSelectionRange(3, 3)
+      await act(async () => { fireEvent.keyDown(textarea, { key: 'Tab' }) })
+      await act(async () => { fireEvent.keyDown(textarea, { key: 'Tab' }) })
+      expect(screen.queryByTestId('indent-guide-overlay')).toBeInTheDocument()
     })
   })
 })

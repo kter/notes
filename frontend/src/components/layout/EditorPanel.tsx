@@ -112,6 +112,9 @@ export function EditorPanel({
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
   const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
   const printCleanupRef = useRef<(() => void) | null>(null);
+  const [showIndentGuides, setShowIndentGuides] = useState(false);
+  const [indentGuideCount, setIndentGuideCount] = useState(0);
+  const charMeasureRef = useRef<HTMLSpanElement>(null);
 
   // Cache line count whenever content changes (cheap ref update, avoids O(n) split in scroll handlers)
   useEffect(() => {
@@ -545,6 +548,40 @@ export function EditorPanel({
     };
   }, []);
 
+  const getCharWidth = useCallback((): number => {
+    if (!charMeasureRef.current) return 0;
+    return charMeasureRef.current.getBoundingClientRect().width;
+  }, []);
+
+  const getCurrentLineIndentLevel = useCallback((text: string, cursorPos: number): number => {
+    const lineStart = text.lastIndexOf("\n", cursorPos - 1) + 1;
+    const lineEnd = text.indexOf("\n", cursorPos);
+    const currentLine = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
+    const m = currentLine.match(/^(\s*)/);
+    return m ? Math.floor(m[1].length / 2) : 0;
+  }, []);
+
+  const isCursorAtLineStart = useCallback((text: string, cursorPos: number): boolean => {
+    const lineStart = text.lastIndexOf("\n", cursorPos - 1) + 1;
+    const cursorOffsetInLine = cursorPos - lineStart;
+    const lineEnd = text.indexOf("\n", cursorPos);
+    const currentLine = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
+    const info = getListMarkerInfo(currentLine);
+    if (!info) return false;
+    const prefixLen = info.indent.length + (info.marker?.length ?? 0) + info.markerSpace.length;
+    return cursorOffsetInLine <= prefixLen;
+  }, [getListMarkerInfo]);
+
+  const showIndentGuidesForCurrentPosition = useCallback((text: string, cursorPos: number) => {
+    const level = getCurrentLineIndentLevel(text, cursorPos);
+    if (level === 0) {
+      setShowIndentGuides(false);
+      return;
+    }
+    setIndentGuideCount(level);
+    setShowIndentGuides(true);
+  }, [getCurrentLineIndentLevel]);
+
   // Handle Tab/Shift+Tab for indentation
   const handleTabKey = useCallback((
     e: KeyboardEvent<HTMLTextAreaElement>,
@@ -600,6 +637,7 @@ export function EditorPanel({
       const newStart = Math.max(startPos, selectionStart + totalOffsetStart);
       const newEnd = selectionEnd + totalOffsetEnd;
       textarea.setSelectionRange(newStart, newEnd);
+      showIndentGuidesForCurrentPosition(textarea.value, textarea.selectionStart);
       return;
     }
 
@@ -652,6 +690,7 @@ export function EditorPanel({
 
           const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
           textarea.setSelectionRange(newPos, newPos);
+          showIndentGuidesForCurrentPosition(textarea.value, textarea.selectionStart);
           return;
         }
       }
@@ -659,7 +698,8 @@ export function EditorPanel({
       // Insert 2 spaces at current cursor position
       document.execCommand("insertText", false, "  ");
     }
-  }, []);
+    showIndentGuidesForCurrentPosition(textarea.value, textarea.selectionStart);
+  }, [showIndentGuidesForCurrentPosition]);
 
   // Handle Enter key for list continuation
   const handleEnterKey = useCallback((
@@ -733,7 +773,16 @@ export function EditorPanel({
     }
   }, [handleTabKey, handleEnterKey]);
 
-
+  const handleSelect = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { value, selectionStart } = textarea;
+    if (isCursorAtLineStart(value, selectionStart)) {
+      showIndentGuidesForCurrentPosition(value, selectionStart);
+    } else {
+      setShowIndentGuides(false);
+    }
+  }, [isCursorAtLineStart, showIndentGuidesForCurrentPosition]);
 
   // Fullscreen API toggle
   const toggleFullscreen = useCallback(async () => {
@@ -1271,7 +1320,7 @@ export function EditorPanel({
               {(!isPreviewOpen || (isDesktopViewport && !isEditorCollapsed)) && (
                 <div
                   className={cn(
-                    "min-h-0",
+                    "relative min-h-0",
                     isPreviewOpen ? "flex-none min-w-0" : "flex-1",
                     isDraggingOver && "ring-2 ring-primary rounded"
                   )}
@@ -1307,7 +1356,25 @@ export function EditorPanel({
                     placeholder={t("editor.noteContentPlaceholder")}
                     className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
                     data-testid="editor-content-input"
+                    onKeyUp={handleSelect}
+                    onMouseUp={handleSelect}
                   />
+                  {showIndentGuides && (
+                    <div
+                      className="absolute inset-0 pointer-events-none overflow-hidden"
+                      data-testid="indent-guide-overlay"
+                      aria-hidden="true"
+                    >
+                      {Array.from({ length: indentGuideCount }, (_, i) => (
+                        <div
+                          key={i}
+                          className="absolute top-0 bottom-0 w-px bg-gray-400/40 dark:bg-gray-500/40"
+                          style={{ left: `${(i + 1) * 2 * getCharWidth()}px` }}
+                          data-testid={`indent-guide-line-${i}`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1433,6 +1500,14 @@ export function EditorPanel({
       />
         </div>
       </div>
+      <span
+        ref={charMeasureRef}
+        className="font-mono invisible absolute -z-10 whitespace-pre"
+        aria-hidden="true"
+        style={{ fontSize: "inherit", lineHeight: "inherit" }}
+      >
+        x
+      </span>
     </>
   );
 }

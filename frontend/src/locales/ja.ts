@@ -256,6 +256,26 @@ export const ja = {
     resetDate: "リセット日",
     exceeded: "月間のトークン上限に達しました。使用量は来月の初めにリセットされます。",
   },
+
+  // Weather
+  weather: {
+    title: "天気",
+    temperature: "気温",
+    lastUpdated: "更新",
+    condition: {
+      clearSky: "快晴",
+      mainlyClear: "ほぼ晴れ",
+      partlyCloudy: "一部曇り",
+      overcast: "曇り",
+      fog: "霧",
+      drizzle: "霧雨",
+      rain: "雨",
+      snow: "雪",
+      rainShowers: "にわか雨",
+      thunderstorm: "雷雨",
+      unknown: "不明",
+    },
+  },
 } as const;
 
 // Structural type for translations (allows different string values)
@@ -486,5 +506,23 @@ export type TranslationKeys = {
     limit: string;
     resetDate: string;
     exceeded: string;
+  };
+  weather: {
+    title: string;
+    temperature: string;
+    lastUpdated: string;
+    condition: {
+      clearSky: string;
+      mainlyClear: string;
+      partlyCloudy: string;
+      overcast: string;
+      fog: string;
+      drizzle: string;
+      rain: string;
+      snow: string;
+      rainShowers: string;
+      thunderstorm: string;
+      unknown: string;
+    };
   };
 };

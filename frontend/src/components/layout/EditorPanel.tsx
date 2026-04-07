@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock } from "@/components/Clock";
+import { WeatherWidget } from "@/components/WeatherWidget";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
@@ -1448,9 +1449,10 @@ export function EditorPanel({
           </div>
         </div>
 
-        {/* Clock and Token Usage - Absolutely centered */}
+        {/* Clock, Weather and Token Usage - Absolutely centered */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-4">
           <Clock />
+          <WeatherWidget />
           {tokenUsage && (
             <TokenUsageIndicator
               tokensUsed={tokenUsage.tokens_used}

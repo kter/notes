@@ -256,6 +256,26 @@ export const en = {
     resetDate: "Reset Date",
     exceeded: "Monthly token limit exceeded. Your usage will reset at the beginning of next month.",
   },
+
+  // Weather
+  weather: {
+    title: "Weather",
+    temperature: "Temperature",
+    lastUpdated: "Updated",
+    condition: {
+      clearSky: "Clear sky",
+      mainlyClear: "Mainly clear",
+      partlyCloudy: "Partly cloudy",
+      overcast: "Overcast",
+      fog: "Fog",
+      drizzle: "Drizzle",
+      rain: "Rain",
+      snow: "Snow",
+      rainShowers: "Rain showers",
+      thunderstorm: "Thunderstorm",
+      unknown: "Unknown",
+    },
+  },
 };
 
 // Export type
@@ -489,5 +509,23 @@ export type TranslationKeys = {
     limit: string;
     resetDate: string;
     exceeded: string;
+  };
+  weather: {
+    title: string;
+    temperature: string;
+    lastUpdated: string;
+    condition: {
+      clearSky: string;
+      mainlyClear: string;
+      partlyCloudy: string;
+      overcast: string;
+      fog: string;
+      drizzle: string;
+      rain: string;
+      snow: string;
+      rainShowers: string;
+      thunderstorm: string;
+      unknown: string;
+    };
   };
 };

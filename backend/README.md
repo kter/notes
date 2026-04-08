@@ -5,7 +5,7 @@ FastAPI backend for the Notes application.
 ## Responsibilities
 
 - Cognito-backed authentication and app-user resolution
-- note, folder, settings, share, admin, image, and MCP APIs
+- note, folder, settings, share, admin, and image APIs
 - AI summarize/chat/edit orchestration
 - DSQL-aware persistence and schema bootstrap
 - Lambda and worker entry points

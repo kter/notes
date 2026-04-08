@@ -22,7 +22,6 @@ AWS_REGION ?= ap-northeast-1
 # Use deferred evaluation (=) so these are evaluated when used, picked up after profile/env is set
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
-MCP_SERVER_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-mcp-server-$(ENV)
 SENTRY_DSN_PARAMETER_NAME_FRONTEND ?= /notes-app/$(ENV)/sentry-dsn-frontend
 SENTRY_DSN_PARAMETER_NAME_BACKEND ?= /notes-app/$(ENV)/sentry-dsn-backend
 OPTIONAL_SSM_PARAMETER_SCRIPT := ./scripts/get_optional_ssm_parameter.sh
@@ -166,7 +165,7 @@ deploy-frontend: build-frontend ## Build and deploy frontend to S3
 # =============================================================================
 
 .PHONY: deploy
-deploy: ## Deploy both backend, frontend, and MCP, then run tests (optimized)
+deploy: ## Deploy backend and frontend, then run tests (optimized)
 	@$(MAKE) --no-print-directory _deploy-setup ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
 	@$(MAKE) --no-print-directory _deploy-backend ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
 	@$(MAKE) --no-print-directory _deploy-frontend ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
@@ -182,11 +181,10 @@ _deploy-setup: tf-switch ## One-time setup (terraform init + workspace switch)
 
 .PHONY: _deploy-backend
 _deploy-backend: ## Build, push, and deploy all Lambda functions via Terraform (optimized)
-	@$(MAKE) --no-print-directory -j2 push-backend push-mcp-server ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
+	@$(MAKE) --no-print-directory push-backend ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)
 	@DIGEST=$$($(MAKE) --no-print-directory get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)); \
-	MCP_SERVER_DIGEST=$$($(MAKE) --no-print-directory get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE)); \
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$$DIGEST" -var="mcp_server_image_tag=$$MCP_SERVER_DIGEST" -auto-approve
-	@echo "Backend and MCP server deployed!"
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -var="lambda_image_tag=$$DIGEST" -auto-approve
+	@echo "Backend deployed!"
 
 .PHONY: _deploy-frontend
 _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
@@ -204,8 +202,6 @@ _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
 	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
 	@echo "Frontend deployed to $(BUCKET)"
 	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
-
-# _deploy-mcp is now merged into _deploy-backend above
 
 .PHONY: _deploy-test
 _deploy-test: ## Run post-deployment integration tests (dev only, uses already-initialized Terraform state)
@@ -349,7 +345,7 @@ clean: ## Clean build artifacts
 test: test-backend test-frontend test-lint ## Run the default fast suite: backend + frontend unit tests + lint
 
 .PHONY: test-unit
-test-unit: test-backend test-frontend test-mcp-lambda-unit test-auth-manager-unit ## Run all unit tests across backend, frontend, and Lambda packages
+test-unit: test-backend test-frontend ## Run all unit tests across backend and frontend
 
 .PHONY: test-app-contracts
 test-app-contracts: ## Run high-value backend API contract regressions
@@ -379,22 +375,10 @@ stop-hook-unit-tests: ## Run unit tests only for changed app surfaces from Claud
 	done
 
 .PHONY: test-all
-test-all: test-unit test-lint test-integration test-mcp-lambda-integration test-e2e-all ## Run the full suite: lint + unit + integration + E2E
-
-.PHONY: test-mcp-lambda-unit
-test-mcp-lambda-unit: ## Run MCP Lambda unit tests
-	cd lambda/mcp_server && uv run --extra dev pytest tests/test_app_unit.py -q --tb=short
-
-.PHONY: test-auth-manager-unit
-test-auth-manager-unit: ## Run auth-manager Lambda unit tests
-	cd lambda/auth_manager && uv run --extra dev python -m pytest tests/test_main_unit.py -q --tb=short
-
-.PHONY: test-mcp-lambda-integration
-test-mcp-lambda-integration: ## Run MCP Lambda integration tests (requires AWS/Cognito env vars)
-	cd lambda/mcp_server && uv run --extra dev pytest tests/test_mcp_integration.py -v
+test-all: test-unit test-lint test-integration test-e2e-all ## Run the full suite: lint + unit + integration + E2E
 
 .PHONY: test-integration-full
-test-integration-full: test-integration test-mcp-lambda-integration ## Run all integration tests against deployed services
+test-integration-full: test-integration ## Run all integration tests against deployed services
 
 .PHONY: test-backend
 test-backend: ## Run backend unit/integration-free tests locally
@@ -564,52 +548,3 @@ install-playwright-deps: ## Install host-side Playwright dependencies for Chromi
 install-hooks: ## Install git hooks via lefthook
 	mise exec -- lefthook install
 	@echo "Git hooks installed via lefthook."
-
-# =============================================================================
-# MCP Server Deployment
-# =============================================================================
-
-.PHONY: build-mcp-server
-build-mcp-server: ## Build MCP server Docker image
-	cd lambda/mcp_server && docker buildx build --provenance=false --load -t $(MCP_SERVER_REPO):latest .
-
-.PHONY: push-mcp-server
-push-mcp-server: ecr-login build-mcp-server ## Build and push MCP server Docker image to ECR
-	docker push $(MCP_SERVER_REPO):latest
-	@echo "MCP Server image pushed: $(MCP_SERVER_REPO):latest"
-	$(eval MCP_SERVER_DIGEST := $(shell docker inspect --format='{{.Id}}' $(MCP_SERVER_REPO):latest | awk -F ':' '{print $$2}'))
-	@echo "MCP Server digest: $(MCP_SERVER_DIGEST)"
-
-.PHONY: get-mcp-server-digest
-get-mcp-server-digest: ## Get the latest MCP server image digest from ECR
-	@aws ecr describe-images --repository-name notes-app-mcp-server-$(ENV) \
-		--image-ids imageTag=latest \
-		--profile $(AWS_PROFILE) \
-		--query 'imageDetails[0].imageDigest' \
-		--output text
-
-.PHONY: deploy-mcp
-deploy-mcp: tf-switch push-mcp-server ## Deploy MCP infrastructure
-	$(eval MCP_SERVER_DIGEST := $(shell $(MAKE) get-mcp-server-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE) --no-print-directory))
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply \
-		-var="mcp_server_image_tag=$(MCP_SERVER_DIGEST)" \
-		-auto-approve
-	@echo "MCP infrastructure deployed!"
-
-.PHONY: mcp-logs
-mcp-logs: ## Tail MCP server logs
-	aws logs tail /aws/lambda/notes-app-mcp-server-$(ENV) --follow --profile $(AWS_PROFILE)
-
-.PHONY: test-mcp-server
-test-mcp-server: ## Test MCP server connection
-	$(eval MCP_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw mcp_server_api_url))
-	@echo "MCP Server URL: $(MCP_URL)"
-	@echo ""
-	@echo "Health check:"
-	@curl -s $(MCP_URL)/health | jq .
-	@echo ""
-	@echo "To test the MCP protocol, use a valid Cognito token:"
-	@echo "curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer <TOKEN>' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/list\",\"params\":{}}' $(MCP_URL)/"
-	@echo ""
-	@echo "To configure Claude Desktop, add the following to your MCP config:"
-	@echo '{"mcpServers": {"notes-app": {"url": "$(MCP_URL)/", "headers": {"Authorization": "Bearer <YOUR_COGNITO_TOKEN>"}}}}'

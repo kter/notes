@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from app.bootstrap import RequestDatabaseInitializer
 from app.config import get_settings
 from app.database import create_db_and_tables, get_session
-from app.features import admin, assistant, images, mcp, settings, share
+from app.features import admin, assistant, images, settings, share
 from app.features.workspace import (
     changes_router,
     folders_router,
@@ -70,7 +70,6 @@ app.include_router(changes_router, prefix="/api/workspace", tags=["workspace"])
 app.include_router(snapshot_router, prefix="/api/workspace", tags=["workspace"])
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(assistant.router, prefix="/api/ai", tags=["ai"])
-app.include_router(mcp.router)
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(share.router, prefix="/api", tags=["share"])
 app.include_router(admin.router)

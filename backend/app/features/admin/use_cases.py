@@ -19,7 +19,6 @@ from app.models import (
     AppUser,
     AppUserRead,
     Folder,
-    MCPToken,
     Note,
     UserSettings,
     UserSettingsRead,
@@ -85,7 +84,6 @@ class AdminUseCases:
             token_usage=get_usage_snapshot(self.session, user_id),
             note_count=self._count_for_user(Note, user_id),
             folder_count=self._count_for_user(Folder, user_id),
-            mcp_token_count=self._count_for_user(MCPToken, user_id),
             available_models=AVAILABLE_MODELS,
             available_languages=AVAILABLE_LANGUAGES,
         )
@@ -147,9 +145,7 @@ class AdminUseCases:
         )
         return self.get_user_detail(user_id)
 
-    def _count_for_user(
-        self, model: type[Note | Folder | MCPToken], user_id: str
-    ) -> int:
+    def _count_for_user(self, model: type[Note | Folder], user_id: str) -> int:
         statement = (
             select(func.count()).select_from(model).where(model.user_id == user_id)
         )
@@ -163,7 +159,6 @@ class AdminUseCases:
             token_usage=get_usage_snapshot(self.session, app_user.user_id),
             note_count=self._count_for_user(Note, app_user.user_id),
             folder_count=self._count_for_user(Folder, app_user.user_id),
-            mcp_token_count=self._count_for_user(MCPToken, app_user.user_id),
         )
 
     def _ensure_not_demoting_last_admin(

@@ -247,7 +247,7 @@ Makefile is the primary entry point for tests. `make help` shows the full list, 
 # Fast local check used most often
 make test
 
-# All unit tests, including the MCP Lambda package
+# All unit tests
 make test-unit
 
 # Backend integration tests against the deployed dev environment
@@ -272,12 +272,10 @@ make test
 # Unit tests only
 make test-backend
 make test-frontend
-make test-mcp-lambda-unit
 make test-unit
 
 # Deployed-environment tests
 make test-integration ENV=dev
-make test-mcp-lambda-integration
 
 # Focused regression checks for internal refactors
 make test-app-contracts
@@ -360,8 +358,7 @@ make test-refactor-regressions
 
 - `ENV=dev|prd` selects the deployed environment for integration and E2E tests.
 - `TEST_ARGS='...'` is passed through to Playwright, so file paths and `-g` filters work as-is.
-- `test-mcp-lambda-integration` requires the AWS/Cognito-related environment variables expected by [`lambda/mcp_server/tests/test_mcp_integration.py`](lambda/mcp_server/tests/test_mcp_integration.py).
-- `test-all` includes `test-integration`, `test-mcp-lambda-integration`, and `test-e2e-all`, so it assumes the deployed environment, Docker, and E2E credentials are all available.
+- `test-all` includes `test-integration` and `test-e2e-all`, so it assumes the deployed environment, Docker, and E2E credentials are all available.
 
 > [!TIP]
 > For detailed credential management and CI/CD setup, see [frontend/docs/E2E_CREDENTIALS.md](frontend/docs/E2E_CREDENTIALS.md).

@@ -27,7 +27,5 @@ assert_targets() {
 
 assert_targets 'backend/app/main.py' 'test-backend'
 assert_targets 'frontend/src/app/page.tsx' 'test-frontend'
-assert_targets 'lambda/mcp_server/app.py' 'test-mcp-lambda-unit'
-assert_targets 'lambda/auth_manager/main.py' 'test-auth-manager-unit'
 assert_targets $'backend/app/main.py\nfrontend/src/app/page.tsx\nbackend/app/config.py' $'test-backend\ntest-frontend'
 assert_targets $'README.md\nterraform/main.tf' ''

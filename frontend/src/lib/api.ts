@@ -19,10 +19,6 @@ import type {
   SummarizeRequest,
   SummarizeResponse,
   UserSettingsUpdate,
-  MCPTokenCreateRequest,
-  MCPTokenResponse,
-  MCPTokensListResponse,
-  MCPSettingsResponse,
   AppUser,
   AdminUserDetailResponse,
   AdminUsersListResponse,
@@ -239,40 +235,6 @@ class ApiClient {
     return this.request<AdminUserDetailResponse>(`/api/admin/users/${userId}`, {
       method: "PATCH",
       body: JSON.stringify(data),
-    });
-  }
-
-  // MCP Token Management API
-  async createMcpToken(data: MCPTokenCreateRequest): Promise<MCPTokenResponse> {
-    return this.request<MCPTokenResponse>("/api/mcp/tokens", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async listMcpTokens(): Promise<MCPTokensListResponse> {
-    return this.request<MCPTokensListResponse>("/api/mcp/tokens");
-  }
-
-  async getMcpSettings(): Promise<MCPSettingsResponse> {
-    return this.request<MCPSettingsResponse>("/api/mcp/settings");
-  }
-
-  async revokeMcpToken(tokenId: string): Promise<void> {
-    return this.request<void>(`/api/mcp/tokens/${tokenId}/revoke`, {
-      method: "POST",
-    });
-  }
-
-  async deleteMcpToken(tokenId: string): Promise<void> {
-    return this.request<void>(`/api/mcp/tokens/${tokenId}`, {
-      method: "DELETE",
-    });
-  }
-
-  async restoreMcpToken(tokenId: string): Promise<void> {
-    return this.request<void>(`/api/mcp/tokens/${tokenId}/restore`, {
-      method: "POST",
     });
   }
 

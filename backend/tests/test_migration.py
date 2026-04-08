@@ -47,21 +47,6 @@ def test_migration_bootstraps_legacy_schema_and_stamps_head():
         conn.execute(
             text(
                 """
-                CREATE TABLE mcp_tokens (
-                    id VARCHAR PRIMARY KEY,
-                    user_id VARCHAR,
-                    token_hash VARCHAR,
-                    name VARCHAR,
-                    created_at DATETIME,
-                    expires_at DATETIME,
-                    revoked_at DATETIME
-                )
-                """
-            )
-        )
-        conn.execute(
-            text(
-                """
                 INSERT INTO user_settings (user_id, llm_model_id)
                 VALUES ('user1', 'gpt-4')
                 """
@@ -76,15 +61,11 @@ def test_migration_bootstraps_legacy_schema_and_stamps_head():
     user_settings_columns = {
         column["name"] for column in inspector.get_columns("user_settings")
     }
-    mcp_tokens_columns = {
-        column["name"] for column in inspector.get_columns("mcp_tokens")
-    }
     folder_columns = {column["name"] for column in inspector.get_columns("folders")}
     note_columns = {column["name"] for column in inspector.get_columns("notes")}
 
     assert "language" in user_settings_columns
     assert "token_limit" in user_settings_columns
-    assert "last_used_at" in mcp_tokens_columns
     assert "version" in folder_columns
     assert "deleted_at" in folder_columns
     assert "version" in note_columns
@@ -121,7 +102,6 @@ def test_migration_applies_initial_revision_to_fresh_db():
         "applied_mutations",
         "app_users",
         "folders",
-        "mcp_tokens",
         "note_shares",
         "notes",
         "token_usage",
@@ -186,6 +166,21 @@ def test_migration_bootstraps_existing_dsql_revision_to_head():
         conn.execute(
             text(
                 """
+                CREATE TABLE mcp_tokens (
+                    id VARCHAR PRIMARY KEY,
+                    user_id VARCHAR,
+                    token_hash VARCHAR,
+                    name VARCHAR,
+                    created_at DATETIME,
+                    expires_at DATETIME,
+                    revoked_at DATETIME
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 CREATE TABLE alembic_version (
                     version_num VARCHAR(32) NOT NULL PRIMARY KEY
                 )
@@ -204,6 +199,7 @@ def test_migration_bootstraps_existing_dsql_revision_to_head():
     inspector = inspect(engine)
     assert "ai_edit_jobs" in inspector.get_table_names()
     assert "applied_mutations" in inspector.get_table_names()
+    assert "mcp_tokens" not in inspector.get_table_names()
     folder_columns = {column["name"] for column in inspector.get_columns("folders")}
     note_columns = {column["name"] for column in inspector.get_columns("notes")}
     assert "version" in folder_columns

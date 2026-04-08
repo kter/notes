@@ -19,7 +19,6 @@ locals {
       admin_domain_name = "admin.notes.dev.devtools.site"
       hosted_zone_name  = "dev.devtools.site"
       enable_noindex    = true
-      mcp_domain_name   = "mcp.notes.dev.devtools.site"
     }
     prd = {
       domain_name       = "notes.devtools.site"
@@ -27,7 +26,6 @@ locals {
       admin_domain_name = "admin.notes.devtools.site"
       hosted_zone_name  = "devtools.site"
       enable_noindex    = false
-      mcp_domain_name   = "mcp.notes.devtools.site"
     }
   }
 
@@ -49,20 +47,6 @@ variable "cognito_logout_urls" {
 # Lambda image tag (use digest for production deployments)
 variable "lambda_image_tag" {
   description = "Docker image tag for Lambda function (e.g., 'latest' or sha256 digest)"
-  type        = string
-  default     = "latest"
-}
-
-# MCP Server Lambda image tag
-variable "mcp_server_image_tag" {
-  description = "Docker image tag for MCP Server Lambda function (e.g., 'latest' or sha256 digest)"
-  type        = string
-  default     = "latest"
-}
-
-# MCP Auth Manager Lambda image tag
-variable "mcp_auth_manager_image_tag" {
-  description = "Docker image tag for MCP Auth Manager Lambda function (e.g., 'latest' or sha256 digest)"
   type        = string
   default     = "latest"
 }

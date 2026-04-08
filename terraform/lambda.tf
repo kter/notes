@@ -17,7 +17,6 @@ locals {
       ])
       ENVIRONMENT               = terraform.workspace
       CACHE_BUCKET_NAME         = aws_s3_bucket.cache.bucket
-      MCP_SERVER_URL            = "https://${local.current_env.mcp_domain_name}"
       IMAGE_BUCKET_NAME         = aws_s3_bucket.images.bucket
       AI_EDIT_JOB_TOPIC_ARN     = aws_sns_topic.ai_edit_jobs.arn
       CDN_DOMAIN                = local.current_env.domain_name

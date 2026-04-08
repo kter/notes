@@ -40,11 +40,5 @@ while IFS= read -r file_path; do
     frontend/*)
       emit_target_once "test-frontend"
       ;;
-    lambda/mcp_server/*)
-      emit_target_once "test-mcp-lambda-unit"
-      ;;
-    lambda/auth_manager/*)
-      emit_target_once "test-auth-manager-unit"
-      ;;
   esac
 done < <(collect_changed_files)

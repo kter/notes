@@ -41,7 +41,7 @@ dev-backend: ## Run backend locally
 
 .PHONY: dev-frontend
 dev-frontend: ## Run frontend locally
-	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_ENVIRONMENT=dev npm run dev
+	cd frontend && npm run dev
 
 .PHONY: dev
 dev: ## Run both backend and frontend (requires tmux or run in separate terminals)

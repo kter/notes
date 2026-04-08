@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock } from "@/components/Clock";
 import { WeatherWidget } from "@/components/WeatherWidget";
+import { SunlightMap } from "@/components/SunlightMap";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
@@ -1240,6 +1241,7 @@ export function EditorPanel({
             <span className="hidden md:inline">{t("editor.share")}</span>
           </Button>
         </div>
+        <SunlightMap />
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"

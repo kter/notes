@@ -136,22 +136,44 @@ Git hooks are managed with `lefthook`. The `pre-commit` hook now runs formatter 
 
 Agent hook settings are checked into the repo for both Claude Code and Codex. Their Stop hooks run `make stop-hook-unit-tests`, which only runs unit tests for the app surfaces changed in the current working tree. You can verify the wiring with `make test-agent-hooks`, and the changed-surface selector is covered by `make test-git-hook-helpers`.
 
-### Quick Start
+### Quick Start (フロントエンドのみ・dev環境バックエンドに接続)
+
+デプロイ済みのdev環境バックエンドを利用してフロントエンドをローカルで動かす場合:
+
+1. `frontend/.env.local` を作成:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.notes.dev.devtools.site
+NEXT_PUBLIC_ENVIRONMENT=dev
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=<terraform output cognito_user_pool_id>
+NEXT_PUBLIC_COGNITO_CLIENT_ID=<terraform output cognito_user_pool_client_id>
+```
+
+Cognito の値は Terraform から取得できます:
+
+```bash
+cd terraform
+AWS_PROFILE=dev terraform output cognito_user_pool_id
+AWS_PROFILE=dev terraform output cognito_user_pool_client_id
+```
+
+2. 開発サーバーを起動:
+
+```bash
+make dev-frontend
+```
+
+3. http://localhost:3000 にアクセス
+
+### Full Local Stack (バックエンドも含めてローカル実行)
 
 1. Open the project in VS Code
 2. Click "Reopen in Container" when prompted
-3. Start the development servers:
+3. Start the development servers in separate terminals:
 
 ```bash
-# Backend
-cd backend
-uv sync
-uv run uvicorn app.main:app --reload
-
-# Frontend  
-cd frontend
-npm install
-npm run dev
+make dev-backend
+make dev-frontend
 ```
 
 4. Access the app at http://localhost:3000
@@ -171,6 +193,8 @@ BOOTSTRAP_ADMIN_EMAILS=admin@example.com
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_ENVIRONMENT=dev
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=<your-pool-id>
+NEXT_PUBLIC_COGNITO_CLIENT_ID=<your-client-id>
 ```
 
 ## Admin Console

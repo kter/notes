@@ -196,8 +196,8 @@ describe('EditorPanel', () => {
     fireEvent.change(textarea, { target: { value: 'New content' } })
     
     // Fast forward debounce
-    vi.runAllTimers()
-    
+    vi.advanceTimersByTime(600)
+
     expect(defaultProps.onUpdateNote).toHaveBeenCalledWith('1', { title: 'Initial content', content: 'New content' })
     vi.useRealTimers()
   })
@@ -822,7 +822,7 @@ describe('EditorPanel', () => {
         expect.objectContaining({ content: '- [x] task item\n- [x] done item' }),
       )
 
-      act(() => { vi.runAllTimers() })
+      act(() => { vi.advanceTimersByTime(600) })
 
       expect(onUpdateNote).toHaveBeenCalledWith('2', {
         title: 'Task note',

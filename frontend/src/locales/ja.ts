@@ -276,6 +276,12 @@ export const ja = {
       unknown: "不明",
     },
   },
+
+  // Sunlight Map
+  sunlightMap: {
+    title: "日照マップ",
+    description: "地球上の現在の昼夜エリア",
+  },
 } as const;
 
 // Structural type for translations (allows different string values)
@@ -524,5 +530,9 @@ export type TranslationKeys = {
       thunderstorm: string;
       unknown: string;
     };
+  };
+  sunlightMap: {
+    title: string;
+    description: string;
   };
 };

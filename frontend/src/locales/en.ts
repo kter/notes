@@ -276,6 +276,12 @@ export const en = {
       unknown: "Unknown",
     },
   },
+
+  // Sunlight Map
+  sunlightMap: {
+    title: "Sunlight Map",
+    description: "Current day and night areas on Earth",
+  },
 };
 
 // Export type
@@ -527,5 +533,9 @@ export type TranslationKeys = {
       thunderstorm: string;
       unknown: string;
     };
+  };
+  sunlightMap: {
+    title: string;
+    description: string;
   };
 };

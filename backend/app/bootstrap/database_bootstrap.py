@@ -8,12 +8,14 @@ from typing import Any
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
+from sqlalchemy import exc as sa_exc
 from sqlalchemy import inspect, text
 from sqlmodel import SQLModel
 
 from alembic import command
 
 ALEMBIC_VERSION_TABLE = "alembic_version"
+OBSOLETE_TABLES = ("mcp_tokens",)
 
 
 class DatabaseSchemaBootstrapper:
@@ -226,12 +228,6 @@ class DatabaseSchemaBootstrapper:
         )
         self._ensure_legacy_column_portable(
             connection,
-            table_name="mcp_tokens",
-            column_name="last_used_at",
-            alter_sql="ALTER TABLE mcp_tokens ADD COLUMN last_used_at TIMESTAMP WITH TIME ZONE",
-        )
-        self._ensure_legacy_column_portable(
-            connection,
             table_name="folders",
             column_name="version",
             alter_sql="ALTER TABLE folders ADD COLUMN version INTEGER",
@@ -256,6 +252,18 @@ class DatabaseSchemaBootstrapper:
             column_name="deleted_at",
             alter_sql="ALTER TABLE notes ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE",
         )
+        self._drop_obsolete_tables(connection)
+
+    def _drop_obsolete_tables(self, connection) -> None:
+        try:
+            existing_tables = set(inspect(connection).get_table_names())
+        except sa_exc.NoInspectionAvailable:
+            return
+        for table_name in OBSOLETE_TABLES:
+            if table_name not in existing_tables:
+                continue
+            connection.execute(text(f"DROP TABLE IF EXISTS {table_name}"))  # noqa: S608
+            self._commit_if_dsql_runtime(connection)
 
     def _get_alembic_head_revision(self) -> str:
         script = ScriptDirectory.from_config(self._get_alembic_config())

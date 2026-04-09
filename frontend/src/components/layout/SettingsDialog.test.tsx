@@ -1,9 +1,9 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { SettingsDialog } from "./SettingsDialog";
-import { AuthProvider } from "@/lib/auth-context";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock api.ts
+import { AuthProvider } from "@/lib/auth-context";
+import { SettingsDialog } from "./SettingsDialog";
+
 vi.mock("@/lib/api", () => ({
   ApiError: class extends Error {
     constructor(status: number, statusText: string, data: unknown) {
@@ -20,14 +20,12 @@ vi.mock("@/lib/api", () => ({
   getSharedNote: vi.fn(),
 }));
 
-// Mock useTranslation
 const mockT = vi.fn((key: string) => {
   const translations: Record<string, string> = {
     "common.save": "Save",
+    "common.saved": "Saved",
     "common.cancel": "Cancel",
     "common.error": "Error",
-    "common.loading": "Loading...",
-    "common.copy": "Copy",
     "settings.title": "Settings",
     "settings.description": "Manage your settings",
     "settings.aiModel": "AI Model",
@@ -43,29 +41,9 @@ const mockT = vi.fn((key: string) => {
     "settings.exportButton": "Download ZIP",
     "settings.supportTitle": "Support Developer",
     "settings.supportDescription": "Support on Ko-fi",
-    "settings.mcpSection": "MCP API Keys",
-    "settings.mcpDescription": "Manage API keys",
-    "settings.mcpServerConfig": "MCP Server Configuration",
-    "settings.mcpConnectionDescription": "Set up MCP clients",
-    "settings.mcpServerUrl": "MCP Server URL",
-    "settings.mcpNoTokens": "No API keys",
-    "settings.mcpCreateToken": "Create API Key",
-    "settings.mcpMaxTokensReached": "Maximum 2 active API keys allowed",
-    "settings.mcpTokenActive": "Active",
-    "settings.mcpTokenRevoked": "Revoked",
-    "settings.mcpTokenExpires": "Expires at",
-    "settings.mcpRevokeToken": "Revoke",
-    "settings.mcpDeleteToken": "Delete",
-    "settings.mcpDeleteConfirm": "Delete this API key? This action cannot be undone.",
-    "settings.createApiKey": "Create API Key",
-    "settings.createApiKeyDescription": "Create a new API key",
-    "settings.apiKeyNameRequired": "Purpose is required",
-    "settings.apiKeyName": "Purpose",
-    "settings.apiKeyNamePlaceholder": "e.g., VSCode, Inspector",
-    "settings.apiKey": "API Key",
-    "settings.apiKeyCreated": "API key created",
-    "settings.apiKeyWarning": "This API key will only be shown once.",
     "tokenUsage.title": "Token Usage",
+    "tokenUsage.used": "used",
+    "tokenUsage.resetDate": "Reset date",
   };
   return translations[key] || key;
 });
@@ -78,27 +56,17 @@ vi.mock("@/hooks/useTranslation", () => ({
   }),
 }));
 
-// Mock clipboard API
-const mockClipboard = {
-  writeText: vi.fn().mockResolvedValue(undefined),
-};
-Object.defineProperty(navigator, "clipboard", {
-  value: mockClipboard,
-  configurable: true,
-  writable: true,
-});
-
-// Mock window.confirm
-const mockConfirm = vi.fn();
-window.confirm = mockConfirm;
+const createObjectURLMock = vi.fn(() => "blob:test");
+const revokeObjectURLMock = vi.fn();
 
 describe("SettingsDialog", () => {
   const mockApi = {
     getSettings: vi.fn().mockResolvedValue({
       settings: {
         user_id: "test-user",
-        llm_model_id: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        llm_model_id: "model-1",
         language: "auto",
+        token_limit: 10000,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
@@ -114,15 +82,6 @@ describe("SettingsDialog", () => {
     }),
     updateSettings: vi.fn().mockResolvedValue({}),
     exportNotes: vi.fn().mockResolvedValue(new Blob()),
-    listMcpTokens: vi.fn(),
-    createMcpToken: vi.fn(),
-    revokeMcpToken: vi.fn(),
-    getMcpSettings: vi.fn().mockResolvedValue({
-      server_url: "https://example.com/api/mcp",
-      token_expires_in: 3600,
-      token_expiration_options: [30, 60, 90, 365],
-    }),
-    deleteMcpToken: vi.fn(),
   };
 
   const defaultProps = {
@@ -138,197 +97,57 @@ describe("SettingsDialog", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockConfirm.mockReturnValue(true);
-    // Update the mock to return mockApi when createApiClient is called
+    window.URL.createObjectURL = createObjectURLMock;
+    window.URL.revokeObjectURL = revokeObjectURLMock;
     const { createApiClient } = await import("@/lib/api");
-    vi.mocked(createApiClient).mockReturnValue(mockApi as unknown as ReturnType<typeof createApiClient>);
-  });
-
-  const renderWithAuth = (ui: React.ReactNode) => {
-    return render(
-      <AuthProvider>
-        {ui}
-      </AuthProvider>
+    vi.mocked(createApiClient).mockReturnValue(
+      mockApi as unknown as ReturnType<typeof createApiClient>
     );
-  };
+  });
 
-  describe("MCP API Keys Section", () => {
-    it("shows 'No API keys' message when there are no tokens", async () => {
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: [] });
+  const renderWithAuth = (ui: React.ReactNode) =>
+    render(<AuthProvider>{ui}</AuthProvider>);
 
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
+  it("renders dialog title and action buttons", async () => {
+    renderWithAuth(<SettingsDialog {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(screen.getByText("No API keys")).toBeInTheDocument();
-      });
-    });
-
-    it("displays API keys in list", async () => {
-      const mockTokens = [
-        {
-          id: "token-1",
-          name: "VSCode",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-      ];
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
-
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText("VSCode")).toBeInTheDocument();
-        expect(screen.getByText("Active")).toBeInTheDocument();
-      });
-    });
-
-    it("shows create button when fewer than 2 active tokens", async () => {
-      const mockTokens = [
-        {
-          id: "token-1",
-          name: "Token 1",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-      ];
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
-
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText("Create API Key")).toBeInTheDocument();
-      });
-    });
-
-    it("shows max reached message when 2 active tokens exist", async () => {
-      const mockTokens = [
-        {
-          id: "token-1",
-          name: "Token 1",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-        {
-          id: "token-2",
-          name: "Token 2",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-      ];
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
-
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText("Maximum 2 active API keys allowed")).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(screen.getByText("Settings")).toBeInTheDocument();
+      expect(screen.getByText("Manage your settings")).toBeInTheDocument();
+      expect(screen.getByText("Save")).toBeInTheDocument();
+      expect(screen.getByText("Cancel")).toBeInTheDocument();
     });
   });
 
-  describe("MCP Token Deletion", () => {
-    it("shows delete confirmation dialog when delete button is clicked", async () => {
-      const mockTokens = [
-        {
-          id: "token-1",
-          name: "Test Token",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-      ];
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
+  it("loads settings and renders the export section", async () => {
+    renderWithAuth(<SettingsDialog {...defaultProps} />);
 
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        const deleteButton = screen.getByTestId("mcp-token-delete-token-1");
-        fireEvent.click(deleteButton);
-      });
-
-      expect(mockConfirm).toHaveBeenCalledWith(
-        "Delete this API key? This action cannot be undone."
-      );
-    });
-
-    it("does not delete when confirmation is cancelled", async () => {
-      mockConfirm.mockReturnValue(false);
-      const mockTokens = [
-        {
-          id: "token-1",
-          name: "Test Token",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-      ];
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
-
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        const deleteButton = screen.getByTestId("mcp-token-delete-token-1");
-        fireEvent.click(deleteButton);
-      });
-
-      expect(mockConfirm).toHaveBeenCalled();
-      expect(mockApi.deleteMcpToken).not.toHaveBeenCalled();
-    });
-
-    it("deletes token when confirmation is accepted", async () => {
-      mockConfirm.mockReturnValue(true);
-      const mockTokens = [
-        {
-          id: "token-1",
-          name: "Test Token",
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          revoked_at: null,
-          is_active: true,
-        },
-      ];
-      mockApi.listMcpTokens.mockResolvedValue({ tokens: mockTokens });
-      mockApi.deleteMcpToken.mockResolvedValue({});
-
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        const deleteButton = screen.getByTestId("mcp-token-delete-token-1");
-        fireEvent.click(deleteButton);
-      });
-
-      await waitFor(() => {
-        expect(mockApi.deleteMcpToken).toHaveBeenCalledWith("token-1");
-      });
+    await waitFor(() => {
+      expect(mockApi.getSettings).toHaveBeenCalled();
+      expect(screen.getByText("Data Export")).toBeInTheDocument();
     });
   });
 
-  describe("Dialog Structure", () => {
-    it("renders dialog title and description", async () => {
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
+  it("calls exportNotes when export button is clicked", async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      () => {}
+    );
 
-      await waitFor(() => {
-        expect(screen.getByText("Settings")).toBeInTheDocument();
-        expect(screen.getByText("Manage your settings")).toBeInTheDocument();
-      });
+    renderWithAuth(<SettingsDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Download ZIP")).toBeInTheDocument();
     });
 
-    it("has save and cancel buttons", async () => {
-      renderWithAuth(<SettingsDialog {...defaultProps} />);
+    fireEvent.click(screen.getByText("Download ZIP"));
 
-      await waitFor(() => {
-        expect(screen.getByText("Save")).toBeInTheDocument();
-        expect(screen.getByText("Cancel")).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(mockApi.exportNotes).toHaveBeenCalled();
+      expect(createObjectURLMock).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalled();
+      expect(revokeObjectURLMock).toHaveBeenCalled();
     });
+
+    clickSpy.mockRestore();
   });
 });

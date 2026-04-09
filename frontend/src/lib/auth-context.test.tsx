@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "./auth-context";
 
@@ -15,6 +15,10 @@ function AuthConsumer() {
 }
 
 describe("AuthProvider", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("binds the authenticated user id to Sentry", async () => {
     render(
       <AuthProvider>
@@ -26,6 +30,8 @@ describe("AuthProvider", () => {
       expect(screen.getByText("test-user-id")).toBeInTheDocument();
     });
 
-    expect(Sentry.setUser).toHaveBeenCalledWith({ id: "test-user-id" });
+    await waitFor(() => {
+      expect(Sentry.setUser).toHaveBeenLastCalledWith({ id: "test-user-id" });
+    });
   });
 });

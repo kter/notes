@@ -11,7 +11,6 @@ class AdminUserListItem(BaseModel):
     token_usage: TokenUsageRead
     note_count: int
     folder_count: int
-    mcp_token_count: int
 
 
 class AdminUsersListResponse(BaseModel):
@@ -27,7 +26,6 @@ class AdminUserDetailResponse(BaseModel):
     token_usage: TokenUsageRead
     note_count: int
     folder_count: int
-    mcp_token_count: int
     available_models: list[dict[str, str]]
     available_languages: list[dict[str, str]]
 

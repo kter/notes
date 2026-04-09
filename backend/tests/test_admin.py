@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.models import AppUser, Folder, MCPToken, Note, TokenUsage, UserSettings
+from app.models import AppUser, Folder, Note, TokenUsage, UserSettings
 
 
 def seed_admin_user(session, user_id: str, email: str, admin: bool = True) -> AppUser:
@@ -33,7 +33,6 @@ class TestAdminUserManagement:
         )
         session.add(Note(user_id="target-user", title="Admin test"))
         session.add(Folder(user_id="target-user", name="Admin folder"))
-        session.add(MCPToken(user_id="target-user", token_hash="hash", name="CLI"))
         session.commit()
 
         admin_client = make_client("admin-user")
@@ -49,7 +48,6 @@ class TestAdminUserManagement:
         assert target["token_usage"]["tokens_used"] == 321
         assert target["note_count"] == 1
         assert target["folder_count"] == 1
-        assert target["mcp_token_count"] == 1
 
     def test_admin_can_search_users(self, make_client, session):
         seed_admin_user(session, "admin-user", "admin@example.com", admin=True)

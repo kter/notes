@@ -32,18 +32,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
-        "mcp_tokens",
-        sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("user_id", sa.String(), nullable=False),
-        sa.Column("token_hash", sa.String(), nullable=False),
-        sa.Column("name", sa.String(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_table(
         "notes",
         sa.Column("title", sa.String(length=255), nullable=False),
         sa.Column("content", sa.Text(), nullable=True),
@@ -91,6 +79,5 @@ def downgrade() -> None:
     op.drop_table("token_usage")
     op.drop_table("note_shares")
     op.drop_table("notes")
-    op.drop_table("mcp_tokens")
     op.drop_table("folders")
     op.drop_table("app_users")

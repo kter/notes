@@ -101,7 +101,6 @@ resource "aws_iam_role_policy" "logs" {
   })
 }
 
-# Cognito access policy for MCP Auth Manager
 resource "aws_iam_role_policy" "cognito_access" {
   name = "cognito-access"
   role = aws_iam_role.backend.id

@@ -35,8 +35,6 @@ The system is organized into these feature boundaries:
   Public share links and shared-note read surface.
 - `media`
   Image upload and media metadata.
-- `mcp`
-  MCP token lifecycle and MCP settings.
 
 ## Backend Target Structure
 
@@ -121,14 +119,6 @@ backend/app/
       schemas.py
       use_cases/
         upload_image.py
-    mcp/
-      router.py
-      schemas.py
-      use_cases/
-        create_token.py
-        list_tokens.py
-        revoke_token.py
-        restore_token.py
 ```
 
 ## Backend Rules
@@ -245,7 +235,7 @@ workspace_changes
 ### Existing Tables
 
 - `ai_edit_jobs` remains, but becomes part of the `assistant` boundary.
-- `app_users`, `user_settings`, `note_shares`, `mcp_tokens` remain valid and should gradually adopt the same error and persistence conventions.
+- `app_users`, `user_settings`, and `note_shares` remain valid and should gradually adopt the same error and persistence conventions.
 
 ## API Direction
 
@@ -477,10 +467,6 @@ frontend/src/
       components/
       api/
         shareApi.ts
-    mcp/
-      components/
-      api/
-        mcpApi.ts
   shared/
     i18n/
     http/

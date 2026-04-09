@@ -257,7 +257,6 @@ export function AdminConsole() {
                 token_usage: updated.token_usage,
                 note_count: updated.note_count,
                 folder_count: updated.folder_count,
-                mcp_token_count: updated.mcp_token_count,
               }
             : item
         )
@@ -482,10 +481,6 @@ export function AdminConsole() {
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-stone-400">Folders</p>
                     <p className="mt-3 text-2xl font-semibold">{detail.folder_count}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-stone-400">MCP keys</p>
-                    <p className="mt-3 text-2xl font-semibold">{detail.mcp_token_count}</p>
                   </div>
                 </div>
 

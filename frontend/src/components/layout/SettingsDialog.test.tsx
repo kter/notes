@@ -63,11 +63,17 @@ const mockT = vi.fn((key: string) => {
   return translations[key] || key;
 });
 
+const alternateMockT = vi.fn((key: string) => mockT(key));
+let currentTranslationFn = mockT;
+const setLanguageMock = vi.fn(() => {
+  currentTranslationFn = alternateMockT;
+});
+
 vi.mock("@/hooks/useTranslation", () => ({
   useTranslation: () => ({
-    t: mockT,
+    t: currentTranslationFn,
     language: "en",
-    setLanguage: vi.fn(),
+    setLanguage: setLanguageMock,
   }),
 }));
 
@@ -126,6 +132,7 @@ describe("SettingsDialog", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    currentTranslationFn = mockT;
     window.URL.createObjectURL = createObjectURLMock;
     window.URL.revokeObjectURL = revokeObjectURLMock;
     vi.stubGlobal("confirm", vi.fn(() => true));
@@ -185,6 +192,38 @@ describe("SettingsDialog", () => {
     });
   });
 
+  it("keeps the one-time secret visible after a settings save rerender", async () => {
+    const view = renderWithAuth(<SettingsDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Create API key")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Key name"), {
+      target: { value: "External client" },
+    });
+    fireEvent.click(screen.getByText("Create API key"));
+
+    await waitFor(() => {
+      expect(screen.getByText("notes_test_secret_value")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(mockApi.updateSettings).toHaveBeenCalled();
+      expect(setLanguageMock).toHaveBeenCalled();
+    });
+
+    view.rerender(
+      <AuthProvider>
+        <SettingsDialog {...defaultProps} />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText("notes_test_secret_value")).toBeInTheDocument();
+  });
+
   it("revokes an existing API key", async () => {
     mockApi.listApiKeys.mockResolvedValueOnce([
       {
@@ -210,6 +249,21 @@ describe("SettingsDialog", () => {
       expect(mockApi.revokeApiKey).toHaveBeenCalledWith("key-1");
       expect(screen.queryByText("Existing key")).not.toBeInTheDocument();
     });
+  });
+
+  it("shows API key errors without blocking the rest of settings", async () => {
+    mockApi.listApiKeys.mockRejectedValueOnce(new Error("api keys unavailable"));
+
+    renderWithAuth(<SettingsDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(mockApi.getSettings).toHaveBeenCalled();
+      expect(screen.getByText("Download ZIP")).toBeInTheDocument();
+      expect(screen.getByText("Failed to load API keys")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Save")).toBeInTheDocument();
+    expect(screen.getByText("Create API key")).toBeInTheDocument();
   });
 
   it("calls exportNotes when export button is clicked", async () => {

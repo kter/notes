@@ -33,6 +33,13 @@ interface SettingsDialogProps {
   tokenUsage?: TokenUsageRead | null;
 }
 
+type SettingsErrorKey = "settings.loadError" | "settings.saveError" | "common.error";
+type ApiKeysErrorKey =
+  | "settings.apiKeysListError"
+  | "settings.apiKeysCreateError"
+  | "settings.apiKeysRevokeError"
+  | "common.error";
+
 export function SettingsDialog({
   open,
   onOpenChange,
@@ -50,34 +57,61 @@ export function SettingsDialog({
   const [apiKeyName, setApiKeyName] = useState("");
   const [newApiKeySecret, setNewApiKeySecret] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isApiKeysLoading, setIsApiKeysLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isCreatingApiKey, setIsCreatingApiKey] = useState(false);
   const [revokingApiKeyId, setRevokingApiKeyId] = useState<string | null>(null);
   const [secretCopied, setSecretCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<SettingsErrorKey | null>(null);
+  const [apiKeysErrorKey, setApiKeysErrorKey] = useState<ApiKeysErrorKey | null>(
+    null
+  );
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadApiKeys(apiClient: Awaited<ReturnType<typeof getApi>>) {
+      setIsApiKeysLoading(true);
+      setApiKeysErrorKey(null);
+
+      try {
+        const userApiKeys = await apiClient.listApiKeys();
+        if (!isMounted) return;
+
+        logger.debug("Settings API keys response received", {
+          api_key_count: userApiKeys.length,
+        });
+        setApiKeys(userApiKeys);
+      } catch (err) {
+        if (!isMounted) return;
+
+        logger.error("Failed to load API keys", err);
+        setApiKeysErrorKey("settings.apiKeysListError");
+      } finally {
+        if (isMounted) {
+          setIsApiKeysLoading(false);
+        }
+      }
+    }
+
     async function loadSettings() {
       if (!open) return;
       setIsLoading(true);
-      setError(null);
+      setErrorKey(null);
+      setApiKeysErrorKey(null);
       setSaveSuccess(false);
-      setNewApiKeySecret(null);
-      setSecretCopied(false);
 
       try {
         const apiClient = await getApi();
-        const [response, userApiKeys] = await Promise.all([
-          apiClient.getSettings(),
-          apiClient.listApiKeys(),
-        ]);
+        const response = await apiClient.getSettings();
+        if (!isMounted) return;
+
         logger.debug("Settings API response received", {
           has_settings: Boolean(response?.settings),
           available_model_count: response?.available_models?.length ?? 0,
           available_language_count: response?.available_languages?.length ?? 0,
-          api_key_count: userApiKeys.length,
         });
 
         if (response?.settings) {
@@ -93,21 +127,41 @@ export function SettingsDialog({
           setAvailableLanguages(response.available_languages);
         }
 
-        setApiKeys(userApiKeys);
-      } catch (err) {
-        logger.error("Failed to load settings", err);
-        setError(t("settings.apiKeysListError"));
-      } finally {
         setIsLoading(false);
+        void loadApiKeys(apiClient);
+      } catch (err) {
+        if (!isMounted) return;
+
+        logger.error("Failed to load settings", err);
+        setErrorKey("settings.loadError");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     void loadSettings();
-  }, [open, getApi, t]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, getApi]);
+
+  useEffect(() => {
+    if (open) return;
+
+    setApiKeyName("");
+    setNewApiKeySecret(null);
+    setSecretCopied(false);
+    setErrorKey(null);
+    setApiKeysErrorKey(null);
+    setSaveSuccess(false);
+  }, [open]);
 
   const handleSave = async () => {
     setIsSaving(true);
-    setError(null);
+    setErrorKey(null);
     setSaveSuccess(false);
     try {
       const apiClient = await getApi();
@@ -120,7 +174,7 @@ export function SettingsDialog({
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       logger.error("Failed to save settings", err);
-      setError(t("settings.saveError"));
+      setErrorKey("settings.saveError");
     } finally {
       setIsSaving(false);
     }
@@ -128,7 +182,7 @@ export function SettingsDialog({
 
   const handleExport = async () => {
     setIsExporting(true);
-    setError(null);
+    setErrorKey(null);
     try {
       const apiClient = await getApi();
       const blob = await apiClient.exportNotes();
@@ -145,7 +199,7 @@ export function SettingsDialog({
       window.URL.revokeObjectURL(url);
     } catch (err) {
       logger.error("Failed to export notes", err);
-      setError(t("common.error"));
+      setErrorKey("common.error");
     } finally {
       setIsExporting(false);
     }
@@ -158,7 +212,7 @@ export function SettingsDialog({
     }
 
     setIsCreatingApiKey(true);
-    setError(null);
+    setApiKeysErrorKey(null);
     setSecretCopied(false);
 
     try {
@@ -169,7 +223,7 @@ export function SettingsDialog({
       setNewApiKeySecret(response.token_plain);
     } catch (err) {
       logger.error("Failed to create API key", err);
-      setError(t("settings.apiKeysCreateError"));
+      setApiKeysErrorKey("settings.apiKeysCreateError");
     } finally {
       setIsCreatingApiKey(false);
     }
@@ -186,7 +240,7 @@ export function SettingsDialog({
       setTimeout(() => setSecretCopied(false), 2000);
     } catch (err) {
       logger.error("Failed to copy API key", err);
-      setError(t("common.error"));
+      setApiKeysErrorKey("common.error");
     }
   };
 
@@ -196,7 +250,7 @@ export function SettingsDialog({
     }
 
     setRevokingApiKeyId(keyId);
-    setError(null);
+    setApiKeysErrorKey(null);
 
     try {
       const apiClient = await getApi();
@@ -204,7 +258,7 @@ export function SettingsDialog({
       setApiKeys((prev) => prev.filter((key) => key.id !== keyId));
     } catch (err) {
       logger.error("Failed to revoke API key", err);
-      setError(t("settings.apiKeysRevokeError"));
+      setApiKeysErrorKey("settings.apiKeysRevokeError");
     } finally {
       setRevokingApiKeyId(null);
     }
@@ -230,8 +284,8 @@ export function SettingsDialog({
           <div className="flex items-center justify-center py-8">
             <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : error ? (
-          <div className="py-4 text-sm text-red-500">{error}</div>
+        ) : errorKey ? (
+          <div className="py-4 text-sm text-red-500">{t(errorKey)}</div>
         ) : (
           <div className="flex max-h-[80vh] flex-col overflow-hidden">
             <div className="flex-1 space-y-6 overflow-y-auto px-1 py-4 pr-6 -mr-6">
@@ -350,6 +404,10 @@ export function SettingsDialog({
                   </div>
                 </div>
 
+                {apiKeysErrorKey ? (
+                  <p className="text-sm text-red-500">{t(apiKeysErrorKey)}</p>
+                ) : null}
+
                 {newApiKeySecret ? (
                   <div className="space-y-2 rounded-md border p-3">
                     <div className="space-y-1">
@@ -370,7 +428,12 @@ export function SettingsDialog({
                 ) : null}
 
                 <div className="space-y-2">
-                  {apiKeys.length === 0 ? (
+                  {isApiKeysLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2Icon className="h-4 w-4 animate-spin" />
+                      <span>{t("common.loading")}</span>
+                    </div>
+                  ) : apiKeys.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       {t("settings.apiKeysEmpty")}
                     </p>

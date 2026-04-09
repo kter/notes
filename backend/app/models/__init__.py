@@ -20,6 +20,12 @@ from app.models.token_usage import (
     TokenUsage,
     TokenUsageRead,
 )
+from app.models.user_api_key import (
+    UserApiKey,
+    UserApiKeyCreate,
+    UserApiKeyCreateResponse,
+    UserApiKeyRead,
+)
 from app.models.user_settings import (
     AVAILABLE_LANGUAGES,
     AVAILABLE_MODELS,
@@ -64,6 +70,10 @@ __all__ = [
     "SharedNoteRead",
     "TokenUsage",
     "TokenUsageRead",
+    "UserApiKey",
+    "UserApiKeyCreate",
+    "UserApiKeyCreateResponse",
+    "UserApiKeyRead",
     "UserSettings",
     "UserSettingsRead",
     "UserSettingsUpdate",

@@ -179,6 +179,25 @@ export interface TokenUsageRead {
   period_end: string;
 }
 
+export interface UserApiKey {
+  id: string;
+  user_id: string;
+  name: string;
+  token_prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface UserApiKeyCreate {
+  name: string;
+}
+
+export interface UserApiKeyCreateResponse {
+  api_key: UserApiKey;
+  token_plain: string;
+}
+
 export interface SettingsResponse {
   settings: UserSettings;
   available_models: AvailableModel[];

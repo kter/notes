@@ -1,8 +1,10 @@
 import logging
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlmodel import Session
 
+from app.auth import UserApiKeyService
 from app.db_commit import commit_with_error_handling
 from app.features.assistant.usage_policy import get_usage_info
 from app.features.settings.schemas import SettingsResponse
@@ -14,6 +16,9 @@ from app.models import (
     DEFAULT_LLM_MODEL_ID,
     AvailableLanguage,
     AvailableModel,
+    UserApiKeyCreate,
+    UserApiKeyCreateResponse,
+    UserApiKeyRead,
     UserSettings,
     UserSettingsRead,
     UserSettingsUpdate,
@@ -121,3 +126,41 @@ class SettingsUseCases:
     @staticmethod
     def available_languages() -> list[AvailableLanguage]:
         return [AvailableLanguage(**language) for language in AVAILABLE_LANGUAGES]
+
+
+class ApiKeyUseCases:
+    """Application use cases for self-managed API keys."""
+
+    def __init__(self, session: Session, user_id: str):
+        self.user_id = user_id
+        self.service = UserApiKeyService(session)
+
+    def list_api_keys(self) -> list[UserApiKeyRead]:
+        return [
+            UserApiKeyRead.model_validate(item)
+            for item in self.service.list_active_keys(self.user_id)
+        ]
+
+    def create_api_key(self, payload: UserApiKeyCreate) -> UserApiKeyCreateResponse:
+        api_key, token_plain = self.service.create_key(self.user_id, payload)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.api_key.created",
+            api_key_id=api_key.id,
+            outcome="success",
+        )
+        return UserApiKeyCreateResponse(
+            api_key=UserApiKeyRead.model_validate(api_key),
+            token_plain=token_plain,
+        )
+
+    def revoke_api_key(self, key_id: UUID) -> None:
+        self.service.revoke_key(self.user_id, key_id)
+        log_event(
+            logger,
+            logging.INFO,
+            "audit.api_key.revoked",
+            api_key_id=key_id,
+            outcome="success",
+        )

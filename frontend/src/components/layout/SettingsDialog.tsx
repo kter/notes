@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logger } from "@/lib/logger";
 import { CheckIcon, Loader2Icon } from "lucide-react";
@@ -23,6 +24,7 @@ import type {
   AvailableLanguage,
   AvailableModel,
   TokenUsageRead,
+  UserApiKey,
 } from "@/types";
 
 interface SettingsDialogProps {
@@ -44,9 +46,15 @@ export function SettingsDialog({
   const [availableLanguages, setAvailableLanguages] = useState<AvailableLanguage[]>(
     []
   );
+  const [apiKeys, setApiKeys] = useState<UserApiKey[]>([]);
+  const [apiKeyName, setApiKeyName] = useState("");
+  const [newApiKeySecret, setNewApiKeySecret] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isCreatingApiKey, setIsCreatingApiKey] = useState(false);
+  const [revokingApiKeyId, setRevokingApiKeyId] = useState<string | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,14 +64,20 @@ export function SettingsDialog({
       setIsLoading(true);
       setError(null);
       setSaveSuccess(false);
+      setNewApiKeySecret(null);
+      setSecretCopied(false);
 
       try {
         const apiClient = await getApi();
-        const response = await apiClient.getSettings();
+        const [response, userApiKeys] = await Promise.all([
+          apiClient.getSettings(),
+          apiClient.listApiKeys(),
+        ]);
         logger.debug("Settings API response received", {
           has_settings: Boolean(response?.settings),
           available_model_count: response?.available_models?.length ?? 0,
           available_language_count: response?.available_languages?.length ?? 0,
+          api_key_count: userApiKeys.length,
         });
 
         if (response?.settings) {
@@ -78,9 +92,11 @@ export function SettingsDialog({
         if (response?.available_languages) {
           setAvailableLanguages(response.available_languages);
         }
+
+        setApiKeys(userApiKeys);
       } catch (err) {
         logger.error("Failed to load settings", err);
-        setError(t("settings.loadError"));
+        setError(t("settings.apiKeysListError"));
       } finally {
         setIsLoading(false);
       }
@@ -133,6 +149,73 @@ export function SettingsDialog({
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleCreateApiKey = async () => {
+    const trimmedName = apiKeyName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    setIsCreatingApiKey(true);
+    setError(null);
+    setSecretCopied(false);
+
+    try {
+      const apiClient = await getApi();
+      const response = await apiClient.createApiKey({ name: trimmedName });
+      setApiKeys((prev) => [response.api_key, ...prev]);
+      setApiKeyName("");
+      setNewApiKeySecret(response.token_plain);
+    } catch (err) {
+      logger.error("Failed to create API key", err);
+      setError(t("settings.apiKeysCreateError"));
+    } finally {
+      setIsCreatingApiKey(false);
+    }
+  };
+
+  const handleCopyApiKey = async () => {
+    if (!newApiKeySecret) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(newApiKeySecret);
+      setSecretCopied(true);
+      setTimeout(() => setSecretCopied(false), 2000);
+    } catch (err) {
+      logger.error("Failed to copy API key", err);
+      setError(t("common.error"));
+    }
+  };
+
+  const handleRevokeApiKey = async (keyId: string) => {
+    if (!confirm(t("settings.apiKeysRevokeConfirm"))) {
+      return;
+    }
+
+    setRevokingApiKeyId(keyId);
+    setError(null);
+
+    try {
+      const apiClient = await getApi();
+      await apiClient.revokeApiKey(keyId);
+      setApiKeys((prev) => prev.filter((key) => key.id !== keyId));
+    } catch (err) {
+      logger.error("Failed to revoke API key", err);
+      setError(t("settings.apiKeysRevokeError"));
+    } finally {
+      setRevokingApiKeyId(null);
+    }
+  };
+
+  const formatLastUsed = (value: string | null) => {
+    if (!value) {
+      return t("settings.apiKeysNeverUsed");
+    }
+
+    return new Date(value).toLocaleString();
   };
 
   return (
@@ -235,6 +318,92 @@ export function SettingsDialog({
                   </div>
                 </div>
               )}
+
+              <div className="space-y-4 border-t pt-6">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium leading-none">
+                    {t("settings.apiKeysTitle")}
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.apiKeysDescription")}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="api-key-name">{t("settings.apiKeysNameLabel")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="api-key-name"
+                      value={apiKeyName}
+                      onChange={(event) => setApiKeyName(event.target.value)}
+                      placeholder={t("settings.apiKeysNamePlaceholder")}
+                    />
+                    <Button
+                      onClick={handleCreateApiKey}
+                      disabled={isCreatingApiKey || apiKeyName.trim().length === 0}
+                    >
+                      {isCreatingApiKey ? (
+                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {t("settings.apiKeysCreateButton")}
+                    </Button>
+                  </div>
+                </div>
+
+                {newApiKeySecret ? (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {t("settings.apiKeysCreatedTitle")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.apiKeysCreatedDescription")}
+                      </p>
+                    </div>
+                    <code className="block overflow-x-auto rounded bg-muted px-3 py-2 text-sm">
+                      {newApiKeySecret}
+                    </code>
+                    <Button variant="outline" onClick={handleCopyApiKey}>
+                      {secretCopied ? t("common.copied") : t("common.copy")}
+                    </Button>
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  {apiKeys.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.apiKeysEmpty")}
+                    </p>
+                  ) : (
+                    apiKeys.map((key) => (
+                      <div
+                        key={key.id}
+                        className="flex items-center justify-between rounded-md border p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{key.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {key.token_prefix}...
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t("settings.apiKeysLastUsed")}: {formatLastUsed(key.last_used_at)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleRevokeApiKey(key.id)}
+                          disabled={revokingApiKeyId === key.id}
+                        >
+                          {revokingApiKeyId === key.id ? (
+                            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          {t("settings.apiKeysRevokeButton")}
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-4 border-t pt-6">
                 <div className="space-y-1">

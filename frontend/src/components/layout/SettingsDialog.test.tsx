@@ -36,6 +36,21 @@ const mockT = vi.fn((key: string) => {
     "settings.selectLanguage": "Select language",
     "settings.loadError": "Failed to load settings",
     "settings.saveError": "Failed to save settings",
+    "settings.apiKeysTitle": "API Keys",
+    "settings.apiKeysDescription": "Create API keys for external folder and note clients.",
+    "settings.apiKeysEmpty": "No API keys yet.",
+    "settings.apiKeysNameLabel": "Key name",
+    "settings.apiKeysNamePlaceholder": "External client",
+    "settings.apiKeysCreateButton": "Create API key",
+    "settings.apiKeysCreateError": "Failed to create API key",
+    "settings.apiKeysListError": "Failed to load API keys",
+    "settings.apiKeysRevokeButton": "Revoke",
+    "settings.apiKeysRevokeConfirm": "Revoke this API key?",
+    "settings.apiKeysRevokeError": "Failed to revoke API key",
+    "settings.apiKeysCreatedTitle": "New API key",
+    "settings.apiKeysCreatedDescription": "Copy this secret now. It will only be shown once.",
+    "settings.apiKeysLastUsed": "Last used",
+    "settings.apiKeysNeverUsed": "Never used",
     "settings.exportTitle": "Data Export",
     "settings.exportDescription": "Export all notes",
     "settings.exportButton": "Download ZIP",
@@ -81,6 +96,20 @@ describe("SettingsDialog", () => {
       ],
     }),
     updateSettings: vi.fn().mockResolvedValue({}),
+    listApiKeys: vi.fn().mockResolvedValue([]),
+    createApiKey: vi.fn().mockResolvedValue({
+      api_key: {
+        id: "key-1",
+        user_id: "test-user",
+        name: "External client",
+        token_prefix: "notes_test_secret",
+        created_at: new Date().toISOString(),
+        last_used_at: null,
+        revoked_at: null,
+      },
+      token_plain: "notes_test_secret_value",
+    }),
+    revokeApiKey: vi.fn().mockResolvedValue(undefined),
     exportNotes: vi.fn().mockResolvedValue(new Blob()),
   };
 
@@ -99,6 +128,13 @@ describe("SettingsDialog", () => {
     vi.clearAllMocks();
     window.URL.createObjectURL = createObjectURLMock;
     window.URL.revokeObjectURL = revokeObjectURLMock;
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
     const { createApiClient } = await import("@/lib/api");
     vi.mocked(createApiClient).mockReturnValue(
       mockApi as unknown as ReturnType<typeof createApiClient>
@@ -124,7 +160,55 @@ describe("SettingsDialog", () => {
 
     await waitFor(() => {
       expect(mockApi.getSettings).toHaveBeenCalled();
+      expect(mockApi.listApiKeys).toHaveBeenCalled();
+      expect(screen.getByText("API Keys")).toBeInTheDocument();
       expect(screen.getByText("Data Export")).toBeInTheDocument();
+    });
+  });
+
+  it("creates an API key and shows the secret once", async () => {
+    renderWithAuth(<SettingsDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Create API key")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Key name"), {
+      target: { value: "External client" },
+    });
+    fireEvent.click(screen.getByText("Create API key"));
+
+    await waitFor(() => {
+      expect(mockApi.createApiKey).toHaveBeenCalledWith({ name: "External client" });
+      expect(screen.getByText("New API key")).toBeInTheDocument();
+      expect(screen.getByText("notes_test_secret_value")).toBeInTheDocument();
+    });
+  });
+
+  it("revokes an existing API key", async () => {
+    mockApi.listApiKeys.mockResolvedValueOnce([
+      {
+        id: "key-1",
+        user_id: "test-user",
+        name: "Existing key",
+        token_prefix: "notes_existing",
+        created_at: new Date().toISOString(),
+        last_used_at: null,
+        revoked_at: null,
+      },
+    ]);
+
+    renderWithAuth(<SettingsDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Existing key")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Revoke"));
+
+    await waitFor(() => {
+      expect(mockApi.revokeApiKey).toHaveBeenCalledWith("key-1");
+      expect(screen.queryByText("Existing key")).not.toBeInTheDocument();
     });
   });
 

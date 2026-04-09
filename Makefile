@@ -351,6 +351,11 @@ test-unit: test-backend test-frontend ## Run all unit tests across backend and f
 test-app-contracts: ## Run high-value backend API contract regressions
 	cd backend && uv run --extra dev python -m pytest tests/test_notes.py tests/test_folders.py tests/test_settings.py tests/test_share.py tests/test_admin.py -q --tb=short
 
+.PHONY: test-external-api
+test-external-api: ## Run external folder/note API key regressions
+	cd backend && uv run --extra dev python -m pytest tests/test_api_keys.py -q --tb=short
+	cd frontend && npm run test -- --run src/components/layout/SettingsDialog.test.tsx
+
 .PHONY: test-sync
 test-sync: ## Run frontend sync and offline regression tests
 	cd frontend && npm run test -- --run src/hooks/useHomeData.test.ts src/hooks/useNotes.test.ts src/hooks/useOfflineSync.test.ts src/lib/syncQueue.test.ts src/lib/merge.test.ts

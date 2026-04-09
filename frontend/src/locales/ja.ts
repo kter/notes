@@ -31,6 +31,21 @@ export const ja = {
     selectLanguage: "言語を選択",
     loadError: "設定の読み込みに失敗しました",
     saveError: "設定の保存に失敗しました",
+    apiKeysTitle: "APIキー",
+    apiKeysDescription: "外部クライアントからフォルダやノートを操作するためのAPIキーを発行します。",
+    apiKeysEmpty: "APIキーはまだありません。",
+    apiKeysNameLabel: "キー名",
+    apiKeysNamePlaceholder: "外部クライアント",
+    apiKeysCreateButton: "APIキーを作成",
+    apiKeysCreateError: "APIキーの作成に失敗しました",
+    apiKeysListError: "APIキーの読み込みに失敗しました",
+    apiKeysRevokeButton: "失効",
+    apiKeysRevokeConfirm: "このAPIキーを失効しますか？",
+    apiKeysRevokeError: "APIキーの失効に失敗しました",
+    apiKeysCreatedTitle: "新しいAPIキー",
+    apiKeysCreatedDescription: "このシークレットは今だけ表示されます。必ず控えてください。",
+    apiKeysLastUsed: "最終使用",
+    apiKeysNeverUsed: "未使用",
     exportTitle: "データエクスポート",
     exportDescription: "すべてのノートをZIP形式でエクスポートします。",
     exportButton: "ZIPをダウンロード",
@@ -280,6 +295,21 @@ export type TranslationKeys = {
     selectLanguage: string;
     loadError: string;
     saveError: string;
+    apiKeysTitle: string;
+    apiKeysDescription: string;
+    apiKeysEmpty: string;
+    apiKeysNameLabel: string;
+    apiKeysNamePlaceholder: string;
+    apiKeysCreateButton: string;
+    apiKeysCreateError: string;
+    apiKeysListError: string;
+    apiKeysRevokeButton: string;
+    apiKeysRevokeConfirm: string;
+    apiKeysRevokeError: string;
+    apiKeysCreatedTitle: string;
+    apiKeysCreatedDescription: string;
+    apiKeysLastUsed: string;
+    apiKeysNeverUsed: string;
     exportTitle: string;
     exportDescription: string;
     exportButton: string;

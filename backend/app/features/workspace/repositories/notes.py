@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlmodel import select
 
-from app.core.persistence import UserScopedRepository
+from app.core.persistence import UserScopedRepository, normalize_version
 from app.models import Note, NoteCreate, NoteUpdate
 
 
@@ -24,8 +24,14 @@ class NoteRepository(UserScopedRepository[Note]):
             statement = statement.where(Note.deleted_at.is_(None))
         if folder_id is not None:
             statement = statement.where(Note.folder_id == folder_id)
-        statement = statement.order_by(Note.updated_at.desc())
-        return self.session.exec(statement).all()
+        notes = self.session.exec(statement).all()
+        for note in notes:
+            normalize_version(note)
+        return sorted(
+            notes,
+            key=lambda note: (note.updated_at, str(note.id)),
+            reverse=True,
+        )
 
     def create(self, note_in: NoteCreate) -> Note:
         note = Note(**note_in.model_dump(), user_id=self.user_id)

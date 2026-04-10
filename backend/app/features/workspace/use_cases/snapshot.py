@@ -1,10 +1,14 @@
+import logging
 from datetime import UTC, datetime
 
 from sqlmodel import Session
 
 from app.features.workspace.schemas import WorkspaceSnapshotResponse
 from app.features.workspace.use_cases.queries import WorkspaceQueryUseCases
+from app.logging_utils import log_event
 from app.models import FolderRead, NoteRead
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceSnapshotUseCase:
@@ -14,22 +18,31 @@ class WorkspaceSnapshotUseCase:
         self.workspace_queries = WorkspaceQueryUseCases(session, user_id)
 
     def get_snapshot(self) -> WorkspaceSnapshotResponse:
-        folders = [
-            FolderRead.model_validate(folder)
-            for folder in self.workspace_queries.list_folders(include_deleted=True)
-        ]
-        notes = [
-            NoteRead.model_validate(note)
-            for note in self.workspace_queries.list_all_notes(include_deleted=True)
-        ]
-        server_time = datetime.now(UTC)
-        cursor = self._build_cursor(folders, notes, server_time)
-        return WorkspaceSnapshotResponse(
-            folders=folders,
-            notes=notes,
-            cursor=cursor,
-            server_time=server_time,
-        )
+        try:
+            folders = [
+                FolderRead.model_validate(folder)
+                for folder in self.workspace_queries.list_folders(include_deleted=True)
+            ]
+            notes = [
+                NoteRead.model_validate(note)
+                for note in self.workspace_queries.list_all_notes(include_deleted=True)
+            ]
+            server_time = datetime.now(UTC)
+            cursor = self._build_cursor(folders, notes, server_time)
+            return WorkspaceSnapshotResponse(
+                folders=folders,
+                notes=notes,
+                cursor=cursor,
+                server_time=server_time,
+            )
+        except Exception:
+            log_event(
+                logger,
+                logging.ERROR,
+                "workspace.snapshot.build_failed",
+                exc_info=True,
+            )
+            raise
 
     @staticmethod
     def _build_cursor(

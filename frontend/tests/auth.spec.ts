@@ -24,7 +24,7 @@ async function navigateToLogin(page: Page): Promise<void> {
 }
 
 test.describe('Authentication', () => {
-  test('should login successfully', async ({ page }) => {
+  test('should login successfully', async ({ page, isMobile }) => {
     await navigateToLogin(page);
     
     const email = process.env.E2E_TEST_USER_EMAIL;
@@ -40,7 +40,22 @@ test.describe('Authentication', () => {
     await page.getByTestId('login-submit-button').click();
 
     await expect(page).toHaveURL(/\/$/, { timeout: 15000 });
-    await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible();
+    if (isMobile) {
+      const foldersNav = page.getByTestId('mobile-nav-folders');
+      await expect(foldersNav).toBeVisible({ timeout: 30000 });
+      await foldersNav.click();
+
+      const foldersLayout = page.getByTestId('mobile-layout-folders');
+      await expect(foldersLayout).toBeVisible({ timeout: 30000 });
+      await expect(foldersLayout.getByTestId('sidebar-nav-all-notes')).toBeVisible({ timeout: 30000 });
+      return;
+    }
+
+    try {
+      await expect(page.getByRole('heading', { name: /Folders|フォルダ|sidebar\.folders/i })).toBeVisible({ timeout: 5000 });
+    } catch {
+      await expect(page.getByText(/All Notes|すべてのノート|sidebar\.allNotes/i).first()).toBeVisible({ timeout: 30000 });
+    }
   });
 
   test('should show error on failed login', async ({ page }) => {

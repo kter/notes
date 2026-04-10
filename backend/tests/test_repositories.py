@@ -56,6 +56,48 @@ def test_note_repository_lists_only_owned_notes_and_respects_folder_filter(
     assert [note.title for note in folder_notes] == ["older"]
 
 
+def test_folder_repository_lists_in_descending_updated_at_order(session: Session):
+    user_id = "test-user-123"
+    older = datetime.now(UTC) - timedelta(days=1)
+    newer = datetime.now(UTC)
+
+    session.add(Folder(name="older", user_id=user_id, updated_at=older))
+    session.add(Folder(name="newer", user_id=user_id, updated_at=newer))
+    session.commit()
+
+    repository = FolderRepository(session, user_id)
+
+    assert [folder.name for folder in repository.list()] == ["newer", "older"]
+
+
+def test_folder_repository_normalizes_legacy_null_version_rows(session: Session):
+    folder = Folder(name="legacy", user_id="test-user-123")
+    folder.version = None
+    session.add(folder)
+    session.commit()
+
+    repository = FolderRepository(session, "test-user-123")
+    listed = repository.list()
+    owned = repository.get_owned(folder.id)
+
+    assert listed[0].version == 1
+    assert owned.version == 1
+
+
+def test_note_repository_normalizes_legacy_null_version_rows(session: Session):
+    note = Note(title="legacy", content="", user_id="test-user-123")
+    note.version = None
+    session.add(note)
+    session.commit()
+
+    repository = NoteRepository(session, "test-user-123")
+    listed = repository.list()
+    owned = repository.get_owned(note.id)
+
+    assert listed[0].version == 1
+    assert owned.version == 1
+
+
 def test_note_repository_update_touches_timestamp(session: Session):
     repository = NoteRepository(session, "test-user-123")
     note = repository.create(NoteCreate(title="before", content="before"))
@@ -121,3 +163,27 @@ def test_folder_repository_soft_delete_hides_from_default_queries(session: Sessi
     assert deleted.version == 2
     assert repository.list() == []
     assert repository.list(include_deleted=True)[0].id == folder.id
+
+
+def test_note_repository_update_bumps_legacy_null_version_to_two(session: Session):
+    note = Note(title="legacy", content="", user_id="test-user-123")
+    note.version = None
+    session.add(note)
+    session.commit()
+
+    repository = NoteRepository(session, "test-user-123")
+    updated = repository.update(note.id, NoteUpdate(title="updated"))
+
+    assert updated.version == 2
+
+
+def test_folder_repository_update_bumps_legacy_null_version_to_two(session: Session):
+    folder = Folder(name="legacy", user_id="test-user-123")
+    folder.version = None
+    session.add(folder)
+    session.commit()
+
+    repository = FolderRepository(session, "test-user-123")
+    updated = repository.update(folder.id, FolderUpdate(name="updated"))
+
+    assert updated.version == 2

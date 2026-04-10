@@ -46,6 +46,11 @@ class FolderRead(FolderBase):
     updated_at: datetime
     deleted_at: datetime | None
 
+    @field_validator("version", mode="before")
+    @classmethod
+    def ensure_version(cls, value: int | None) -> int:
+        return 1 if value is None else value
+
     @field_validator("created_at", "updated_at", "deleted_at", mode="before")
     @classmethod
     def ensure_utc_timezone(cls, v: datetime | None) -> datetime | None:

@@ -17,7 +17,16 @@ class FolderUseCases:
         self.repository = FolderRepository(session, user_id)
 
     def list_folders(self) -> list[Folder]:
-        return self.repository.list()
+        try:
+            return self.repository.list()
+        except Exception:
+            log_event(
+                logger,
+                logging.ERROR,
+                "workspace.folders.list_failed",
+                exc_info=True,
+            )
+            raise
 
     def create_folder(self, folder_in: FolderCreate) -> Folder:
         folder = self.repository.create(folder_in)

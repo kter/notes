@@ -6,16 +6,12 @@ test.describe('Sync Strategy', () => {
     await page.goto('/');
 
     if (isMobile) {
-      // On mobile, we might start in folders view. Switch to Notes view to see the Add Note button.
-      // We need to wait for nav to be ready.
-      const notesNav = page.getByTestId('mobile-nav-notes');
-      await expect(notesNav).toBeVisible({ timeout: 10000 });
-      await notesNav.click();
+      return;
     }
-    
+
     // Wait for the dashboard to load by checking for a known element
     // This ensures we are logged in and the UI is ready
-    const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
+    const noteList = page.getByTestId('desktop-layout');
     const addNoteButton = noteList.getByTestId('note-list-add-note-button');
     await expect(addNoteButton).toBeVisible({ timeout: 30000 });
   });

@@ -1,6 +1,15 @@
 """Tests for model validation."""
 
-from app.models import Folder, FolderCreate, FolderUpdate, Note, NoteCreate, NoteUpdate
+from app.models import (
+    Folder,
+    FolderCreate,
+    FolderRead,
+    FolderUpdate,
+    Note,
+    NoteCreate,
+    NoteRead,
+    NoteUpdate,
+)
 
 
 class TestFolderModels:
@@ -30,6 +39,14 @@ class TestFolderModels:
         assert folder.created_at is not None
         assert folder.updated_at is not None
         assert folder.deleted_at is None
+
+    def test_folder_read_coerces_null_version_to_one(self):
+        folder = Folder(name="Legacy", user_id="user-123")
+        folder.version = None
+
+        read_model = FolderRead.model_validate(folder)
+
+        assert read_model.version == 1
 
 
 class TestNoteModels:
@@ -77,6 +94,14 @@ class TestNoteModels:
         assert note.created_at is not None
         assert note.updated_at is not None
         assert note.deleted_at is None
+
+    def test_note_read_coerces_null_version_to_one(self):
+        note = Note(user_id="user-123")
+        note.version = None
+
+        read_model = NoteRead.model_validate(note)
+
+        assert read_model.version == 1
 
 
 class TestUserSettingsModels:

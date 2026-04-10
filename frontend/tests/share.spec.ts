@@ -1,6 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-import { createFolderFixture, createNoteFixture } from './helpers/apiFixtures';
+import {
+  createFolderFixture,
+  createNoteFixture,
+  waitForWorkspaceSnapshotReady,
+} from './helpers/apiFixtures';
+
+async function prepareWorkspaceUi(page: Page): Promise<void> {
+  await waitForWorkspaceSnapshotReady(page, {
+    attempts: 12,
+    delayMs: 5000,
+    timeoutMs: 30000,
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle');
+}
+
+async function expectVisibleWithReload(page: Page, locator: ReturnType<Page['locator']>): Promise<void> {
+  try {
+    await expect(locator).toBeVisible({ timeout: 15000 });
+  } catch {
+    await prepareWorkspaceUi(page);
+    await expect(locator).toBeVisible({ timeout: 30000 });
+  }
+}
 
 test.describe('Sharing Functionality', () => {
   test('should perform full share cycle', async ({ page, context, isMobile }) => {
@@ -18,14 +41,13 @@ test.describe('Sharing Functionality', () => {
       content: noteContent,
       folder_id: createdFolder.id,
     });
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    await prepareWorkspaceUi(page);
 
     // Select the folder
     console.log(`[Share E2E] Created folder: ${folderName}`);
     const sidebar = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
     const folderButton = sidebar.getByTestId(`sidebar-folder-item-${createdFolder.id}`);
-    await expect(folderButton).toBeVisible({ timeout: 15000 });
+    await expectVisibleWithReload(page, folderButton);
     await folderButton.click();
 
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');

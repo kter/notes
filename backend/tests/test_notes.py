@@ -16,13 +16,25 @@ class TestListNotes:
 
     def test_list_notes(self, client: TestClient):
         """Test listing notes after creating some."""
-        client.post("/api/notes", json={"title": "Note 1", "content": "Content 1"})
-        client.post("/api/notes", json={"title": "Note 2", "content": "Content 2"})
+        first = client.post(
+            "/api/notes", json={"title": "Note 1", "content": "Content 1"}
+        )
+        assert first.status_code == 201
+        second = client.post(
+            "/api/notes", json={"title": "Note 2", "content": "Content 2"}
+        )
+        assert second.status_code == 201
+        updated_first = client.patch(
+            f"/api/notes/{first.json()['id']}",
+            json={"content": "Updated content 1"},
+        )
+        assert updated_first.status_code == 200
 
         response = client.get("/api/notes")
         assert response.status_code == 200
         notes = response.json()
         assert len(notes) == 2
+        assert [note["title"] for note in notes] == ["Note 1", "Note 2"]
 
     def test_list_notes_filter_by_folder(self, client: TestClient):
         """Test filtering notes by folder_id."""

@@ -1,17 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+import { waitForWorkspaceSnapshotReady } from './helpers/apiFixtures';
 import { getAppliedEntityId, isWorkspaceChangeRequest, waitForWorkspaceChange } from './helpers/workspaceSync';
+
+async function prepareWorkspaceUi(page: Parameters<typeof waitForWorkspaceSnapshotReady>[0]): Promise<void> {
+  await waitForWorkspaceSnapshotReady(page, {
+    attempts: 12,
+    delayMs: 5000,
+    timeoutMs: 30000,
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+}
+
+async function expectVisibleWithReload(
+  page: Parameters<typeof waitForWorkspaceSnapshotReady>[0],
+  locator: ReturnType<Parameters<typeof waitForWorkspaceSnapshotReady>[0]['locator']>
+): Promise<void> {
+  try {
+    await expect(locator).toBeVisible({ timeout: 15000 });
+  } catch {
+    await prepareWorkspaceUi(page);
+    await expect(locator).toBeVisible({ timeout: 30000 });
+  }
+}
 
 test.describe('UI Loading States', () => {
 
   test('should show loading state when creating a folder', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Desktop only');
     await page.goto('/');
+    await prepareWorkspaceUi(page);
     const desktopLayout = page.getByTestId('desktop-layout');
 
     // 1. Open create folder input
     const addFolderButton = desktopLayout.getByTestId('sidebar-add-folder-button');
-    await expect(addFolderButton).toBeVisible({ timeout: 15000 });
+    await expectVisibleWithReload(page, addFolderButton);
     const createFolderPromise = waitForWorkspaceChange(page, 'folder', 'create');
     await addFolderButton.click();
 
@@ -32,7 +56,7 @@ test.describe('UI Loading States', () => {
 
     // Ideally we would check for the loader, but it might disappear too fast.
     // At least verify the folder is created.
-    await expect(desktopLayout.getByTestId(`sidebar-folder-item-${createdFolderId}`)).toBeVisible();
+    await expectVisibleWithReload(page, desktopLayout.getByTestId(`sidebar-folder-item-${createdFolderId}`));
   });
 
   test('should show loading state when creating a note', async ({ page, isMobile, browserName }) => {

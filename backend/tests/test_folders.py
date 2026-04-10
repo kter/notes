@@ -17,13 +17,24 @@ class TestListFolders:
     def test_list_folders(self, client: TestClient):
         """Test listing folders after creating some."""
         # Create folders
-        client.post("/api/folders", json={"name": "Folder 1"})
-        client.post("/api/folders", json={"name": "Folder 2"})
+        first = client.post("/api/folders", json={"name": "Folder 1"})
+        assert first.status_code == 201
+        second = client.post("/api/folders", json={"name": "Folder 2"})
+        assert second.status_code == 201
+        updated_first = client.patch(
+            f"/api/folders/{first.json()['id']}",
+            json={"name": "Folder 1 Updated"},
+        )
+        assert updated_first.status_code == 200
 
         response = client.get("/api/folders")
         assert response.status_code == 200
         folders = response.json()
         assert len(folders) == 2
+        assert [folder["name"] for folder in folders] == [
+            "Folder 1 Updated",
+            "Folder 2",
+        ]
 
 
 class TestCreateFolder:

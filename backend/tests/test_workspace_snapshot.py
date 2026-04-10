@@ -8,6 +8,9 @@ class TestWorkspaceSnapshot:
         folder_response = client.post("/api/folders", json={"name": "Folder A"})
         assert folder_response.status_code == 201
         folder_id = folder_response.json()["id"]
+        folder_b_response = client.post("/api/folders", json={"name": "Folder B"})
+        assert folder_b_response.status_code == 201
+        folder_b_id = folder_b_response.json()["id"]
 
         note_response = client.post(
             "/api/notes",
@@ -15,6 +18,22 @@ class TestWorkspaceSnapshot:
         )
         assert note_response.status_code == 201
         note_id = note_response.json()["id"]
+        second_note_response = client.post(
+            "/api/notes",
+            json={"title": "Note B", "content": "Body", "folder_id": folder_b_id},
+        )
+        assert second_note_response.status_code == 201
+
+        update_folder_response = client.patch(
+            f"/api/folders/{folder_id}",
+            json={"name": "Folder A Updated"},
+        )
+        assert update_folder_response.status_code == 200
+        update_note_response = client.patch(
+            f"/api/notes/{note_id}",
+            json={"content": "Body updated"},
+        )
+        assert update_note_response.status_code == 200
 
         response = client.get("/api/workspace/snapshot")
         assert response.status_code == 200
@@ -28,10 +47,12 @@ class TestWorkspaceSnapshot:
             folder for folder in data["folders"] if folder["id"] == folder_id
         )
         snapshot_note = next(note for note in data["notes"] if note["id"] == note_id)
-        assert snapshot_folder["version"] == 1
+        assert snapshot_folder["version"] == 2
         assert snapshot_folder["deleted_at"] is None
-        assert snapshot_note["version"] == 1
+        assert snapshot_note["version"] == 2
         assert snapshot_note["deleted_at"] is None
+        assert data["folders"][0]["id"] == folder_id
+        assert data["notes"][0]["id"] == note_id
 
     def test_snapshot_only_returns_current_users_data(self, make_client):
         primary_writer = make_client("user-a")

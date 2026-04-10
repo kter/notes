@@ -17,7 +17,17 @@ class NoteUseCases:
         self.repository = NoteRepository(session, user_id)
 
     def list_notes(self, folder_id: UUID | None = None) -> list[Note]:
-        return self.repository.list(folder_id)
+        try:
+            return self.repository.list(folder_id)
+        except Exception:
+            log_event(
+                logger,
+                logging.ERROR,
+                "workspace.notes.list_failed",
+                exc_info=True,
+                folder_id=folder_id,
+            )
+            raise
 
     def create_note(self, note_in: NoteCreate) -> Note:
         note = self.repository.create(note_in)

@@ -21,9 +21,16 @@ def touch_updated_at(resource: object) -> None:
         setattr(resource, "updated_at", utc_now())
 
 
+def normalize_version(resource: object) -> None:
+    """Backfill legacy resources whose `version` is unexpectedly NULL."""
+    if hasattr(resource, "version") and getattr(resource, "version") is None:
+        setattr(resource, "version", 1)
+
+
 def bump_version(resource: object) -> None:
     """Increment `version` for resources that expose the field."""
     if hasattr(resource, "version"):
+        normalize_version(resource)
         setattr(resource, "version", getattr(resource, "version") + 1)
 
 
@@ -47,6 +54,7 @@ class UserScopedRepository[TModel: SQLModel]:
             and getattr(resource, "deleted_at") is not None
         ):
             raise NotFound(f"{self.resource_name} not found")
+        normalize_version(resource)
         return resource
 
     def save(
@@ -57,6 +65,7 @@ class UserScopedRepository[TModel: SQLModel]:
         bump: bool = False,
         resource_name: str | None = None,
     ) -> TModel:
+        normalize_version(resource)
         if touch:
             touch_updated_at(resource)
         if bump:

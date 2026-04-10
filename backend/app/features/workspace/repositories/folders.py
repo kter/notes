@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlmodel import select
 
-from app.core.persistence import UserScopedRepository
+from app.core.persistence import UserScopedRepository, normalize_version
 from app.models import Folder, FolderCreate, FolderUpdate
 
 
@@ -17,8 +17,14 @@ class FolderRepository(UserScopedRepository[Folder]):
         statement = select(Folder).where(Folder.user_id == self.user_id)
         if not include_deleted:
             statement = statement.where(Folder.deleted_at.is_(None))
-        statement = statement.order_by(Folder.updated_at.desc())
-        return self.session.exec(statement).all()
+        folders = self.session.exec(statement).all()
+        for folder in folders:
+            normalize_version(folder)
+        return sorted(
+            folders,
+            key=lambda folder: (folder.updated_at, str(folder.id)),
+            reverse=True,
+        )
 
     def create(self, folder_in: FolderCreate) -> Folder:
         folder = Folder(**folder_in.model_dump(), user_id=self.user_id)

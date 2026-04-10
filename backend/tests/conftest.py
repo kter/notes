@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from app.auth import get_current_user, get_user_id
+from app.auth import get_current_user, get_folder_note_user_id, get_user_id
 from app.database import get_session
 from app.main import app
 
@@ -51,6 +51,7 @@ def client_fixture(session: Session) -> Generator[TestClient, None, None]:
 
     app.dependency_overrides[get_session] = get_session_override
     app.dependency_overrides[get_user_id] = get_user_id_override
+    app.dependency_overrides[get_folder_note_user_id] = get_user_id_override
     app.dependency_overrides[get_current_user] = get_current_user_override
 
     with TestClient(app) as client:
@@ -84,6 +85,7 @@ def make_client_fixture(
 
         app.dependency_overrides[get_session] = get_session_override
         app.dependency_overrides[get_user_id] = get_user_id_override
+        app.dependency_overrides[get_folder_note_user_id] = get_user_id_override
         app.dependency_overrides[get_current_user] = get_current_user_override
 
         client = TestClient(app)
@@ -94,4 +96,19 @@ def make_client_fixture(
 
     for client in clients:
         client.close()
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(name="client_without_auth")
+def client_without_auth_fixture(session: Session) -> Generator[TestClient, None, None]:
+    """Create a test client with only the database dependency overridden."""
+
+    def get_session_override():
+        yield session
+
+    app.dependency_overrides[get_session] = get_session_override
+
+    with TestClient(app) as client:
+        yield client
+
     app.dependency_overrides.clear()

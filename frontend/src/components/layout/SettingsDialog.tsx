@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logger } from "@/lib/logger";
 import { CheckIcon, Loader2Icon } from "lucide-react";
@@ -23,6 +24,7 @@ import type {
   AvailableLanguage,
   AvailableModel,
   TokenUsageRead,
+  UserApiKey,
 } from "@/types";
 
 interface SettingsDialogProps {
@@ -30,6 +32,13 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   tokenUsage?: TokenUsageRead | null;
 }
+
+type SettingsErrorKey = "settings.loadError" | "settings.saveError" | "common.error";
+type ApiKeysErrorKey =
+  | "settings.apiKeysListError"
+  | "settings.apiKeysCreateError"
+  | "settings.apiKeysRevokeError"
+  | "common.error";
 
 export function SettingsDialog({
   open,
@@ -44,22 +53,61 @@ export function SettingsDialog({
   const [availableLanguages, setAvailableLanguages] = useState<AvailableLanguage[]>(
     []
   );
+  const [apiKeys, setApiKeys] = useState<UserApiKey[]>([]);
+  const [apiKeyName, setApiKeyName] = useState("");
+  const [newApiKeySecret, setNewApiKeySecret] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isApiKeysLoading, setIsApiKeysLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isCreatingApiKey, setIsCreatingApiKey] = useState(false);
+  const [revokingApiKeyId, setRevokingApiKeyId] = useState<string | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<SettingsErrorKey | null>(null);
+  const [apiKeysErrorKey, setApiKeysErrorKey] = useState<ApiKeysErrorKey | null>(
+    null
+  );
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadApiKeys(apiClient: Awaited<ReturnType<typeof getApi>>) {
+      setIsApiKeysLoading(true);
+      setApiKeysErrorKey(null);
+
+      try {
+        const userApiKeys = await apiClient.listApiKeys();
+        if (!isMounted) return;
+
+        logger.debug("Settings API keys response received", {
+          api_key_count: userApiKeys.length,
+        });
+        setApiKeys(userApiKeys);
+      } catch (err) {
+        if (!isMounted) return;
+
+        logger.error("Failed to load API keys", err);
+        setApiKeysErrorKey("settings.apiKeysListError");
+      } finally {
+        if (isMounted) {
+          setIsApiKeysLoading(false);
+        }
+      }
+    }
+
     async function loadSettings() {
       if (!open) return;
       setIsLoading(true);
-      setError(null);
+      setErrorKey(null);
+      setApiKeysErrorKey(null);
       setSaveSuccess(false);
 
       try {
         const apiClient = await getApi();
         const response = await apiClient.getSettings();
+        if (!isMounted) return;
+
         logger.debug("Settings API response received", {
           has_settings: Boolean(response?.settings),
           available_model_count: response?.available_models?.length ?? 0,
@@ -78,20 +126,42 @@ export function SettingsDialog({
         if (response?.available_languages) {
           setAvailableLanguages(response.available_languages);
         }
-      } catch (err) {
-        logger.error("Failed to load settings", err);
-        setError(t("settings.loadError"));
-      } finally {
+
         setIsLoading(false);
+        void loadApiKeys(apiClient);
+      } catch (err) {
+        if (!isMounted) return;
+
+        logger.error("Failed to load settings", err);
+        setErrorKey("settings.loadError");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     void loadSettings();
-  }, [open, getApi, t]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, getApi]);
+
+  useEffect(() => {
+    if (open) return;
+
+    setApiKeyName("");
+    setNewApiKeySecret(null);
+    setSecretCopied(false);
+    setErrorKey(null);
+    setApiKeysErrorKey(null);
+    setSaveSuccess(false);
+  }, [open]);
 
   const handleSave = async () => {
     setIsSaving(true);
-    setError(null);
+    setErrorKey(null);
     setSaveSuccess(false);
     try {
       const apiClient = await getApi();
@@ -104,7 +174,7 @@ export function SettingsDialog({
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       logger.error("Failed to save settings", err);
-      setError(t("settings.saveError"));
+      setErrorKey("settings.saveError");
     } finally {
       setIsSaving(false);
     }
@@ -112,7 +182,7 @@ export function SettingsDialog({
 
   const handleExport = async () => {
     setIsExporting(true);
-    setError(null);
+    setErrorKey(null);
     try {
       const apiClient = await getApi();
       const blob = await apiClient.exportNotes();
@@ -129,10 +199,77 @@ export function SettingsDialog({
       window.URL.revokeObjectURL(url);
     } catch (err) {
       logger.error("Failed to export notes", err);
-      setError(t("common.error"));
+      setErrorKey("common.error");
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleCreateApiKey = async () => {
+    const trimmedName = apiKeyName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    setIsCreatingApiKey(true);
+    setApiKeysErrorKey(null);
+    setSecretCopied(false);
+
+    try {
+      const apiClient = await getApi();
+      const response = await apiClient.createApiKey({ name: trimmedName });
+      setApiKeys((prev) => [response.api_key, ...prev]);
+      setApiKeyName("");
+      setNewApiKeySecret(response.token_plain);
+    } catch (err) {
+      logger.error("Failed to create API key", err);
+      setApiKeysErrorKey("settings.apiKeysCreateError");
+    } finally {
+      setIsCreatingApiKey(false);
+    }
+  };
+
+  const handleCopyApiKey = async () => {
+    if (!newApiKeySecret) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(newApiKeySecret);
+      setSecretCopied(true);
+      setTimeout(() => setSecretCopied(false), 2000);
+    } catch (err) {
+      logger.error("Failed to copy API key", err);
+      setApiKeysErrorKey("common.error");
+    }
+  };
+
+  const handleRevokeApiKey = async (keyId: string) => {
+    if (!confirm(t("settings.apiKeysRevokeConfirm"))) {
+      return;
+    }
+
+    setRevokingApiKeyId(keyId);
+    setApiKeysErrorKey(null);
+
+    try {
+      const apiClient = await getApi();
+      await apiClient.revokeApiKey(keyId);
+      setApiKeys((prev) => prev.filter((key) => key.id !== keyId));
+    } catch (err) {
+      logger.error("Failed to revoke API key", err);
+      setApiKeysErrorKey("settings.apiKeysRevokeError");
+    } finally {
+      setRevokingApiKeyId(null);
+    }
+  };
+
+  const formatLastUsed = (value: string | null) => {
+    if (!value) {
+      return t("settings.apiKeysNeverUsed");
+    }
+
+    return new Date(value).toLocaleString();
   };
 
   return (
@@ -147,8 +284,8 @@ export function SettingsDialog({
           <div className="flex items-center justify-center py-8">
             <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : error ? (
-          <div className="py-4 text-sm text-red-500">{error}</div>
+        ) : errorKey ? (
+          <div className="py-4 text-sm text-red-500">{t(errorKey)}</div>
         ) : (
           <div className="flex max-h-[80vh] flex-col overflow-hidden">
             <div className="flex-1 space-y-6 overflow-y-auto px-1 py-4 pr-6 -mr-6">
@@ -235,6 +372,101 @@ export function SettingsDialog({
                   </div>
                 </div>
               )}
+
+              <div className="space-y-4 border-t pt-6">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium leading-none">
+                    {t("settings.apiKeysTitle")}
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.apiKeysDescription")}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="api-key-name">{t("settings.apiKeysNameLabel")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="api-key-name"
+                      value={apiKeyName}
+                      onChange={(event) => setApiKeyName(event.target.value)}
+                      placeholder={t("settings.apiKeysNamePlaceholder")}
+                    />
+                    <Button
+                      onClick={handleCreateApiKey}
+                      disabled={isCreatingApiKey || apiKeyName.trim().length === 0}
+                    >
+                      {isCreatingApiKey ? (
+                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {t("settings.apiKeysCreateButton")}
+                    </Button>
+                  </div>
+                </div>
+
+                {apiKeysErrorKey ? (
+                  <p className="text-sm text-red-500">{t(apiKeysErrorKey)}</p>
+                ) : null}
+
+                {newApiKeySecret ? (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {t("settings.apiKeysCreatedTitle")}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.apiKeysCreatedDescription")}
+                      </p>
+                    </div>
+                    <code className="block overflow-x-auto rounded bg-muted px-3 py-2 text-sm">
+                      {newApiKeySecret}
+                    </code>
+                    <Button variant="outline" onClick={handleCopyApiKey}>
+                      {secretCopied ? t("common.copied") : t("common.copy")}
+                    </Button>
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  {isApiKeysLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2Icon className="h-4 w-4 animate-spin" />
+                      <span>{t("common.loading")}</span>
+                    </div>
+                  ) : apiKeys.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.apiKeysEmpty")}
+                    </p>
+                  ) : (
+                    apiKeys.map((key) => (
+                      <div
+                        key={key.id}
+                        className="flex items-center justify-between rounded-md border p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{key.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {key.token_prefix}...
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t("settings.apiKeysLastUsed")}: {formatLastUsed(key.last_used_at)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleRevokeApiKey(key.id)}
+                          disabled={revokingApiKeyId === key.id}
+                        >
+                          {revokingApiKeyId === key.id ? (
+                            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          {t("settings.apiKeysRevokeButton")}
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-4 border-t pt-6">
                 <div className="space-y-1">

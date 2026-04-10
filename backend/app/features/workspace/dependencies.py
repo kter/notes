@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlmodel import Session
 
-from app.auth import UserId
+from app.auth import FolderNoteUserId, UserId
 from app.database import get_session
 from app.features.workspace.use_cases import (
     FolderUseCases,
@@ -17,14 +17,14 @@ from app.features.workspace.use_cases import (
 
 def get_folder_use_cases(
     session: Annotated[Session, Depends(get_session)],
-    user_id: UserId,
+    user_id: FolderNoteUserId,
 ) -> FolderUseCases:
     return FolderUseCases(session, user_id)
 
 
 def get_note_use_cases(
     session: Annotated[Session, Depends(get_session)],
-    user_id: UserId,
+    user_id: FolderNoteUserId,
 ) -> NoteUseCases:
     return NoteUseCases(session, user_id)
 

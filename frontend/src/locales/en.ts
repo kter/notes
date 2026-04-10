@@ -31,6 +31,21 @@ export const en = {
     selectLanguage: "Select language",
     loadError: "Failed to load settings",
     saveError: "Failed to save settings",
+    apiKeysTitle: "API Keys",
+    apiKeysDescription: "Create API keys for external folder and note clients.",
+    apiKeysEmpty: "No API keys yet.",
+    apiKeysNameLabel: "Key name",
+    apiKeysNamePlaceholder: "External client",
+    apiKeysCreateButton: "Create API key",
+    apiKeysCreateError: "Failed to create API key",
+    apiKeysListError: "Failed to load API keys",
+    apiKeysRevokeButton: "Revoke",
+    apiKeysRevokeConfirm: "Revoke this API key?",
+    apiKeysRevokeError: "Failed to revoke API key",
+    apiKeysCreatedTitle: "New API key",
+    apiKeysCreatedDescription: "Copy this secret now. It will only be shown once.",
+    apiKeysLastUsed: "Last used",
+    apiKeysNeverUsed: "Never used",
     exportTitle: "Data Export",
     exportDescription: "Export all notes as a ZIP file.",
     exportButton: "Download ZIP",
@@ -280,6 +295,21 @@ export type TranslationKeys = {
     selectLanguage: string;
     loadError: string;
     saveError: string;
+    apiKeysTitle: string;
+    apiKeysDescription: string;
+    apiKeysEmpty: string;
+    apiKeysNameLabel: string;
+    apiKeysNamePlaceholder: string;
+    apiKeysCreateButton: string;
+    apiKeysCreateError: string;
+    apiKeysListError: string;
+    apiKeysRevokeButton: string;
+    apiKeysRevokeConfirm: string;
+    apiKeysRevokeError: string;
+    apiKeysCreatedTitle: string;
+    apiKeysCreatedDescription: string;
+    apiKeysLastUsed: string;
+    apiKeysNeverUsed: string;
     exportTitle: string;
     exportDescription: string;
     exportButton: string;

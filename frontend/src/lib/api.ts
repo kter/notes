@@ -19,6 +19,9 @@ import type {
   SummarizeRequest,
   SummarizeResponse,
   UserSettingsUpdate,
+  UserApiKey,
+  UserApiKeyCreate,
+  UserApiKeyCreateResponse,
   AppUser,
   AdminUserDetailResponse,
   AdminUsersListResponse,
@@ -201,6 +204,23 @@ class ApiClient {
     return this.request<SettingsResponse>("/api/settings", {
       method: "PUT",
       body: JSON.stringify(data),
+    });
+  }
+
+  async listApiKeys(): Promise<UserApiKey[]> {
+    return this.request<UserApiKey[]>("/api/settings/api-keys");
+  }
+
+  async createApiKey(data: UserApiKeyCreate): Promise<UserApiKeyCreateResponse> {
+    return this.request<UserApiKeyCreateResponse>("/api/settings/api-keys", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async revokeApiKey(keyId: string): Promise<void> {
+    return this.request<void>(`/api/settings/api-keys/${keyId}`, {
+      method: "DELETE",
     });
   }
 

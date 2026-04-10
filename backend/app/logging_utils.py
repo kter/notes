@@ -18,11 +18,13 @@ TIMEZONE_NAME = "UTC"
 REDACTED = "[REDACTED]"
 DEFAULT_REDACT_KEYS = {
     "authorization",
+    "api_key",
     "token",
     "token_plain",
     "password",
     "email",
     "share_token",
+    "x-api-key",
     "prompt",
     "instruction",
     "content",

@@ -69,9 +69,30 @@ function useSolarTerminator() {
   return solar;
 }
 
+function useGeolocation(): { lat: number; lon: number } | null {
+  const [position, setPosition] = useState<{ lat: number; lon: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+      },
+      () => {
+        // Geolocation denied or unavailable — no dot
+      },
+      { timeout: 10_000 }
+    );
+  }, []);
+
+  return position;
+}
+
 export const SunlightMap = memo(function SunlightMap() {
   const { t } = useTranslation();
   const { lat: sunLat, lon: sunLon } = useSolarTerminator();
+  const userPosition = useGeolocation();
 
   const nightPath = useMemo(
     () => calculateTerminatorPath(sunLat, sunLon),
@@ -121,6 +142,19 @@ export const SunlightMap = memo(function SunlightMap() {
                   <path key={i} d={d} />
                 ))}
               </g>
+              {/* Current location dot */}
+              {userPosition && (
+                <circle
+                  data-testid="sunlight-map-location"
+                  cx={userPosition.lon + 180}
+                  cy={90 - userPosition.lat}
+                  r={3}
+                  fill="red"
+                  stroke="white"
+                  strokeWidth={0.8}
+                  aria-label={t("sunlightMap.yourLocation")}
+                />
+              )}
             </svg>
           </div>
         </TooltipTrigger>

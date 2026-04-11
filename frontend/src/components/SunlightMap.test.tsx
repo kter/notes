@@ -12,6 +12,7 @@ vi.mock("@/hooks/useTranslation", () => ({
       const texts: Record<string, string> = {
         "sunlightMap.title": "Sunlight Map",
         "sunlightMap.description": "Current day and night areas on Earth",
+        "sunlightMap.yourLocation": "Your current location",
       };
       return texts[key] || key;
     },
@@ -21,6 +22,7 @@ vi.mock("@/hooks/useTranslation", () => ({
 describe("SunlightMap", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("SVG要素が描画される", () => {
@@ -37,6 +39,39 @@ describe("SunlightMap", () => {
     expect(
       (SunlightMap as unknown as { $$typeof?: symbol })?.$$typeof
     ).toBe(Symbol.for("react.memo"));
+  });
+
+  it("ジオロケーションが利用可能な場合に現在地ドットが表示される", async () => {
+    const mockGeolocation = {
+      getCurrentPosition: vi.fn((success) =>
+        success({ coords: { latitude: 35.6762, longitude: 139.6503 } })
+      ),
+    };
+    vi.stubGlobal("navigator", { geolocation: mockGeolocation });
+
+    const { findByTestId } = render(<SunlightMap />);
+    const dot = await findByTestId("sunlight-map-location");
+    expect(dot).toBeInTheDocument();
+    expect(dot.getAttribute("cx")).toBe(String(139.6503 + 180));
+    expect(dot.getAttribute("cy")).toBe(String(90 - 35.6762));
+    expect(dot.getAttribute("fill")).toBe("red");
+  });
+
+  it("ジオロケーションが拒否された場合は現在地ドットが表示されない", () => {
+    const mockGeolocation = {
+      getCurrentPosition: vi.fn((_success, error) => error(new Error("denied"))),
+    };
+    vi.stubGlobal("navigator", { geolocation: mockGeolocation });
+
+    const { queryByTestId } = render(<SunlightMap />);
+    expect(queryByTestId("sunlight-map-location")).not.toBeInTheDocument();
+  });
+
+  it("ジオロケーションが存在しない場合は現在地ドットが表示されない", () => {
+    vi.stubGlobal("navigator", {});
+
+    const { queryByTestId } = render(<SunlightMap />);
+    expect(queryByTestId("sunlight-map-location")).not.toBeInTheDocument();
   });
 });
 

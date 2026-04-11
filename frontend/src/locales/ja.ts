@@ -263,6 +263,7 @@ export const ja = {
   sunlightMap: {
     title: "日照マップ",
     description: "地球上の現在の昼夜エリア",
+    yourLocation: "現在地",
   },
 } as const;
 
@@ -499,5 +500,6 @@ export type TranslationKeys = {
   sunlightMap: {
     title: string;
     description: string;
+    yourLocation: string;
   };
 };

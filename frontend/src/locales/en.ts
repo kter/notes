@@ -263,6 +263,7 @@ export const en = {
   sunlightMap: {
     title: "Sunlight Map",
     description: "Current day and night areas on Earth",
+    yourLocation: "Your current location",
   },
 };
 
@@ -501,5 +502,6 @@ export type TranslationKeys = {
   sunlightMap: {
     title: string;
     description: string;
+    yourLocation: string;
   };
 };

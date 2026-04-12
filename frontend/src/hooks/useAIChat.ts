@@ -6,7 +6,7 @@ import { useTranslation } from "./useTranslation";
 import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/types";
 
-export type ChatScope = "note" | "folder" | "all";
+export type ChatScope = "note" | "folder" | "all" | "selection";
 const EDIT_JOB_POLL_INTERVAL_MS = 1500;
 const EDIT_JOB_TIMEOUT_MS = 120000;
 
@@ -20,12 +20,14 @@ interface UseAIChatReturn {
     message: string,
     scope: ChatScope,
     noteId?: string | null,
-    folderId?: string | null
+    folderId?: string | null,
+    selectedContent?: string
   ) => Promise<void>;
   handleSendEditRequest: (
     instruction: string,
     currentContent: string,
-    noteId?: string
+    noteId?: string,
+    selectionRange?: { start: number; end: number }
   ) => Promise<void>;
   handleAcceptEdit: (messageIndex: number) => string | null;
   handleRejectEdit: (messageIndex: number) => void;
@@ -72,7 +74,8 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     message: string,
     scope: ChatScope,
     noteId?: string | null,
-    folderId?: string | null
+    folderId?: string | null,
+    selectedContent?: string
   ) => {
     const userMessage: ChatMessage = { role: "user", content: message };
     setChatMessages((prev) => [...prev, userMessage]);
@@ -86,6 +89,7 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
         folder_id: folderId || undefined,
         question: message,
         history: chatMessages,
+        selected_content: scope === "selection" ? selectedContent : undefined,
       });
 
       if (result.tokens_used && onTokenUsage) {
@@ -110,16 +114,21 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
   const handleSendEditRequest = async (
     instruction: string,
     currentContent: string,
-    noteId?: string
+    noteId?: string,
+    selectionRange?: { start: number; end: number }
   ) => {
     const userMessage: ChatMessage = { role: "user", content: instruction };
     setChatMessages((prev) => [...prev, userMessage]);
     setIsAILoading(true);
 
+    const contentToEdit = selectionRange
+      ? currentContent.slice(selectionRange.start, selectionRange.end)
+      : currentContent;
+
     try {
       const apiClient = await getApi();
       const createResult = await apiClient.createEditJob({
-        content: currentContent,
+        content: contentToEdit,
         instruction,
         note_id: noteId,
       });
@@ -151,18 +160,21 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
 
       const assistantMessage: ChatMessage = {
         role: "assistant",
-        content: result.edited_content === currentContent
+        content: result.edited_content === contentToEdit
           ? instruction
           : "",
         editProposal: {
           originalContent: currentContent,
-          editedContent: result.edited_content,
-          status: result.edited_content === currentContent ? undefined : "pending",
+          editedContent: selectionRange
+            ? currentContent.slice(0, selectionRange.start) + result.edited_content + currentContent.slice(selectionRange.end)
+            : result.edited_content,
+          status: result.edited_content === contentToEdit ? undefined : "pending",
+          selectionRange,
         },
       };
 
       // If no changes, show a message instead of diff
-      if (result.edited_content === currentContent) {
+      if (result.edited_content === contentToEdit) {
         assistantMessage.content = "";
         assistantMessage.editProposal = undefined;
         setChatMessages((prev) => [

@@ -7,7 +7,8 @@ from app.features.assistant.usage_policy import get_usage_info, record_usage
 from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIEditJob, Note, UserSettings
-from app.shared import NotFound
+from app.models.enums import ChatScope
+from app.shared import NotFound, ValidationFailed
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID
 
 
@@ -139,3 +140,47 @@ def test_get_edit_job_enforces_user_scope(session: Session):
         use_cases.get_job(job.id)
 
     assert exc_info.value.detail == "Edit job not found"
+
+
+@pytest.mark.asyncio
+async def test_chat_with_selection_scope_uses_selected_content(session: Session):
+    session.add(UserSettings(user_id=TEST_USER_ID, llm_model_id="model", language="en"))
+    session.commit()
+
+    ai_gateway = CapturingAIGateway()
+    use_cases = AIInteractionUseCases(
+        session,
+        TEST_USER_ID,
+        ai_gateway,
+        WorkspaceQueryUseCases(session, TEST_USER_ID),
+    )
+
+    answer, _ = await use_cases.chat_with_context(
+        scope=ChatScope.SELECTION,
+        question="What does this mean?",
+        selected_content="# Hello\nThis is selected text.",
+    )
+
+    assert answer == "answer"
+    assert ai_gateway.calls[0]["content"] == "# Hello\nThis is selected text."
+    assert ai_gateway.calls[0]["operation"] == "chat"
+
+
+@pytest.mark.asyncio
+async def test_chat_with_selection_scope_raises_when_content_empty(session: Session):
+    session.add(UserSettings(user_id=TEST_USER_ID, llm_model_id="model", language="en"))
+    session.commit()
+
+    use_cases = AIInteractionUseCases(
+        session,
+        TEST_USER_ID,
+        CapturingAIGateway(),
+        WorkspaceQueryUseCases(session, TEST_USER_ID),
+    )
+
+    with pytest.raises(ValidationFailed):
+        await use_cases.chat_with_context(
+            scope=ChatScope.SELECTION,
+            question="What does this mean?",
+            selected_content="",
+        )

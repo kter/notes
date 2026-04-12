@@ -95,6 +95,7 @@ export interface EditProposal {
   originalContent: string;
   editedContent: string;
   status?: "pending" | "accepted" | "rejected";
+  selectionRange?: { start: number; end: number };
 }
 
 export interface ChatMessage {
@@ -104,11 +105,12 @@ export interface ChatMessage {
 }
 
 export interface ChatRequest {
-  scope?: "note" | "folder" | "all";
+  scope?: "note" | "folder" | "all" | "selection";
   note_id?: string;
   folder_id?: string;
   question: string;
   history?: ChatMessage[];
+  selected_content?: string;
 }
 
 export interface ChatResponse {

@@ -153,6 +153,11 @@ export const en = {
     askAboutThisFolder: "Ask about this folder...",
     askAboutAllNotes: "Ask about all your notes...",
     openAIChat: "Open AI Chat",
+    selection: "Selection",
+    selectedLines: "Selected text ({{count}} lines)",
+    askAboutSelection: "Ask about the selected text.",
+    askAboutCurrentSelection: "Ask about the selected text...",
+    noTextSelected: "No text selected",
   },
 
   // AI Edit
@@ -410,6 +415,11 @@ export type TranslationKeys = {
     askAboutThisFolder: string;
     askAboutAllNotes: string;
     openAIChat: string;
+    selection: string;
+    selectedLines: string;
+    askAboutSelection: string;
+    askAboutCurrentSelection: string;
+    noTextSelected: string;
   };
   aiEdit: {
     edit: string;

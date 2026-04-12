@@ -153,6 +153,11 @@ export const ja = {
     askAboutThisFolder: "このフォルダについて質問...",
     askAboutAllNotes: "すべてのノートについて質問...",
     openAIChat: "AIチャットを開く",
+    selection: "選択範囲",
+    selectedLines: "選択テキスト（{{count}}行）",
+    askAboutSelection: "選択テキストについて質問してください。",
+    askAboutCurrentSelection: "選択テキストについて質問...",
+    noTextSelected: "テキストが選択されていません",
   },
 
   // AI Edit
@@ -410,6 +415,11 @@ export type TranslationKeys = {
     askAboutThisFolder: string;
     askAboutAllNotes: string;
     openAIChat: string;
+    selection: string;
+    selectedLines: string;
+    askAboutSelection: string;
+    askAboutCurrentSelection: string;
+    noTextSelected: string;
   };
   aiEdit: {
     edit: string;
@@ -421,6 +431,8 @@ export type TranslationKeys = {
     noNoteForEdit: string;
     noChanges: string;
     reviewInEditor: string;
+    tokenLimitExceeded: string;
+    editFailed: string;
   };
   auth: {
     login: string;

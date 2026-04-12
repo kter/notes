@@ -73,6 +73,7 @@ async def chat_with_context(
             history=request.history,
             note_id=request.note_id,
             folder_id=request.folder_id,
+            selected_content=request.selected_content,
         )
     except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
         _raise_ai_http_error(exc)

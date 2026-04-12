@@ -27,6 +27,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   } | null>(null);
 
   const editorContentRef = useRef("");
+  const editorSelectedTextRef = useRef("");
 
   const {
     folders,
@@ -94,6 +95,10 @@ export function useWorkspaceState(isAuthenticated: boolean) {
 
   const handleEditorContentChange = useCallback((content: string) => {
     editorContentRef.current = content;
+  }, []);
+
+  const handleEditorSelectionChange = useCallback((selectedText: string) => {
+    editorSelectedTextRef.current = selectedText;
   }, []);
 
   const handleAcceptEditAndApply = useCallback(
@@ -186,6 +191,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     handleRejectEdit,
     clearChat,
     handleEditorContentChange,
+    handleEditorSelectionChange,
     getCurrentEditorContent: () => editorContentRef.current,
+    getCurrentEditorSelectedText: () => editorSelectedTextRef.current,
   };
 }

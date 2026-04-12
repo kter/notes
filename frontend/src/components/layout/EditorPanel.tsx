@@ -52,6 +52,7 @@ interface EditorPanelProps {
   savedHash?: string;
   tokenUsage?: TokenUsageRead | null;
   onContentChange?: (content: string) => void;
+  onSelectionChange?: (selectedText: string) => void;
   contentOverride?: { content: string; version: number } | null;
   pendingEditProposal?: EditProposal | null;
   onAcceptEdit?: () => void;
@@ -69,6 +70,7 @@ export function EditorPanel({
   isSummarizing = false,
   syncStatus,
   onContentChange,
+  onSelectionChange,
   contentOverride,
   triggerServerSync,
   savedHash,
@@ -778,13 +780,17 @@ export function EditorPanel({
   const handleSelect = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const { value, selectionStart } = textarea;
+    const { value, selectionStart, selectionEnd } = textarea;
     if (isCursorAtLineStart(value, selectionStart)) {
       showIndentGuidesForCurrentPosition(value, selectionStart);
     } else {
       setShowIndentGuides(false);
     }
-  }, [isCursorAtLineStart, showIndentGuidesForCurrentPosition]);
+    if (onSelectionChange) {
+      const selectedText = selectionStart !== selectionEnd ? value.slice(selectionStart, selectionEnd) : "";
+      onSelectionChange(selectedText);
+    }
+  }, [isCursorAtLineStart, showIndentGuidesForCurrentPosition, onSelectionChange]);
 
   // Fullscreen API toggle
   const toggleFullscreen = useCallback(async () => {

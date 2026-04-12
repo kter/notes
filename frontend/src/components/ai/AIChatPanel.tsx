@@ -38,7 +38,8 @@ interface AIChatPanelProps {
     message: string,
     scope: ChatScope,
     noteId?: string | null,
-    folderId?: string | null
+    folderId?: string | null,
+    selectedContent?: string
   ) => void;
   onClearChat: () => void;
   isLoading: boolean;
@@ -50,10 +51,11 @@ interface AIChatPanelProps {
   // Edit mode props
   isEditMode?: boolean;
   onToggleEditMode?: (editMode: boolean) => void;
-  onSendEditRequest?: (instruction: string, currentContent: string, noteId?: string) => void;
+  onSendEditRequest?: (instruction: string, currentContent: string, noteId?: string, selectionRange?: { start: number; end: number }) => void;
   onAcceptEdit?: (messageIndex: number) => void;
   onRejectEdit?: (messageIndex: number) => void;
   currentEditorContent?: string;
+  selectedText?: string;
 }
 
 export function AIChatPanel({
@@ -74,6 +76,7 @@ export function AIChatPanel({
   onAcceptEdit,
   onRejectEdit,
   currentEditorContent = "",
+  selectedText = "",
 }: AIChatPanelProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
@@ -106,20 +109,29 @@ export function AIChatPanel({
     }
   }, [messages]);
 
+  const selectionRange = selectedText && currentEditorContent
+    ? (() => {
+        const start = currentEditorContent.indexOf(selectedText);
+        return start !== -1 ? { start, end: start + selectedText.length } : undefined;
+      })()
+    : undefined;
+
   const handleSend = () => {
     if (input.trim() && !isLoading) {
       if (isEditMode && onSendEditRequest) {
         onSendEditRequest(
           input.trim(),
           currentEditorContent,
-          selectedNote?.id
+          selectedNote?.id,
+          selectionRange
         );
       } else {
         onSendMessage(
           input.trim(),
           scope,
           scope === "note" ? selectedNote?.id : null,
-          scope === "folder" ? (selectedFolder?.id || selectedNote?.folder_id) : null
+          scope === "folder" ? (selectedFolder?.id || selectedNote?.folder_id) : null,
+          scope === "selection" ? selectedText : undefined
         );
       }
       setInput("");
@@ -254,6 +266,14 @@ export function AIChatPanel({
                     <span>{t("ai.allNotes")}</span>
                   </div>
                 </SelectItem>
+                {selectedText && (
+                  <SelectItem value="selection">
+                    <div className="flex items-center gap-2">
+                      <SparklesIcon className="h-3 w-3" />
+                      <span>{t("ai.selection")}</span>
+                    </div>
+                  </SelectItem>
+                )}
               </SelectContent>
             </Select>
 
@@ -262,6 +282,9 @@ export function AIChatPanel({
               {scope === "note" && (selectedNote ? (selectedNote.title || t("ai.untitled")) : t("ai.noNoteSelected"))}
               {scope === "folder" && (selectedFolder?.name || t("ai.noFolderSelected"))}
               {scope === "all" && t("ai.allNotesAndFolders")}
+              {scope === "selection" && (selectedText
+                ? t("ai.selectedLines").replace("{{count}}", String(selectedText.split("\n").length))
+                : t("ai.noTextSelected"))}
             </div>
           </div>
         )}
@@ -270,7 +293,9 @@ export function AIChatPanel({
         {isEditMode && (
           <div className="text-[11px] text-muted-foreground truncate px-1">
             {selectedNote
-              ? (selectedNote.title || t("ai.untitled"))
+              ? (selectedText
+                  ? t("ai.selectedLines").replace("{{count}}", String(selectedText.split("\n").length))
+                  : (selectedNote.title || t("ai.untitled")))
               : t("aiEdit.noNoteForEdit")}
           </div>
         )}
@@ -303,7 +328,7 @@ export function AIChatPanel({
               <p className="text-xs text-muted-foreground">
                 {isEditMode
                   ? t("aiEdit.editPlaceholder")
-                  : scope === "all" ? t("ai.askAboutNotes") : scope === "folder" ? t("ai.askAboutFolder") : t("ai.askAboutNote")}
+                  : scope === "all" ? t("ai.askAboutNotes") : scope === "folder" ? t("ai.askAboutFolder") : scope === "selection" ? t("ai.askAboutSelection") : t("ai.askAboutNote")}
               </p>
             </div>
           ) : (
@@ -433,6 +458,7 @@ export function AIChatPanel({
                 ? t("aiEdit.editPlaceholder")
                 : scope === "note" ? t("ai.askAboutCurrentNote") :
                   scope === "folder" ? t("ai.askAboutThisFolder") :
+                  scope === "selection" ? t("ai.askAboutCurrentSelection") :
                   t("ai.askAboutAllNotes")
             }
             onKeyDown={(e) => {

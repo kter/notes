@@ -51,10 +51,15 @@ class AIInteractionUseCases:
         history: list[dict] | None = None,
         note_id: UUID | None = None,
         folder_id: UUID | None = None,
+        selected_content: str | None = None,
     ) -> tuple[str, int]:
-        content = self.context_builder.build(
-            scope=scope, note_id=note_id, folder_id=folder_id
-        )
+        if scope == ChatScope.SELECTION:
+            require_non_empty(selected_content or "", "Selected content is empty")
+            content = selected_content or ""
+        else:
+            content = self.context_builder.build(
+                scope=scope, note_id=note_id, folder_id=folder_id
+            )
         return await self._run_ai_call(
             lambda model_id, language: self.ai_gateway.chat(
                 content=content,

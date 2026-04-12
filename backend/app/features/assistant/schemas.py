@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     folder_id: UUID | None = None
     question: str
     history: list[dict] | None = None
+    selected_content: str | None = None
 
 
 class ChatResponse(BaseModel):

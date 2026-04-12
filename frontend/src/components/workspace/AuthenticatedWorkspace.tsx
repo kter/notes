@@ -112,6 +112,7 @@ export function AuthenticatedWorkspace({
               }
               tokenUsage={workspace.tokenUsage}
               onContentChange={workspace.handleEditorContentChange}
+              onSelectionChange={workspace.handleEditorSelectionChange}
               contentOverride={workspace.contentOverride}
               pendingEditProposal={pendingEditEntry?.message.editProposal ?? null}
               onAcceptEdit={
@@ -139,16 +140,18 @@ export function AuthenticatedWorkspace({
               onResizeStart={workspace.chatPanelResize.handleMouseDown}
               isEditMode={workspace.isEditMode}
               onToggleEditMode={workspace.setIsEditMode}
-              onSendEditRequest={(instruction, _content, noteId) =>
+              onSendEditRequest={(instruction, _content, noteId, selectionRange) =>
                 workspace.handleSendEditRequest(
                   instruction,
                   workspace.getCurrentEditorContent(),
-                  noteId
+                  noteId,
+                  selectionRange
                 )
               }
               onAcceptEdit={workspace.handleAcceptEditAndApply}
               onRejectEdit={workspace.handleRejectEdit}
-              currentEditorContent=""
+              currentEditorContent={workspace.getCurrentEditorContent()}
+              selectedText={workspace.getCurrentEditorSelectedText()}
             />
           </div>
         }

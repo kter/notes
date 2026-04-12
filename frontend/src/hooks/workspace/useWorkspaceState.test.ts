@@ -175,4 +175,22 @@ describe("useWorkspaceState", () => {
       version: 1,
     });
   });
+
+  it("tracks editor selected text via handleEditorSelectionChange", () => {
+    const { result } = renderHook(() => useWorkspaceState(true));
+
+    expect(result.current.getCurrentEditorSelectedText()).toBe("");
+
+    act(() => {
+      result.current.handleEditorSelectionChange("selected text");
+    });
+
+    expect(result.current.getCurrentEditorSelectedText()).toBe("selected text");
+
+    act(() => {
+      result.current.handleEditorSelectionChange("");
+    });
+
+    expect(result.current.getCurrentEditorSelectedText()).toBe("");
+  });
 });

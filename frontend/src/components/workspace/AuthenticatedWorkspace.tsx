@@ -38,11 +38,9 @@ export function AuthenticatedWorkspace({
     <>
       <ThreeColumnLayout
         isSidebarOpen={workspace.isSidebarOpen}
-        onToggleSidebar={() => workspace.setIsSidebarOpen(!workspace.isSidebarOpen)}
+        onToggleSidebar={workspace.handleToggleSidebar}
         isNoteListOpen={workspace.isNoteListOpen}
-        onToggleNoteList={() =>
-          workspace.setIsNoteListOpen(!workspace.isNoteListOpen)
-        }
+        onToggleNoteList={workspace.handleToggleNoteList}
         sidebar={
           <div className="flex flex-col h-full">
             <Sidebar
@@ -52,9 +50,7 @@ export function AuthenticatedWorkspace({
               onCreateFolder={workspace.handleCreateFolder}
               onRenameFolder={workspace.handleRenameFolder}
               onDeleteFolder={workspace.handleDeleteFolder}
-              onToggleCollapse={() =>
-                workspace.setIsSidebarOpen(!workspace.isSidebarOpen)
-              }
+              onToggleCollapse={workspace.handleToggleSidebar}
             />
             <WorkspaceSidebarFooter
               isSidebarOpen={workspace.isSidebarOpen}
@@ -65,10 +61,7 @@ export function AuthenticatedWorkspace({
           </div>
         }
         mobileView={workspace.mobileView}
-        onMobileViewChange={(view) => {
-          workspace.setMobileView(view);
-          workspace.setIsChatOpen(view === "chat");
-        }}
+        onMobileViewChange={workspace.handleMobileViewChange}
         noteList={
           <NoteList
             notes={workspace.filteredNotes}
@@ -81,9 +74,7 @@ export function AuthenticatedWorkspace({
             onDeleteFolder={workspace.handleDeleteFolder}
             searchQuery={workspace.searchQuery}
             onSearchChange={workspace.setSearchQuery}
-            onToggleCollapse={() =>
-              workspace.setIsNoteListOpen(!workspace.isNoteListOpen)
-            }
+            onToggleCollapse={workspace.handleToggleNoteList}
           />
         }
         editor={
@@ -94,13 +85,8 @@ export function AuthenticatedWorkspace({
               folders={workspace.folders}
               onUpdateNote={workspace.handleUpdateNote}
               onDeleteNote={workspace.handleDeleteNote}
-              onSummarize={async (id) => {
-                await workspace.triggerServerSync(id);
-                await workspace.handleSummarize(id);
-                workspace.setIsChatOpen(true);
-                workspace.setMobileView("chat");
-              }}
-              onOpenChat={() => workspace.setIsChatOpen(!workspace.isChatOpen)}
+              onSummarize={workspace.handleSummarizeNote}
+              onOpenChat={workspace.handleToggleChat}
               isChatOpen={workspace.isChatOpen}
               isSummarizing={workspace.isAILoading}
               syncStatus={workspace.syncStatus}
@@ -115,20 +101,12 @@ export function AuthenticatedWorkspace({
               onSelectionChange={workspace.handleEditorSelectionChange}
               contentOverride={workspace.contentOverride}
               pendingEditProposal={pendingEditEntry?.message.editProposal ?? null}
-              onAcceptEdit={
-                pendingEditEntry
-                  ? () => workspace.handleAcceptEditAndApply(pendingEditEntry.index)
-                  : undefined
-              }
-              onRejectEdit={
-                pendingEditEntry
-                  ? () => workspace.handleRejectEdit(pendingEditEntry.index)
-                  : undefined
-              }
+              onAcceptEdit={workspace.handlePendingAcceptEdit}
+              onRejectEdit={workspace.handlePendingRejectEdit}
             />
             <AIChatPanel
               isOpen={workspace.isChatOpen}
-              onClose={() => workspace.setIsChatOpen(!workspace.isChatOpen)}
+              onClose={workspace.handleToggleChat}
               messages={workspace.chatMessages}
               onSendMessage={workspace.handleSendMessage}
               onClearChat={workspace.clearChat}
@@ -140,14 +118,7 @@ export function AuthenticatedWorkspace({
               onResizeStart={workspace.chatPanelResize.handleMouseDown}
               isEditMode={workspace.isEditMode}
               onToggleEditMode={workspace.setIsEditMode}
-              onSendEditRequest={(instruction, _content, noteId, selectionRange) =>
-                workspace.handleSendEditRequest(
-                  instruction,
-                  workspace.getCurrentEditorContent(),
-                  noteId,
-                  selectionRange
-                )
-              }
+              onSendEditRequest={workspace.handleSendEditRequestFromPanel}
               onAcceptEdit={workspace.handleAcceptEditAndApply}
               onRejectEdit={workspace.handleRejectEdit}
               currentEditorContent={workspace.getCurrentEditorContent()}

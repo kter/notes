@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { MobileView } from "@/components/layout";
 import { useAIChat } from "@/hooks/useAIChat";
@@ -115,15 +115,17 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     [handleAcceptEdit, handleUpdateNote, selectedNoteId]
   );
 
-  const pendingEditEntry = chatMessages.reduce<{
-    message: (typeof chatMessages)[0];
-    index: number;
-  } | null>(
-    (found, message, index) =>
-      message.editProposal?.status === "pending"
-        ? { message, index }
-        : found,
-    null
+  const pendingEditEntry = useMemo(
+    () =>
+      chatMessages.reduce<{
+        message: (typeof chatMessages)[0];
+        index: number;
+      } | null>(
+        (found, message, index) =>
+          message.editProposal?.status === "pending" ? { message, index } : found,
+        null
+      ),
+    [chatMessages]
   );
 
   const chatPanelResize = useResizable({
@@ -134,10 +136,61 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     direction: "right",
   });
 
-  const selectedNote = notes.find((note) => note.id === selectedNoteId) || null;
-  const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) || null;
+  const handleToggleSidebar = useCallback(() => setIsSidebarOpen((v) => !v), []);
+  const handleToggleNoteList = useCallback(() => setIsNoteListOpen((v) => !v), []);
+  const handleToggleChat = useCallback(() => setIsChatOpen((v) => !v), []);
+
+  const handleMobileViewChange = useCallback((view: MobileView) => {
+    setMobileView(view);
+    setIsChatOpen(view === "chat");
+  }, []);
+
+  const selectedNote = useMemo(
+    () => notes.find((note) => note.id === selectedNoteId) ?? null,
+    [notes, selectedNoteId]
+  );
+  const selectedFolder = useMemo(
+    () => folders.find((folder) => folder.id === selectedFolderId) ?? null,
+    [folders, selectedFolderId]
+  );
   const selectedFolderName = selectedFolder?.name;
   const filteredNotes = useNoteFilter(notes, selectedFolderId, searchQuery);
+
+  const handleSummarizeNote = useCallback(
+    async (id: string) => {
+      await triggerServerSync(id);
+      await handleSummarize(id);
+      setIsChatOpen(true);
+      setMobileView("chat");
+    },
+    [triggerServerSync, handleSummarize]
+  );
+
+  const handleSendEditRequestFromPanel = useCallback(
+    (
+      instruction: string,
+      _content: string,
+      noteId?: string,
+      selectionRange?: { start: number; end: number }
+    ) => handleSendEditRequest(instruction, editorContentRef.current, noteId, selectionRange),
+    [handleSendEditRequest]
+  );
+
+  const handlePendingAcceptEdit = useMemo(
+    () =>
+      pendingEditEntry
+        ? () => handleAcceptEditAndApply(pendingEditEntry.index)
+        : undefined,
+    [pendingEditEntry, handleAcceptEditAndApply]
+  );
+
+  const handlePendingRejectEdit = useMemo(
+    () =>
+      pendingEditEntry
+        ? () => handleRejectEdit(pendingEditEntry.index)
+        : undefined,
+    [pendingEditEntry, handleRejectEdit]
+  );
 
   return {
     selectedFolderId,
@@ -192,6 +245,14 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     clearChat,
     handleEditorContentChange,
     handleEditorSelectionChange,
+    handleToggleSidebar,
+    handleToggleNoteList,
+    handleToggleChat,
+    handleMobileViewChange,
+    handleSummarizeNote,
+    handleSendEditRequestFromPanel,
+    handlePendingAcceptEdit,
+    handlePendingRejectEdit,
     getCurrentEditorContent: () => editorContentRef.current,
     getCurrentEditorSelectedText: () => editorSelectedTextRef.current,
   };

@@ -599,12 +599,12 @@ describe('EditorPanel', () => {
       mockCalculateHash.mockClear()
     })
 
-    describe('Hash calculation debounce (500ms)', () => {
+    describe('Hash calculation debounce (idle/2000ms)', () => {
       afterEach(() => {
         vi.useRealTimers()
       })
 
-      it('does not calculate hash before 500ms have elapsed', () => {
+      it('does not calculate hash before 2000ms have elapsed', () => {
         vi.useFakeTimers()
         render(<EditorPanel {...defaultProps} />)
         mockCalculateHash.mockClear() // clear the initial mount call
@@ -612,11 +612,11 @@ describe('EditorPanel', () => {
         const textarea = screen.getByRole('textbox', { name: /content/i })
         fireEvent.change(textarea, { target: { value: 'New content' } })
 
-        vi.advanceTimersByTime(499)
+        vi.advanceTimersByTime(1999)
         expect(mockCalculateHash).not.toHaveBeenCalled()
       })
 
-      it('calculates hash after 500ms have elapsed', () => {
+      it('calculates hash after 2000ms have elapsed', () => {
         vi.useFakeTimers()
         render(<EditorPanel {...defaultProps} />)
         mockCalculateHash.mockClear()
@@ -624,7 +624,7 @@ describe('EditorPanel', () => {
         const textarea = screen.getByRole('textbox', { name: /content/i })
         fireEvent.change(textarea, { target: { value: 'New content' } })
 
-        vi.advanceTimersByTime(500)
+        vi.advanceTimersByTime(2000)
         expect(mockCalculateHash).toHaveBeenCalledWith('New content')
       })
 
@@ -642,11 +642,11 @@ describe('EditorPanel', () => {
         vi.advanceTimersByTime(200)
         fireEvent.change(textarea, { target: { value: 'abc' } })
 
-        // 400ms elapsed since last change — not yet triggered
-        vi.advanceTimersByTime(499)
+        // 1999ms elapsed since last change — not yet triggered
+        vi.advanceTimersByTime(1999)
         expect(mockCalculateHash).not.toHaveBeenCalled()
 
-        // 500ms after last change — triggered once with final value
+        // 2000ms after last change — triggered once with final value
         vi.advanceTimersByTime(1)
         expect(mockCalculateHash).toHaveBeenCalledTimes(1)
         expect(mockCalculateHash).toHaveBeenCalledWith('abc')

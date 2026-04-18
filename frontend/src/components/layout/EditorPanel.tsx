@@ -30,6 +30,8 @@ import { ShareDialog } from "@/components/ui/ShareDialog";
 import type { NoteShare } from "@/types";
 import { createPortal, flushSync } from "react-dom";
 
+const REMARK_PLUGINS = [remarkGfm, remarkSourceLine];
+
 const DESKTOP_BREAKPOINT = 768;
 const DEFAULT_EDITOR_PREVIEW_WIDTH = 50;
 const MIN_PREVIEW_WIDTH_PX = 280;
@@ -111,7 +113,6 @@ export function EditorPanel({
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const editorPreviewLayoutRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
-  const contentLinesRef = useRef(1);
   const scrollRafRef = useRef<number | null>(null);
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
   const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
@@ -119,15 +120,6 @@ export function EditorPanel({
   const [showIndentGuides, setShowIndentGuides] = useState(false);
   const [indentGuideCount, setIndentGuideCount] = useState(0);
   const charMeasureRef = useRef<HTMLSpanElement>(null);
-
-  // Cache line count whenever content changes (cheap ref update, avoids O(n) split in scroll handlers)
-  useEffect(() => {
-    let count = 1;
-    for (let i = 0; i < content.length; i++) {
-      if (content.charCodeAt(i) === 10) count++;
-    }
-    contentLinesRef.current = count;
-  }, [content]);
 
   useEffect(() => {
     editorPreviewWidthRef.current = editorPreviewWidth;
@@ -150,14 +142,22 @@ export function EditorPanel({
   // Hash-based Verification Logic
   const [currentHash, setCurrentHash] = useState("");
 
-  // Calculate hash of current content whenever it changes (debounced to avoid blocking typing)
+  // Calculate hash only when the browser is idle to avoid competing with typing
   useEffect(() => {
+    let cancelled = false;
     const calculate = async () => {
+      if (cancelled) return;
       const hash = await calculateHash(content);
-      setCurrentHash(hash);
+      if (!cancelled) setCurrentHash(hash);
     };
-    const timer = setTimeout(calculate, 500);
-    return () => clearTimeout(timer);
+    const scheduleId = typeof requestIdleCallback !== "undefined"
+      ? requestIdleCallback(calculate, { timeout: 2000 })
+      : setTimeout(calculate, 2000) as unknown as number;
+    return () => {
+      cancelled = true;
+      if (typeof requestIdleCallback !== "undefined") cancelIdleCallback(scheduleId);
+      else clearTimeout(scheduleId as unknown as ReturnType<typeof setTimeout>);
+    };
   }, [content]);
 
   // Refs to track the last saved state to avoid loops with optimistic updates
@@ -840,7 +840,11 @@ export function EditorPanel({
       const editor = textareaRef.current;
       const preview = previewContainerRef.current;
 
-      const contentLines = contentLinesRef.current;
+      const val = editor.value;
+      let contentLines = 1;
+      for (let i = 0; i < val.length; i++) {
+        if (val.charCodeAt(i) === 10) contentLines++;
+      }
       const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
       const targetLine = Math.floor(contentLines * scrollPercentage);
 
@@ -879,7 +883,12 @@ export function EditorPanel({
 
       const editor = textareaRef.current;
       const preview = previewContainerRef.current;
-      const contentLines = contentLinesRef.current;
+
+      const val = editor.value;
+      let contentLines = 1;
+      for (let i = 0; i < val.length; i++) {
+        if (val.charCodeAt(i) === 10) contentLines++;
+      }
 
       const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
       let visibleElement: HTMLElement | null = null;
@@ -1417,7 +1426,7 @@ export function EditorPanel({
                   >
                     <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkSourceLine]}
+                        remarkPlugins={REMARK_PLUGINS}
                         components={markdownComponents}
                       >
                         {deferredContent || `*${t("editor.previewPlaceholder")}*`}

@@ -6,20 +6,22 @@ export function useNoteFilter(
   selectedFolderId: string | null,
   searchQuery: string
 ) {
+  // Stage 1: folder filter — never touches content
+  const folderFiltered = useMemo(
+    () => (selectedFolderId ? notes.filter((n) => n.folder_id === selectedFolderId) : notes),
+    [notes, selectedFolderId]
+  );
+
+  // Stage 2: search filter — skipped entirely when query is empty
   const filteredNotes = useMemo(() => {
-    return notes.filter((n) => {
-      // Folder filter
-      const matchesFolder = selectedFolderId ? n.folder_id === selectedFolderId : true;
-      
-      // Search filter
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery || 
-        (n.title?.toLowerCase().includes(query) ?? false) || 
-        (n.content?.toLowerCase().includes(query) ?? false);
-        
-      return matchesFolder && matchesSearch;
-    });
-  }, [notes, selectedFolderId, searchQuery]);
+    if (!searchQuery) return folderFiltered;
+    const query = searchQuery.toLowerCase();
+    return folderFiltered.filter(
+      (n) =>
+        (n.title?.toLowerCase().includes(query) ?? false) ||
+        (n.content?.toLowerCase().includes(query) ?? false)
+    );
+  }, [folderFiltered, searchQuery]);
 
   return filteredNotes;
 }

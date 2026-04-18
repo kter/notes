@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChevronRightIcon, FolderIcon, FileTextIcon, PenSquareIcon, MessageSquareIcon } from "lucide-react";
@@ -20,7 +20,7 @@ interface ThreeColumnLayoutProps {
   onMobileViewChange: (view: MobileView) => void;
 }
 
-export function ThreeColumnLayout({
+export const ThreeColumnLayout = memo(function ThreeColumnLayout({
   sidebar,
   noteList,
   editor,
@@ -227,4 +227,4 @@ export function ThreeColumnLayout({
       `}</style>
     </div>
   );
-}
+});

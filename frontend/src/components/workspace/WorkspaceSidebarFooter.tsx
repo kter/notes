@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { LogOutIcon, SettingsIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ interface WorkspaceSidebarFooterProps {
   onSignOut: () => void | Promise<void>;
 }
 
-export function WorkspaceSidebarFooter({
+export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooter({
   isSidebarOpen,
   userEmail,
   onOpenSettings,
@@ -56,4 +57,4 @@ export function WorkspaceSidebarFooter({
       </div>
     </div>
   );
-}
+});

@@ -7,7 +7,7 @@ import type { Folder } from "@/types";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon, CheckIcon, XIcon, Loader2Icon } from "lucide-react";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useTranslation } from "@/hooks";
 
 interface SidebarProps {
@@ -20,7 +20,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   folders,
   selectedFolderId,
   onSelectFolder,
@@ -235,4 +235,4 @@ export function Sidebar({
       </ScrollArea>
     </div>
   );
-}
+});

@@ -24,7 +24,7 @@ import {
   MessageSquareIcon,
   PencilIcon,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks";
 import ReactMarkdown from "react-markdown";
@@ -58,7 +58,7 @@ interface AIChatPanelProps {
   selectedText?: string;
 }
 
-export function AIChatPanel({
+export const AIChatPanel = memo(function AIChatPanel({
   isOpen,
   onClose,
   messages,
@@ -490,4 +490,4 @@ export function AIChatPanel({
       </div>
     </div>
   );
-}
+});

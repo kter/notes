@@ -18,7 +18,7 @@ import {
   Loader2Icon
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useTranslation } from "@/hooks";
 
 interface NoteListProps {
@@ -35,7 +35,7 @@ interface NoteListProps {
   onToggleCollapse?: () => void;
 }
 
-export function NoteList({
+export const NoteList = memo(function NoteList({
   notes,
   selectedNoteId,
   onSelectNote,
@@ -305,4 +305,4 @@ export function NoteList({
       </ScrollArea>
     </div>
   );
-}
+});

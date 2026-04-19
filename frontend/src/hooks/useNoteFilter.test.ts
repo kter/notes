@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { useNoteFilter } from "./useNoteFilter";
+import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 import type { Note } from "@/types";
 
 const makeNote = (overrides: Partial<Note>): Note => ({
@@ -24,6 +25,10 @@ const notes: Note[] = [
 ];
 
 describe("useNoteFilter", () => {
+  afterEach(() => {
+    notes.forEach((n) => noteBodyStore.delete(n.id));
+  });
+
   it("returns all notes when no folder and no query", () => {
     const { result } = renderHook(() => useNoteFilter(notes, null, ""));
     expect(result.current).toHaveLength(4);
@@ -71,5 +76,25 @@ describe("useNoteFilter", () => {
   it("returns empty array when nothing matches", () => {
     const { result } = renderHook(() => useNoteFilter(notes, null, "zzznomatch"));
     expect(result.current).toHaveLength(0);
+  });
+
+  it("uses noteBodyStore content for search when available", () => {
+    // Note 2 has n.content="foo bar", but noteBodyStore has updated body with "hello store"
+    noteBodyStore.set("2", "hello store updated content");
+    const { result } = renderHook(() => useNoteFilter(notes, null, "store updated"));
+    expect(result.current.map((n) => n.id)).toEqual(["2"]);
+  });
+
+  it("falls back to n.content when note not in noteBodyStore", () => {
+    // Note 3 is not in noteBodyStore, so n.content="baz qux" is used
+    const { result } = renderHook(() => useNoteFilter(notes, null, "baz"));
+    expect(result.current.map((n) => n.id)).toEqual(["3"]);
+  });
+
+  it("noteBodyStore content takes precedence over stale n.content", () => {
+    // Simulate content-only edit: n.content is stale, noteBodyStore has latest
+    noteBodyStore.set("1", "completely different text");
+    const { result } = renderHook(() => useNoteFilter(notes, null, "completely different"));
+    expect(result.current.map((n) => n.id)).toEqual(["1"]);
   });
 });

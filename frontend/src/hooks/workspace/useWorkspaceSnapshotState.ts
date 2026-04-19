@@ -10,6 +10,7 @@ import {
   getActiveFolders,
   getActiveNotes,
   persistWorkspaceSnapshot,
+  withSnippet,
 } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
 import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
@@ -45,10 +46,11 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
       hasFetchedRef.current = true;
 
       try {
-        const [localFolders, localNotes] = await Promise.all([
+        const [localFolders, localNotesRaw] = await Promise.all([
           notesDB.getAllFolders(),
           notesDB.getAllNotes(),
         ]);
+        const localNotes = localNotesRaw.map(withSnippet);
 
         if (localFolders.length > 0 || localNotes.length > 0) {
           if (!isActive) {

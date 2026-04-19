@@ -63,6 +63,7 @@ vi.mock("@/lib/workspaceSync", () => ({
   isConflictApiError: (error: unknown) =>
     error instanceof ApiError && error.status === 409,
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
+  withSnippet: (note: Note) => ({ ...note, snippet: (note.content ?? "").slice(0, 80) }),
 }));
 
 import { useNoteSyncEngine } from "./useNoteSyncEngine";
@@ -158,7 +159,7 @@ describe("useNoteSyncEngine", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.notes).toEqual([serverNote]);
+      expect(result.current.notes).toEqual([{ ...serverNote, snippet: "" }]);
       expect(result.current.selectedNoteId).toBe("server-note-1");
     });
 

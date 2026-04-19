@@ -22,6 +22,7 @@ export interface Note {
   id: string;
   title: string;
   content: string;
+  snippet?: string;
   user_id: string;
   folder_id: string | null;
   version: number;

@@ -23,12 +23,16 @@ export function isDeletedEntity<T extends { deleted_at: string | null }>(
   return entity.deleted_at !== null;
 }
 
+export function withSnippet(note: Note): Note {
+  return { ...note, snippet: note.content.slice(0, 80) };
+}
+
 export function getActiveFolders(snapshot: WorkspaceSnapshotResponse): Folder[] {
   return snapshot.folders.filter((folder) => !isDeletedEntity(folder));
 }
 
 export function getActiveNotes(snapshot: WorkspaceSnapshotResponse): Note[] {
-  return snapshot.notes.filter((note) => !isDeletedEntity(note));
+  return snapshot.notes.filter((note) => !isDeletedEntity(note)).map(withSnippet);
 }
 
 export async function persistWorkspaceSnapshot(

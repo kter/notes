@@ -12,6 +12,7 @@ import {
   isConflictApiError,
   persistWorkspaceSnapshot,
   refreshWorkspaceSnapshot,
+  withSnippet,
 } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
 import type { Note, WorkspaceSnapshotResponse } from "@/types";
@@ -134,7 +135,7 @@ export function useNoteSyncEngine({
 
             setNotes((prev) =>
               prev.map((note) =>
-                note.id === id ? serverNote : note
+                note.id === id ? withSnippet(serverNote) : note
               )
             );
 
@@ -252,6 +253,7 @@ export function useNoteSyncEngine({
       id: tempId,
       title: "",
       content: "",
+      snippet: "",
       folder_id: selectedFolderId,
       user_id: "",
       version: 1,
@@ -297,7 +299,7 @@ export function useNoteSyncEngine({
         setSavedHashes((prev) => ({ ...prev, [serverNote.id]: hash }));
 
         setNotes((prev) =>
-          prev.map((note) => (note.id === tempId ? serverNote : note))
+          prev.map((note) => (note.id === tempId ? withSnippet(serverNote) : note))
         );
         setSelectedNoteId(serverNote.id);
         setServerVersion(serverNote.id, serverNote.version);
@@ -365,6 +367,9 @@ export function useNoteSyncEngine({
             ? {
                 ...note,
                 ...updates,
+                ...(updates.content !== undefined
+                  ? { snippet: updates.content.slice(0, 80) }
+                  : {}),
                 version: note.version + 1,
                 updated_at: new Date().toISOString(),
                 deleted_at: null,
@@ -378,6 +383,9 @@ export function useNoteSyncEngine({
           const updatedNote = {
             ...noteForLocalSave,
             ...updates,
+            ...(updates.content !== undefined
+              ? { snippet: updates.content.slice(0, 80) }
+              : {}),
             version: noteForLocalSave.version + 1,
             updated_at: new Date().toISOString(),
             deleted_at: null,

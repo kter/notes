@@ -95,17 +95,22 @@ describe("useHomeData", () => {
       { initialProps: { isAuthenticated: true } }
     );
 
+    const serverNotesWithSnippet = serverNotes.map((n) => ({
+      ...n,
+      snippet: (n.content ?? "").slice(0, 80),
+    }));
+
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
       expect(result.current.folders).toEqual(serverFolders);
-      expect(result.current.notes).toEqual(serverNotes);
+      expect(result.current.notes).toEqual(serverNotesWithSnippet);
     });
 
     rerender({ isAuthenticated: true });
 
     expect(getApiMock).toHaveBeenCalledTimes(1);
     expect(notesDB.saveFolders).toHaveBeenCalledWith(serverFolders);
-    expect(notesDB.saveNotes).toHaveBeenCalledWith(serverNotes);
+    expect(notesDB.saveNotes).toHaveBeenCalledWith(serverNotesWithSnippet);
   });
 
   it("stops loading immediately when the user is unauthenticated", async () => {

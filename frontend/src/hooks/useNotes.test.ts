@@ -53,6 +53,9 @@ vi.mock("@/lib/utils", () => ({
 vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshot: (...args: unknown[]) => persistWorkspaceSnapshotMock(...args),
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
+  withSnippet: (note: Note) => ({ ...note, snippet: (note.content ?? "").slice(0, 80) }),
+  isConflictApiError: () => false,
+  refreshWorkspaceSnapshot: vi.fn(),
 }));
 
 import { useNotes } from "./useNotes";
@@ -137,7 +140,7 @@ describe("useNotes", () => {
     });
 
     await waitFor(() => {
-    expect(result.current.notes).toEqual([serverNote]);
+      expect(result.current.notes).toEqual([{ ...serverNote, snippet: "" }]);
       expect(result.current.selectedNoteId).toBe("server-note-1");
     });
 

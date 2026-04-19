@@ -287,7 +287,7 @@ export const NoteList = memo(function NoteList({
                     </h3>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                       <HighlightedText 
-                        text={note.content.slice(0, 50) || t("noteList.noContent")} 
+                        text={(note.snippet ?? note.content.slice(0, 50)) || t("noteList.noContent")} 
                         highlight={searchQuery} 
                       />
                     </p>

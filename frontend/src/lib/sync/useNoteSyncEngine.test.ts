@@ -330,6 +330,41 @@ describe("useNoteSyncEngine", () => {
     vi.useRealTimers();
   });
 
+  it("metadata-only update calls saveNote, not saveNoteBody", async () => {
+    const initialNote = buildNote();
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, { title: "New Title" });
+    });
+
+    expect(notesDB.saveNote).toHaveBeenCalledWith(
+      expect.objectContaining({ id: initialNote.id, title: "New Title" })
+    );
+    expect(notesDB.saveNoteBody).not.toHaveBeenCalled();
+  });
+
+  it("update with both content and title calls saveNote, not saveNoteBody", async () => {
+    const initialNote = buildNote();
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, {
+        content: "New body",
+        title: "New Title",
+      });
+    });
+
+    expect(notesDB.saveNote).toHaveBeenCalledWith(
+      expect.objectContaining({ id: initialNote.id, title: "New Title", content: "New body" })
+    );
+    expect(notesDB.saveNoteBody).not.toHaveBeenCalled();
+  });
+
   it("surfaces translated local save failures", async () => {
     const initialNote = buildNote();
     vi.mocked(notesDB.saveNoteBody).mockRejectedValueOnce(new Error("indexeddb unavailable"));

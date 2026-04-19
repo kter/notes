@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MobileView } from "@/components/layout";
 import { useAIChat } from "@/hooks/useAIChat";
@@ -9,6 +9,7 @@ import { useNoteFilter } from "@/hooks/useNoteFilter";
 import { useNotes } from "@/hooks/useNotes";
 import { useResizable } from "@/hooks/useResizable";
 import { useTokenUsage } from "@/hooks/useTokenUsage";
+import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 
 import { useWorkspaceSyncState } from "./useWorkspaceSyncState";
 
@@ -29,6 +30,10 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   const editorContentRef = useRef("");
   const editorSelectedTextRef = useRef("");
   const selectionSubscribersRef = useRef(new Set<() => void>());
+  const selectedNoteIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedNoteIdRef.current = selectedNoteId;
+  }, [selectedNoteId]);
 
   const {
     folders,
@@ -96,6 +101,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
 
   const handleEditorContentChange = useCallback((content: string) => {
     editorContentRef.current = content;
+    if (selectedNoteIdRef.current) noteBodyStore.set(selectedNoteIdRef.current, content);
   }, []);
 
   const handleEditorSelectionChange = useCallback((selectedText: string) => {
@@ -202,6 +208,11 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     [pendingEditEntry, handleRejectEdit]
   );
 
+  const getCurrentEditorContent = useCallback((): string => {
+    const id = selectedNoteIdRef.current;
+    return (id && noteBodyStore.get(id)) || editorContentRef.current;
+  }, []);
+
   return {
     selectedFolderId,
     selectedNoteId,
@@ -263,7 +274,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     handleSendEditRequestFromPanel,
     handlePendingAcceptEdit,
     handlePendingRejectEdit,
-    getCurrentEditorContent: () => editorContentRef.current,
+    getCurrentEditorContent,
     getCurrentEditorSelectedText: () => editorSelectedTextRef.current,
     subscribeToEditorSelectionChange,
   };

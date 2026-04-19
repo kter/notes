@@ -28,6 +28,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
 
   const editorContentRef = useRef("");
   const editorSelectedTextRef = useRef("");
+  const selectionSubscribersRef = useRef(new Set<() => void>());
 
   const {
     folders,
@@ -99,7 +100,16 @@ export function useWorkspaceState(isAuthenticated: boolean) {
 
   const handleEditorSelectionChange = useCallback((selectedText: string) => {
     editorSelectedTextRef.current = selectedText;
+    selectionSubscribersRef.current.forEach((cb) => cb());
   }, []);
+
+  const subscribeToEditorSelectionChange = useCallback(
+    (callback: () => void) => {
+      selectionSubscribersRef.current.add(callback);
+      return () => { selectionSubscribersRef.current.delete(callback); };
+    },
+    []
+  );
 
   const handleAcceptEditAndApply = useCallback(
     (messageIndex: number) => {
@@ -255,5 +265,6 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     handlePendingRejectEdit,
     getCurrentEditorContent: () => editorContentRef.current,
     getCurrentEditorSelectedText: () => editorSelectedTextRef.current,
+    subscribeToEditorSelectionChange,
   };
 }

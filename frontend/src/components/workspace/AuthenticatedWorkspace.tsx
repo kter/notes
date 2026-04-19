@@ -121,8 +121,9 @@ export function AuthenticatedWorkspace({
               onSendEditRequest={workspace.handleSendEditRequestFromPanel}
               onAcceptEdit={workspace.handleAcceptEditAndApply}
               onRejectEdit={workspace.handleRejectEdit}
-              currentEditorContent={workspace.getCurrentEditorContent()}
-              selectedText={workspace.getCurrentEditorSelectedText()}
+              getCurrentEditorContent={workspace.getCurrentEditorContent}
+              subscribeToEditorSelectionChange={workspace.subscribeToEditorSelectionChange}
+              getCurrentEditorSelectedText={workspace.getCurrentEditorSelectedText}
             />
           </div>
         }

@@ -24,7 +24,7 @@ import {
   MessageSquareIcon,
   PencilIcon,
 } from "lucide-react";
-import { useState, useRef, useEffect, memo } from "react";
+import { useState, useRef, useEffect, memo, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks";
 import ReactMarkdown from "react-markdown";
@@ -54,9 +54,13 @@ interface AIChatPanelProps {
   onSendEditRequest?: (instruction: string, currentContent: string, noteId?: string, selectionRange?: { start: number; end: number }) => void;
   onAcceptEdit?: (messageIndex: number) => void;
   onRejectEdit?: (messageIndex: number) => void;
-  currentEditorContent?: string;
-  selectedText?: string;
+  getCurrentEditorContent?: () => string;
+  subscribeToEditorSelectionChange?: (callback: () => void) => () => void;
+  getCurrentEditorSelectedText?: () => string;
 }
+
+const noopSubscribe = () => () => {};
+const emptyString = () => "";
 
 export const AIChatPanel = memo(function AIChatPanel({
   isOpen,
@@ -75,8 +79,9 @@ export const AIChatPanel = memo(function AIChatPanel({
   onSendEditRequest,
   onAcceptEdit,
   onRejectEdit,
-  currentEditorContent = "",
-  selectedText = "",
+  getCurrentEditorContent,
+  subscribeToEditorSelectionChange,
+  getCurrentEditorSelectedText,
 }: AIChatPanelProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
@@ -84,6 +89,12 @@ export const AIChatPanel = memo(function AIChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [prevNoteId, setPrevNoteId] = useState(selectedNote?.id);
   const [prevFolderId, setPrevFolderId] = useState(selectedFolder?.id);
+
+  const selectedText = useSyncExternalStore(
+    subscribeToEditorSelectionChange ?? noopSubscribe,
+    getCurrentEditorSelectedText ?? emptyString,
+    emptyString
+  );
 
   const noteId = selectedNote?.id;
   const folderId = selectedFolder?.id;
@@ -109,19 +120,20 @@ export const AIChatPanel = memo(function AIChatPanel({
     }
   }, [messages]);
 
-  const selectionRange = selectedText && currentEditorContent
-    ? (() => {
-        const start = currentEditorContent.indexOf(selectedText);
-        return start !== -1 ? { start, end: start + selectedText.length } : undefined;
-      })()
-    : undefined;
-
   const handleSend = () => {
     if (input.trim() && !isLoading) {
       if (isEditMode && onSendEditRequest) {
+        const currentContent = getCurrentEditorContent?.() ?? "";
+        const currentSelectedText = getCurrentEditorSelectedText?.() ?? "";
+        const selectionRange = currentSelectedText && currentContent
+          ? (() => {
+              const start = currentContent.indexOf(currentSelectedText);
+              return start !== -1 ? { start, end: start + currentSelectedText.length } : undefined;
+            })()
+          : undefined;
         onSendEditRequest(
           input.trim(),
-          currentEditorContent,
+          currentContent,
           selectedNote?.id,
           selectionRange
         );

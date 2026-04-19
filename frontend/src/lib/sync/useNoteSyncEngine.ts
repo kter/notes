@@ -20,6 +20,7 @@ import type { Note, WorkspaceSnapshotResponse } from "@/types";
 import { useDebouncedAsync } from "./useDebouncedAsync";
 import { SYNC_RETRY_CONFIG } from "./syncConfig";
 import type { LocalSyncStatus, RemoteSyncStatus, SyncStatus } from "./types";
+import { noteBodyStore } from "./noteBodyStore";
 
 const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceSnapshotResponse) => void = () => {};
 
@@ -359,44 +360,76 @@ export function useNoteSyncEngine({
       retryArgsRef.current = null;
       setRetryCountdown(undefined);
 
-      let noteForLocalSave: Note | undefined;
-      setNotes((prev) => {
-        noteForLocalSave = prev.find((note) => note.id === id);
-        return prev.map((note) =>
-          note.id === id
-            ? {
-                ...note,
-                ...updates,
-                ...(updates.content !== undefined
-                  ? { snippet: updates.content.slice(0, 80) }
-                  : {}),
-                version: note.version + 1,
-                updated_at: new Date().toISOString(),
-                deleted_at: null,
-              }
-            : note
-        );
-      });
+      const isContentOnly =
+        updates.content !== undefined &&
+        updates.title === undefined &&
+        updates.folder_id === undefined;
 
-      try {
-        if (noteForLocalSave) {
-          const updatedNote = {
-            ...noteForLocalSave,
-            ...updates,
-            ...(updates.content !== undefined
-              ? { snippet: updates.content.slice(0, 80) }
-              : {}),
-            version: noteForLocalSave.version + 1,
-            updated_at: new Date().toISOString(),
-            deleted_at: null,
-          };
-          await notesDB.saveNote(updatedNote);
-          setLocalStatus("saved");
+      let noteForLocalSave: Note | undefined;
+
+      if (isContentOnly) {
+        noteBodyStore.set(id, updates.content!);
+        const now = new Date().toISOString();
+        const snippet = updates.content!.slice(0, 80);
+        setNotes((prev) => {
+          noteForLocalSave = prev.find((note) => note.id === id);
+          return prev.map((note) =>
+            note.id === id
+              ? { ...note, snippet, version: note.version + 1, updated_at: now, deleted_at: null }
+              : note
+          );
+        });
+        try {
+          if (noteForLocalSave) {
+            await notesDB.saveNoteBody(id, updates.content!);
+            setLocalStatus("saved");
+          }
+        } catch (error) {
+          logger.error("Failed to save locally", error);
+          setLocalStatus("failed");
+          setLastError(t("sync.localSaveFailed"));
         }
-      } catch (error) {
-        logger.error("Failed to save locally", error);
-        setLocalStatus("failed");
-        setLastError(t("sync.localSaveFailed"));
+      } else {
+        if (updates.content !== undefined) {
+          noteBodyStore.set(id, updates.content);
+        }
+        setNotes((prev) => {
+          noteForLocalSave = prev.find((note) => note.id === id);
+          return prev.map((note) =>
+            note.id === id
+              ? {
+                  ...note,
+                  ...updates,
+                  ...(updates.content !== undefined
+                    ? { snippet: updates.content.slice(0, 80) }
+                    : {}),
+                  version: note.version + 1,
+                  updated_at: new Date().toISOString(),
+                  deleted_at: null,
+                }
+              : note
+          );
+        });
+        try {
+          if (noteForLocalSave) {
+            const updatedNote = {
+              ...noteForLocalSave,
+              ...updates,
+              ...(updates.content !== undefined
+                ? { snippet: updates.content.slice(0, 80) }
+                : {}),
+              version: noteForLocalSave.version + 1,
+              updated_at: new Date().toISOString(),
+              deleted_at: null,
+            };
+            await notesDB.saveNote(updatedNote);
+            setLocalStatus("saved");
+          }
+        } catch (error) {
+          logger.error("Failed to save locally", error);
+          setLocalStatus("failed");
+          setLastError(t("sync.localSaveFailed"));
+        }
       }
 
       const expectedVersion = getExpectedVersion(id, noteForLocalSave?.version);

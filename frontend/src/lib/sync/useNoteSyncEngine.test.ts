@@ -38,6 +38,7 @@ vi.mock("@/hooks/useTranslation", () => ({
 vi.mock("@/lib/indexedDB", () => ({
   notesDB: {
     saveNote: vi.fn(),
+    saveNoteBody: vi.fn(),
     deleteNote: vi.fn(),
     getNote: vi.fn(),
     saveNotes: vi.fn(),
@@ -109,6 +110,7 @@ describe("useNoteSyncEngine", () => {
     vi.clearAllMocks();
     vi.mocked(calculateHash).mockResolvedValue("hash-123");
     vi.mocked(notesDB.saveNote).mockResolvedValue();
+    vi.mocked(notesDB.saveNoteBody).mockResolvedValue();
     vi.mocked(notesDB.deleteNote).mockResolvedValue();
     vi.mocked(notesDB.getNote).mockResolvedValue(undefined);
     vi.mocked(notesDB.saveNotes).mockResolvedValue();
@@ -330,7 +332,7 @@ describe("useNoteSyncEngine", () => {
 
   it("surfaces translated local save failures", async () => {
     const initialNote = buildNote();
-    vi.mocked(notesDB.saveNote).mockRejectedValueOnce(new Error("indexeddb unavailable"));
+    vi.mocked(notesDB.saveNoteBody).mockRejectedValueOnce(new Error("indexeddb unavailable"));
 
     const { result } = renderHook(() =>
       useNoteSyncEngineHarness([initialNote], null, initialNote.id)

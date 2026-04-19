@@ -32,6 +32,7 @@ vi.mock("@/hooks/useTranslation", () => ({
 vi.mock("@/lib/indexedDB", () => ({
   notesDB: {
     saveNote: vi.fn(),
+    saveNoteBody: vi.fn(),
     deleteNote: vi.fn(),
     getNote: vi.fn(),
     saveNotes: vi.fn(),
@@ -93,6 +94,7 @@ describe("useNotes", () => {
     vi.clearAllMocks();
     vi.mocked(calculateHash).mockResolvedValue("hash-123");
     vi.mocked(notesDB.saveNote).mockResolvedValue();
+    vi.mocked(notesDB.saveNoteBody).mockResolvedValue();
     vi.mocked(notesDB.deleteNote).mockResolvedValue();
     vi.mocked(notesDB.getNote).mockResolvedValue(undefined);
     vi.mocked(notesDB.saveNotes).mockResolvedValue();
@@ -193,14 +195,10 @@ describe("useNotes", () => {
       await result.current.handleUpdateNote(initialNote.id, { content: "Updated content" });
     });
 
-    expect(result.current.notes[0]?.content).toBe("Updated content");
+    expect(result.current.notes[0]?.snippet).toBe("Updated content");
     expect(result.current.syncStatus.remote).toBe("unsynced");
-    expect(notesDB.saveNote).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: initialNote.id,
-        content: "Updated content",
-      })
-    );
+    expect(notesDB.saveNoteBody).toHaveBeenCalledWith(initialNote.id, "Updated content");
+    expect(notesDB.saveNote).not.toHaveBeenCalled();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);

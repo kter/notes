@@ -140,6 +140,27 @@ class NotesDB {
     });
   }
 
+  async saveNoteBody(id: string, content: string): Promise<void> {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(NOTES_STORE, "readwrite");
+      const store = transaction.objectStore(NOTES_STORE);
+      const getRequest = store.get(id);
+
+      getRequest.onerror = () => reject(getRequest.error);
+      getRequest.onsuccess = () => {
+        const note: Note | undefined = getRequest.result;
+        if (!note) {
+          resolve();
+          return;
+        }
+        const putRequest = store.put({ ...note, content });
+        putRequest.onerror = () => reject(putRequest.error);
+        putRequest.onsuccess = () => resolve();
+      };
+    });
+  }
+
   async deleteNote(id: string): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {

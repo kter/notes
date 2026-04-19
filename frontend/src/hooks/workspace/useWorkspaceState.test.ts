@@ -193,4 +193,63 @@ describe("useWorkspaceState", () => {
 
     expect(result.current.getCurrentEditorSelectedText()).toBe("");
   });
+
+  it("notifies subscribers when editor selection changes", () => {
+    const { result } = renderHook(() => useWorkspaceState(true));
+    const callback = vi.fn();
+
+    act(() => {
+      result.current.subscribeToEditorSelectionChange(callback);
+    });
+
+    act(() => {
+      result.current.handleEditorSelectionChange("hello world");
+    });
+
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.handleEditorSelectionChange("updated");
+    });
+
+    expect(callback).toHaveBeenCalledTimes(2);
+  });
+
+  it("unsubscribing stops further notifications", () => {
+    const { result } = renderHook(() => useWorkspaceState(true));
+    const callback = vi.fn();
+    let unsubscribe: () => void;
+
+    act(() => {
+      unsubscribe = result.current.subscribeToEditorSelectionChange(callback);
+    });
+
+    act(() => {
+      unsubscribe();
+    });
+
+    act(() => {
+      result.current.handleEditorSelectionChange("text after unsubscribe");
+    });
+
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("supports multiple subscribers and notifies all of them", () => {
+    const { result } = renderHook(() => useWorkspaceState(true));
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+
+    act(() => {
+      result.current.subscribeToEditorSelectionChange(cb1);
+      result.current.subscribeToEditorSelectionChange(cb2);
+    });
+
+    act(() => {
+      result.current.handleEditorSelectionChange("multi");
+    });
+
+    expect(cb1).toHaveBeenCalledTimes(1);
+    expect(cb2).toHaveBeenCalledTimes(1);
+  });
 });

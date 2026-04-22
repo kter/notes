@@ -168,18 +168,17 @@ export function EditorPanel({
   const currentTitleRef = useRef(title);
   const currentContentRef = useRef(content);
 
-  // Update refs when note changes to a different one (switched notes)
+  // Update refs on mount (key={note.id} remounts on note switch).
+  // lastSaved refs track the persisted baseline; current refs track the live editor state.
+  // Use the initialized `content` state (which prefers noteBodyStore over note?.content)
+  // so that prior unsaved edits aren't clobbered by the stale prop value.
   useEffect(() => {
     lastSavedTitle.current = note?.title ?? "";
     lastSavedContent.current = note?.content ?? "";
     currentTitleRef.current = note?.title ?? "";
-    currentContentRef.current = note?.content ?? "";
-    // We also need to update local state if the note prop changes and it's NOT what we just saved.
-    // However, the existing logic `useState(note?.title)` only runs on mount.
-    // The key={note.id} in parent ensures re-mount on switch.
-    // So we don't need to sync state here, just refs.
-    onContentChange?.(note?.content ?? "");
-  }, [note?.id, note?.title, note?.content]); // eslint-disable-line react-hooks/exhaustive-deps
+    currentContentRef.current = content;
+    onContentChange?.(content);
+  }, [note?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply content override from AI edit accept
   const contentOverrideVersionRef = useRef<number>(-1);
@@ -416,8 +415,11 @@ export function EditorPanel({
     }
 
     const handler = setTimeout(() => {
-      onUpdateNote(note.id, { title, content });
-      // Update refs to reflect that we've triggered a save for this content
+      const updates: { title?: string; content?: string } = {};
+      if (title !== lastSavedTitle.current) updates.title = title;
+      if (content !== lastSavedContent.current) updates.content = content;
+      if (Object.keys(updates).length === 0) return;
+      onUpdateNote(note.id, updates);
       lastSavedTitle.current = title;
       lastSavedContent.current = content;
     }, 500);
@@ -481,7 +483,10 @@ export function EditorPanel({
   const handleBlur = () => {
     // Use refs to check for changes to ensure we have the latest values
     if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
-      onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
+      const updates: { title?: string; content?: string } = {};
+      if (currentTitleRef.current !== lastSavedTitle.current) updates.title = currentTitleRef.current;
+      if (currentContentRef.current !== lastSavedContent.current) updates.content = currentContentRef.current;
+      onUpdateNote(note.id, updates);
       lastSavedTitle.current = currentTitleRef.current;
       lastSavedContent.current = currentContentRef.current;
     }
@@ -1120,7 +1125,10 @@ export function EditorPanel({
             onClick={() => {
               // Ensure we save any pending changes before summarizing
               if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
-                onUpdateNote(note.id, { title: currentTitleRef.current, content: currentContentRef.current });
+                const updates: { title?: string; content?: string } = {};
+                if (currentTitleRef.current !== lastSavedTitle.current) updates.title = currentTitleRef.current;
+                if (currentContentRef.current !== lastSavedContent.current) updates.content = currentContentRef.current;
+                onUpdateNote(note.id, updates);
                 lastSavedTitle.current = currentTitleRef.current;
                 lastSavedContent.current = currentContentRef.current;
               }

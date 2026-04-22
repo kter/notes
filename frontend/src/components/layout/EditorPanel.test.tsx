@@ -198,7 +198,8 @@ describe('EditorPanel', () => {
     // Fast forward debounce
     vi.advanceTimersByTime(600)
 
-    expect(defaultProps.onUpdateNote).toHaveBeenCalledWith('1', { title: 'Initial content', content: 'New content' })
+    // Only changed fields are sent; title was not modified, so only content is included.
+    expect(defaultProps.onUpdateNote).toHaveBeenCalledWith('1', { content: 'New content' })
     vi.useRealTimers()
   })
 
@@ -824,8 +825,8 @@ describe('EditorPanel', () => {
 
       act(() => { vi.advanceTimersByTime(600) })
 
+      // Only changed fields are sent; title was not modified, so only content is included.
       expect(onUpdateNote).toHaveBeenCalledWith('2', {
-        title: 'Task note',
         content: '- [x] task item\n- [x] done item',
       })
       vi.useRealTimers()

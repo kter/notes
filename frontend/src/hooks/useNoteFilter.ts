@@ -7,10 +7,20 @@ export function useNoteFilter(
   selectedFolderId: string | null,
   searchQuery: string
 ) {
+  // Fingerprint tracks only folder membership changes (id + folder_id), not snippet/updated_at.
+  // This prevents folderFiltered from re-running on every auto-save that doesn't move notes.
+  const folderFingerprint = useMemo(
+    () => notes.map((n) => `${n.id}:${n.folder_id ?? ""}`).join("|"),
+    [notes]
+  );
+
   // Stage 1: folder filter — never touches content
   const folderFiltered = useMemo(
     () => (selectedFolderId ? notes.filter((n) => n.folder_id === selectedFolderId) : notes),
-    [notes, selectedFolderId]
+    // Depend on folderFingerprint instead of notes to skip re-runs when only
+    // snippet/updated_at/version change (which can't affect folder membership).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [folderFingerprint, selectedFolderId]
   );
 
   // Stage 2: search filter — skipped entirely when query is empty

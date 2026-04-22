@@ -393,18 +393,19 @@ export function useNoteSyncEngine({
         if (updates.content !== undefined) {
           noteBodyStore.set(id, updates.content);
         }
+        // Keep content out of notes[] — only metadata and snippet live there.
+        const { content: bodyOnly, ...metadataUpdates } = updates;
+        const now = new Date().toISOString();
         setNotes((prev) => {
           noteForLocalSave = prev.find((note) => note.id === id);
           return prev.map((note) =>
             note.id === id
               ? {
                   ...note,
-                  ...updates,
-                  ...(updates.content !== undefined
-                    ? { snippet: updates.content.slice(0, 80) }
-                    : {}),
+                  ...metadataUpdates,
+                  ...(bodyOnly !== undefined ? { snippet: bodyOnly.slice(0, 80) } : {}),
                   version: note.version + 1,
-                  updated_at: new Date().toISOString(),
+                  updated_at: now,
                   deleted_at: null,
                 }
               : note
@@ -412,14 +413,18 @@ export function useNoteSyncEngine({
         });
         try {
           if (noteForLocalSave) {
+            // For metadata-only changes: noteBodyStore may have a newer body than notes[]
+            // (because isContentOnly saves update the store but not notes[]).
+            // Use the store value as the authoritative body for the IDB record.
+            const latestBody =
+              bodyOnly ?? noteBodyStore.get(id) ?? noteForLocalSave.content ?? "";
             const updatedNote = {
               ...noteForLocalSave,
-              ...updates,
-              ...(updates.content !== undefined
-                ? { snippet: updates.content.slice(0, 80) }
-                : {}),
+              ...metadataUpdates,
+              content: latestBody,
+              ...(bodyOnly !== undefined ? { snippet: bodyOnly.slice(0, 80) } : {}),
               version: noteForLocalSave.version + 1,
-              updated_at: new Date().toISOString(),
+              updated_at: now,
               deleted_at: null,
             };
             await notesDB.saveNote(updatedNote);

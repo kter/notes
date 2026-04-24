@@ -112,6 +112,7 @@ export function EditorPanel({
   const [showIndentGuides, setShowIndentGuides] = useState(false);
   const [indentGuideCount, setIndentGuideCount] = useState(0);
   const charMeasureRef = useRef<HTMLSpanElement>(null);
+  const isComposingRef = useRef(false);
 
   useEffect(() => {
     editorPreviewWidthRef.current = editorPreviewWidth;
@@ -429,8 +430,25 @@ export function EditorPanel({
   const handleContentChange = useCallback((value: string) => {
     setContent(value);
     currentContentRef.current = value;
-    onContentChange?.(value);
+    if (!isComposingRef.current) {
+      onContentChange?.(value);
+    }
   }, [onContentChange]);
+
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(
+    (e: React.CompositionEvent<HTMLTextAreaElement>) => {
+      isComposingRef.current = false;
+      const value = e.currentTarget.value;
+      setContent(value);
+      currentContentRef.current = value;
+      onContentChange?.(value);
+    },
+    [onContentChange]
+  );
 
   const markdownComponents = useMemo((): Components => ({
     input(props) {
@@ -1092,6 +1110,8 @@ export function EditorPanel({
                         fieldSizing="fixed"
                         value={content}
                         onChange={(e) => handleContentChange(e.target.value)}
+                        onCompositionStart={handleCompositionStart}
+                        onCompositionEnd={handleCompositionEnd}
                         onKeyDown={handleKeyDown}
                         onScroll={handleEditorScroll}
                         onBlur={handleBlur}

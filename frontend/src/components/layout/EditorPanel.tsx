@@ -85,8 +85,8 @@ export function EditorPanel({
   // Initialize state from props - reliance on key={note.id} in parent to reset state on switch
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
-  // Use deferred content for preview to prevent input lag during heavy markdown rendering
-  const deferredContent = useDeferredValue(content);
+  const [committedContent, setCommittedContent] = useState(note?.content ?? "");
+  const deferredContent = useDeferredValue(committedContent);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState(
@@ -431,6 +431,7 @@ export function EditorPanel({
     setContent(value);
     currentContentRef.current = value;
     if (!isComposingRef.current) {
+      setCommittedContent(value);
       onContentChange?.(value);
     }
   }, [onContentChange]);
@@ -444,6 +445,7 @@ export function EditorPanel({
       isComposingRef.current = false;
       const value = e.currentTarget.value;
       setContent(value);
+      setCommittedContent(value);
       currentContentRef.current = value;
       onContentChange?.(value);
     },

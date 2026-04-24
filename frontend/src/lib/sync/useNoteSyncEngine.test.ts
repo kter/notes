@@ -59,6 +59,7 @@ vi.mock("@/lib/utils", () => ({
 
 vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshot: vi.fn().mockResolvedValue(undefined),
+  persistWorkspaceSnapshotIncremental: vi.fn().mockResolvedValue(undefined),
   refreshWorkspaceSnapshot: (...args: unknown[]) =>
     refreshWorkspaceSnapshotMock(...args),
   isConflictApiError: (error: unknown) =>

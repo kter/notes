@@ -1,6 +1,6 @@
 import { notesDB } from "@/lib/indexedDB";
 import { ApiError } from "@/lib/api";
-import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
+import type { Folder, Note, WorkspaceAppliedChange, WorkspaceSnapshotResponse } from "@/types";
 
 const WORKSPACE_CURSOR_STORAGE_KEY = "notes-workspace-cursor";
 const WORKSPACE_DEVICE_ID_STORAGE_KEY = "notes-workspace-device-id";
@@ -33,6 +33,40 @@ export function getActiveFolders(snapshot: WorkspaceSnapshotResponse): Folder[] 
 
 export function getActiveNotes(snapshot: WorkspaceSnapshotResponse): Note[] {
   return snapshot.notes.filter((note) => !isDeletedEntity(note)).map(withSnippet);
+}
+
+export async function persistWorkspaceSnapshotIncremental(
+  snapshot: WorkspaceSnapshotResponse,
+  appliedChanges: WorkspaceAppliedChange[]
+): Promise<void> {
+  const appliedNoteIds = new Set(
+    appliedChanges.filter((c) => c.entity === "note").map((c) => c.entity_id)
+  );
+  const appliedFolderIds = new Set(
+    appliedChanges.filter((c) => c.entity === "folder").map((c) => c.entity_id)
+  );
+
+  const notesById = new Map(snapshot.notes.map((n) => [n.id, n]));
+  const foldersById = new Map(snapshot.folders.map((f) => [f.id, f]));
+
+  await Promise.all([
+    ...[...appliedNoteIds].map((id) => {
+      const note = notesById.get(id);
+      if (!note) return Promise.resolve();
+      return isDeletedEntity(note)
+        ? notesDB.deleteNote(id)
+        : notesDB.saveNote(withSnippet(note));
+    }),
+    ...[...appliedFolderIds].map((id) => {
+      const folder = foldersById.get(id);
+      if (!folder) return Promise.resolve();
+      return isDeletedEntity(folder)
+        ? notesDB.deleteFolder(id)
+        : notesDB.saveFolder(folder);
+    }),
+  ]);
+
+  setWorkspaceCursor(snapshot.cursor);
 }
 
 export async function persistWorkspaceSnapshot(

@@ -10,7 +10,7 @@ import { calculateHash } from "@/lib/utils";
 import {
   getWorkspaceSyncRequestMetadata,
   isConflictApiError,
-  persistWorkspaceSnapshot,
+  persistWorkspaceSnapshotIncremental,
   refreshWorkspaceSnapshot,
   withSnippet,
 } from "@/lib/workspaceSync";
@@ -140,7 +140,7 @@ export function useNoteSyncEngine({
               )
             );
 
-            await persistWorkspaceSnapshot(response.snapshot);
+            await persistWorkspaceSnapshotIncremental(response.snapshot, response.applied);
             syncServerVersionsFromSnapshot(response.snapshot);
             handleSnapshotSynced(response.snapshot);
 
@@ -307,7 +307,7 @@ export function useNoteSyncEngine({
         delete serverVersionByNoteIdRef.current[tempId];
 
         await notesDB.deleteNote(tempId);
-        await persistWorkspaceSnapshot(response.snapshot);
+        await persistWorkspaceSnapshotIncremental(response.snapshot, response.applied);
         syncServerVersionsFromSnapshot(response.snapshot);
         handleSnapshotSynced(response.snapshot);
         setRemoteStatus("synced");
@@ -478,7 +478,7 @@ export function useNoteSyncEngine({
                 },
               ],
             });
-            await persistWorkspaceSnapshot(response.snapshot);
+            await persistWorkspaceSnapshotIncremental(response.snapshot, response.applied);
             syncServerVersionsFromSnapshot(response.snapshot);
             delete serverVersionByNoteIdRef.current[id];
             handleSnapshotSynced(response.snapshot);

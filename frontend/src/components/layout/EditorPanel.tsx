@@ -2,35 +2,34 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Clock } from "@/components/Clock";
-import { WeatherWidget } from "@/components/WeatherWidget";
-import { SunlightMap } from "@/components/SunlightMap";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
 import { DiffView } from "@/components/ai/DiffView";
 import { useApi, useTranslation } from "@/hooks";
-import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
-import { SparklesIcon, TrashIcon, MessageSquareIcon, FolderIcon, ChevronDownIcon, Loader2Icon, CheckIcon, DownloadIcon, EyeIcon, EyeOffIcon, HashIcon, Share2Icon, Maximize2Icon, Minimize2Icon, PrinterIcon } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo, KeyboardEvent, useDeferredValue } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { remarkSourceLine } from "@/lib/remark-source-line";
 import { toggleMarkdownCheckbox } from "@/lib/markdownCheckboxToggle";
 import type { SyncStatus } from "@/hooks/useNotes";
 import { calculateHash, cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ShareDialog } from "@/components/ui/ShareDialog";
-import type { NoteShare } from "@/types";
 import { createPortal, flushSync } from "react-dom";
+import { EditorToolbar } from "./EditorToolbar";
+import { EditorMarkdownPreview } from "./EditorMarkdownPreview";
+import { EditorStatusBar } from "./EditorStatusBar";
 
-const REMARK_PLUGINS = [remarkGfm, remarkSourceLine];
+function downloadFile(fileContent: string, filename: string, mimeType: string) {
+  const blob = new Blob([fileContent], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const DESKTOP_BREAKPOINT = 768;
 const DEFAULT_EDITOR_PREVIEW_WIDTH = 50;
@@ -88,8 +87,6 @@ export function EditorPanel({
   const [content, setContent] = useState(note?.content ?? "");
   // Use deferred content for preview to prevent input lag during heavy markdown rendering
   const deferredContent = useDeferredValue(content);
-  const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState(
@@ -102,12 +99,7 @@ export function EditorPanel({
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isShareLoading, setIsShareLoading] = useState(false);
-  const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
   const [printSnapshot, setPrintSnapshot] = useState<{ title: string; content: string } | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -429,20 +421,6 @@ export function EditorPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, note?.id, onUpdateNote]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsFolderDropdownOpen(false);
-      }
-      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
-        setIsExportDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const handleTitleChange = (value: string) => {
     setTitle(value);
     currentTitleRef.current = value;
@@ -495,15 +473,6 @@ export function EditorPanel({
       triggerServerSync(note.id);
     }
   };
-
-  const handleFolderChange = (folderId: string | null) => {
-    if (note) {
-      onUpdateNote(note.id, { folder_id: folderId });
-    }
-    setIsFolderDropdownOpen(false);
-  };
-
-
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -918,47 +887,23 @@ export function EditorPanel({
   }, [isSplitPreviewVisible]);
 
   // JSON export handlers
-  const downloadFile = (content: string, filename: string, mimeType: string) => {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setIsExportDropdownOpen(false);
-  };
+  const handleExportMarkdown = useCallback(() => {
+    const markdown = `# ${currentTitleRef.current}\n\n${currentContentRef.current}`;
+    downloadFile(markdown, `${currentTitleRef.current || "untitled"}.md`, "text/markdown");
+  }, []);  
 
-  const handleExportMarkdown = () => {
-    if (!note) return;
-    const markdown = `# ${title}\n\n${content}`;
-    const filename = `${title || "untitled"}.md`;
-    downloadFile(markdown, filename, "text/markdown");
-  };
-
-  const handleExportText = () => {
-    if (!note) return;
-    const text = `${title}\n\n${content}`;
-    const filename = `${title || "untitled"}.txt`;
-    downloadFile(text, filename, "text/plain");
-  };
+  const handleExportText = useCallback(() => {
+    const text = `${currentTitleRef.current}\n\n${currentContentRef.current}`;
+    downloadFile(text, `${currentTitleRef.current || "untitled"}.txt`, "text/plain");
+  }, []);  
 
   const handlePrintPreview = useCallback(() => {
-    if (!note) {
-      return;
-    }
-
     printCleanupRef.current?.();
 
     let isCleanedUp = false;
 
     const cleanupPrintMode = () => {
-      if (isCleanedUp) {
-        return;
-      }
-
+      if (isCleanedUp) return;
       isCleanedUp = true;
       document.body.classList.remove(PRINT_MODE_BODY_CLASS);
       window.removeEventListener("afterprint", cleanupPrintMode);
@@ -981,7 +926,7 @@ export function EditorPanel({
         window.print();
       });
     });
-  }, [note]);
+  }, []);  
 
   const currentFolder = folders.find((f) => f.id === note?.folder_id);
   const printPreview =
@@ -1014,58 +959,6 @@ export function EditorPanel({
     );
   }
 
-  // --- SAVE STATUS LOGIC START ---
-
-  let statusIcon = null;
-  let statusText = "";
-  let statusTooltip = "";
-  let statusColorClass = "";
-
-  // Destructure syncStatus
-  const { remote: remoteStatus, lastError, isSaving, retryCountdown } = syncStatus;
-
-  // Hash-based Verification Logic
-  // If no savedHash is available yet (initial load), fall back to remoteStatus checks temporarily
-  // Strict mismatch: We have a server hash, and it differs from current.
-  const isStrictlyMismatch = !!savedHash && !!currentHash && savedHash !== currentHash;
-
-  // Loose mismatch: We don't have a hash yet (first edit), but the system knows it's unsynced.
-  const isLooselyMismatch = !savedHash && remoteStatus === 'unsynced';
-
-  if (isSaving) {
-    statusIcon = <Loader2Icon className="h-3 w-3 animate-spin" />;
-    statusText = t("common.loading");
-    statusTooltip = t("sync.savingRemote");
-    statusColorClass = "text-muted-foreground";
-  } else if (remoteStatus === 'failed') {
-    // Remote Failed
-    statusIcon = <CheckIcon className="h-3 w-3" />;
-    statusText = t("sync.failedSavedLocally");
-    if (retryCountdown !== undefined) {
-      statusText += " " + t("sync.retryingIn").replace("{{seconds}}", String(retryCountdown));
-    }
-    statusTooltip = t("sync.remoteSaveFailed");
-    statusColorClass = "text-orange-500";
-  } else if (isStrictlyMismatch || isLooselyMismatch) {
-    // Unsaved state (Strict or Loose)
-    statusIcon = <div className="h-2 w-2 rounded-full bg-orange-300" />;
-    statusText = t("editor.unsaved");
-    statusTooltip = isStrictlyMismatch ? t("editor.unsavedStrictMismatch") : t("editor.unsavedLooseMismatch");
-    statusColorClass = "text-muted-foreground";
-  } else {
-    // Default / Success / Verified
-    statusIcon = <CheckIcon className="h-3 w-3" />;
-    statusText = t("common.saved");
-    statusTooltip = t("sync.savedVerified");
-    statusColorClass = "text-green-500";
-  }
-
-  // Append error detail if present
-  if (lastError) {
-    statusTooltip += ` (${lastError})`;
-  }
-  // --- SAVE STATUS LOGIC END ---
-
   return (
     <>
       {printPreview}
@@ -1073,458 +966,213 @@ export function EditorPanel({
         ref={fullscreenContainerRef}
         className={cn(
           "note-print-root",
-          isFullscreen ? "flex flex-col bg-background overflow-hidden w-full h-full" : "flex-1 flex flex-col overflow-hidden"
+          isFullscreen
+            ? "flex flex-col bg-background overflow-hidden w-full h-full"
+            : "flex-1 flex flex-col overflow-hidden"
         )}
       >
         <div className="note-print-screen flex flex-1 flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 md:p-4 p-2 border-b border-border/50">
-        <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-          {/* Folder Selector */}
-          <div className="relative" ref={dropdownRef}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-              className="gap-1 md:gap-2"
-              data-testid="editor-folder-dropdown"
-            >
-              <FolderIcon className="h-4 w-4" />
-              <span className="max-w-[80px] md:max-w-[120px] truncate hidden sm:inline">
-                {currentFolder?.name || t("sidebar.allNotes")}
-              </span>
-              <ChevronDownIcon className="h-3 w-3" />
-            </Button>
-            {isFolderDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
-                <div className="py-1">
-                  <button
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${!note.folder_id ? "bg-accent" : ""
-                      }`}
-                    onClick={() => handleFolderChange(null)}
-                  >
-                    {t("sidebar.allNotes")}
-                  </button>
-                  {folders.map((folder) => (
-                    <button
-                      key={folder.id}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${note.folder_id === folder.id ? "bg-accent" : ""
-                        }`}
-                      onClick={() => handleFolderChange(folder.id)}
-                    >
-                      {folder.name}
-                    </button>
-                  ))}
-                </div>
+          <EditorToolbar
+            noteId={note.id}
+            noteFolderId={note.folder_id}
+            folders={folders}
+            currentFolder={currentFolder}
+            isSummarizing={isSummarizing}
+            isChatOpen={isChatOpen}
+            isPreviewOpen={isPreviewOpen}
+            isDesktopViewport={isDesktopViewport}
+            isEditorCollapsed={isEditorCollapsed}
+            isFullscreen={isFullscreen}
+            hasPendingEditProposal={!!pendingEditProposal}
+            currentTitleRef={currentTitleRef}
+            currentContentRef={currentContentRef}
+            lastSavedTitleRef={lastSavedTitle}
+            lastSavedContentRef={lastSavedContent}
+            onUpdateNote={onUpdateNote}
+            onSummarize={onSummarize}
+            onOpenChat={onOpenChat}
+            onPreviewToggle={handlePreviewToggle}
+            onShowEditorPane={handleShowEditorPane}
+            onHideEditorPane={handleHideEditorPane}
+            onExportMarkdown={handleExportMarkdown}
+            onExportText={handleExportText}
+            onPrintPreview={handlePrintPreview}
+            onToggleFullscreen={toggleFullscreen}
+            onDeleteNote={onDeleteNote}
+          />
+
+          {/* Editor */}
+          <div className="flex-1 flex flex-col overflow-hidden" role="main">
+            {/* Fixed Title Area */}
+            <div className="p-4 md:p-6 pb-0 flex-none bg-background z-10">
+              <div className="relative mb-4">
+                <label htmlFor="note-title" className="sr-only">
+                  Note title
+                </label>
+                <Input
+                  id="note-title"
+                  value={title}
+                  onChange={(e) => handleTitleChange(e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder={t("editor.noteTitlePlaceholder")}
+                  className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto"
+                  data-testid="editor-title-input"
+                />
               </div>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              // Ensure we save any pending changes before summarizing
-              if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
-                const updates: { title?: string; content?: string } = {};
-                if (currentTitleRef.current !== lastSavedTitle.current) updates.title = currentTitleRef.current;
-                if (currentContentRef.current !== lastSavedContent.current) updates.content = currentContentRef.current;
-                onUpdateNote(note.id, updates);
-                lastSavedTitle.current = currentTitleRef.current;
-                lastSavedContent.current = currentContentRef.current;
+              <Separator className="mb-4" />
+            </div>
+
+            {/* Editor and Preview Layout */}
+            <div
+              ref={editorPreviewLayoutRef}
+              className="relative flex-1 flex min-h-0 px-4 md:px-6 pb-4"
+              data-testid={
+                isDesktopSplitPreview
+                  ? "editor-preview-desktop-layout"
+                  : "editor-preview-layout"
               }
-              onSummarize(note.id);
-            }}
-            disabled={isSummarizing}
-            className="gap-1 md:gap-2"
-            aria-label={t("editor.summarizeNote")}
-            data-testid="editor-summarize-button"
-          >
-            {isSummarizing ? (
-              <Loader2Icon className="h-4 w-4 animate-spin" />
-            ) : (
-              <SparklesIcon className="h-4 w-4" />
-            )}
-            <span className="hidden md:inline">{isSummarizing ? t("editor.summarizing") : t("editor.summarize")}</span>
-          </Button>
-          <Button
-            variant={isChatOpen ? "secondary" : "ghost"}
-            size="sm"
-            onClick={onOpenChat}
-            className="gap-1 md:gap-2"
-            aria-label={t("editor.toggleChat")}
-            data-testid="editor-chat-button"
-          >
-            <MessageSquareIcon className="h-4 w-4" />
-            <span className="hidden md:inline">{t("editor.chat")}</span>
-          </Button>
-          {/* Export Button */}
-          <div className="relative" ref={exportDropdownRef}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-              className="gap-1 md:gap-2"
-              aria-label={t("editor.exportNote")}
-              data-testid="editor-export-dropdown"
             >
-              <DownloadIcon className="h-4 w-4" />
-              <span className="hidden md:inline">{t("editor.export")}</span>
-              <ChevronDownIcon className="h-3 w-3" />
-            </Button>
-            {isExportDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
-                <div className="py-1">
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                    onClick={handleExportMarkdown}
-                    data-testid="editor-export-markdown"
-                  >
-                    {t("editor.markdown")}
-                  </button>
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                    onClick={handleExportText}
-                  >
-                    {t("editor.plainText")}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Preview Toggle Button */}
-          <Button
-            variant={isPreviewOpen ? "secondary" : "ghost"}
-            size="sm"
-            onClick={handlePreviewToggle}
-            className="gap-1 md:gap-2"
-            data-testid="editor-preview-toggle"
-            disabled={!!pendingEditProposal}
-          >
-            {isPreviewOpen ? (
-              <EyeOffIcon className="h-4 w-4" />
-            ) : (
-              <EyeIcon className="h-4 w-4" />
-            )}
-            <span className="hidden md:inline">{t("editor.preview")}</span>
-          </Button>
-          {isPreviewOpen && !pendingEditProposal && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={
-                isDesktopViewport
-                  ? (isEditorCollapsed ? handleShowEditorPane : handleHideEditorPane)
-                  : () => setIsPreviewOpen(false)
-              }
-              className="gap-1"
-              data-testid={isDesktopViewport
-                ? (isEditorCollapsed ? "editor-show-button" : "editor-hide-button")
-                : "editor-show-button"}
-          >
-            <span>
-                {isDesktopViewport
-                  ? (isEditorCollapsed ? t("editor.showEditor") : t("editor.hideEditor"))
-                  : t("editor.showEditor")}
-              </span>
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handlePrintPreview}
-            className="gap-1 md:gap-2"
-            aria-label={t("editor.printPreview")}
-            data-testid="editor-print-button"
-          >
-            <PrinterIcon className="h-4 w-4" />
-            <span className="hidden md:inline">{t("editor.print")}</span>
-          </Button>
-          {/* Share Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={async () => {
-              setIsShareDialogOpen(true);
-              setIsShareLoading(true);
-              try {
-                const api = await getApi();
-                const share = await api.getNoteShare(note.id);
-                setCurrentShare(share);
-              } catch {
-                setCurrentShare(null);
-              } finally {
-                setIsShareLoading(false);
-              }
-            }}
-            className="gap-1 md:gap-2"
-            aria-label={t("editor.shareNote")}
-            data-testid="editor-share-button"
-          >
-            <Share2Icon className="h-4 w-4" />
-            <span className="hidden md:inline">{t("editor.share")}</span>
-          </Button>
-        </div>
-        <SunlightMap />
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleFullscreen}
-            aria-label={isFullscreen ? t("editor.exitFullscreen") : t("editor.fullscreen")}
-            data-testid="editor-fullscreen-button"
-            title={isFullscreen ? t("editor.exitFullscreen") : t("editor.fullscreen")}
-          >
-            {isFullscreen ? (
-              <Minimize2Icon className="h-4 w-4" />
-            ) : (
-              <Maximize2Icon className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-destructive hover:text-destructive"
-            onClick={() => {
-              if (confirm(t("noteList.deleteConfirm"))) {
-                onDeleteNote(note.id);
-              }
-            }}
-            data-testid="editor-delete-note-button"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Editor */}
-      <div className="flex-1 flex flex-col overflow-hidden" role="main">
-        {/* Fixed Title Area */}
-        <div className="p-4 md:p-6 pb-0 flex-none bg-background z-10">
-          <div className="relative mb-4">
-            <label htmlFor="note-title" className="sr-only">Note title</label>
-            <Input
-              id="note-title"
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              onBlur={handleBlur}
-              placeholder={t("editor.noteTitlePlaceholder")}
-              className="text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto"
-              data-testid="editor-title-input"
-            />
-
-          </div>
-          <Separator className="mb-4" />
-        </div>
-
-        {/* Editor and Preview Layout */}
-        <div
-          ref={editorPreviewLayoutRef}
-          className="relative flex-1 flex min-h-0 px-4 md:px-6 pb-4"
-          data-testid={isDesktopSplitPreview ? "editor-preview-desktop-layout" : "editor-preview-layout"}
-        >
-          {/* Image upload error message */}
-          {imageUploadError && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground text-sm px-4 py-2 rounded shadow-md">
-              {imageUploadError}
-            </div>
-          )}
-
-          {pendingEditProposal ? (
-            <div className="flex flex-col flex-1 min-h-0" data-testid="editor-diff-panel">
-              <DiffView
-                originalContent={pendingEditProposal.originalContent}
-                editedContent={pendingEditProposal.editedContent}
-                onAccept={onAcceptEdit ?? (() => {})}
-                onReject={onRejectEdit ?? (() => {})}
-                isApplied={null}
-                fullSize
-              />
-            </div>
-          ) : (
-            <>
-              {/* Markdown Editor Column */}
-              {(!isPreviewOpen || (isDesktopViewport && !isEditorCollapsed)) && (
-                <div
-                  className={cn(
-                    "relative min-h-0",
-                    isPreviewOpen ? "flex-none min-w-0" : "flex-1",
-                    isDraggingOver && "ring-2 ring-primary rounded"
-                  )}
-                  style={isDesktopSplitPreview ? { width: `${editorPreviewWidth}%` } : undefined}
-                  ref={editorContainerRef}
-                  data-testid="editor-drop-zone"
-                  onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
-                  onDragLeave={() => setIsDraggingOver(false)}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-                    setIsDraggingOver(false);
-                    const file = e.dataTransfer.files[0];
-                    if (file) await handleImageUpload(file);
-                  }}
-                >
-                  <label htmlFor="note-content" className="sr-only">Note content</label>
-                  <Textarea
-                    id="note-content"
-                    ref={textareaRef}
-                    fieldSizing="fixed"
-                    value={content}
-                    onChange={(e) => handleContentChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    onScroll={handleEditorScroll}
-                    onBlur={handleBlur}
-                    onPaste={async (e) => {
-                      const file = e.clipboardData.files[0];
-                      if (file?.type.startsWith("image/")) {
-                        e.preventDefault();
-                        await handleImageUpload(file);
-                      }
-                    }}
-                    placeholder={t("editor.noteContentPlaceholder")}
-                    className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
-                    data-testid="editor-content-input"
-                    onKeyUp={handleSelect}
-                    onMouseUp={handleSelect}
-                  />
-                  {showIndentGuides && (
-                    <div
-                      className="absolute inset-0 pointer-events-none overflow-hidden"
-                      data-testid="indent-guide-overlay"
-                      aria-hidden="true"
-                    >
-                      {Array.from({ length: indentGuideCount }, (_, i) => (
-                        <div
-                          key={i}
-                          className="absolute top-0 bottom-0 w-px bg-gray-400/40 dark:bg-gray-500/40"
-                          style={{ left: `${(i + 1) * 2 * getCharWidth()}px` }}
-                          data-testid={`indent-guide-line-${i}`}
-                        />
-                      ))}
-                    </div>
-                  )}
+              {/* Image upload error message */}
+              {imageUploadError && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground text-sm px-4 py-2 rounded shadow-md">
+                  {imageUploadError}
                 </div>
               )}
 
-              {/* Markdown Preview Column */}
-              {isPreviewOpen && (
+              {pendingEditProposal ? (
+                <div
+                  className="flex flex-col flex-1 min-h-0"
+                  data-testid="editor-diff-panel"
+                >
+                  <DiffView
+                    originalContent={pendingEditProposal.originalContent}
+                    editedContent={pendingEditProposal.editedContent}
+                    onAccept={onAcceptEdit ?? (() => {})}
+                    onReject={onRejectEdit ?? (() => {})}
+                    isApplied={null}
+                    fullSize
+                  />
+                </div>
+              ) : (
                 <>
-                  {isDesktopViewport && (
+                  {/* Markdown Editor Column */}
+                  {(!isPreviewOpen ||
+                    (isDesktopViewport && !isEditorCollapsed)) && (
                     <div
-                      role="separator"
-                      tabIndex={0}
-                      aria-orientation="vertical"
-                      aria-label={t("editor.resizeEditorPreview")}
-                      onMouseDown={handlePreviewResizeStart}
-                      onDoubleClick={handlePreviewResizeDoubleClick}
-                      onKeyDown={handlePreviewResizeKeyDown}
-                      data-testid="editor-preview-resize-handle"
                       className={cn(
-                        "flex-shrink-0 w-2 rounded-full cursor-col-resize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-                        isPreviewResizing ? "bg-primary/70" : "bg-border/30 hover:bg-primary/50"
+                        "relative min-h-0",
+                        isPreviewOpen ? "flex-none min-w-0" : "flex-1",
+                        isDraggingOver && "ring-2 ring-primary rounded"
                       )}
-                    />
-                  )}
-                  <div
-                    className={cn(
-                      "min-w-0 overflow-y-auto",
-                      isDesktopViewport ? "flex-1" : "w-full"
-                    )}
-                    ref={previewContainerRef}
-                    onScroll={isSplitPreviewVisible ? handlePreviewScroll : undefined}
-                    data-testid="editor-preview-pane"
-                  >
-                    <div className="markdown-preview prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={REMARK_PLUGINS}
-                        components={markdownComponents}
-                      >
-                        {deferredContent || `*${t("editor.previewPlaceholder")}*`}
-                      </ReactMarkdown>
+                      style={
+                        isDesktopSplitPreview
+                          ? { width: `${editorPreviewWidth}%` }
+                          : undefined
+                      }
+                      ref={editorContainerRef}
+                      data-testid="editor-drop-zone"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDraggingOver(true);
+                      }}
+                      onDragLeave={() => setIsDraggingOver(false)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        setIsDraggingOver(false);
+                        const file = e.dataTransfer.files[0];
+                        if (file) await handleImageUpload(file);
+                      }}
+                    >
+                      <label htmlFor="note-content" className="sr-only">
+                        Note content
+                      </label>
+                      <Textarea
+                        id="note-content"
+                        ref={textareaRef}
+                        fieldSizing="fixed"
+                        value={content}
+                        onChange={(e) => handleContentChange(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onScroll={handleEditorScroll}
+                        onBlur={handleBlur}
+                        onPaste={async (e) => {
+                          const file = e.clipboardData.files[0];
+                          if (file?.type.startsWith("image/")) {
+                            e.preventDefault();
+                            await handleImageUpload(file);
+                          }
+                        }}
+                        placeholder={t("editor.noteContentPlaceholder")}
+                        className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
+                        data-testid="editor-content-input"
+                        onKeyUp={handleSelect}
+                        onMouseUp={handleSelect}
+                      />
+                      {showIndentGuides && (
+                        <div
+                          className="absolute inset-0 pointer-events-none overflow-hidden"
+                          data-testid="indent-guide-overlay"
+                          aria-hidden="true"
+                        >
+                          {Array.from({ length: indentGuideCount }, (_, i) => (
+                            <div
+                              key={i}
+                              className="absolute top-0 bottom-0 w-px bg-gray-400/40 dark:bg-gray-500/40"
+                              style={{ left: `${(i + 1) * 2 * getCharWidth()}px` }}
+                              data-testid={`indent-guide-line-${i}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* Markdown Preview Column */}
+                  {isPreviewOpen && (
+                    <>
+                      {isDesktopViewport && (
+                        <div
+                          role="separator"
+                          tabIndex={0}
+                          aria-orientation="vertical"
+                          aria-label={t("editor.resizeEditorPreview")}
+                          onMouseDown={handlePreviewResizeStart}
+                          onDoubleClick={handlePreviewResizeDoubleClick}
+                          onKeyDown={handlePreviewResizeKeyDown}
+                          data-testid="editor-preview-resize-handle"
+                          className={cn(
+                            "flex-shrink-0 w-2 rounded-full cursor-col-resize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                            isPreviewResizing
+                              ? "bg-primary/70"
+                              : "bg-border/30 hover:bg-primary/50"
+                          )}
+                        />
+                      )}
+                      <EditorMarkdownPreview
+                        deferredContent={deferredContent}
+                        markdownComponents={markdownComponents}
+                        previewContainerRef={previewContainerRef}
+                        onPreviewScroll={
+                          isSplitPreviewVisible ? handlePreviewScroll : undefined
+                        }
+                        isDesktopViewport={isDesktopViewport}
+                        previewPlaceholder={t("editor.previewPlaceholder")}
+                      />
+                    </>
+                  )}
                 </>
               )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Status bar */}
-      <div className="relative flex flex-wrap items-center justify-between px-4 md:px-6 py-2 border-t border-border/50 text-xs text-muted-foreground gap-y-2">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1" data-testid="sync-status">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={`flex items-center gap-1 cursor-help ${statusColorClass}`}>
-                    {statusIcon}
-                    <span className="font-medium">{statusText}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{statusTooltip}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            </div>
           </div>
-          <div className="flex items-center gap-1 border-l border-border/50 pl-4">
-            <HashIcon className="h-3 w-3" />
-            <span>
-              {t("editor.characters")}: <span className="font-medium text-foreground">{content.length}</span>
-            </span>
-          </div>
-        </div>
 
-        {/* Clock, Weather and Token Usage - Absolutely centered */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-4">
-          <Clock />
-          <WeatherWidget />
-          {tokenUsage && (
-            <TokenUsageIndicator
-              tokensUsed={tokenUsage.tokens_used}
-              tokenLimit={tokenUsage.token_limit}
-              resetDate={tokenUsage.period_end}
-            />
-          )}
-        </div>
-
-        <div className="whitespace-nowrap">
-          {t("editor.lastSaved")}: {new Date(note.updated_at).toLocaleString("ja-JP", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </div>
-      </div>
-
-      {/* Share Dialog */}
-      <ShareDialog
-        isOpen={isShareDialogOpen}
-        onClose={() => setIsShareDialogOpen(false)}
-        shareUrl={currentShare ? `${window.location.origin}/shared?token=${currentShare.share_token}` : null}
-        isLoading={isShareLoading}
-        onCreateShare={async () => {
-          setIsShareLoading(true);
-          try {
-            const api = await getApi();
-            const share = await api.createNoteShare(note.id);
-            setCurrentShare(share);
-          } finally {
-            setIsShareLoading(false);
-          }
-        }}
-        onRevokeShare={async () => {
-          setIsShareLoading(true);
-          try {
-            const api = await getApi();
-            await api.deleteNoteShare(note.id);
-            setCurrentShare(null);
-          } finally {
-            setIsShareLoading(false);
-          }
-        }}
-      />
+          <EditorStatusBar
+            contentLength={content.length}
+            currentHash={currentHash}
+            savedHash={savedHash}
+            syncStatus={syncStatus}
+            tokenUsage={tokenUsage}
+            updatedAt={note.updated_at}
+          />
         </div>
       </div>
       <span

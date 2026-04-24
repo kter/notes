@@ -13,6 +13,7 @@ const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
   base_cursor: "cursor-1",
 }));
 const persistWorkspaceSnapshotMock = vi.fn().mockResolvedValue(undefined);
+const persistWorkspaceSnapshotIncrementalMock = vi.fn().mockResolvedValue(undefined);
 const translationMap = {
   "sync.offlineSyncUnavailable": "Cannot sync while offline",
 } as const;
@@ -53,6 +54,7 @@ vi.mock("@/lib/utils", () => ({
 
 vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshot: (...args: unknown[]) => persistWorkspaceSnapshotMock(...args),
+  persistWorkspaceSnapshotIncremental: (...args: unknown[]) => persistWorkspaceSnapshotIncrementalMock(...args),
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
   withSnippet: (note: Note) => ({ ...note, snippet: (note.content ?? "").slice(0, 80) }),
   isConflictApiError: () => false,
@@ -147,12 +149,15 @@ describe("useNotes", () => {
     });
 
     expect(notesDB.saveNote).toHaveBeenCalledTimes(1);
-    expect(persistWorkspaceSnapshotMock).toHaveBeenCalledWith({
-      folders: [],
-      notes: [serverNote],
-      cursor: "cursor-1",
-      server_time: "2024-01-01T00:00:00.000Z",
-    });
+    expect(persistWorkspaceSnapshotIncrementalMock).toHaveBeenCalledWith(
+      {
+        folders: [],
+        notes: [serverNote],
+        cursor: "cursor-1",
+        server_time: "2024-01-01T00:00:00.000Z",
+      },
+      expect.any(Array)
+    );
     expect(notesDB.deleteNote).toHaveBeenCalledWith(expect.stringMatching(/^temp-/));
     expect(result.current.syncStatus.remote).toBe("synced");
     expect(result.current.savedHashes).toEqual({ "server-note-1": "hash-123" });

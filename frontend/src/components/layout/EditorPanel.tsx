@@ -772,6 +772,7 @@ export function EditorPanel({
   }, [handleTabKey, handleEnterKey]);
 
   const handleSelect = useCallback(() => {
+    if (isComposingRef.current) return;
     const textarea = textareaRef.current;
     if (!textarea) return;
     const { value, selectionStart, selectionEnd } = textarea;

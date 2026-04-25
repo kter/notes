@@ -1,13 +1,12 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
 import { DiffView } from "@/components/ai/DiffView";
 import { useApi, useTranslation } from "@/hooks";
-import { useEffect, useState, useRef, useCallback, useMemo, KeyboardEvent, useDeferredValue, startTransition } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, useDeferredValue, startTransition, type KeyboardEvent } from "react";
+import { MarkdownEditor, type MarkdownEditorHandle } from "@/components/editor/MarkdownEditor";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -100,19 +99,13 @@ export function EditorPanel({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [printSnapshot, setPrintSnapshot] = useState<{ title: string; content: string } | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<MarkdownEditorHandle>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const editorPreviewLayoutRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef(false);
-  const scrollRafRef = useRef<number | null>(null);
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
   const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
   const printCleanupRef = useRef<(() => void) | null>(null);
-  const [showIndentGuides, setShowIndentGuides] = useState(false);
-  const [indentGuideCount, setIndentGuideCount] = useState(0);
-  const charMeasureRef = useRef<HTMLSpanElement>(null);
-  const isComposingRef = useRef(false);
 
   useEffect(() => {
     editorPreviewWidthRef.current = editorPreviewWidth;
@@ -175,12 +168,10 @@ export function EditorPanel({
 
   // Apply content override from AI edit accept
   const contentOverrideVersionRef = useRef<number>(-1);
-  // setEditorContent is defined later; access via ref to avoid circular deps
-  const setEditorContentRef = useRef<(v: string) => void>(() => {});
   useEffect(() => {
     if (contentOverride && contentOverride.version !== contentOverrideVersionRef.current) {
       contentOverrideVersionRef.current = contentOverride.version;
-      setEditorContentRef.current(contentOverride.content);
+      editorRef.current?.setValue(contentOverride.content);
     }
   }, [contentOverride]);
 
@@ -191,12 +182,9 @@ export function EditorPanel({
     noteIdRef.current = note?.id;
   }, [note?.id]);
 
-  // Clean up pending RAF on unmount
+  // Clean up print mode on unmount
   useEffect(() => {
     return () => {
-      if (scrollRafRef.current !== null) {
-        cancelAnimationFrame(scrollRafRef.current);
-      }
       printCleanupRef.current?.();
     };
   }, []);
@@ -429,58 +417,19 @@ export function EditorPanel({
     currentTitleRef.current = value;
   };
 
-  // Called by textarea onChange only — never updates the textarea DOM (browser already did it).
-  // setContent / setCommittedContent are wrapped in a transition so the React re-render does
-  // not block the next keystroke; safe because the textarea is uncontrolled.
-  const handleContentChange = useCallback((value: string) => {
+  // Called by CM6's updateListener on every doc change (after compositionEnd for IME input).
+  const handleEditorChange = useCallback((value: string) => {
     currentContentRef.current = value;
-    if (isComposingRef.current) return;
     onContentChange?.(value);
-    startTransition(() => {
-      setContent(value);
-      setCommittedContent(value);
-    });
-  }, [onContentChange]);
-
-  // Called for programmatic content changes (contentOverride, checkbox, image paste).
-  // Updates the textarea DOM imperatively because the textarea is uncontrolled.
-  const setEditorContent = useCallback((value: string) => {
-    currentContentRef.current = value;
-    if (textareaRef.current) {
-      const focused = document.activeElement === textareaRef.current;
-      const sel = focused ? textareaRef.current.selectionStart : null;
-      textareaRef.current.value = value;
-      if (focused && sel !== null) {
-        const clamped = Math.min(sel, value.length);
-        textareaRef.current.setSelectionRange(clamped, clamped);
-      }
-    }
     setContent(value);
-    setCommittedContent(value);
-    onContentChange?.(value);
+    startTransition(() => setCommittedContent(value));
   }, [onContentChange]);
-  // Keep the ref in sync so the contentOverride effect (defined earlier) can call it.
-  setEditorContentRef.current = setEditorContent;
 
-  const handleCompositionStart = useCallback(() => {
-    isComposingRef.current = true;
+  // Called for programmatic content changes (checkbox, image paste).
+  // CM6's setValue triggers handleEditorChange automatically via updateListener.
+  const setEditorContent = useCallback((value: string) => {
+    editorRef.current?.setValue(value);
   }, []);
-
-  const handleCompositionEnd = useCallback(
-    (e: React.CompositionEvent<HTMLTextAreaElement>) => {
-      isComposingRef.current = false;
-      const value = e.currentTarget.value;
-      currentContentRef.current = value;
-      onContentChange?.(value);
-      // Defer the React re-render so the user can immediately start the next composition
-      // without waiting for EditorPanel's reconciliation to finish.
-      startTransition(() => {
-        setContent(value);
-        setCommittedContent(value);
-      });
-    },
-    [onContentChange]
-  );
 
   const markdownComponents = useMemo((): Components => ({
     input(props) {
@@ -535,12 +484,12 @@ export function EditorPanel({
     }
 
     const placeholder = `![${t("editor.uploading")}]()`;
-    const textarea = textareaRef.current;
     const currentValue = currentContentRef.current;
-    const insertPos = textarea ? textarea.selectionStart : currentValue.length;
+    const view = editorRef.current?.view();
+    const insertPos = view?.state.selection.main.from ?? currentValue.length;
 
     setEditorContent(currentValue.slice(0, insertPos) + placeholder + currentValue.slice(insertPos));
-    textarea?.setSelectionRange(insertPos + placeholder.length, insertPos + placeholder.length);
+    view?.dispatch({ selection: { anchor: insertPos + placeholder.length } });
 
     try {
       const api = await getApi();
@@ -551,271 +500,9 @@ export function EditorPanel({
     }
   }, [getApi, setEditorContent, t]);
 
-  // Helper: Get list marker information from current line
-  interface ListMarkerInfo {
-    fullMatch: string;
-    indent: string;
-    marker: string | undefined;
-    markerSpace: string;
-    contentAfterMarker: string;
-  }
 
-  const getListMarkerInfo = useCallback((currentLine: string): ListMarkerInfo | null => {
-    // Match leading whitespace and optional list markers
-    // Supports: -, *, +, 1., 2., etc.
-    const match = currentLine.match(/^(\s*)([-*+]|\d+\.)?(\s*)/);
-    if (!match) return null;
 
-    const [fullMatch, indent, marker, markerSpace] = match;
-    return {
-      fullMatch,
-      indent: indent || "",
-      marker,
-      markerSpace: markerSpace || "",
-      contentAfterMarker: currentLine.slice(fullMatch.length),
-    };
-  }, []);
 
-  const getCharWidth = useCallback((): number => {
-    if (!charMeasureRef.current) return 0;
-    return charMeasureRef.current.getBoundingClientRect().width;
-  }, []);
-
-  const getCurrentLineIndentLevel = useCallback((text: string, cursorPos: number): number => {
-    const lineStart = text.lastIndexOf("\n", cursorPos - 1) + 1;
-    const lineEnd = text.indexOf("\n", cursorPos);
-    const currentLine = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-    const m = currentLine.match(/^(\s*)/);
-    return m ? Math.floor(m[1].length / 2) : 0;
-  }, []);
-
-  const isCursorAtLineStart = useCallback((text: string, cursorPos: number): boolean => {
-    const lineStart = text.lastIndexOf("\n", cursorPos - 1) + 1;
-    const cursorOffsetInLine = cursorPos - lineStart;
-    const lineEnd = text.indexOf("\n", cursorPos);
-    const currentLine = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-    const info = getListMarkerInfo(currentLine);
-    if (!info) return false;
-    const prefixLen = info.indent.length + (info.marker?.length ?? 0) + info.markerSpace.length;
-    return cursorOffsetInLine <= prefixLen;
-  }, [getListMarkerInfo]);
-
-  const showIndentGuidesForCurrentPosition = useCallback((text: string, cursorPos: number) => {
-    const level = getCurrentLineIndentLevel(text, cursorPos);
-    if (level === 0) {
-      setShowIndentGuides(false);
-      return;
-    }
-    setIndentGuideCount(level);
-    setShowIndentGuides(true);
-  }, [getCurrentLineIndentLevel]);
-
-  // Handle Tab/Shift+Tab for indentation
-  const handleTabKey = useCallback((
-    e: KeyboardEvent<HTMLTextAreaElement>,
-    textarea: HTMLTextAreaElement
-  ): void => {
-    e.preventDefault();
-
-    const { selectionStart, selectionEnd, value } = textarea;
-
-    // Handle multi-line selection
-    if (selectionStart !== selectionEnd) {
-      const startPos = value.lastIndexOf("\n", selectionStart - 1) + 1;
-      const endPos = value.indexOf("\n", selectionEnd);
-      const effectiveEndPos = endPos === -1 ? value.length : endPos;
-
-      const selection = value.slice(startPos, effectiveEndPos);
-      const lines = selection.split("\n");
-      let newSelection = "";
-      let totalOffsetStart = 0;
-      let totalOffsetEnd = 0;
-
-      if (e.shiftKey) {
-        // Unindent multiple lines
-        newSelection = lines
-          .map((line, index) => {
-            const indentMatch = line.match(/^(\s{1,2})/);
-            const spacesToRemove = indentMatch ? indentMatch[1].length : 0;
-
-            if (index === 0) {
-              totalOffsetStart -= Math.min(spacesToRemove, Math.max(0, selectionStart - startPos));
-            }
-            totalOffsetEnd -= spacesToRemove;
-
-            return line.slice(spacesToRemove);
-          })
-          .join("\n");
-      } else {
-        // Indent multiple lines
-        newSelection = lines
-          .map((line) => {
-            totalOffsetEnd += 2;
-            return "  " + line;
-          })
-          .join("\n");
-        totalOffsetStart = 2;
-      }
-
-      // Use document.execCommand to preserve undo history
-      textarea.setSelectionRange(startPos, effectiveEndPos);
-      document.execCommand("insertText", false, newSelection);
-
-      // Adjust cursor position
-      const newStart = Math.max(startPos, selectionStart + totalOffsetStart);
-      const newEnd = selectionEnd + totalOffsetEnd;
-      textarea.setSelectionRange(newStart, newEnd);
-      showIndentGuidesForCurrentPosition(textarea.value, textarea.selectionStart);
-      return;
-    }
-
-    // Find the start of the current line
-    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const currentLine = value.slice(lineStart, selectionStart);
-
-    // Check if the line is a list item (starts with optional whitespace + list marker)
-    const listMatch = currentLine.match(/^(\s*)([-*+]|\d+\.)\s/);
-
-    if (listMatch || currentLine.match(/^\s+/)) {
-      // We're in a list item or indented line
-      if (e.shiftKey) {
-        // Shift+Tab: Remove indentation (2 spaces from the beginning of the line)
-        const lineContent = value.slice(lineStart);
-        const indentMatch = lineContent.match(/^(\s{1,2})/);
-
-        if (indentMatch) {
-          const spacesToRemove = indentMatch[1].length;
-
-          // Use document.execCommand to preserve undo history
-          textarea.setSelectionRange(lineStart, lineStart + spacesToRemove);
-          document.execCommand("delete");
-
-          // Adjust cursor position
-          const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
-          textarea.setSelectionRange(newPos, newPos);
-        }
-      } else {
-        // Tab: Add indentation (2 spaces at the beginning of the line)
-        textarea.setSelectionRange(lineStart, lineStart);
-        document.execCommand("insertText", false, "  ");
-
-        // Adjust cursor position
-        const newPos = selectionStart + 2;
-        textarea.setSelectionRange(newPos, newPos);
-      }
-    } else {
-      // Not in a list item - insert tab characters at cursor position
-      if (e.shiftKey) {
-        // Optional: handle Shift+Tab even for non-list items if it has leading spaces
-        const lineContent = value.slice(lineStart);
-        const indentMatch = lineContent.match(/^(\s{1,2})/);
-        if (indentMatch) {
-          const spacesToRemove = indentMatch[1].length;
-
-          // Use document.execCommand to preserve undo history
-          textarea.setSelectionRange(lineStart, lineStart + spacesToRemove);
-          document.execCommand("delete");
-
-          const newPos = Math.max(lineStart, selectionStart - spacesToRemove);
-          textarea.setSelectionRange(newPos, newPos);
-          showIndentGuidesForCurrentPosition(textarea.value, textarea.selectionStart);
-          return;
-        }
-      }
-
-      // Insert 2 spaces at current cursor position
-      document.execCommand("insertText", false, "  ");
-    }
-    showIndentGuidesForCurrentPosition(textarea.value, textarea.selectionStart);
-  }, [showIndentGuidesForCurrentPosition]);
-
-  // Handle Enter key for list continuation
-  const handleEnterKey = useCallback((
-    e: KeyboardEvent<HTMLTextAreaElement>,
-    textarea: HTMLTextAreaElement
-  ): void => {
-    const { selectionStart, value } = textarea;
-
-    // Find the start of the current line
-    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const currentLine = value.slice(lineStart, selectionStart);
-
-    const markerInfo = getListMarkerInfo(currentLine);
-    if (!markerInfo) return;
-
-    const { indent, marker, markerSpace, contentAfterMarker } = markerInfo;
-
-    // Check if the line only contains the marker (empty list item)
-    if (marker && contentAfterMarker.trim() === "") {
-      // Empty list item - remove the marker and indent on Enter
-      e.preventDefault();
-
-      // Use document.execCommand to preserve undo history
-      textarea.setSelectionRange(lineStart, selectionStart);
-      document.execCommand("insertText", false, "\n");
-      return;
-    }
-
-    // Build the continuation string
-    let continuation = indent;
-    if (marker) {
-      // Increment number for ordered lists
-      const numMatch = marker.match(/^(\d+)\.$/);
-      if (numMatch) {
-        continuation += (parseInt(numMatch[1], 10) + 1) + "." + markerSpace;
-      } else {
-        continuation += marker + markerSpace;
-      }
-    }
-
-    // Only intercept if there's something to continue
-    if (continuation) {
-      e.preventDefault();
-
-      // Use document.execCommand to preserve undo history
-      document.execCommand("insertText", false, "\n" + continuation);
-
-      // Scroll to keep cursor visible
-      requestAnimationFrame(() => {
-        textarea.blur();
-        textarea.focus();
-      });
-    }
-  }, [getListMarkerInfo]);
-
-  // Main keyboard event handler - delegates to specific handlers
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Skip handling during IME composition (e.g., Japanese input)
-    if (e.nativeEvent.isComposing) return;
-
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    if (e.key === "Tab") {
-      handleTabKey(e, textarea);
-      return;
-    }
-
-    if (e.key === "Enter") {
-      handleEnterKey(e, textarea);
-    }
-  }, [handleTabKey, handleEnterKey]);
-
-  const handleSelect = useCallback(() => {
-    if (isComposingRef.current) return;
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const { value, selectionStart, selectionEnd } = textarea;
-    if (isCursorAtLineStart(value, selectionStart)) {
-      showIndentGuidesForCurrentPosition(value, selectionStart);
-    } else {
-      setShowIndentGuides(false);
-    }
-    if (onSelectionChange) {
-      const selectedText = selectionStart !== selectionEnd ? value.slice(selectionStart, selectionEnd) : "";
-      onSelectionChange(selectedText);
-    }
-  }, [isCursorAtLineStart, showIndentGuidesForCurrentPosition, onSelectionChange]);
 
   // Fullscreen API toggle
   const toggleFullscreen = useCallback(async () => {
@@ -849,93 +536,6 @@ export function EditorPanel({
 
   const isDesktopSplitPreview = isPreviewOpen && isDesktopViewport;
   const isEditorCollapsed = isDesktopSplitPreview && editorPreviewWidth <= 0;
-  const isSplitPreviewVisible = isDesktopSplitPreview && !isEditorCollapsed;
-
-  // Scroll Sync Handlers (throttled with requestAnimationFrame, no content dependency)
-  const handleEditorScroll = useCallback(() => {
-    if (isScrollingRef.current || !isSplitPreviewVisible || !textareaRef.current || !previewContainerRef.current) return;
-    if (scrollRafRef.current !== null) return;
-
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null;
-      if (!textareaRef.current || !previewContainerRef.current) return;
-
-      isScrollingRef.current = true;
-
-      const editor = textareaRef.current;
-      const preview = previewContainerRef.current;
-
-      const val = editor.value;
-      let contentLines = 1;
-      for (let i = 0; i < val.length; i++) {
-        if (val.charCodeAt(i) === 10) contentLines++;
-      }
-      const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
-      const targetLine = Math.floor(contentLines * scrollPercentage);
-
-      const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-      let targetElement = null;
-
-      for (const el of elements) {
-        const line = parseInt(el.getAttribute("data-source-line") || "0", 10);
-        if (line >= targetLine) {
-          targetElement = el;
-          break;
-        }
-      }
-
-      if (targetElement) {
-        preview.scrollTop = targetElement.offsetTop - preview.offsetTop;
-      } else if (scrollPercentage > 0.99) {
-        preview.scrollTop = preview.scrollHeight;
-      }
-
-      setTimeout(() => {
-        isScrollingRef.current = false;
-      }, 50);
-    });
-  }, [isSplitPreviewVisible]);
-
-  const handlePreviewScroll = useCallback(() => {
-    if (isScrollingRef.current || !isSplitPreviewVisible || !textareaRef.current || !previewContainerRef.current) return;
-    if (scrollRafRef.current !== null) return;
-
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null;
-      if (!textareaRef.current || !previewContainerRef.current) return;
-
-      isScrollingRef.current = true;
-
-      const editor = textareaRef.current;
-      const preview = previewContainerRef.current;
-
-      const val = editor.value;
-      let contentLines = 1;
-      for (let i = 0; i < val.length; i++) {
-        if (val.charCodeAt(i) === 10) contentLines++;
-      }
-
-      const elements = Array.from(preview.querySelectorAll("[data-source-line]")) as HTMLElement[];
-      let visibleElement: HTMLElement | null = null;
-
-      for (const el of elements) {
-        if (el.offsetTop - preview.offsetTop >= preview.scrollTop) {
-          visibleElement = el;
-          break;
-        }
-      }
-
-      if (visibleElement) {
-        const line = parseInt(visibleElement.getAttribute("data-source-line") || "0", 10);
-        const targetScrollTop = (line / contentLines) * (editor.scrollHeight - editor.clientHeight);
-        editor.scrollTop = targetScrollTop;
-      }
-
-      setTimeout(() => {
-        isScrollingRef.current = false;
-      }, 50);
-    });
-  }, [isSplitPreviewVisible]);
 
   // JSON export handlers
   const handleExportMarkdown = useCallback(() => {
@@ -1134,53 +734,18 @@ export function EditorPanel({
                         if (file) await handleImageUpload(file);
                       }}
                     >
-                      <label htmlFor="note-content" className="sr-only">
-                        Note content
-                      </label>
-                      <Textarea
-                        id="note-content"
-                        ref={textareaRef}
-                        fieldSizing="fixed"
-                        defaultValue={note?.content ?? ""}
-                        onChange={(e) => handleContentChange(e.target.value)}
-                        onCompositionStart={handleCompositionStart}
-                        onCompositionEnd={handleCompositionEnd}
-                        onKeyDown={handleKeyDown}
-                        onScroll={handleEditorScroll}
+                      <MarkdownEditor
+                        ref={editorRef}
+                        key={note?.id}
+                        initialValue={note?.content ?? ""}
+                        onChange={handleEditorChange}
                         onBlur={handleBlur}
-                        onPaste={async (e) => {
-                          const file = e.clipboardData.files[0];
-                          if (file?.type.startsWith("image/")) {
-                            e.preventDefault();
-                            await handleImageUpload(file);
-                          }
-                        }}
+                        onSelectionChange={onSelectionChange}
+                        onPasteImage={handleImageUpload}
                         placeholder={t("editor.noteContentPlaceholder")}
-                        className="h-full resize-none border-none shadow-none focus-visible:ring-0 px-0 text-base leading-relaxed min-h-[400px] font-mono"
+                        className="h-full min-h-[400px]"
                         data-testid="editor-content-input"
-                        onKeyUp={handleSelect}
-                        onMouseUp={handleSelect}
-                        spellCheck={false}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
                       />
-                      {showIndentGuides && (
-                        <div
-                          className="absolute inset-0 pointer-events-none overflow-hidden"
-                          data-testid="indent-guide-overlay"
-                          aria-hidden="true"
-                        >
-                          {Array.from({ length: indentGuideCount }, (_, i) => (
-                            <div
-                              key={i}
-                              className="absolute top-0 bottom-0 w-px bg-gray-400/40 dark:bg-gray-500/40"
-                              style={{ left: `${(i + 1) * 2 * getCharWidth()}px` }}
-                              data-testid={`indent-guide-line-${i}`}
-                            />
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -1209,9 +774,7 @@ export function EditorPanel({
                         deferredContent={deferredContent}
                         markdownComponents={markdownComponents}
                         previewContainerRef={previewContainerRef}
-                        onPreviewScroll={
-                          isSplitPreviewVisible ? handlePreviewScroll : undefined
-                        }
+                        onPreviewScroll={undefined}
                         isDesktopViewport={isDesktopViewport}
                         previewPlaceholder={t("editor.previewPlaceholder")}
                       />
@@ -1232,14 +795,6 @@ export function EditorPanel({
           />
         </div>
       </div>
-      <span
-        ref={charMeasureRef}
-        className="font-mono invisible absolute -z-10 whitespace-pre"
-        aria-hidden="true"
-        style={{ fontSize: "inherit", lineHeight: "inherit" }}
-      >
-        x
-      </span>
     </>
   );
 }

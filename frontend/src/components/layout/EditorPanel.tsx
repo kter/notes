@@ -175,12 +175,14 @@ export function EditorPanel({
 
   // Apply content override from AI edit accept
   const contentOverrideVersionRef = useRef<number>(-1);
+  // setEditorContent is defined later; access via ref to avoid circular deps
+  const setEditorContentRef = useRef<(v: string) => void>(() => {});
   useEffect(() => {
     if (contentOverride && contentOverride.version !== contentOverrideVersionRef.current) {
       contentOverrideVersionRef.current = contentOverride.version;
-      handleContentChange(contentOverride.content);
+      setEditorContentRef.current(contentOverride.content);
     }
-  }, [contentOverride]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [contentOverride]);
 
   // Trigger server sync on unmount or when switching notes
   // Store note.id in a ref so cleanup function has access to the current value
@@ -427,14 +429,34 @@ export function EditorPanel({
     currentTitleRef.current = value;
   };
 
+  // Called by textarea onChange only — never updates the textarea DOM (browser already did it).
   const handleContentChange = useCallback((value: string) => {
-    setContent(value);
     currentContentRef.current = value;
-    if (!isComposingRef.current) {
-      setCommittedContent(value);
-      onContentChange?.(value);
-    }
+    if (isComposingRef.current) return;
+    setContent(value);
+    setCommittedContent(value);
+    onContentChange?.(value);
   }, [onContentChange]);
+
+  // Called for programmatic content changes (contentOverride, checkbox, image paste).
+  // Updates the textarea DOM imperatively because the textarea is uncontrolled.
+  const setEditorContent = useCallback((value: string) => {
+    currentContentRef.current = value;
+    if (textareaRef.current) {
+      const focused = document.activeElement === textareaRef.current;
+      const sel = focused ? textareaRef.current.selectionStart : null;
+      textareaRef.current.value = value;
+      if (focused && sel !== null) {
+        const clamped = Math.min(sel, value.length);
+        textareaRef.current.setSelectionRange(clamped, clamped);
+      }
+    }
+    setContent(value);
+    setCommittedContent(value);
+    onContentChange?.(value);
+  }, [onContentChange]);
+  // Keep the ref in sync so the contentOverride effect (defined earlier) can call it.
+  setEditorContentRef.current = setEditorContent;
 
   const handleCompositionStart = useCallback(() => {
     isComposingRef.current = true;
@@ -470,13 +492,13 @@ export function EditorPanel({
             const lineNumber = parseInt(lineSource.getAttribute("data-source-line") ?? "0", 10);
             if (!lineNumber) return;
             const newContent = toggleMarkdownCheckbox(currentContentRef.current, lineNumber);
-            if (newContent !== currentContentRef.current) handleContentChange(newContent);
+            if (newContent !== currentContentRef.current) setEditorContent(newContent);
           }}
           style={{ cursor: "pointer" }}
         />
       );
     },
-  }), [handleContentChange]);
+  }), [setEditorContent]);
 
   const handleBlur = () => {
     // Use refs to check for changes to ensure we have the latest values
@@ -506,20 +528,20 @@ export function EditorPanel({
 
     const placeholder = `![${t("editor.uploading")}]()`;
     const textarea = textareaRef.current;
-    const insertPos = textarea ? textarea.selectionStart : content.length;
+    const currentValue = currentContentRef.current;
+    const insertPos = textarea ? textarea.selectionStart : currentValue.length;
 
-    const newContent =
-      content.slice(0, insertPos) + placeholder + content.slice(insertPos);
-    handleContentChange(newContent);
+    setEditorContent(currentValue.slice(0, insertPos) + placeholder + currentValue.slice(insertPos));
+    textarea?.setSelectionRange(insertPos + placeholder.length, insertPos + placeholder.length);
 
     try {
       const api = await getApi();
       const { url } = await api.uploadImage(file);
-      setContent((prev) => prev.replace(placeholder, `![image](${url})`));
+      setEditorContent(currentContentRef.current.replace(placeholder, `![image](${url})`));
     } catch {
-      setContent((prev) => prev.replace(placeholder, ""));
+      setEditorContent(currentContentRef.current.replace(placeholder, ""));
     }
-  }, [content, getApi, handleContentChange, t]);
+  }, [getApi, setEditorContent, t]);
 
   // Helper: Get list marker information from current line
   interface ListMarkerInfo {
@@ -1111,7 +1133,7 @@ export function EditorPanel({
                         id="note-content"
                         ref={textareaRef}
                         fieldSizing="fixed"
-                        value={content}
+                        defaultValue={note?.content ?? ""}
                         onChange={(e) => handleContentChange(e.target.value)}
                         onCompositionStart={handleCompositionStart}
                         onCompositionEnd={handleCompositionEnd}

@@ -1160,6 +1160,10 @@ export function EditorPanel({
                         data-testid="editor-content-input"
                         onKeyUp={handleSelect}
                         onMouseUp={handleSelect}
+                        spellCheck={false}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
                       />
                       {showIndentGuides && (
                         <div

@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import type { Note, Folder, TokenUsageRead, EditProposal } from "@/types";
 import { DiffView } from "@/components/ai/DiffView";
 import { useApi, useTranslation } from "@/hooks";
-import { useEffect, useState, useRef, useCallback, useMemo, KeyboardEvent, useDeferredValue } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, KeyboardEvent, useDeferredValue, startTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -430,12 +430,16 @@ export function EditorPanel({
   };
 
   // Called by textarea onChange only — never updates the textarea DOM (browser already did it).
+  // setContent / setCommittedContent are wrapped in a transition so the React re-render does
+  // not block the next keystroke; safe because the textarea is uncontrolled.
   const handleContentChange = useCallback((value: string) => {
     currentContentRef.current = value;
     if (isComposingRef.current) return;
-    setContent(value);
-    setCommittedContent(value);
     onContentChange?.(value);
+    startTransition(() => {
+      setContent(value);
+      setCommittedContent(value);
+    });
   }, [onContentChange]);
 
   // Called for programmatic content changes (contentOverride, checkbox, image paste).
@@ -466,10 +470,14 @@ export function EditorPanel({
     (e: React.CompositionEvent<HTMLTextAreaElement>) => {
       isComposingRef.current = false;
       const value = e.currentTarget.value;
-      setContent(value);
-      setCommittedContent(value);
       currentContentRef.current = value;
       onContentChange?.(value);
+      // Defer the React re-render so the user can immediately start the next composition
+      // without waiting for EditorPanel's reconciliation to finish.
+      startTransition(() => {
+        setContent(value);
+        setCommittedContent(value);
+      });
     },
     [onContentChange]
   );

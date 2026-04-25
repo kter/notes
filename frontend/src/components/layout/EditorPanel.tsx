@@ -428,12 +428,11 @@ export function EditorPanel({
   };
 
   const handleContentChange = useCallback((value: string) => {
-    setContent(value);
     currentContentRef.current = value;
-    if (!isComposingRef.current) {
-      setCommittedContent(value);
-      onContentChange?.(value);
-    }
+    if (isComposingRef.current) return;
+    setContent(value);
+    setCommittedContent(value);
+    onContentChange?.(value);
   }, [onContentChange]);
 
   const handleCompositionStart = useCallback(() => {

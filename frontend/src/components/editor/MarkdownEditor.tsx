@@ -94,6 +94,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           // Remove CM6 default selection color so Tailwind / OS selection is visible
           ".cm-selectionBackground": { background: "Highlight" },
           "&.cm-focused .cm-selectionBackground": { background: "Highlight" },
+          ".cm-cursor, .cm-dropCursor": {
+            borderLeftColor: "var(--foreground)",
+          },
+          "&.cm-focused .cm-cursor": {
+            borderLeftColor: "var(--foreground)",
+          },
         }),
         EditorView.contentAttributes.of({
           spellcheck: "false",

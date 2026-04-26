@@ -5,6 +5,9 @@ import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from 
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { markdownIndentKeymap } from "./extensions/markdownIndent";
+import { markdownListContinuationKeymap } from "./extensions/markdownListContinuation";
+import { indentGuide } from "./extensions/indentGuide";
 
 export interface MarkdownEditorHandle {
   getValue: () => string;
@@ -56,10 +59,16 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
 
       const extensions = [
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([
+          ...markdownIndentKeymap,
+          ...markdownListContinuationKeymap,
+          ...defaultKeymap,
+          ...historyKeymap,
+        ]),
         markdown(),
         drawSelection(),
         EditorView.lineWrapping,
+        indentGuide,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChangeRef.current?.(update.state.doc.toString());

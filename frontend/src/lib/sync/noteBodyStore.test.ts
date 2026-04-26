@@ -43,6 +43,56 @@ describe("noteBodyStore", () => {
     });
   });
 
+  describe("has", () => {
+    it("returns false for unknown id", () => {
+      expect(noteBodyStore.has("unknown")).toBe(false);
+    });
+
+    it("returns true after set", () => {
+      noteBodyStore.set("a", "data");
+      expect(noteBodyStore.has("a")).toBe(true);
+    });
+
+    it("returns false after delete", () => {
+      noteBodyStore.set("a", "data");
+      noteBodyStore.delete("a");
+      expect(noteBodyStore.has("a")).toBe(false);
+    });
+
+    it("returns true even when value is empty string", () => {
+      noteBodyStore.set("a", "");
+      expect(noteBodyStore.has("a")).toBe(true);
+    });
+  });
+
+  describe("version", () => {
+    it("increments on set with new value", () => {
+      const before = noteBodyStore.version();
+      noteBodyStore.set("a", "v1");
+      expect(noteBodyStore.version()).toBe(before + 1);
+    });
+
+    it("does not increment when setting the same value", () => {
+      noteBodyStore.set("a", "same");
+      const before = noteBodyStore.version();
+      noteBodyStore.set("a", "same");
+      expect(noteBodyStore.version()).toBe(before);
+    });
+
+    it("increments on delete", () => {
+      noteBodyStore.set("a", "data");
+      const before = noteBodyStore.version();
+      noteBodyStore.delete("a");
+      expect(noteBodyStore.version()).toBe(before + 1);
+    });
+
+    it("does not increment when deleting nonexistent id", () => {
+      const before = noteBodyStore.version();
+      noteBodyStore.delete("nonexistent");
+      expect(noteBodyStore.version()).toBe(before);
+    });
+  });
+
   describe("delete", () => {
     it("removes a stored value", () => {
       noteBodyStore.set("a", "data");

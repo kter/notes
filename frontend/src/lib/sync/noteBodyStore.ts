@@ -4,6 +4,7 @@ type Listener = () => void;
 
 const bodies = new Map<string, string>();
 const listeners = new Set<Listener>();
+let storeVersion = 0;
 
 function subscribe(listener: Listener): () => void {
   listeners.add(listener);
@@ -21,9 +22,14 @@ export const noteBodyStore = {
     return bodies.get(id) ?? "";
   },
 
+  has(id: string): boolean {
+    return bodies.has(id);
+  },
+
   set(id: string, content: string): void {
     if (bodies.get(id) !== content) {
       bodies.set(id, content);
+      storeVersion++;
       notify();
     }
   },
@@ -31,8 +37,13 @@ export const noteBodyStore = {
   delete(id: string): void {
     if (bodies.has(id)) {
       bodies.delete(id);
+      storeVersion++;
       notify();
     }
+  },
+
+  version(): number {
+    return storeVersion;
   },
 
   subscribe,

@@ -191,7 +191,7 @@ test.describe('Golden Path: Note Lifecycle', () => {
     const titleInput = layout.getByTestId('editor-title-input');
     const contentInput = layout.getByTestId('editor-content-input');
     await expect(titleInput).toHaveValue(noteTitle, { timeout: 30000 });
-    await expect(contentInput).toHaveValue(noteContent, { timeout: 30000 });
+    await expect(contentInput).toContainText(noteContent, { timeout: 30000 });
 
     console.log('[Golden Path] Editing note title and content');
     await titleInput.fill(updatedTitle);

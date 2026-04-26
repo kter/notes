@@ -50,7 +50,8 @@ vi.mock('@/components/ai/DiffView', () => ({
   ),
 }))
 
-// Mock MarkdownEditor with a textarea facade so existing tests work unchanged
+// Mock MarkdownEditor with a textarea facade so existing tests work unchanged.
+// The wrapper div acts as scrollDOM so scroll-sync tests can fire events on it.
 vi.mock('@/components/editor/MarkdownEditor', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react')
@@ -59,6 +60,7 @@ vi.mock('@/components/editor/MarkdownEditor', () => {
     const { initialValue, onChange, onBlur, onPasteImage, placeholder, className } = props
     const testId = props['data-testid']
     const [value, setValue] = React.useState(initialValue ?? '')
+    const scrollDOMRef = React.useRef(null)
     React.useImperativeHandle(ref, () => ({
       getValue: () => value,
       setValue: (newValue: string) => {
@@ -66,29 +68,36 @@ vi.mock('@/components/editor/MarkdownEditor', () => {
         onChange?.(newValue)
       },
       focus: () => {},
-      view: () => null,
+      view: () => scrollDOMRef.current ? {
+        scrollDOM: scrollDOMRef.current,
+        state: { selection: { main: { from: 0, to: 0 } } },
+        dispatch: () => {},
+      } : null,
     }), [value, onChange])
-    return React.createElement('textarea', {
-      'aria-label': 'Note content',
-      'data-testid': testId,
-      className,
-      placeholder,
-      value,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onChange: (e: any) => {
-        setValue(e.target.value)
-        onChange?.(e.target.value)
-      },
-      onBlur,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onPaste: (e: any) => {
-        const file = e.clipboardData?.files[0]
-        if (file?.type.startsWith('image/')) {
-          e.preventDefault()
-          onPasteImage?.(file)
-        }
-      },
-    })
+     
+    return React.createElement('div',
+      { ref: scrollDOMRef, 'data-testid': 'mock-cm-scroller', className }, // eslint-disable-line react-hooks/refs
+      React.createElement('textarea', {
+        'aria-label': 'Note content',
+        'data-testid': testId,
+        placeholder,
+        value,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onChange: (e: any) => {
+          setValue(e.target.value)
+          onChange?.(e.target.value)
+        },
+        onBlur,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onPaste: (e: any) => {
+          const file = e.clipboardData?.files[0]
+          if (file?.type.startsWith('image/')) {
+            e.preventDefault()
+            onPasteImage?.(file)
+          }
+        },
+      })
+    )
   })
   return { MarkdownEditor: MockMarkdownEditor }
 })
@@ -697,7 +706,7 @@ describe('EditorPanel', () => {
       })
     })
 
-    describe.skip('Scroll RAF throttling', () => {
+    describe('Scroll RAF throttling', () => {
       let originalRaf: typeof requestAnimationFrame
       let originalCaf: typeof cancelAnimationFrame
 
@@ -717,16 +726,12 @@ describe('EditorPanel', () => {
 
         render(<EditorPanel {...defaultProps} />)
 
-        // Open preview to enable scroll sync
-        const previewButton = screen.getByTestId('editor-preview-toggle')
-        fireEvent.click(previewButton)
-
-        const textarea = screen.getByRole('textbox', { name: /content/i })
+        const scroller = screen.getByTestId('mock-cm-scroller')
 
         // Fire multiple scroll events in the same frame
-        fireEvent.scroll(textarea)
-        fireEvent.scroll(textarea)
-        fireEvent.scroll(textarea)
+        fireEvent.scroll(scroller)
+        fireEvent.scroll(scroller)
+        fireEvent.scroll(scroller)
 
         // Only one RAF should be scheduled (subsequent events are blocked by the ref guard)
         expect(mockRaf).toHaveBeenCalledTimes(1)
@@ -744,13 +749,10 @@ describe('EditorPanel', () => {
 
         render(<EditorPanel {...defaultProps} />)
 
-        const previewButton = screen.getByTestId('editor-preview-toggle')
-        fireEvent.click(previewButton)
-
-        const textarea = screen.getByRole('textbox', { name: /content/i })
+        const scroller = screen.getByTestId('mock-cm-scroller')
 
         // First scroll — schedules RAF
-        fireEvent.scroll(textarea)
+        fireEvent.scroll(scroller)
         expect(mockRaf).toHaveBeenCalledTimes(1)
 
         // Execute the RAF callback — clears scrollRafRef.current and sets isScrollingRef.current = true
@@ -762,7 +764,7 @@ describe('EditorPanel', () => {
         vi.advanceTimersByTime(50)
 
         // Second scroll after frame + cooldown — should schedule a new RAF
-        fireEvent.scroll(textarea)
+        fireEvent.scroll(scroller)
         expect(mockRaf).toHaveBeenCalledTimes(2)
 
         vi.useRealTimers()
@@ -777,12 +779,8 @@ describe('EditorPanel', () => {
 
         const { unmount } = render(<EditorPanel {...defaultProps} />)
 
-        // Open preview and trigger a scroll to schedule a RAF
-        const previewButton = screen.getByTestId('editor-preview-toggle')
-        fireEvent.click(previewButton)
-
-        const textarea = screen.getByRole('textbox', { name: /content/i })
-        fireEvent.scroll(textarea)
+        const scroller = screen.getByTestId('mock-cm-scroller')
+        fireEvent.scroll(scroller)
 
         // RAF is pending (callback not yet executed)
         expect(mockRaf).toHaveBeenCalled()

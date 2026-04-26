@@ -102,6 +102,8 @@ export function EditorPanel({
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const scrollRafRef = useRef<number | null>(null);
+  const isScrollingRef = useRef(false);
   const editorPreviewLayoutRef = useRef<HTMLDivElement>(null);
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
   const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
@@ -124,6 +126,36 @@ export function EditorPanel({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const handleEditorScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) return;
+    if (isScrollingRef.current) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const view = editorRef.current?.view();
+      const preview = previewContainerRef.current;
+      if (!view || !preview) return;
+      const src = view.scrollDOM;
+      const ratio = src.scrollTop / Math.max(1, src.scrollHeight - src.clientHeight);
+      preview.scrollTop = ratio * Math.max(0, preview.scrollHeight - preview.clientHeight);
+      isScrollingRef.current = true;
+      setTimeout(() => { isScrollingRef.current = false; }, 50);
+    });
+  }, []);
+
+  useEffect(() => {
+    const view = editorRef.current?.view();
+    if (!view) return;
+    const target = view.scrollDOM;
+    target.addEventListener("scroll", handleEditorScroll, { passive: true });
+    return () => {
+      target.removeEventListener("scroll", handleEditorScroll);
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    };
+  }, [note?.id, handleEditorScroll]);
 
   // Hash-based Verification Logic
   const [currentHash, setCurrentHash] = useState("");

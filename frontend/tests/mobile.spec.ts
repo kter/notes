@@ -61,8 +61,8 @@ test.describe('Mobile Comprehensive Scenario', () => {
     await expect(titleInput).toBeVisible({ timeout: 20000 });
     await expect(titleInput).toHaveValue(createdNote.title, { timeout: 20000 });
     await expect(
-      layout.getByPlaceholder(/Start writing your note|Markdownでノートを書き始め/i).first()
-    ).toHaveValue(createdNote.content, { timeout: 20000 });
+      layout.getByTestId('editor-content-input')
+    ).toContainText(createdNote.content, { timeout: 20000 });
 
     // 4. Summarize -> Auto transition to Chat/Summary view
     console.log('[Mobile Test] Summarizing');

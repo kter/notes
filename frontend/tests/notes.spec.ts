@@ -71,7 +71,7 @@ test.describe('Notes Functionality', () => {
     await expect(noteItem).toBeVisible({ timeout: 30000 });
     await noteItem.click();
     await expect(layout.getByTestId('editor-title-input')).toHaveValue(noteTitle, { timeout: 30000 });
-    await expect(layout.getByTestId('editor-content-input')).toHaveValue(noteContent, { timeout: 30000 });
+    await expect(layout.getByTestId('editor-content-input')).toContainText(noteContent, { timeout: 30000 });
 
     // 4. Summarize
     console.log('[E2E] Requesting summary');
@@ -335,7 +335,7 @@ test.describe('Notes Functionality', () => {
     await expect(existingNoteItem).toBeVisible({ timeout: 30000 });
     await existingNoteItem.click();
     await expect(layout.getByTestId('editor-title-input')).toHaveValue(onlineNoteTitle, { timeout: 30000 });
-    await expect(contentInput).toHaveValue(initialContent, { timeout: 30000 });
+    await expect(contentInput).toContainText(initialContent, { timeout: 30000 });
 
 
     // 2. Go offline
@@ -417,6 +417,6 @@ test.describe('Notes Functionality', () => {
 
     const reloadedLayout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
     await expect(reloadedLayout.getByTestId('editor-title-input')).toHaveValue(onlineNoteTitle, { timeout: 20000 });
-    await expect(reloadedLayout.getByTestId('editor-content-input')).toHaveValue(offlineContent, { timeout: 20000 });
+    await expect(reloadedLayout.getByTestId('editor-content-input')).toContainText(offlineContent, { timeout: 20000 });
   });
 });

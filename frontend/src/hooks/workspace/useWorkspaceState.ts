@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { MobileView } from "@/components/layout";
 import { useAIChat } from "@/hooks/useAIChat";
@@ -30,10 +30,6 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   const editorContentRef = useRef("");
   const editorSelectedTextRef = useRef("");
   const selectionSubscribersRef = useRef(new Set<() => void>());
-  const selectedNoteIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    selectedNoteIdRef.current = selectedNoteId;
-  }, [selectedNoteId]);
 
   const {
     folders,
@@ -101,8 +97,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
 
   const handleEditorContentChange = useCallback((content: string) => {
     editorContentRef.current = content;
-    if (selectedNoteIdRef.current) noteBodyStore.set(selectedNoteIdRef.current, content);
-  }, []);
+    if (selectedNoteId) noteBodyStore.set(selectedNoteId, content);
+  }, [selectedNoteId]);
 
   const handleEditorSelectionChange = useCallback((selectedText: string) => {
     editorSelectedTextRef.current = selectedText;
@@ -209,9 +205,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   );
 
   const getCurrentEditorContent = useCallback((): string => {
-    const id = selectedNoteIdRef.current;
-    return (id && noteBodyStore.get(id)) || editorContentRef.current;
-  }, []);
+    return (selectedNoteId && noteBodyStore.get(selectedNoteId)) || editorContentRef.current;
+  }, [selectedNoteId]);
 
   return {
     selectedFolderId,

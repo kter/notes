@@ -4,6 +4,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from "@codemirror/view";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
+import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { markdownIndentKeymap } from "./extensions/markdownIndent";
 import { markdownListContinuationKeymap } from "./extensions/markdownListContinuation";
@@ -66,6 +67,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           ...historyKeymap,
         ]),
         markdown(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         drawSelection(),
         EditorView.lineWrapping,
         indentGuide,

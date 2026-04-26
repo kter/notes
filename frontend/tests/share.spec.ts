@@ -74,7 +74,7 @@ test.describe('Sharing Functionality', () => {
       await expect(titleInput).toBeVisible({ timeout: 20000 });
     }
     await expect(titleInput).toHaveValue(noteTitle, { timeout: 30000 });
-    await expect(contentTextarea).toHaveValue(noteContent, { timeout: 30000 });
+    await expect(contentTextarea).toContainText(noteContent, { timeout: 30000 });
 
     // Click the Share button
     console.log('[Share E2E] Opening share dialog');

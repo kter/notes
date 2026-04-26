@@ -185,10 +185,10 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   const handleSendEditRequestFromPanel = useCallback(
     (
       instruction: string,
-      _content: string,
+      content: string,
       noteId?: string,
       selectionRange?: { start: number; end: number }
-    ) => handleSendEditRequest(instruction, editorContentRef.current, noteId, selectionRange),
+    ) => handleSendEditRequest(instruction, content, noteId, selectionRange),
     [handleSendEditRequest]
   );
 

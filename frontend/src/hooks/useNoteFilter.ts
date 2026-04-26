@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { Note } from "@/types";
 import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 
@@ -7,6 +7,13 @@ export function useNoteFilter(
   selectedFolderId: string | null,
   searchQuery: string
 ) {
+  // Subscribe to noteBodyStore so search results refresh when note bodies change.
+  const bodyVersion = useSyncExternalStore(
+    noteBodyStore.subscribe,
+    () => noteBodyStore.version(),
+    () => 0
+  );
+
   // Fingerprint tracks only folder membership changes (id + folder_id), not snippet/updated_at.
   // This prevents folderFiltered from re-running on every auto-save that doesn't move notes.
   const folderFingerprint = useMemo(
@@ -29,13 +36,14 @@ export function useNoteFilter(
     const query = searchQuery.toLowerCase();
     return folderFiltered.filter((n) => {
       if (n.title?.toLowerCase().includes(query)) return true;
-      // Prefer noteBodyStore for latest content (n.content is stale after content-only edits).
-      // Falls back to n.content for notes not yet loaded into the store.
-      // TODO: replace with IndexedDB full-text index to cover notes not in store.
-      const body = noteBodyStore.get(n.id) || n.content;
+      // Use noteBodyStore when available (has() distinguishes "empty" from "not loaded").
+      // Fall back to n.content (snapshot value) only for notes not yet opened in this session.
+      const body = noteBodyStore.has(n.id) ? noteBodyStore.get(n.id) : (n.content ?? "");
       return body.toLowerCase().includes(query);
     });
-  }, [folderFiltered, searchQuery]);
+    // bodyVersion ensures re-evaluation when note bodies change in the store.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folderFiltered, searchQuery, bodyVersion]);
 
   return filteredNotes;
 }

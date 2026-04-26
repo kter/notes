@@ -102,7 +102,8 @@ export function EditorPanel({
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
-  const scrollRafRef = useRef<number | null>(null);
+  const editorScrollRafRef = useRef<number | null>(null);
+  const previewScrollRafRef = useRef<number | null>(null);
   const isScrollingRef = useRef(false);
   const editorPreviewLayoutRef = useRef<HTMLDivElement>(null);
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
@@ -128,17 +129,33 @@ export function EditorPanel({
   }, []);
 
   const handleEditorScroll = useCallback(() => {
-    if (scrollRafRef.current !== null) return;
+    if (editorScrollRafRef.current !== null) return;
     if (isScrollingRef.current) return;
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null;
+    editorScrollRafRef.current = requestAnimationFrame(() => {
+      editorScrollRafRef.current = null;
       const view = editorRef.current?.view();
       const preview = previewContainerRef.current;
       if (!view || !preview) return;
       const src = view.scrollDOM;
       const ratio = src.scrollTop / Math.max(1, src.scrollHeight - src.clientHeight);
-      preview.scrollTop = ratio * Math.max(0, preview.scrollHeight - preview.clientHeight);
       isScrollingRef.current = true;
+      preview.scrollTop = ratio * Math.max(0, preview.scrollHeight - preview.clientHeight);
+      setTimeout(() => { isScrollingRef.current = false; }, 50);
+    });
+  }, []);
+
+  const handlePreviewScroll = useCallback(() => {
+    if (previewScrollRafRef.current !== null) return;
+    if (isScrollingRef.current) return;
+    previewScrollRafRef.current = requestAnimationFrame(() => {
+      previewScrollRafRef.current = null;
+      const view = editorRef.current?.view();
+      const preview = previewContainerRef.current;
+      if (!view || !preview) return;
+      const dst = view.scrollDOM;
+      const ratio = preview.scrollTop / Math.max(1, preview.scrollHeight - preview.clientHeight);
+      isScrollingRef.current = true;
+      dst.scrollTop = ratio * Math.max(0, dst.scrollHeight - dst.clientHeight);
       setTimeout(() => { isScrollingRef.current = false; }, 50);
     });
   }, []);
@@ -150,9 +167,13 @@ export function EditorPanel({
     target.addEventListener("scroll", handleEditorScroll, { passive: true });
     return () => {
       target.removeEventListener("scroll", handleEditorScroll);
-      if (scrollRafRef.current !== null) {
-        cancelAnimationFrame(scrollRafRef.current);
-        scrollRafRef.current = null;
+      if (editorScrollRafRef.current !== null) {
+        cancelAnimationFrame(editorScrollRafRef.current);
+        editorScrollRafRef.current = null;
+      }
+      if (previewScrollRafRef.current !== null) {
+        cancelAnimationFrame(previewScrollRafRef.current);
+        previewScrollRafRef.current = null;
       }
     };
   }, [note?.id, handleEditorScroll]);
@@ -806,7 +827,7 @@ export function EditorPanel({
                         deferredContent={deferredContent}
                         markdownComponents={markdownComponents}
                         previewContainerRef={previewContainerRef}
-                        onPreviewScroll={undefined}
+                        onPreviewScroll={handlePreviewScroll}
                         isDesktopViewport={isDesktopViewport}
                         previewPlaceholder={t("editor.previewPlaceholder")}
                       />

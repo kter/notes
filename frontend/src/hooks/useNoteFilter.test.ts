@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, afterEach } from "vitest";
 import { useNoteFilter } from "./useNoteFilter";
 import { noteBodyStore } from "@/lib/sync/noteBodyStore";
@@ -96,5 +96,29 @@ describe("useNoteFilter", () => {
     noteBodyStore.set("1", "completely different text");
     const { result } = renderHook(() => useNoteFilter(notes, null, "completely different"));
     expect(result.current.map((n) => n.id)).toEqual(["1"]);
+  });
+
+  it("does not fall back to n.content when store has empty string for that note", () => {
+    // n.content="hello world" for note "1", but user deleted all content → store has ""
+    noteBodyStore.set("1", "");
+    const { result } = renderHook(() => useNoteFilter(notes, null, "hello"));
+    // Note "1" should NOT appear (store empty string wins over stale n.content)
+    // Note "4" has n.content="hello again" and is not in store, so it still matches
+    expect(result.current.map((n) => n.id)).toEqual(["4"]);
+  });
+
+  it("updates search results reactively when noteBodyStore changes", () => {
+    const { result } = renderHook(() => useNoteFilter(notes, null, "reactive"));
+    expect(result.current).toHaveLength(0);
+
+    act(() => {
+      noteBodyStore.set("2", "reactive keyword added");
+    });
+    expect(result.current.map((n) => n.id)).toEqual(["2"]);
+
+    act(() => {
+      noteBodyStore.delete("2");
+    });
+    expect(result.current).toHaveLength(0);
   });
 });

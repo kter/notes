@@ -23,6 +23,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("folders");
   const [contentOverride, setContentOverride] = useState<{
+    noteId: string;
     content: string;
     version: number;
   } | null>(null);
@@ -60,6 +61,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
 
   const handleSelectNote = useCallback((id: string | null) => {
     setSelectedNoteId(id);
+    setContentOverride(null);
     if (id) {
       setMobileView("editor");
     }
@@ -118,6 +120,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
       const editedContent = handleAcceptEdit(messageIndex);
       if (editedContent && selectedNoteId) {
         setContentOverride((prev) => ({
+          noteId: selectedNoteId,
           content: editedContent,
           version: (prev?.version ?? 0) + 1,
         }));

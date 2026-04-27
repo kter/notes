@@ -874,4 +874,79 @@ describe('EditorPanel', () => {
     })
   })
 
+  describe('contentOverride is scoped to its source note', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('does not apply note A accepted edit to note B after key-switch remount', () => {
+      vi.useFakeTimers()
+      const onUpdateNote = vi.fn()
+
+      const noteA = { ...mockNote, id: 'A', content: 'A original' }
+      const noteB = { ...mockNote, id: 'B', content: 'B original' }
+      const overrideForA = { noteId: 'A', content: 'A edited', version: 1 }
+
+      // Render EditorPanel for note A with the override — the editor should show "A edited"
+      const { rerender } = render(
+        <EditorPanel
+          {...defaultProps}
+          key={noteA.id}
+          note={noteA}
+          contentOverride={overrideForA}
+          onUpdateNote={onUpdateNote}
+        />
+      )
+      expect(
+        (screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement).value
+      ).toBe('A edited')
+
+      // Simulate switching to note B while parent has not yet cleared contentOverride
+      // (worst case: the note switch arrives before the parent's setContentOverride(null))
+      rerender(
+        <EditorPanel
+          {...defaultProps}
+          key={noteB.id}
+          note={noteB}
+          contentOverride={overrideForA}  // still A's override
+          onUpdateNote={onUpdateNote}
+        />
+      )
+
+      // B's editor must show B's own content, not A's edited content
+      expect(
+        (screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement).value
+      ).toBe('B original')
+
+      // Auto-save must NOT write "A edited" into note B
+      act(() => { vi.advanceTimersByTime(600) })
+      expect(onUpdateNote).not.toHaveBeenCalledWith(
+        'B',
+        expect.objectContaining({ content: 'A edited' })
+      )
+    })
+
+    it('applies contentOverride only when noteId matches the current note', () => {
+      const noteB = { ...mockNote, id: 'B', content: 'B original' }
+      const overrideForA = { noteId: 'A', content: 'A edited', version: 1 }
+      const overrideForB = { noteId: 'B', content: 'B edited', version: 2 }
+
+      const { rerender } = render(
+        <EditorPanel {...defaultProps} note={noteB} contentOverride={overrideForA} />
+      )
+      // Override is for A, not B — B shows its own content
+      expect(
+        (screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement).value
+      ).toBe('B original')
+
+      // Now supply override for B — it should be applied
+      rerender(
+        <EditorPanel {...defaultProps} note={noteB} contentOverride={overrideForB} />
+      )
+      expect(
+        (screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement).value
+      ).toBe('B edited')
+    })
+  })
+
 })

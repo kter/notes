@@ -171,9 +171,68 @@ describe("useWorkspaceState", () => {
       content: "Edited content",
     });
     expect(result.current.contentOverride).toEqual({
+      noteId: "note-1",
       content: "Edited content",
       version: 1,
     });
+  });
+
+  it("scopes contentOverride to the note it was created for and clears it on note switch", () => {
+    const handleAcceptEdit = vi.fn().mockReturnValue("Edited content");
+
+    useNotesMock.mockReturnValue({
+      syncStatus: { local: "saved", remote: "synced", isSaving: false },
+      handleCreateNote: vi.fn(),
+      handleUpdateNote: vi.fn(),
+      handleDeleteNote: vi.fn(),
+      triggerServerSync: vi.fn(),
+      savedHashes: {},
+    });
+    useAIChatMock.mockReturnValue({
+      chatMessages: [
+        {
+          role: "assistant",
+          content: "",
+          editProposal: {
+            originalContent: "Original content",
+            editedContent: "Edited content",
+            status: "pending",
+          },
+        },
+      ],
+      isAILoading: false,
+      isEditMode: true,
+      setIsEditMode: vi.fn(),
+      handleSummarize: vi.fn(),
+      handleSendMessage: vi.fn(),
+      handleSendEditRequest: vi.fn(),
+      handleAcceptEdit,
+      handleRejectEdit: vi.fn(),
+      clearChat: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useWorkspaceState(true));
+
+    act(() => {
+      result.current.handleSelectNote("note-1");
+    });
+    act(() => {
+      result.current.handleAcceptEditAndApply(0);
+    });
+
+    // contentOverride is tagged with the source note id
+    expect(result.current.contentOverride).toEqual({
+      noteId: "note-1",
+      content: "Edited content",
+      version: 1,
+    });
+
+    // Switching to a different note clears contentOverride
+    act(() => {
+      result.current.handleSelectNote("note-2");
+    });
+
+    expect(result.current.contentOverride).toBeNull();
   });
 
   it("tracks editor selected text via handleEditorSelectionChange", () => {

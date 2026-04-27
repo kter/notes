@@ -124,7 +124,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
           content: editedContent,
           version: (prev?.version ?? 0) + 1,
         }));
-        handleUpdateNote(selectedNoteId, { content: editedContent });
+        handleUpdateNote(selectedNoteId, { content: editedContent }, { immediate: true });
       }
     },
     [handleAcceptEdit, handleUpdateNote, selectedNoteId]

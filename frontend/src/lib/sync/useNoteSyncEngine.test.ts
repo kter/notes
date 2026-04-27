@@ -176,6 +176,48 @@ describe("useNoteSyncEngine", () => {
     expect(result.current.syncStatus.remote).toBe("synced");
   });
 
+  it("syncs to the server immediately when immediate option is set, without waiting for the debounce", async () => {
+    const initialNote = buildNote();
+    const updatedServerNote = buildNote({ content: "AI edit", version: 2 });
+    const applyWorkspaceChanges = vi.fn().mockResolvedValue({
+      applied: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: initialNote.id,
+          client_mutation_id: null,
+          folder: null,
+          note: updatedServerNote,
+        },
+      ],
+      snapshot: {
+        folders: [],
+        notes: [updatedServerNote],
+        cursor: "cursor-2",
+        server_time: "2024-01-02T00:00:00.000Z",
+      },
+    });
+    getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(
+        initialNote.id,
+        { content: "AI edit" },
+        { immediate: true }
+      );
+    });
+
+    // Server sync should fire without advancing the 5-second debounce timer
+    await waitFor(() => {
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+      expect(result.current.syncStatus.remote).toBe("synced");
+    });
+  });
+
   it("queues offline updates when the debounced remote sync runs", async () => {
     vi.useFakeTimers();
     Object.defineProperty(window.navigator, "onLine", {

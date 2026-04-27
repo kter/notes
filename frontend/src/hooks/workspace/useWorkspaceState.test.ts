@@ -121,6 +121,58 @@ describe("useWorkspaceState", () => {
     expect(result.current.mobileView).toBe("editor");
   });
 
+  it("triggers immediate server sync when accepting an AI edit", () => {
+    const handleUpdateNote = vi.fn();
+    const handleAcceptEdit = vi.fn().mockReturnValue("AI edited content");
+
+    useNotesMock.mockReturnValue({
+      syncStatus: { local: "saved", remote: "synced", isSaving: false },
+      handleCreateNote: vi.fn(),
+      handleUpdateNote,
+      handleDeleteNote: vi.fn(),
+      triggerServerSync: vi.fn(),
+      savedHashes: {},
+    });
+    useAIChatMock.mockReturnValue({
+      chatMessages: [
+        {
+          role: "assistant",
+          content: "",
+          editProposal: {
+            originalContent: "Original",
+            editedContent: "AI edited content",
+            status: "pending",
+          },
+        },
+      ],
+      isAILoading: false,
+      isEditMode: true,
+      setIsEditMode: vi.fn(),
+      handleSummarize: vi.fn(),
+      handleSendMessage: vi.fn(),
+      handleSendEditRequest: vi.fn(),
+      handleAcceptEdit,
+      handleRejectEdit: vi.fn(),
+      clearChat: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useWorkspaceState(true));
+
+    act(() => {
+      result.current.handleSelectNote("note-1");
+    });
+
+    act(() => {
+      result.current.handleAcceptEditAndApply(0);
+    });
+
+    expect(handleUpdateNote).toHaveBeenCalledWith(
+      "note-1",
+      { content: "AI edited content" },
+      { immediate: true }
+    );
+  });
+
   it("applies accepted AI edits to the selected note", () => {
     const handleUpdateNote = vi.fn();
     const handleAcceptEdit = vi.fn().mockReturnValue("Edited content");
@@ -169,7 +221,7 @@ describe("useWorkspaceState", () => {
     expect(handleAcceptEdit).toHaveBeenCalledWith(0);
     expect(handleUpdateNote).toHaveBeenCalledWith("note-1", {
       content: "Edited content",
-    });
+    }, { immediate: true });
     expect(result.current.contentOverride).toEqual({
       noteId: "note-1",
       content: "Edited content",

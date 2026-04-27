@@ -35,7 +35,7 @@ interface NoteSyncEngineParams {
 interface NoteSyncEngineResult {
   syncStatus: SyncStatus;
   handleCreateNote: () => Promise<void>;
-  handleUpdateNote: (id: string, updates: NoteSyncUpdates) => void;
+  handleUpdateNote: (id: string, updates: NoteSyncUpdates, options?: { immediate?: boolean }) => void;
   handleDeleteNote: (id: string) => Promise<void>;
   triggerServerSync: (id: string) => Promise<void> | void;
   savedHashes: Record<string, string>;
@@ -351,7 +351,7 @@ export function useNoteSyncEngine({
   ]);
 
   const handleUpdateNote = useCallback(
-    async (id: string, updates: NoteSyncUpdates) => {
+    async (id: string, updates: NoteSyncUpdates, options?: { immediate?: boolean }) => {
       clearTimeout(retryTimeoutRef.current ?? undefined);
       clearInterval(retryIntervalRef.current ?? undefined);
       retryTimeoutRef.current = null;
@@ -439,9 +439,14 @@ export function useNoteSyncEngine({
 
       const expectedVersion = getExpectedVersion(id, noteForLocalSave?.version);
       setRemoteStatus("unsynced");
-      debouncedServerSync(id, updates, expectedVersion);
+      if (options?.immediate) {
+        cancelServerSync();
+        void syncNoteToServer(id, updates, expectedVersion);
+      } else {
+        debouncedServerSync(id, updates, expectedVersion);
+      }
     },
-    [debouncedServerSync, getExpectedVersion, setNotes, t]
+    [cancelServerSync, debouncedServerSync, getExpectedVersion, setNotes, syncNoteToServer, t]
   );
 
   const handleDeleteNote = useCallback(

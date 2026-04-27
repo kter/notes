@@ -11,7 +11,7 @@ interface UseNotesReturn {
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
   syncStatus: SyncStatus;
   handleCreateNote: () => Promise<void>;
-  handleUpdateNote: (id: string, updates: { title?: string; content?: string; folder_id?: string | null }) => void;
+  handleUpdateNote: (id: string, updates: { title?: string; content?: string; folder_id?: string | null }, options?: { immediate?: boolean }) => void;
   handleDeleteNote: (id: string) => Promise<void>;
   triggerServerSync: (id: string) => Promise<void> | void;
   savedHashes: Record<string, string>;

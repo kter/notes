@@ -53,7 +53,7 @@ interface EditorPanelProps {
   tokenUsage?: TokenUsageRead | null;
   onContentChange?: (content: string) => void;
   onSelectionChange?: (selectedText: string) => void;
-  contentOverride?: { content: string; version: number } | null;
+  contentOverride?: { noteId: string; content: string; version: number } | null;
   pendingEditProposal?: EditProposal | null;
   onAcceptEdit?: () => void;
   onRejectEdit?: () => void;
@@ -219,14 +219,18 @@ export function EditorPanel({
     onContentChange?.(content);
   }, [note?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply content override from AI edit accept
+  // Apply content override from AI edit accept — only for the note it was created for
   const contentOverrideVersionRef = useRef<number>(-1);
   useEffect(() => {
-    if (contentOverride && contentOverride.version !== contentOverrideVersionRef.current) {
+    if (
+      contentOverride &&
+      contentOverride.noteId === note?.id &&
+      contentOverride.version !== contentOverrideVersionRef.current
+    ) {
       contentOverrideVersionRef.current = contentOverride.version;
       editorRef.current?.setValue(contentOverride.content);
     }
-  }, [contentOverride]);
+  }, [contentOverride, note?.id]);
 
   // Trigger server sync on unmount or when switching notes
   // Store note.id in a ref so cleanup function has access to the current value

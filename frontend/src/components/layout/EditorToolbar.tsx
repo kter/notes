@@ -1,3 +1,13 @@
+/**
+ * エディタ上部のツールバーコンポーネント。
+ * フォルダ移動・AI 要約・チャット・エクスポート・プレビュー切り替え・共有・フルスクリーンなどの操作を提供する。
+ * 共有ダイアログの開閉と共有リンクの取得・作成・削除も内部で管理する。
+ *
+ * 主なエクスポート:
+ * - EditorToolbar: エディタツールバーコンポーネント
+ *
+ * 呼び出し関係: EditorPanel から使用される。
+ */
 "use client";
 
 import { memo, useState, useRef, useEffect } from "react";
@@ -56,6 +66,11 @@ interface EditorToolbarProps {
   onDeleteNote: (id: string) => void;
 }
 
+/**
+ * ツールバー本体。
+ * 未保存変更がある状態で AI 要約ボタンを押した場合、要約前に変更を強制保存してから onSummarize を呼ぶ。
+ * ドロップダウンはクリック外で自動的に閉じる。
+ */
 export const EditorToolbar = memo(function EditorToolbar({
   noteId,
   noteFolderId,

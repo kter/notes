@@ -1,3 +1,10 @@
+"""管理者コンソール向けユーザー管理ユースケースを提供するモジュール。
+
+責務: 管理者がユーザー一覧の取得・詳細確認・設定変更を行うビジネスロジックを担う。
+主要なエクスポート: AdminUseCases
+呼び出し関係: admin/router.py から呼ばれ、SQLModel Session・usage_policy を利用する。
+"""
+
 import logging
 from datetime import UTC, datetime
 
@@ -30,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class AdminUseCases:
-    """Application use cases for admin console user management."""
+    """管理者コンソール向けユーザー管理ユースケース。"""
 
     def __init__(self, session: Session):
         self.session = session
@@ -42,6 +49,7 @@ class AdminUseCases:
         limit: int = 20,
         offset: int = 0,
     ) -> AdminUsersListResponse:
+        """ユーザー一覧をページング付きで返す。q で user_id・email・表示名を部分一致検索できる。"""
         statement = select(AppUser)
 
         if q:
@@ -73,6 +81,7 @@ class AdminUseCases:
         )
 
     def get_user_detail(self, user_id: str) -> AdminUserDetailResponse:
+        """指定ユーザーの詳細情報（設定・トークン使用量・ノート数）を返す。存在しない場合は NotFound を送出。"""
         app_user = self.session.get(AppUser, user_id)
         if app_user is None:
             raise NotFound("User not found")
@@ -91,6 +100,7 @@ class AdminUseCases:
     def update_user(
         self, user_id: str, payload: AdminUserUpdateRequest
     ) -> AdminUserDetailResponse:
+        """管理者権限・LLMモデル・言語・トークン上限を更新し、更新後の詳細を返す。"""
         app_user = self.session.get(AppUser, user_id)
         if app_user is None:
             raise NotFound("User not found")
@@ -146,12 +156,14 @@ class AdminUseCases:
         return self.get_user_detail(user_id)
 
     def _count_for_user(self, model: type[Note | Folder], user_id: str) -> int:
+        """指定モデル（Note または Folder）のうち、user_id に紐づくレコード数を返す。"""
         statement = (
             select(func.count()).select_from(model).where(model.user_id == user_id)
         )
         return int(self.session.exec(statement).one())
 
     def _build_list_item(self, app_user: AppUser) -> AdminUserListItem:
+        """AppUser から一覧表示用の AdminUserListItem を組み立てて返す。"""
         settings = self.session.get(UserSettings, app_user.user_id)
         return AdminUserListItem(
             user=AppUserRead.model_validate(app_user),
@@ -166,6 +178,7 @@ class AdminUseCases:
         target_user: AppUser,
         requested_admin: bool,
     ) -> None:
+        """最後の管理者を降格しようとした場合に ValidationFailed を送出するガード処理。"""
         if requested_admin or not target_user.admin:
             return
 
@@ -181,6 +194,7 @@ class AdminUseCases:
     def _build_settings_read(
         settings: UserSettings | None, user_id: str
     ) -> UserSettingsRead:
+        """UserSettings（未作成の場合はデフォルト値）から UserSettingsRead を構築して返す。"""
         now = datetime.now(UTC)
         return UserSettingsRead(
             user_id=user_id,

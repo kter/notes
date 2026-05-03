@@ -1,3 +1,14 @@
+/**
+ * CodeMirror 6 をベースとした Markdown エディタコンポーネント。
+ * インデント・リスト継続・インデントガイドなどの Markdown 特有のキーバインドを拡張として組み込む。
+ * 親コンポーネントから ref 経由で getValue / setValue / focus / view を呼び出せる。
+ *
+ * 主なエクスポート:
+ * - MarkdownEditor: CM6 Markdown エディタコンポーネント（forwardRef）
+ * - MarkdownEditorHandle: ref ハンドルの型定義
+ *
+ * 呼び出し関係: EditorPanel から ref={editorRef} で使用される。
+ */
 "use client";
 
 import { EditorState } from "@codemirror/state";
@@ -28,6 +39,12 @@ interface MarkdownEditorProps {
   "data-testid"?: string;
 }
 
+/**
+ * CM6 エディタ本体。
+ * マウント時に一度だけ EditorView を生成し、コールバックは ref に持たせることで
+ * props 変化による extensions の再生成を回避する。
+ * note が切り替わる際は親が key={note.id} でコンポーネントをリマウントし、完全にリセットする。
+ */
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
   function MarkdownEditor(
     {

@@ -1,3 +1,11 @@
+"""ドメインエラーを HTTP 例外へ変換するユーティリティ。
+
+責務: DomainError のサブクラスを対応する HTTPException にマッピングする。
+主要なエクスポート: to_http_exception
+呼び出し関係: ルーターおよびミドルウェアから呼ばれ、
+    app.shared のドメインエラー群を参照する。
+"""
+
 from fastapi import HTTPException, status
 
 from app.shared import (
@@ -12,7 +20,7 @@ from app.shared import (
 
 
 def to_http_exception(error: DomainError) -> HTTPException:
-    """Convert a domain error into the matching HTTP exception."""
+    """ドメインエラーを対応する HTTP 例外に変換して返す。"""
     if isinstance(error, NotFound):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error.detail)
     if isinstance(error, Forbidden):

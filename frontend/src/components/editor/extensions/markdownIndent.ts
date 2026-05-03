@@ -1,3 +1,14 @@
+/**
+ * Markdown エディタ向けの Tab / Shift+Tab インデント拡張。
+ * リスト行・インデント済み行では行頭への空白挿入/削除を行い、
+ * それ以外の行ではカーソル位置に 2 スペースを挿入する。
+ * 複数行選択時は選択範囲の全行を一括インデント/アンインデントする。
+ *
+ * 主なエクスポート:
+ * - markdownIndentKeymap: CM6 KeyBinding 配列として MarkdownEditor の keymap に渡す
+ *
+ * 呼び出し関係: MarkdownEditor.tsx の extensions 配列で使用される。
+ */
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, type KeyBinding } from "@codemirror/view";
 
@@ -6,6 +17,11 @@ const LIST_LINE_RE = /^(\s*)([-*+]|\d+\.)\s/;
 const INDENTED_LINE_RE = /^\s+/;
 const LEADING_INDENT_RE = /^(\s{1,2})/;
 
+/**
+ * Tab キーに対応するインデントコマンド。
+ * 複数行選択時は全行に 2 スペースを挿入し、単一行ではリスト行または既インデント行なら
+ * 行頭に 2 スペースを、それ以外ではカーソル位置に 2 スペースを挿入する。
+ */
 function indentCommand(view: EditorView): boolean {
   const { state } = view;
   const { from, to } = state.selection.main;
@@ -56,6 +72,11 @@ function indentCommand(view: EditorView): boolean {
   return true;
 }
 
+/**
+ * Shift+Tab キーに対応するアンインデントコマンド。
+ * 複数行選択時は各行の先頭から最大 2 スペースを除去し、
+ * 単一行では行頭の 1〜2 スペースを除去してカーソルを追従させる。
+ */
 function unindentCommand(view: EditorView): boolean {
   const { state } = view;
   const { from, to } = state.selection.main;

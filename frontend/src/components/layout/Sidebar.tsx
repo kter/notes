@@ -1,3 +1,12 @@
+/**
+ * フォルダ一覧を表示・操作するサイドバーコンポーネント。
+ * フォルダの作成・リネーム・削除とフォルダ選択をインライン UI で行える。
+ *
+ * 主なエクスポート:
+ * - Sidebar: フォルダサイドバーコンポーネント
+ *
+ * 呼び出し関係: ThreeColumnLayout の sidebar スロット（AuthenticatedWorkspace 経由）で使用される。
+ */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +29,11 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
+/**
+ * サイドバー本体。
+ * 新規フォルダ作成中はインライン入力欄を表示し、サブミット中はスピナーで操作をブロックする。
+ * フォルダ一覧の各行はホバー時に編集・削除ボタンをオーバーレイ表示する。
+ */
 export const Sidebar = memo(function Sidebar({
   folders,
   selectedFolderId,

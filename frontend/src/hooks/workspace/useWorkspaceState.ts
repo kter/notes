@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * ワークスペース全体の UI 状態・データ・操作を集約するルートフック。
+ * フォルダ/ノート/チャット/エディタ/モバイルビューなど全画面に関わるステートと
+ * ハンドラーをまとめ、ページコンポーネントへ一括提供する。
+ *
+ * 主なエクスポート:
+ * - useWorkspaceState: ワークスペースに必要なすべての状態・ハンドラーを返す
+ *
+ * 呼び出し関係: WorkspacePage などのトップレベルページコンポーネントから呼ばれる。
+ */
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { MobileView } from "@/components/layout";

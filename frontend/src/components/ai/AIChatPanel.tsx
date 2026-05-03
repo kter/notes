@@ -1,3 +1,13 @@
+/**
+ * AIチャットパネルコンポーネント。チャットモードと AI Edit モードの両方を担う。
+ * チャットモードではスコープ（ノート/フォルダ/全体/選択範囲）を指定した質問応答を行い、
+ * AI Edit モードではエディタの現在内容を渡して編集指示を送信し、diff 表示・承認/拒否フローを提供する。
+ *
+ * 主なエクスポート:
+ * - AIChatPanel: AIチャット・AI Edit パネル本体
+ *
+ * 呼び出し関係: AuthenticatedWorkspace から直接マウントされる。
+ */
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -59,9 +69,17 @@ interface AIChatPanelProps {
   getCurrentEditorSelectedText?: () => string;
 }
 
+// useSyncExternalStore 用のフォールバック（subscribeToEditorSelectionChange が未指定の場合）
 const noopSubscribe = () => () => {};
 const emptyString = () => "";
 
+/**
+ * AIチャット・AI Edit パネル。
+ * - チャットモード: scope に応じたノート内容をコンテキストとして送信し、AI 応答を表示する。
+ * - AI Edit モード: エディタの現在テキストと選択範囲を送信し、AI が返した編集提案を
+ *   DiffView で表示。承認・拒否の操作は親 (AuthenticatedWorkspace) に移譲する。
+ * ノート・フォルダ切り替え時は scope を自動リセットする（render-phase state update）。
+ */
 export const AIChatPanel = memo(function AIChatPanel({
   isOpen,
   onClose,
@@ -90,6 +108,7 @@ export const AIChatPanel = memo(function AIChatPanel({
   const [prevNoteId, setPrevNoteId] = useState(selectedNote?.id);
   const [prevFolderId, setPrevFolderId] = useState(selectedFolder?.id);
 
+  // エディタの選択テキストを外部ストア経由で購読し、スコープ "selection" の送信内容に使用する
   const selectedText = useSyncExternalStore(
     subscribeToEditorSelectionChange ?? noopSubscribe,
     getCurrentEditorSelectedText ?? emptyString,
@@ -99,6 +118,7 @@ export const AIChatPanel = memo(function AIChatPanel({
   const noteId = selectedNote?.id;
   const folderId = selectedFolder?.id;
 
+  // ノート/フォルダが変わった場合、scope を適切な初期値にリセットする（render 中に state 更新）
   if (noteId !== prevNoteId || folderId !== prevFolderId) {
     setPrevNoteId(noteId);
     setPrevFolderId(folderId);
@@ -120,9 +140,15 @@ export const AIChatPanel = memo(function AIChatPanel({
     }
   }, [messages]);
 
+  /**
+   * 送信ボタン / Enter キー押下時の処理。
+   * AI Edit モードでは現在のエディタ内容と選択範囲を添えて onSendEditRequest を呼ぶ。
+   * チャットモードでは scope に応じて onSendMessage を呼ぶ。
+   */
   const handleSend = () => {
     if (input.trim() && !isLoading) {
       if (isEditMode && onSendEditRequest) {
+        // 選択範囲がある場合は content 内の開始/終了位置を計算して渡す
         const currentContent = getCurrentEditorContent?.() ?? "";
         const currentSelectedText = getCurrentEditorSelectedText?.() ?? "";
         const selectionRange = currentSelectedText && currentContent
@@ -367,7 +393,8 @@ export const AIChatPanel = memo(function AIChatPanel({
                       {msg.content && (
                         <p className="text-sm mb-2">{msg.content}</p>
                       )}
-                      {msg.editProposal.status === "pending" ? (
+                      {/* pending: エディタ側の大きな DiffView に誘導するインジケーターを表示 */}
+                        {msg.editProposal.status === "pending" ? (
                         <div
                           className="text-xs px-3 py-2 rounded-md mt-2 bg-primary/10 text-primary border border-primary/20"
                           data-testid="diff-pending-indicator"

@@ -1,5 +1,16 @@
+"""ドメイン層で発生するエラー階層を定義するモジュール。
+
+責務: アプリケーション全体で共有するドメインエラーの基底クラスと
+    サブクラスを提供する。
+主要なエクスポート: DomainError, NotFound, Forbidden, ConflictDetected,
+    QuotaExceeded, ValidationFailed, ShareExpired
+呼び出し関係: ユースケース・リポジトリ層で送出され、
+    app.http_errors の to_http_exception で HTTP 例外へ変換される。
+"""
+
+
 class DomainError(Exception):
-    """Base class for domain-layer failures."""
+    """ドメイン層の障害を表す基底クラス。"""
 
     def __init__(self, detail: str):
         super().__init__(detail)
@@ -7,24 +18,24 @@ class DomainError(Exception):
 
 
 class NotFound(DomainError):
-    """Raised when a resource does not exist in the caller's scope."""
+    """呼び出し元のスコープにリソースが存在しない場合に送出される。"""
 
 
 class Forbidden(DomainError):
-    """Raised when a user cannot perform an action."""
+    """ユーザーが操作を実行できない場合に送出される。"""
 
 
 class ConflictDetected(DomainError):
-    """Raised when optimistic writes or uniqueness guarantees fail."""
+    """楽観的書き込みまたは一意性制約が失敗した場合に送出される。"""
 
 
 class QuotaExceeded(DomainError):
-    """Raised when a caller exceeds a quota or limit."""
+    """呼び出し元がクォータまたは制限を超過した場合に送出される。"""
 
 
 class ValidationFailed(DomainError):
-    """Raised when a request is semantically invalid."""
+    """リクエストが意味的に無効な場合に送出される。"""
 
 
 class ShareExpired(DomainError):
-    """Raised when a shared resource has expired."""
+    """共有リソースの有効期限が切れた場合に送出される。"""

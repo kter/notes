@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * 翻訳キーを文字列に変換するユーティリティフック。
+ * LanguageContext の translations オブジェクトからドット区切りパスで値を取得する。
+ *
+ * 主なエクスポート:
+ * - useTranslation: t(path) 関数と言語設定関連の値を返すフック
+ *
+ * 呼び出し関係: UI コンポーネント全般、useOfflineSync、useAIChat から使用される。
+ */
+
 import { useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { TranslationKeys } from "@/locales";
@@ -29,6 +39,11 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string {
   return typeof result === "string" ? result : path;
 }
 
+/**
+ * LanguageContext から翻訳関数 t と言語状態を取り出して返す。
+ * t(path) はドット区切りパスを受け取り、対応するロケール文字列を返す。
+ * キーが存在しない場合はパス文字列をそのまま返す。
+ */
 export function useTranslation() {
   const { translations, effectiveLanguage, language, setLanguage, isLoading } = useLanguage();
 

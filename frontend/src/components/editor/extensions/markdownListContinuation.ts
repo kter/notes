@@ -1,3 +1,13 @@
+/**
+ * Enter キーでリストの継続行を自動挿入する CM6 拡張。
+ * カーソルがリストアイテムの末尾にある場合、次の行に同じインデントとマーカーを付与する。
+ * 番号付きリストはインクリメント、空のリストアイテムではマーカーを除去して通常改行に戻す。
+ *
+ * 主なエクスポート:
+ * - markdownListContinuationKeymap: CM6 KeyBinding 配列として MarkdownEditor の keymap に渡す
+ *
+ * 呼び出し関係: MarkdownEditor.tsx の extensions 配列で使用される。
+ */
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, type KeyBinding } from "@codemirror/view";
 
@@ -11,6 +21,7 @@ interface ListMarkerInfo {
   contentAfterMarker: string;
 }
 
+/** 行テキストからリストマーカー情報を解析する。マーカーがない場合は null を返す。 */
 function getListMarkerInfo(text: string): ListMarkerInfo | null {
   const m = text.match(LIST_MARKER_RE);
   if (!m) return null;
@@ -24,6 +35,11 @@ function getListMarkerInfo(text: string): ListMarkerInfo | null {
   };
 }
 
+/**
+ * Enter キーのリスト継続コマンド。
+ * カーソル行がリストマーカーを持ち、かつカーソル以降が空の場合はマーカーを除去して改行する（空行脱出）。
+ * それ以外では同じインデント・マーカーの継続行を挿入する。番号付きリストは番号を +1 する。
+ */
 function enterCommand(view: EditorView): boolean {
   const { state } = view;
   const { from, to } = state.selection.main;

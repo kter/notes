@@ -1,3 +1,12 @@
+/**
+ * ユーザーの位置情報を取得し、Open-Meteo API から現在の気象情報を取得して表示するウィジェット。
+ * 30 分ごとに天気を自動更新し、ホバー時にツールチップで詳細を表示する。
+ *
+ * 主なエクスポート:
+ * - WeatherWidget: 現在気温と天気アイコンを表示するコンポーネント
+ *
+ * 呼び出し関係: EditorStatusBar から使用される。
+ */
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
@@ -26,6 +35,7 @@ type WeatherConditionKey =
   | "thunderstorm"
   | "unknown";
 
+// WMO 天気コードから絵文字と翻訳キーへのマッピング
 const WMO_MAP: Record<number, { emoji: string; labelKey: WeatherConditionKey }> = {
   0:  { emoji: "☀️",  labelKey: "clearSky" },
   1:  { emoji: "🌤️", labelKey: "mainlyClear" },
@@ -50,10 +60,15 @@ const WMO_MAP: Record<number, { emoji: string; labelKey: WeatherConditionKey }> 
   99: { emoji: "⛈️",  labelKey: "thunderstorm" },
 };
 
+/** WMO 天気コードに対応する絵文字と翻訳キーを返す。未知のコードは "❓" / "unknown" にフォールバックする。 */
 function getWeatherInfo(code: number): { emoji: string; labelKey: WeatherConditionKey } {
   return WMO_MAP[code] ?? { emoji: "❓", labelKey: "unknown" };
 }
 
+/**
+ * 位置情報を取得して天気データを管理するカスタムフック。
+ * 取得失敗・位置情報拒否・AbortError はすべて適切にハンドリングする。
+ */
 function useWeather(): WeatherState {
   const [state, setState] = useState<WeatherState>({ status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
@@ -118,6 +133,10 @@ function useWeather(): WeatherState {
   return state;
 }
 
+/**
+ * 天気情報をコンパクトに表示するウィジェット。
+ * 取得成功時のみ描画し、ホバーでツールチップに詳細（気温・天気状況・最終更新時刻）を表示する。
+ */
 export const WeatherWidget = memo(function WeatherWidget() {
   const { t } = useTranslation();
   const state = useWeather();

@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * フォルダの作成・リネーム・削除操作を提供するフック。
+ * オンライン時はサーバーへ即時反映し、オフライン時は syncQueue にキューイングする。
+ * 操作結果として返るスナップショットは onSnapshotSynced コールバックで上位に通知される。
+ *
+ * 主なエクスポート:
+ * - useFolders: handleCreateFolder / handleRenameFolder / handleDeleteFolder を返すフック
+ *
+ * 呼び出し関係: useWorkspaceState から使用される。
+ */
+
 import { useCallback } from "react";
 
 import { useApi } from "./useApi";
@@ -31,6 +42,11 @@ interface UseFoldersOptions {
   }) => void;
 }
 
+/**
+ * folders / setFolders を受け取り、フォルダ操作ハンドラーを返す。
+ * オフライン時の変更は IndexedDB と syncQueue に保存され、復帰後に自動送信される。
+ * コンフリクトエラー発生時はサーバースナップショットを再取得してリカバリする。
+ */
 export function useFolders(
   folders: Folder[],
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>,
@@ -57,6 +73,7 @@ export function useFolders(
         deleted_at: null,
       };
 
+      // 楽観的更新: UIに即時反映してからサーバーへ送信する
       setFolders((prev) => [tempFolder, ...prev]);
 
       try {
@@ -79,12 +96,14 @@ export function useFolders(
             ],
           });
 
+          // サーバー確定後、仮IDレコードを削除してスナップショットで置き換える
           await notesDB.deleteFolder(tempId);
           await persistWorkspaceSnapshot(response.snapshot);
           onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
           if (isConflictApiError(error)) {
+            // バージョン競合: 最新サーバー状態を再取得して整合性を回復する
             const apiClient = await getApi();
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
@@ -93,6 +112,7 @@ export function useFolders(
         }
       }
 
+      // オフライン時は syncQueue に積んで復帰後に送信する
       await syncQueue.addChange("create", "folder", tempId, { name });
     },
     [getApi, onSnapshotSynced, setFolders]

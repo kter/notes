@@ -1,3 +1,12 @@
+/**
+ * ノートの共有リンクを管理するダイアログコンポーネント。
+ * 共有リンクの生成・コピー・削除（revoke）を一画面で操作できる。
+ *
+ * 主なエクスポート:
+ * - ShareDialog: 共有リンク管理ダイアログ
+ *
+ * 呼び出し関係: EditorToolbar から使用される。
+ */
 "use client";
 
 import { useState } from "react";
@@ -22,6 +31,11 @@ interface ShareDialogProps {
   onRevokeShare: () => void;
 }
 
+/**
+ * 共有ダイアログ本体。
+ * shareUrl が null の場合は「共有リンク作成」ボタンを、存在する場合はコピー・削除 UI を表示する。
+ * isLoading 中はスピナーを表示してユーザー操作をブロックする。
+ */
 export function ShareDialog({
   isOpen,
   onClose,
@@ -33,6 +47,7 @@ export function ShareDialog({
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
+  /** 共有 URL をクリップボードにコピーし、2 秒間コピー完了フィードバックを表示する。 */
   const handleCopy = async () => {
     if (shareUrl) {
       await navigator.clipboard.writeText(shareUrl);
@@ -41,6 +56,7 @@ export function ShareDialog({
     }
   };
 
+  /** 確認ダイアログを表示し、ユーザーが承認した場合のみ共有リンクを削除する。 */
   const handleRevoke = () => {
     if (confirm(t("share.revokeConfirm"))) {
       onRevokeShare();

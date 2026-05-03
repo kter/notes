@@ -1,7 +1,10 @@
-"""
-AWS Cost Report Lambda Function
+"""AWS コストレポートを毎日メールで送信する Lambda 関数。
 
-毎日のAWSコストレポートをメールで送信するLambda関数
+責務: Cost Explorer API でコストデータを取得し SES でメール送信する。
+主要なエクスポート: handler (Lambda エントリポイント),
+    get_cost_data, create_email_html, send_email
+呼び出し関係: EventBridge スケジュールから handler が起動され、
+    AWS Cost Explorer (us-east-1) と SES (ap-northeast-1) を呼び出す。
 """
 
 import json
@@ -13,7 +16,7 @@ import boto3
 
 
 def get_cost_data(ce_client: Any) -> dict:
-    """Cost Explorer APIからコストデータを取得"""
+    """Cost Explorer API から当月累計・前々日・サービス別コストを取得して返す。"""
     today = datetime.utcnow().date()
 
     # 当月の開始日
@@ -80,7 +83,7 @@ def get_cost_data(ce_client: Any) -> dict:
 
 
 def create_email_html(cost_data: dict) -> str:
-    """HTMLメール本文を生成"""
+    """コストデータを元に HTML メール本文を生成して返す。"""
     services_html = ""
     for svc in cost_data["services"]:
         services_html += f"""
@@ -150,7 +153,7 @@ def create_email_html(cost_data: dict) -> str:
 def send_email(
     ses_client: Any, to_email: str, subject: str, html_body: str, from_email: str
 ) -> dict:
-    """SESでメール送信"""
+    """SES を使って HTML メールを送信し、レスポンスを返す。"""
     response = ses_client.send_email(
         Source=from_email,
         Destination={"ToAddresses": [to_email]},
@@ -163,7 +166,7 @@ def send_email(
 
 
 def handler(event: dict, context: Any) -> dict:
-    """Lambda handler"""
+    """Lambda エントリポイント。コストデータを取得してメールを送信する。"""
     # 環境変数から設定を取得
     to_email = os.environ.get("TO_EMAIL", "takahashi@tomohiko.io")
     from_email = os.environ.get("FROM_EMAIL", "noreply@devtools.site")

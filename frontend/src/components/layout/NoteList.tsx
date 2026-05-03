@@ -1,3 +1,12 @@
+/**
+ * ノート一覧を表示するカラムコンポーネント。
+ * フォルダ名のインライン編集・削除、ノートの新規作成、キーワード検索によるフィルタリングを提供する。
+ *
+ * 主なエクスポート:
+ * - NoteList: ノート一覧コンポーネント
+ *
+ * 呼び出し関係: ThreeColumnLayout の noteList スロット（AuthenticatedWorkspace 経由）で使用される。
+ */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +44,11 @@ interface NoteListProps {
   onToggleCollapse?: () => void;
 }
 
+/**
+ * ノート一覧本体。
+ * フォルダが切り替わると編集状態をリセットし、検索クエリにマッチするテキストをハイライト表示する。
+ * ノートが 0 件の場合は「作成する」リンクを表示して空状態を示す。
+ */
 export const NoteList = memo(function NoteList({
   notes,
   selectedNoteId,
@@ -97,7 +111,7 @@ export const NoteList = memo(function NoteList({
     }
   };
 
-  // Helper function to highlight text
+  // 検索クエリと一致する部分を <span class="search-highlight"> でラップして強調表示するヘルパーコンポーネント
   const HighlightedText = ({ text, highlight }: { text: string; highlight: string }) => {
     if (!highlight.trim()) return <>{text}</>;
 

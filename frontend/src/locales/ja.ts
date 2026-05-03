@@ -1,3 +1,14 @@
+/**
+ * アプリケーションの日本語翻訳定義ファイル。
+ * 全 UI テキストを名前空間ごとにまとめた定数オブジェクト ja と、
+ * 翻訳キーの構造型 TranslationKeys をエクスポートする。
+ *
+ * 主なエクスポート:
+ * - ja: 日本語翻訳オブジェクト
+ * - TranslationKeys: 翻訳オブジェクトの構造型（ja.ts が正とする）
+ *
+ * 呼び出し関係: LanguageContext から effectiveLanguage に応じて参照される。
+ */
 // Japanese translations
 
 export const ja = {

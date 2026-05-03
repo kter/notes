@@ -1,3 +1,12 @@
+/**
+ * ノートの作成・更新・削除をローカルおよびサーバーと同期するカスタムフック。
+ * ローカル保存（IndexedDB）・デバウンスサーバー同期・オフライン対応・リトライ制御を一元管理する。
+ *
+ * 主なエクスポート:
+ * - useNoteSyncEngine: 同期エンジンフック
+ *
+ * 呼び出し関係: ノートエディタのページコンポーネントから使用し、syncQueue・notesDB・API クライアントを呼び出す。
+ */
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -47,6 +56,11 @@ type NoteSyncUpdates = {
   folder_id?: string | null;
 };
 
+/**
+ * ノートの同期ロジックを提供するカスタムフック。
+ * ローカル保存・サーバー同期・競合解決・オフライン時のキューイング・リトライをまとめて扱う。
+ * setNotes でノートリストを更新し、onSnapshotSynced でスナップショット変更を親に通知する。
+ */
 export function useNoteSyncEngine({
   setNotes,
   selectedFolderId,
@@ -70,6 +84,10 @@ export function useNoteSyncEngine({
   const serverVersionByNoteIdRef = useRef<Record<string, number>>({});
   const handleSnapshotSynced = onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
 
+  /**
+   * ノートの既知サーバーバージョンを返す。
+   * 未登録の場合は fallbackVersion を登録してから返す。
+   */
   const getExpectedVersion = useCallback(
     (noteId: string, fallbackVersion?: number) => {
       const knownVersion = serverVersionByNoteIdRef.current[noteId];
@@ -86,10 +104,17 @@ export function useNoteSyncEngine({
     []
   );
 
+  /**
+   * サーバーから取得したノートバージョンを ref に記録する。
+   */
   const setServerVersion = useCallback((noteId: string, version: number) => {
     serverVersionByNoteIdRef.current[noteId] = version;
   }, []);
 
+  /**
+   * スナップショット内の全ノートバージョンを ref に一括反映する。
+   * 論理削除されたノートは ref から除去する。
+   */
   const syncServerVersionsFromSnapshot = useCallback(
     (snapshot?: WorkspaceSnapshotResponse) => {
       if (!snapshot) {
@@ -109,6 +134,11 @@ export function useNoteSyncEngine({
     []
   );
 
+  /**
+   * ノートの変更をサーバーへ即時送信する。
+   * オフライン時は syncQueue に追加してリモート状態を failed にする。
+   * 409 競合時はスナップショットを再取得し、それ以外のエラーはリトライスケジュールを組む。
+   */
   const syncNoteToServer = useCallback(
     async (id: string, updates: NoteSyncUpdates, expectedVersion?: number) => {
       if (navigator.onLine) {
@@ -173,6 +203,7 @@ export function useNoteSyncEngine({
 
             const attempt = retryAttemptRef.current;
             if (attempt < SYNC_RETRY_CONFIG.maxRetryAttempts) {
+              // 指数バックオフで次のリトライ遅延を計算し、最大値でクランプする
               const delayMs = Math.min(
                 SYNC_RETRY_CONFIG.retryBaseDelayMs * Math.pow(2, attempt),
                 SYNC_RETRY_CONFIG.retryMaxDelayMs
@@ -246,6 +277,10 @@ export function useNoteSyncEngine({
     cancel: cancelServerSync,
   } = useDebouncedAsync(syncNoteToServer, 5000);
 
+  /**
+   * 新規ノートを作成し、ローカル（IndexedDB）とサーバーに保存する。
+   * オフライン時は temp ID のままキューに追加し、オンライン時に temp エンティティを本 ID に置き換える。
+   */
   const handleCreateNote = useCallback(async () => {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date().toISOString();
@@ -350,6 +385,11 @@ export function useNoteSyncEngine({
     t,
   ]);
 
+  /**
+   * ノートの更新をローカルに即座に反映し、デバウンスまたは即時でサーバーへ同期する。
+   * content のみの変更（isContentOnly）と、タイトル・フォルダを含む変更で保存処理を切り替える。
+   * options.immediate が true の場合はデバウンスをキャンセルして即送信する。
+   */
   const handleUpdateNote = useCallback(
     async (id: string, updates: NoteSyncUpdates, options?: { immediate?: boolean }) => {
       clearTimeout(retryTimeoutRef.current ?? undefined);
@@ -449,6 +489,10 @@ export function useNoteSyncEngine({
     [cancelServerSync, debouncedServerSync, getExpectedVersion, setNotes, syncNoteToServer, t]
   );
 
+  /**
+   * ノートをローカルと UI から削除し、サーバーへ削除操作を送信する。
+   * temp ID のノートはサーバーに存在しないため同期キューに追加しない。
+   */
   const handleDeleteNote = useCallback(
     async (id: string) => {
       try {
@@ -530,6 +574,10 @@ export function useNoteSyncEngine({
     ]
   );
 
+  /**
+   * デバウンス中のサーバー同期を即時フラッシュし、進行中の保存が完了するまで待機する。
+   * AI 編集確定後など、即座にサーバーへ反映したい場面で使用する。
+   */
   const triggerServerSync = useCallback(
     async (id: string) => {
       void id;

@@ -1,8 +1,14 @@
 "use client";
 
 /**
- * Hook for managing offline sync functionality
- * Monitors online/offline status and triggers sync when back online
+ * オフライン同期を管理するフック。
+ * ブラウザのオンライン/オフライン状態を監視し、オンライン復帰時に IndexedDB の未同期キューをサーバーへ送信する。
+ * 5秒ごとに未同期件数を更新し、forceSync で任意タイミングの強制同期も可能。
+ *
+ * 主なエクスポート:
+ * - useOfflineSync: isOnline / syncStatus / pendingChangesCount / forceSync などを返す
+ *
+ * 呼び出し関係: useWorkspaceSyncState から呼ばれる。
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";

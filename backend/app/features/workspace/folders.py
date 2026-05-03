@@ -1,3 +1,11 @@
+"""フォルダの REST APIルーターモジュール。
+
+責務: フォルダに関する CRUD エンドポイントを提供する。
+主要なエクスポート: router (APIRouter)
+呼び出し関係: workspace のルーターから include_router で登録され、
+    FolderUseCases に処理を委譲する。
+"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -14,7 +22,7 @@ router = APIRouter()
 def list_folders(
     use_cases: Annotated[FolderUseCases, Depends(get_folder_use_cases)],
 ):
-    """List all folders for the current user."""
+    """現在のユーザーの全フォルダ一覧を返す。"""
     return use_cases.list_folders()
 
 
@@ -23,7 +31,7 @@ def create_folder(
     folder_in: FolderCreate,
     use_cases: Annotated[FolderUseCases, Depends(get_folder_use_cases)],
 ):
-    """Create a new folder."""
+    """新規フォルダを作成して返す。"""
     return use_cases.create_folder(folder_in)
 
 
@@ -32,7 +40,7 @@ def get_folder(
     folder_id: UUID,
     use_cases: Annotated[FolderUseCases, Depends(get_folder_use_cases)],
 ):
-    """Get a specific folder by ID."""
+    """指定した folder_id のフォルダを取得して返す。"""
     return use_cases.get_folder(folder_id)
 
 
@@ -42,7 +50,7 @@ def update_folder(
     folder_in: FolderUpdate,
     use_cases: Annotated[FolderUseCases, Depends(get_folder_use_cases)],
 ):
-    """Update a folder."""
+    """指定した folder_id のフォルダを部分更新して返す。"""
     return use_cases.update_folder(folder_id, folder_in)
 
 
@@ -51,5 +59,5 @@ def delete_folder(
     folder_id: UUID,
     use_cases: Annotated[FolderUseCases, Depends(get_folder_use_cases)],
 ):
-    """Delete a folder."""
+    """指定した folder_id のフォルダを soft delete する (deleted_at を設定)。"""
     use_cases.delete_folder(folder_id)

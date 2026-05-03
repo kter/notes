@@ -1,13 +1,21 @@
+"""アプリケーションユーザー（AppUser）に関するモデル定義。
+
+責務: Cognito の認証情報とは別にアプリケーション側で管理するユーザーメタデータを提供する。
+主要なエクスポート: AppUserBase, AppUser, AppUserRead, APP_USER_TOUCH_INTERVAL。
+呼び出し関係: 認証ミドルウェアおよび管理機能から参照される。
+"""
+
 from datetime import UTC, datetime, timedelta
 
 from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
+# last_seen_at を更新する最小間隔（頻繁な更新によるDB負荷を抑制する）
 APP_USER_TOUCH_INTERVAL = timedelta(minutes=30)
 
 
 class AppUserBase(SQLModel):
-    """Base schema for application-managed user metadata."""
+    """アプリケーション管理のユーザーメタデータ共通フィールド。"""
 
     email: str | None = Field(default=None, max_length=320)
     display_name: str | None = Field(default=None, max_length=255)
@@ -15,7 +23,10 @@ class AppUserBase(SQLModel):
 
 
 class AppUser(AppUserBase, table=True):
-    """Application-side user profile keyed by Cognito subject."""
+    """app_users テーブルの ORM モデル。Cognito subject を主キーとする。
+
+    Cognito の認証トークンに含まれる sub をそのまま user_id として使用する。
+    """
 
     __tablename__ = "app_users"
 
@@ -26,7 +37,7 @@ class AppUser(AppUserBase, table=True):
 
 
 class AppUserRead(AppUserBase):
-    """Read schema for application users."""
+    """アプリケーションユーザー読み取りレスポンス用スキーマ。"""
 
     user_id: str
     created_at: datetime
@@ -36,6 +47,7 @@ class AppUserRead(AppUserBase):
     @field_validator("created_at", "updated_at", "last_seen_at", mode="before")
     @classmethod
     def ensure_utc_timezone(cls, value: datetime) -> datetime:
+        """タイムゾーン情報が欠落している場合に UTC を付与し、JSON 直列化を正常化する。"""
         if isinstance(value, datetime) and value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value

@@ -1,3 +1,11 @@
+/**
+ * アプリケーション全体のルートレイアウト。フォント設定・グローバルプロバイダーの初期化・robots メタ情報を担う。
+ *
+ * 主なエクスポート:
+ * - RootLayout: 全ページを包むルートレイアウトコンポーネント
+ *
+ * 呼び出し関係: Next.js App Router のルートレイアウト (app/layout.tsx)。全ルートで自動的に適用される。
+ */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -24,6 +32,10 @@ export const metadata: Metadata = {
   robots: isProduction ? "index, follow" : "noindex, nofollow",
 };
 
+/**
+ * 全ページを包むルートレイアウト。AmplifyProvider・AuthProvider・LanguageProvider の順でネストし、認証・言語コンテキストをアプリ全体に提供する。
+ * 非本番環境では head タグに noindex メタを追加して検索エンジンへのインデックスを防ぐ。
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

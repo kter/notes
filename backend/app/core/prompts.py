@@ -1,9 +1,10 @@
-"""
-System prompts for AI services.
+"""AI サービスで使用するシステムプロンプトを集中管理するモジュール。
 
-This module centralizes all system prompt strings used by AI services,
-making them easier to manage, update, and maintain.
-Supports multiple languages (Japanese and English).
+責務: 要約・タイトル生成・チャット・編集の各プロンプト文字列を定義する。
+主要なエクスポート: get_prompt, SUMMARIZE_PROMPTS, GENERATE_TITLE_PROMPTS,
+    CHAT_PROMPTS, EDIT_PROMPTS
+呼び出し関係: AIGateway から呼ばれる。日本語 (ja) と英語 (en) に対応し、
+    後方互換のためレガシー定数も公開する。
 """
 
 # Language-aware prompts for summarization
@@ -78,15 +79,14 @@ EDIT_PROMPTS = {
 
 
 def get_prompt(prompt_type: str, language: str) -> str:
-    """Get the appropriate prompt for the given type and language.
+    """指定されたプロンプト種別と言語に対応するプロンプト文字列を返す。
 
     Args:
-        prompt_type: One of 'summarize', 'generate_title', 'chat'
-        language: Language code ('ja', 'en', or 'auto')
+        prompt_type: 'summarize', 'generate_title', 'chat', 'edit' のいずれか。
+        language: 言語コード ('ja', 'en', または 'auto')。
 
     Returns:
-        The prompt string for the specified type and language.
-        Falls back to English if language not found.
+        指定種別・言語のプロンプト文字列。言語が見つからない場合は英語にフォールバック。
     """
     prompts_map = {
         "summarize": SUMMARIZE_PROMPTS,
@@ -97,11 +97,11 @@ def get_prompt(prompt_type: str, language: str) -> str:
 
     prompts = prompts_map.get(prompt_type, SUMMARIZE_PROMPTS)
 
-    # Default to English if language not found
+    # 指定言語が辞書に存在しない場合は英語にフォールバック
     return prompts.get(language, prompts["en"])
 
 
-# Legacy constants for backward compatibility
+# 後方互換のためのレガシー定数（英語プロンプトを直参照していたコードに対応）
 SUMMARIZE_SYSTEM_PROMPT = SUMMARIZE_PROMPTS["en"]
 GENERATE_TITLE_SYSTEM_PROMPT = GENERATE_TITLE_PROMPTS["en"]
 CHAT_SYSTEM_PROMPT = CHAT_PROMPTS["en"]

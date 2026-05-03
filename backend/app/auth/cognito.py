@@ -1,3 +1,10 @@
+"""Amazon Cognito JWT トークンの検証モジュール。
+
+責務: Cognito が発行した JWT をオンライン検証し、クレームを返す。
+主要なエクスポート: CognitoJWTVerifier クラス、cognito_verifier シングルトン。
+呼び出し関係: app.auth.dependencies から呼ばれ、httpx / python-jose を呼ぶ。
+"""
+
 import httpx
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError
@@ -8,20 +15,26 @@ settings = get_settings()
 
 
 class CognitoJWTVerifier:
-    """Verify Cognito JWT tokens."""
+    """Cognito JWT トークンを検証するクラス。
+
+    JWKS をオンデマンドで取得してキャッシュし、RS256 署名を検証する。
+    """
 
     def __init__(self):
         self.region = settings.cognito_region
         self.user_pool_id = settings.cognito_user_pool_id
         self.app_client_id = settings.cognito_app_client_id
-        self._jwks = None
+        self._jwks = None  # 初回取得後にメモリキャッシュする
         self._jwks_url = (
             f"https://cognito-idp.{self.region}.amazonaws.com/"
             f"{self.user_pool_id}/.well-known/jwks.json"
         )
 
     async def _get_jwks(self) -> dict:
-        """Fetch JWKS from Cognito."""
+        """Cognito から JWKS を取得してキャッシュする。
+
+        一度取得した JWKS はインスタンス変数に保持し、再リクエストを省く。
+        """
         if self._jwks is None:
             async with httpx.AsyncClient() as client:
                 response = await client.get(self._jwks_url)
@@ -30,7 +43,10 @@ class CognitoJWTVerifier:
         return self._jwks
 
     def _get_signing_key(self, token: str, jwks: dict) -> dict | None:
-        """Get the signing key for a token from JWKS."""
+        """トークンヘッダーの kid に対応する署名キーを JWKS から取得する。
+
+        一致するキーが見つからない場合は None を返す。
+        """
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get("kid")
 
@@ -40,20 +56,19 @@ class CognitoJWTVerifier:
         return None
 
     async def verify_token(self, token: str) -> dict:
-        """
-        Verify a Cognito JWT token and return the claims.
+        """Cognito JWT トークンを検証してクレームを返す。
 
         Args:
-            token: The JWT token string
+            token: 検証対象の JWT 文字列。
 
         Returns:
-            The decoded token claims
+            デコードされたトークンクレーム辞書。
 
         Raises:
-            JWTError: If token verification fails
+            JWTError: 署名検証失敗・有効期限切れ・不正なトークン形式の場合。
         """
         # ----------------------------------------------------------------------
-        # BYPASS FOR INTEGRATION TESTING IN DEV ENVIRONMENT
+        # 開発環境での結合テスト用バイパス
         # ----------------------------------------------------------------------
         if settings.environment == "dev" and token == "dev-integration-test-token":  # noqa: S105
             return {
@@ -89,10 +104,11 @@ class CognitoJWTVerifier:
             )
             return claims
         except ExpiredSignatureError:
+            # 有効期限切れは専用のエラーメッセージに統一する
             raise JWTError("Token has expired")
         except JWTError as e:
             raise JWTError(f"Token verification failed: {e}")
 
 
-# Singleton instance
+# モジュールレベルのシングルトン（アプリ全体で JWKS キャッシュを共有する）
 cognito_verifier = CognitoJWTVerifier()

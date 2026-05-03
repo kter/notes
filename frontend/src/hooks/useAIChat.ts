@@ -1,5 +1,17 @@
 "use client";
 
+/**
+ * AIチャット・AI編集機能をまとめて管理するフック。
+ * ノート要約・チャット送信・編集ジョブのポーリング・編集提案の承認/却下を担い、
+ * トークン消費時は onTokenUsage コールバックで呼び出し元に通知する。
+ *
+ * 主なエクスポート:
+ * - useAIChat: chatMessages / isAILoading / isEditMode / handleSummarize /
+ *              handleSendMessage / handleSendEditRequest / handleAcceptEdit /
+ *              handleRejectEdit / clearChat などを返す
+ *
+ * 呼び出し関係: useWorkspaceState から呼ばれる。
+ */
 import { useState } from "react";
 import { useApi } from "./useApi";
 import { useTranslation } from "./useTranslation";

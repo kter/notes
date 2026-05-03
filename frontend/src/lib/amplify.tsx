@@ -1,3 +1,12 @@
+/**
+ * AWS Amplify の初期化とクライアントサイドへの提供を担うモジュール。
+ * Cognito 認証設定を環境変数から構築し、子コンポーネントへ Amplify コンテキストを提供する。
+ *
+ * 主なエクスポート:
+ * - AmplifyProvider: アプリケーション全体を包む Amplify 初期化プロバイダー
+ *
+ * 呼び出し関係: app レイアウトから使用され、内部で Amplify.configure() を呼び出す。
+ */
 "use client";
 
 import { useEffect, useState, ReactNode } from "react";
@@ -30,6 +39,10 @@ const amplifyConfig: ResourcesConfig = {
   },
 };
 
+/**
+ * Amplify をクライアントサイドでのみ初期化し、子コンポーネントをレンダリングするプロバイダー。
+ * SSR 時のハイドレーションミスマッチを防ぐため、初期化完了まで null を返す。
+ */
 export function AmplifyProvider({ children }: { children: ReactNode }) {
   const [isConfigured, setIsConfigured] = useState(false);
 

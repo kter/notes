@@ -1,3 +1,11 @@
+/**
+ * ログインページ。メールアドレスとパスワードによる Cognito 認証フローを提供する。
+ *
+ * 主なエクスポート:
+ * - LoginPage: ログインフォームページコンポーネント
+ *
+ * 呼び出し関係: Next.js App Router の `/login` ルート (app/login/page.tsx)。
+ */
 "use client";
 
 import { useState } from "react";
@@ -8,6 +16,10 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { FileTextIcon, Loader2Icon } from "lucide-react";
 
+/**
+ * ログインフォームコンポーネント。送信時に signIn を呼び出し、成功するとルートへリダイレクトする。
+ * エラー発生時はフォーム内にエラーメッセージを表示し、ローディング中はボタンを無効化する。
+ */
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

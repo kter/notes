@@ -1,3 +1,12 @@
+"""FastAPI 依存性注入による認証・認可ヘルパーモジュール。
+
+責務: Bearer トークンおよび API キーを検証し、認証済みユーザー情報を返す。
+主要なエクスポート: get_current_user, get_current_app_user, require_admin,
+    get_folder_note_user_id, および各種型エイリアス。
+呼び出し関係: ルーターの Depends から呼ばれ、cognito_verifier / UserApiKeyService
+    / AppUserService を呼ぶ。
+"""
+
 import logging
 from typing import Annotated
 
@@ -14,7 +23,7 @@ from app.logging_utils import bind_user_id, log_event
 from app.models import AppUser
 from app.observability import set_sentry_user_context
 
-# Bearer token security scheme
+# Bearer トークンのセキュリティスキーム（必須 / 任意 の2種類を定義）
 security = HTTPBearer()
 optional_bearer_security = HTTPBearer(auto_error=False)
 api_key_header_security = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -22,6 +31,13 @@ logger = logging.getLogger(__name__)
 
 
 async def _verify_bearer_token(token: str) -> dict:
+    """Bearer トークンを検証してクレームを返す内部ヘルパー。
+
+    検証成功時はログコンテキストと Sentry にユーザー ID を設定する。
+
+    Raises:
+        HTTPException: トークン検証失敗時に 401 を送出する。
+    """
     try:
         claims = await cognito_verifier.verify_token(token)
         user_id = claims.get("sub", "")
@@ -53,17 +69,16 @@ async def _verify_bearer_token(token: str) -> dict:
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> dict:
-    """
-    Dependency to get the current authenticated user.
+    """現在の認証済みユーザーのクレームを返す FastAPI 依存関数。
 
     Args:
-        credentials: Bearer token from Authorization header
+        credentials: Authorization ヘッダーから取得した Bearer トークン。
 
     Returns:
-        The decoded JWT claims
+        デコードされた JWT クレーム辞書。
 
     Raises:
-        HTTPException: If authentication fails
+        HTTPException: 認証失敗時に 401 を送出する。
     """
     return await _verify_bearer_token(credentials.credentials)
 
@@ -72,7 +87,10 @@ def get_current_app_user(
     current_user: Annotated[dict, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> AppUser:
-    """Ensure the authenticated user has an app-local profile."""
+    """JWT クレームからアプリローカルのユーザープロファイルを取得・作成する。
+
+    sub クレームが空の場合は 401 を送出する。
+    """
     user_id = current_user.get("sub", "")
     if not user_id:
         log_event(
@@ -91,14 +109,14 @@ def get_current_app_user(
 
 
 def get_user_id(app_user: Annotated[AppUser, Depends(get_current_app_user)]) -> str:
-    """Extract user ID (sub) from the app-local user profile."""
+    """アプリローカルユーザープロファイルからユーザー ID (sub) を取り出す。"""
     return app_user.user_id
 
 
 def require_admin(
     app_user: Annotated[AppUser, Depends(get_current_app_user)],
 ) -> AppUser:
-    """Require the current user to have admin privileges."""
+    """管理者権限を要求する依存関数。権限がない場合は 403 を送出する。"""
     if not app_user.admin:
         log_event(
             logger,
@@ -121,8 +139,13 @@ async def get_folder_note_user_id(
     api_key: Annotated[str | None, Security(api_key_header_security)],
     session: Annotated[Session, Depends(get_session)],
 ) -> str:
-    """Authenticate folder/note CRUD with either a user JWT or a user API key."""
+    """フォルダ・ノート CRUD のユーザー ID を取得する依存関数。
+
+    Bearer トークンと X-API-Key ヘッダーのどちらかで認証できる。
+    どちらも提供されていない場合は 401 を送出する。
+    """
     if bearer_credentials is not None:
+        # Bearer トークンが提供された場合は JWT で認証する
         claims = await _verify_bearer_token(bearer_credentials.credentials)
         return AppUserService(session).ensure_app_user(claims).user_id
 
@@ -140,6 +163,7 @@ async def get_folder_note_user_id(
             )
             return stored_key.user_id
 
+        # API キーが提供されたが無効だった場合
         log_event(
             logger,
             logging.WARNING,
@@ -152,6 +176,7 @@ async def get_folder_note_user_id(
             detail="Invalid API key",
         )
 
+    # 認証情報が何も提供されなかった場合
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",
@@ -159,7 +184,7 @@ async def get_folder_note_user_id(
     )
 
 
-# Type alias for dependency injection
+# 依存性注入で使用する型エイリアス
 CurrentUser = Annotated[dict, Depends(get_current_user)]
 CurrentAppUser = Annotated[AppUser, Depends(get_current_app_user)]
 AdminUser = Annotated[AppUser, Depends(require_admin)]

@@ -1,3 +1,11 @@
+"""ノート共有フローのアプリケーションユースケース。
+
+責務: 共有リンクの作成・取得・削除と、トークンによる公開ノート取得を実装する。
+主要なエクスポート: ShareUseCases
+呼び出し関係: share/router.py から呼ばれ、SQLModel セッションおよび
+    WorkspaceQueryUseCases を依存として受け取る。
+"""
+
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
@@ -14,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ShareUseCases:
-    """Application use cases for note sharing flows."""
+    """ノート共有フローのアプリケーションユースケース。"""
 
     def __init__(
         self,
@@ -25,6 +33,7 @@ class ShareUseCases:
         self.workspace_queries = workspace_queries
 
     def create_share(self, note_id: UUID) -> NoteShare:
+        """ノートの共有レコードを作成する。既存の共有がある場合はそれを返す。"""
         self._ensure_owned_note(note_id)
 
         existing = self.session.exec(
@@ -56,12 +65,14 @@ class ShareUseCases:
         return share
 
     def get_share(self, note_id: UUID) -> NoteShare | None:
+        """ノートの共有レコードを取得する。存在しない場合は None を返す。"""
         self._ensure_owned_note(note_id)
         return self.session.exec(
             select(NoteShare).where(NoteShare.note_id == note_id)
         ).first()
 
     def delete_share(self, note_id: UUID) -> None:
+        """ノートの共有レコードを削除して共有リンクを無効化する。"""
         self._ensure_owned_note(note_id)
         share = self.session.exec(
             select(NoteShare).where(NoteShare.note_id == note_id)
@@ -81,6 +92,7 @@ class ShareUseCases:
         )
 
     def get_shared_note(self, token: UUID) -> SharedNoteRead:
+        """トークンで共有ノートを取得する。期限切れまたは削除済みの場合は例外を送出。"""
         share = self.session.exec(
             select(NoteShare).where(NoteShare.share_token == token)
         ).first()
@@ -109,6 +121,7 @@ class ShareUseCases:
         )
 
     def _ensure_owned_note(self, note_id: UUID) -> Note:
+        """呼び出し元ユーザーが所有するノートを検証して返す。認証済みフロー専用。"""
         if self.workspace_queries is None:
             raise ValidationFailed(
                 "workspace queries are required for authenticated share flows"

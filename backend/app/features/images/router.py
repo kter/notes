@@ -1,3 +1,11 @@
+"""画像アップロード機能の FastAPI ルーター。
+
+責務: 画像ファイルを S3 にアップロードして CDN URL を返すエンドポイントを提供する。
+主要なエクスポート: router
+呼び出し関係: アプリケーションの main ルーターにマウントされ、
+    ImageUploadUseCases を通じてストレージ処理を呼び出す。
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
@@ -17,7 +25,7 @@ async def upload_image(
     user_id: UserId,
     use_cases: Annotated[ImageUploadUseCases, Depends(get_image_upload_use_cases)],
 ):
-    """Upload an image to S3 and return the CDN URL."""
+    """画像を S3 にアップロードし、CDN URL を返す。"""
     try:
         url = await use_cases.upload_image(file, user_id)
     except ImageUploadFailedError as exc:

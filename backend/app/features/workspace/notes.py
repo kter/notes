@@ -1,3 +1,11 @@
+"""ノートの REST APIルーターモジュール。
+
+責務: ノートに関する CRUD エンドポイントおよびエクスポートエンドポイントを提供する。
+主要なエクスポート: router (APIRouter)
+呼び出し関係: workspace のルーターから include_router で登録され、
+    NoteUseCases / NoteExportUseCase に処理を委譲する。
+"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -19,7 +27,7 @@ def list_notes(
     use_cases: Annotated[NoteUseCases, Depends(get_note_use_cases)],
     folder_id: UUID | None = Query(default=None),
 ):
-    """List notes for the current user, optionally filtered by folder."""
+    """現在のユーザーのノート一覧を返す。folder_id 指定でフォルダ絞り込みも可能。"""
     return use_cases.list_notes(folder_id)
 
 
@@ -28,7 +36,7 @@ def create_note(
     note_in: NoteCreate,
     use_cases: Annotated[NoteUseCases, Depends(get_note_use_cases)],
 ):
-    """Create a new note."""
+    """新規ノートを作成して返す。"""
     return use_cases.create_note(note_in)
 
 
@@ -37,7 +45,7 @@ def get_note(
     note_id: UUID,
     use_cases: Annotated[NoteUseCases, Depends(get_note_use_cases)],
 ):
-    """Get a specific note by ID."""
+    """指定した note_id のノートを取得して返す。"""
     return use_cases.get_note(note_id)
 
 
@@ -47,7 +55,7 @@ def update_note(
     note_in: NoteUpdate,
     use_cases: Annotated[NoteUseCases, Depends(get_note_use_cases)],
 ):
-    """Update a note."""
+    """指定した note_id のノートを部分更新して返す。"""
     return use_cases.update_note(note_id, note_in)
 
 
@@ -56,7 +64,7 @@ def delete_note(
     note_id: UUID,
     use_cases: Annotated[NoteUseCases, Depends(get_note_use_cases)],
 ):
-    """Delete a note."""
+    """指定した note_id のノートを soft delete する (deleted_at を設定)。"""
     use_cases.delete_note(note_id)
 
 
@@ -64,7 +72,7 @@ def delete_note(
 def export_notes(
     use_case: Annotated[NoteExportUseCase, Depends(get_note_export_use_case)],
 ):
-    """Export all notes as a ZIP file, maintaining folder structure."""
+    """全ノートをフォルダ構造を維持したまま ZIP アーカイブとしてエクスポートする。"""
     archive = use_case.export_archive()
 
     return StreamingResponse(

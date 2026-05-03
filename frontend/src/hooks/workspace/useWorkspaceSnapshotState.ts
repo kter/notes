@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * ワークスペースの初期データ読み込みとスナップショット管理を担うフック。
+ * マウント時に IndexedDB からローカルキャッシュを即時表示し、続いてサーバースナップショットを取得してマージする。
+ * applySnapshot はオフライン同期完了後にも呼ばれ、最新状態をステートへ反映する。
+ *
+ * 主なエクスポート:
+ * - useWorkspaceSnapshotState: folders / setFolders / notes / setNotes /
+ *                               isLoading / applySnapshot を返す
+ *
+ * 呼び出し関係: useWorkspaceSyncState および useHomeData から呼ばれる。
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";

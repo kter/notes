@@ -1,3 +1,10 @@
+"""画像アップロードのアプリケーションユースケース。
+
+責務: アップロードファイルのバリデーション、S3 への保存、CDN URL の生成を行う。
+主要なエクスポート: ImageUploadUseCases, ALLOWED_MIME_TYPES, MAX_FILE_SIZE
+呼び出し関係: images/router.py から呼ばれ、boto3 経由で S3 に書き込む。
+"""
+
 import uuid
 
 import boto3
@@ -11,7 +18,7 @@ from app.shared import ValidationFailed
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_FILE_SIZE = (
     10 * 1024 * 1024
-)  # 10MB - must match frontend/src/components/layout/EditorPanel.tsx MAX_SIZE
+)  # 10MB - フロントエンドの EditorPanel.tsx MAX_SIZE と一致させること
 
 MIME_TO_EXT = {
     "image/jpeg": "jpg",
@@ -22,9 +29,10 @@ MIME_TO_EXT = {
 
 
 class ImageUploadUseCases:
-    """Application use cases for image uploads."""
+    """画像アップロードのアプリケーションユースケース。"""
 
     async def upload_image(self, file: UploadFile, user_id: str) -> str:
+        """ファイルを検証して S3 に保存し、CDN URL を返す。"""
         settings = get_settings()
 
         if file.content_type not in ALLOWED_MIME_TYPES:

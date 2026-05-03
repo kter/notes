@@ -1,3 +1,12 @@
+/**
+ * 未ログインユーザー向けのランディングページ。
+ * アプリの機能紹介とサインイン・登録への導線を提供する。
+ *
+ * 主なエクスポート:
+ * - LandingPage: トップレベルのランディングページコンポーネント
+ *
+ * 呼び出し関係: app/page.tsx などルートページから使用される。
+ */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -86,6 +95,9 @@ export function LandingPage() {
   );
 }
 
+/**
+ * 機能紹介カード。アイコン・タイトル・説明文を受け取り、グリッド内の一要素として描画する。
+ */
 function FeatureCard({
   icon,
   title,

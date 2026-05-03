@@ -1,3 +1,13 @@
+/**
+ * SunlightMap コンポーネントで使用する大陸アウトラインの SVG パスデータ。
+ * 正距円筒図法（x = 経度 + 180、y = 90 − 緯度）の座標系で表現されており、
+ * Natural Earth 50m 海岸線データを簡略化して生成した。
+ *
+ * 主なエクスポート:
+ * - CONTINENT_PATHS: 各大陸の SVG パス文字列配列
+ *
+ * 呼び出し関係: SunlightMap.tsx から import される。
+ */
 // Continent outlines for an equirectangular world map.
 // Coordinate system: x = longitude + 180 (0–360), y = 90 − latitude (0–180).
 // Derived from Natural Earth 50m coastline data, simplified.

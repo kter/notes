@@ -1,3 +1,11 @@
+/**
+ * アプリケーションのルートページ。認証状態に応じてランディングページまたは認証済みワークスペースを表示する。
+ *
+ * 主なエクスポート:
+ * - Home: ルートページコンポーネント
+ *
+ * 呼び出し関係: Next.js App Router の `/` ルート (app/page.tsx)。
+ */
 "use client";
 
 import { useEffect } from "react";
@@ -6,6 +14,10 @@ import { AuthenticatedWorkspace } from "@/components/workspace";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2Icon } from "lucide-react";
 
+/**
+ * ルートページコンポーネント。認証ローディング中はスピナーを表示し、未認証ならランディングページ、認証済みならワークスペースを描画する。
+ * マウント時に管理者ホスト名を検出した場合は `/admin/` へリダイレクトする副作用を持つ。
+ */
 export default function Home() {
   const { user, isLoading: authLoading, isAuthenticated, signOut } = useAuth();
 

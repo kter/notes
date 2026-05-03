@@ -1,3 +1,13 @@
+/**
+ * AWS Cognito を利用した認証状態管理モジュール。
+ * サインイン・サインアップ・サインアウトとアクセストークン取得のインターフェースを提供する。
+ *
+ * 主なエクスポート:
+ * - AuthProvider: 認証コンテキストを提供するプロバイダコンポーネント
+ * - useAuth: 認証コンテキストを取得するカスタムフック
+ *
+ * 呼び出し関係: app レイアウトで AuthProvider をラップし、各コンポーネントから useAuth で利用する。
+ */
 "use client";
 
 import {
@@ -40,10 +50,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * 認証状態を管理し、子コンポーネントに AuthContext を提供するプロバイダ。
+ * マウント時にセッションを確認し、ユーザー情報を state に反映する。
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  /**
+   * Cognito の現在ユーザーを取得して state を更新する。
+   * サインイン後にも呼び出してセッションを再取得する。
+   */
   const checkUser = useCallback(async () => {
     try {
       const currentUser = await getCurrentUser();
@@ -67,12 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.setUser(user?.userId ?? null);
   }, [user]);
 
+  /** メールアドレスとパスワードでサインインし、ユーザー情報を再取得する。 */
   const handleSignIn = async (email: string, password: string) => {
     const input: SignInInput = { username: email, password };
     await signIn(input);
     await checkUser();
   };
 
+  /**
+   * 新規アカウントを作成する。
+   * 確認コードが必要な場合は needsConfirmation: true を返す。
+   */
   const handleSignUp = async (email: string, password: string) => {
     const input: SignUpInput = {
       username: email,

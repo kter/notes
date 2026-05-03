@@ -1,4 +1,11 @@
-"""Token usage policy and accounting."""
+"""トークン使用量ポリシーと集計ロジック。
+
+責務: 月次トークン使用量の記録・照合・制限チェックを行う。
+主要なエクスポート: check_limit, record_usage, get_usage_info,
+    get_usage_snapshot, get_or_create_current_period
+呼び出し関係: assistant ユースケース層から呼ばれ、
+    TokenUsage モデルを通じてデータベースに読み書きする。
+"""
 
 import logging
 from datetime import UTC, datetime
@@ -19,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_or_create_current_period(session: Session, user_id: str) -> TokenUsage:
-    """Get or create the token usage record for the current monthly period."""
+    """当月期間のトークン使用量レコードを取得する。存在しない場合は新規作成する。"""
     period_start = _get_period_start()
     statement = select(TokenUsage).where(
         TokenUsage.user_id == user_id,
@@ -45,7 +52,7 @@ def get_or_create_current_period(session: Session, user_id: str) -> TokenUsage:
 
 
 def get_current_period_usage(session: Session, user_id: str) -> TokenUsage | None:
-    """Get the token usage record for the current period without creating it."""
+    """当月のトークン使用量レコードを取得する。新規作成は行わない。"""
     period_start = _get_period_start()
     statement = select(TokenUsage).where(
         TokenUsage.user_id == user_id,
@@ -55,7 +62,7 @@ def get_current_period_usage(session: Session, user_id: str) -> TokenUsage | Non
 
 
 def _get_user_token_limit(session: Session, user_id: str) -> int:
-    """Get the per-user token limit from UserSettings, falling back to the global default."""
+    """UserSettings からユーザー固有のトークン上限を取得する。未設定の場合はグローバルデフォルトを返す。"""
     settings = session.get(UserSettings, user_id)
     if settings is not None:
         return settings.token_limit
@@ -63,13 +70,13 @@ def _get_user_token_limit(session: Session, user_id: str) -> int:
 
 
 def check_limit(session: Session, user_id: str) -> bool:
-    """Check if the user has exceeded their monthly token limit."""
+    """ユーザーが月次トークン上限を超過していないかを確認する。上限内なら True を返す。"""
     usage = get_or_create_current_period(session, user_id)
     return usage.tokens_used < _get_user_token_limit(session, user_id)
 
 
 def record_usage(session: Session, user_id: str, tokens: int) -> TokenUsage:
-    """Record token usage for the current period."""
+    """当月期間のトークン使用量を加算して永続化する。"""
     usage = get_or_create_current_period(session, user_id)
     usage.tokens_used += tokens
     usage.updated_at = datetime.now(UTC)
@@ -83,7 +90,7 @@ def record_usage(session: Session, user_id: str, tokens: int) -> TokenUsage:
 
 
 def get_usage_info(session: Session, user_id: str) -> TokenUsageRead:
-    """Get current token usage information for a user."""
+    """ユーザーの現在のトークン使用状況を取得する。期間レコードがなければ作成する。"""
     usage = get_or_create_current_period(session, user_id)
     return TokenUsageRead(
         tokens_used=usage.tokens_used,
@@ -94,7 +101,7 @@ def get_usage_info(session: Session, user_id: str) -> TokenUsageRead:
 
 
 def get_usage_snapshot(session: Session, user_id: str) -> TokenUsageRead:
-    """Get current usage information without creating a usage record."""
+    """使用量レコードを作成せずに現在の使用状況スナップショットを返す。"""
     usage = get_current_period_usage(session, user_id)
     return TokenUsageRead(
         tokens_used=usage.tokens_used if usage else 0,

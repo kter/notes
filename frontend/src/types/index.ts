@@ -1,4 +1,16 @@
-// Folder types
+/**
+ * アプリケーション全体で使用する型定義をまとめたモジュール。
+ *
+ * 主なエクスポート:
+ * - Folder / Note: ワークスペースのデータエンティティ
+ * - WorkspaceChangesRequest / WorkspaceChangesResponse: サーバー同期用リクエスト/レスポンス
+ * - ChatRequest / EditJob: AI機能関連の型
+ * - UserSettings / SettingsResponse: ユーザー設定関連の型
+ *
+ * 呼び出し関係: api.ts, indexedDB.ts, workspaceSync.ts, syncQueue.ts など全体から参照される。
+ */
+
+// ----- Folder types -----
 export interface Folder {
   id: string;
   name: string;
@@ -17,7 +29,7 @@ export interface FolderUpdate {
   name?: string;
 }
 
-// Token usage types
+// ----- Note types -----
 export interface Note {
   id: string;
   title: string;
@@ -43,6 +55,9 @@ export interface NoteUpdate {
   folder_id?: string | null;
 }
 
+// ----- Workspace Sync types -----
+
+/** サーバーから返るワークスペース全体のスナップショット。cursor でインクリメンタル同期に使用する。 */
 export interface WorkspaceSnapshotResponse {
   folders: Folder[];
   notes: Note[];
@@ -53,6 +68,7 @@ export interface WorkspaceSnapshotResponse {
 export type WorkspaceEntityType = "folder" | "note";
 export type WorkspaceOperationType = "create" | "update" | "delete";
 
+/** サーバーへ送信する単一の変更操作。entity/operation の組み合わせで CRUD を表現する。 */
 export interface WorkspaceChangeRequest {
   entity: WorkspaceEntityType;
   operation: WorkspaceOperationType;
@@ -82,7 +98,7 @@ export interface WorkspaceChangesResponse {
   snapshot: WorkspaceSnapshotResponse;
 }
 
-// AI types
+// ----- AI types -----
 export interface SummarizeRequest {
   note_id: string;
 }

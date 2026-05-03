@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * AIトークン使用量の取得と楽観的更新を管理するフック。
+ * マウント時にバックエンドからトークン使用量を取得し、AI呼び出し後は recordUsage でローカル加算する。
+ * isAuthenticated が false の場合はフェッチをスキップする。
+ *
+ * 主なエクスポート:
+ * - useTokenUsage: tokenUsage / fetchTokenUsage / recordUsage を返す
+ *
+ * 呼び出し関係: useWorkspaceState から呼ばれる。
+ */
 import { useState, useCallback, useEffect } from "react";
 import { useApi } from "./useApi";
 import type { TokenUsageRead } from "@/types";

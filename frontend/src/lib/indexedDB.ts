@@ -1,6 +1,13 @@
 /**
- * IndexedDB wrapper for offline data persistence
- * Stores notes and folders locally in the browser
+ * オフラインデータ永続化のための IndexedDB ラッパー。
+ * ノート・フォルダ・同期キューをブラウザのローカルストレージに保存・管理する。
+ *
+ * 主なエクスポート:
+ * - notesDB: NotesDB クラスのシングルトンインスタンス
+ * - PendingChange: 未同期変更の型定義
+ * - SyncOperationType: create / update / delete の操作種別
+ *
+ * 呼び出し関係: syncQueue、workspaceSync、useNoteSyncEngine から使用される。
  */
 
 import type { Note, Folder } from "@/types";
@@ -26,10 +33,19 @@ export interface PendingChange {
   timestamp: number;
 }
 
+/**
+ * IndexedDB を抽象化した内部クラス。
+ * ノート・フォルダ・同期キューの各ストアに対する CRUD 操作を提供する。
+ */
 class NotesDB {
   private db: IDBDatabase | null = null;
+  // 初期化の重複呼び出しを防ぐための Promise キャッシュ
   private initPromise: Promise<IDBDatabase> | null = null;
 
+  /**
+   * IndexedDB を開き、必要なオブジェクトストアを作成して返す。
+   * 複数箇所から同時に呼ばれた場合、同一 Promise を返して二重初期化を防ぐ。
+   */
   async init(): Promise<IDBDatabase> {
     // Return existing promise if initialization is in progress
     if (this.initPromise) {
@@ -80,6 +96,9 @@ class NotesDB {
     return this.initPromise;
   }
 
+  /**
+   * 初期化済みの DB インスタンスを返す。未初期化なら init() を呼び出す。
+   */
   private async getDB(): Promise<IDBDatabase> {
     if (!this.db) {
       await this.init();
@@ -91,6 +110,7 @@ class NotesDB {
   // Notes Operations
   // =====================
 
+  /** ノートを IndexedDB に保存または上書きする。 */
   async saveNote(note: Note): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -103,6 +123,7 @@ class NotesDB {
     });
   }
 
+  /** 複数ノートを単一トランザクションで一括保存する。 */
   async saveNotes(notes: Note[]): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -116,6 +137,7 @@ class NotesDB {
     });
   }
 
+  /** 指定 ID のノートを取得する。存在しない場合は undefined を返す。 */
   async getNote(id: string): Promise<Note | undefined> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -128,6 +150,7 @@ class NotesDB {
     });
   }
 
+  /** ストア内の全ノートを取得して返す。 */
   async getAllNotes(): Promise<Note[]> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -140,6 +163,10 @@ class NotesDB {
     });
   }
 
+  /**
+   * 既存ノートの content フィールドのみを更新して保存する。
+   * 対象ノートが存在しない場合は何もしない。
+   */
   async saveNoteBody(id: string, content: string): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -161,6 +188,7 @@ class NotesDB {
     });
   }
 
+  /** 指定 ID のノートを IndexedDB から削除する。 */
   async deleteNote(id: string): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -177,6 +205,7 @@ class NotesDB {
   // Folders Operations
   // =====================
 
+  /** フォルダを IndexedDB に保存または上書きする。 */
   async saveFolder(folder: Folder): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -189,6 +218,7 @@ class NotesDB {
     });
   }
 
+  /** 複数フォルダを単一トランザクションで一括保存する。 */
   async saveFolders(folders: Folder[]): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -202,6 +232,7 @@ class NotesDB {
     });
   }
 
+  /** ストア内の全フォルダを取得して返す。 */
   async getAllFolders(): Promise<Folder[]> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -214,6 +245,7 @@ class NotesDB {
     });
   }
 
+  /** 指定 ID のフォルダを IndexedDB から削除する。 */
   async deleteFolder(id: string): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -230,6 +262,7 @@ class NotesDB {
   // Sync Queue Operations
   // =====================
 
+  /** 未同期変更をキューに追加する。同一 ID のレコードがあれば上書きする。 */
   async addPendingChange(change: PendingChange): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -242,6 +275,7 @@ class NotesDB {
     });
   }
 
+  /** timestamp インデックス順に全未同期変更を取得して返す。 */
   async getPendingChanges(): Promise<PendingChange[]> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -255,6 +289,7 @@ class NotesDB {
     });
   }
 
+  /** 指定 ID の未同期変更をキューから削除する。 */
   async removePendingChange(id: string): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -267,6 +302,7 @@ class NotesDB {
     });
   }
 
+  /** 同期キューを全件クリアする。 */
   async clearPendingChanges(): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
@@ -283,6 +319,7 @@ class NotesDB {
   // Utility Methods
   // =====================
 
+  /** ノート・フォルダ・同期キューの全ストアを単一トランザクションでクリアする。 */
   async clearAll(): Promise<void> {
     const db = await this.getDB();
     return new Promise((resolve, reject) => {

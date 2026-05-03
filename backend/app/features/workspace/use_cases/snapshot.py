@@ -1,3 +1,12 @@
+"""ワークスペーススナップショット構築ユースケース。
+
+責務: 全フォルダ・ノート（soft delete 済みを含む）を取得し、
+    カーソルを算出して WorkspaceSnapshotResponse を組み立てる。
+主要なエクスポート: WorkspaceSnapshotUseCase
+呼び出し関係: snapshot エンドポイントおよび WorkspaceChangesUseCase から
+    呼ばれ、WorkspaceQueryUseCases に読み取りを委譲する。
+"""
+
 import logging
 from datetime import UTC, datetime
 
@@ -12,12 +21,18 @@ logger = logging.getLogger(__name__)
 
 
 class WorkspaceSnapshotUseCase:
-    """Build a consolidated workspace snapshot for client bootstrap and sync."""
+    """クライアントのブートストラップおよび同期用スナップショットを構築する。"""
 
     def __init__(self, session: Session, user_id: str):
         self.workspace_queries = WorkspaceQueryUseCases(session, user_id)
 
     def get_snapshot(self) -> WorkspaceSnapshotResponse:
+        """全フォルダ・ノートを取得しスナップショットを返す。
+
+        include_deleted=True を指定することで soft delete 済みエントリも含める。
+        クライアントはこの一覧でローカル DB と差分同期を行う。
+        失敗時はエラーログを記録して例外を再送出する。
+        """
         try:
             folders = [
                 FolderRead.model_validate(folder)
@@ -48,6 +63,11 @@ class WorkspaceSnapshotUseCase:
     def _build_cursor(
         folders: list[FolderRead], notes: list[NoteRead], server_time: datetime
     ) -> str:
+        """スナップショットのカーソルを算出して返す。
+
+        全フォルダ・ノートの updated_at の最大値を ISO 8601 文字列にして返す。
+        エントリが1件もない場合は server_time をデフォルト値として使用する。
+        """
         latest_updated_at = max(
             [item.updated_at for item in folders] + [item.updated_at for item in notes],
             default=server_time,

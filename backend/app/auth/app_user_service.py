@@ -1,3 +1,10 @@
+"""認証済みユーザーのアプリローカルプロファイルを管理するサービス。
+
+責務: JWTクレームを元に AppUser レコードを作成・更新する。
+主要なエクスポート: AppUserService
+呼び出し関係: 認証ミドルウェアから呼ばれ、DBセッションおよび commit_with_retry を呼ぶ。
+"""
+
 from datetime import UTC, datetime
 
 from sqlmodel import Session
@@ -7,17 +14,19 @@ from app.db_commit import commit_with_retry
 from app.models import AppUser
 from app.models.app_user import APP_USER_TOUCH_INTERVAL
 
+# コミット競合時の最大リトライ回数
 APP_USER_COMMIT_MAX_RETRIES = 3
 
 
 class AppUserService:
-    """Ensure and refresh the app-local user profile for authenticated users."""
+    """認証済みユーザーのアプリローカルプロファイルを保証・更新するサービス。"""
 
     def __init__(self, session: Session, settings: Settings | None = None):
         self.session = session
         self.settings = settings or get_settings()
 
     def ensure_app_user(self, claims: dict) -> AppUser:
+        """JWTクレームを元に AppUser を取得または新規作成し、属性を最新化して返す。"""
         user_id = claims["sub"]
         email = claims.get("email")
         display_name = claims.get("name") or claims.get("username")
@@ -58,6 +67,7 @@ class AppUserService:
         return app_user
 
     def should_bootstrap_admin(self, claims: dict) -> bool:
+        """クレームを見てこのユーザーを管理者としてブートストラップすべきか判定する。"""
         user_id = claims.get("sub", "")
         email = (claims.get("email") or "").lower()
         if self.settings.environment == "dev" and user_id.startswith(
@@ -69,6 +79,7 @@ class AppUserService:
         }
 
     def _commit_app_user(self, app_user: AppUser) -> AppUser:
+        """AppUser をDBに保存し、競合時は既存レコードを返す。"""
         self.session.add(app_user)
         existing_user = commit_with_retry(
             self.session,

@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * ドラッグ操作でパネル幅をリサイズし、localStorage に幅を永続化するフック。
+ * 左右どちら方向への展開かを direction オプションで制御できる。
+ *
+ * 主なエクスポート:
+ * - useResizable: width / isResizing / handleMouseDown を返すフック
+ *
+ * 呼び出し関係: useWorkspaceState のチャットパネル幅管理から使用される。
+ */
+
 import { useState, useCallback, useEffect, useRef } from "react";
 
 interface UseResizableOptions {
@@ -11,6 +21,10 @@ interface UseResizableOptions {
   direction?: 'left' | 'right';
 }
 
+/**
+ * storageKey に紐づく localStorage から幅を復元し、ドラッグで変更・保存する。
+ * direction='right' の場合はデルタを反転して「左にドラッグすると拡大」に対応する。
+ */
 export function useResizable({
   storageKey,
   defaultWidth,

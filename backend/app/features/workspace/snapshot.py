@@ -1,3 +1,12 @@
+"""ワークスペーススナップショット取得エンドポイント。
+
+責務: クライアントの初回起動または再同期時に、全フォルダ・ノートを
+    含む統合スナップショットを返す。
+主要なエクスポート: router (GET /snapshot)
+呼び出し関係: workspace ルーターからマウントされ、
+    WorkspaceSnapshotUseCase を呼び出す。
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -15,5 +24,5 @@ def get_workspace_snapshot(
         WorkspaceSnapshotUseCase, Depends(get_workspace_snapshot_use_case)
     ],
 ):
-    """Return a consolidated workspace snapshot for bootstrap and sync."""
+    """ブートストラップおよび同期用のワークスペーススナップショットを返す。"""
     return use_case.get_snapshot()

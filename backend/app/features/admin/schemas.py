@@ -1,3 +1,12 @@
+"""管理者コンソール向けのリクエスト・レスポンス スキーマ定義。
+
+責務: AdminUseCases が返すデータ構造と、管理者向け更新リクエストの
+      バリデーション モデルを定義する。
+主要なエクスポート: AdminUserListItem, AdminUsersListResponse,
+                    AdminUserDetailResponse, AdminUserUpdateRequest
+呼び出し関係: admin/router.py および admin/use_cases.py から参照される。
+"""
+
 from pydantic import BaseModel, Field
 
 from app.models.app_user import AppUserRead
@@ -6,6 +15,8 @@ from app.models.user_settings import UserSettingsRead
 
 
 class AdminUserListItem(BaseModel):
+    """ユーザー一覧の各行に含まれる集約データ。"""
+
     user: AppUserRead
     settings: UserSettingsRead
     token_usage: TokenUsageRead
@@ -14,6 +25,8 @@ class AdminUserListItem(BaseModel):
 
 
 class AdminUsersListResponse(BaseModel):
+    """ユーザー一覧エンドポイントのページネーション付きレスポンス。"""
+
     users: list[AdminUserListItem]
     total: int
     limit: int
@@ -21,6 +34,8 @@ class AdminUsersListResponse(BaseModel):
 
 
 class AdminUserDetailResponse(BaseModel):
+    """ユーザー詳細エンドポイントのレスポンス。選択可能なモデル・言語一覧も含む。"""
+
     user: AppUserRead
     settings: UserSettingsRead
     token_usage: TokenUsageRead
@@ -31,6 +46,8 @@ class AdminUserDetailResponse(BaseModel):
 
 
 class AdminUserUpdateRequest(BaseModel):
+    """管理者によるユーザー更新リクエスト。未指定フィールドは更新されない。"""
+
     model_config = {"extra": "forbid"}
 
     admin: bool | None = None

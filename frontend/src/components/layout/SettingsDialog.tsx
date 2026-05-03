@@ -1,3 +1,12 @@
+/**
+ * ユーザー設定ダイアログコンポーネント。
+ * 言語・AI モデルの変更保存、API キーの発行・失効、全ノートの ZIP エクスポートを一画面で提供する。
+ *
+ * 主なエクスポート:
+ * - SettingsDialog: 設定ダイアログコンポーネント
+ *
+ * 呼び出し関係: AuthenticatedWorkspace から open 制御付きで使用される。
+ */
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
@@ -40,6 +49,10 @@ type ApiKeysErrorKey =
   | "settings.apiKeysRevokeError"
   | "common.error";
 
+/**
+ * 設定ダイアログ本体。
+ * open が true になった時点で設定・API キー一覧を並列取得し、close 時に揮発性の状態（新規キー等）をリセットする。
+ */
 export function SettingsDialog({
   open,
   onOpenChange,
@@ -205,6 +218,11 @@ export function SettingsDialog({
     }
   };
 
+  /**
+   * API キーを新規発行するハンドラ。
+   * 発行直後に平文トークンを newApiKeySecret に保持し、一度だけクリップボードコピーできるようにする。
+   * この平文は再取得不可なためダイアログを閉じるとリセットされる。
+   */
   const handleCreateApiKey = async () => {
     const trimmedName = apiKeyName.trim();
     if (!trimmedName) {

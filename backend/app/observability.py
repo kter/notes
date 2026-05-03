@@ -1,4 +1,11 @@
-"""Observability helpers shared across backend entrypoints."""
+"""バックエンド全エントリポイントで共有するオブザーバビリティヘルパー。
+
+責務: Sentry の初期化・コンテキスト設定を一元管理する。
+主要なエクスポート: init_sentry, set_sentry_request_context,
+    set_sentry_user_context, get_sentry_dsn, is_test_environment
+呼び出し関係: FastAPI/Lambda エントリポイントから呼ばれ、
+    sentry_sdk および AWS SSM Parameter Store を呼び出す。
+"""
 
 import logging
 import os
@@ -20,13 +27,13 @@ _fastapi_integration_enabled = False
 
 
 def is_test_environment() -> bool:
-    """Return whether the current process is running under pytest."""
+    """現在のプロセスが pytest 下で動作しているかを返す。"""
     return bool(os.getenv("PYTEST_CURRENT_TEST")) or "pytest" in sys.modules
 
 
 @lru_cache(maxsize=1)
 def get_sentry_dsn() -> str:
-    """Resolve the DSN from local settings or SSM Parameter Store."""
+    """ローカル設定または SSM Parameter Store から DSN を解決して返す。"""
     settings = get_settings()
     if settings.sentry_dsn:
         return settings.sentry_dsn
@@ -55,7 +62,7 @@ def get_sentry_dsn() -> str:
 
 
 def init_sentry(*, with_fastapi: bool = False) -> bool:
-    """Initialize Sentry once per runtime when a DSN is configured."""
+    """DSN が設定されている場合にランタイム内で一度だけ Sentry を初期化する。"""
     global _sentry_initialized, _fastapi_integration_enabled
 
     if is_test_environment():
@@ -66,6 +73,7 @@ def init_sentry(*, with_fastapi: bool = False) -> bool:
     if not dsn:
         return False
 
+    # FastAPI インテグレーションが未登録のまま再初期化を要求された場合は通過させる
     if _sentry_initialized and (not with_fastapi or _fastapi_integration_enabled):
         return False
 
@@ -100,7 +108,7 @@ def set_sentry_request_context(
     method: str,
     trace_id: str | None = None,
 ) -> None:
-    """Bind request-scoped metadata to the active Sentry scope."""
+    """リクエストスコープのメタデータをアクティブな Sentry スコープへバインドする。"""
     if not _sentry_initialized:
         return
 
@@ -119,7 +127,7 @@ def set_sentry_request_context(
 
 
 def set_sentry_user_context(user_id: str | None) -> None:
-    """Bind the authenticated user to the active Sentry scope."""
+    """認証済みユーザーをアクティブな Sentry スコープへバインドする。"""
     if not _sentry_initialized:
         return
 

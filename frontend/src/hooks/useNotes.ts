@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * ノートの CRUD 操作とサーバー同期を提供するファサードフック。
+ * 内部で useNoteSyncEngine を呼び出し、notes / setNotes をそのまま合成して返す。
+ *
+ * 主なエクスポート:
+ * - useNotes: notes / setNotes / syncStatus / handleCreateNote /
+ *             handleUpdateNote / handleDeleteNote / triggerServerSync /
+ *             savedHashes を返す
+ *
+ * 呼び出し関係: useWorkspaceState から呼ばれる。
+ */
 import type { Note } from "@/types";
 import { useNoteSyncEngine } from "@/lib/sync";
 import type { SyncStatus } from "@/lib/sync";

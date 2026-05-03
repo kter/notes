@@ -1,9 +1,22 @@
+/**
+ * ネストされたリスト項目にインデントガイドライン（縦線）を表示する CM6 ViewPlugin 拡張。
+ * カーソルがリストマーカープレフィックス内にある場合のみ表示し、それ以外では非表示にする。
+ *
+ * 主なエクスポート:
+ * - indentGuide: CM6 拡張として MarkdownEditor の extensions 配列に渡す ViewPlugin
+ *
+ * 呼び出し関係: MarkdownEditor.tsx の extensions 配列で使用される。
+ */
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
 const INDENT_SPACES = 2;
 // Matches: optional leading spaces, optional list marker, optional space after marker
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+\.)(\s*)/;
 
+/**
+ * インデントガイドラインを DOM に直接描画するプラグインクラス。
+ * EditorView の DOM 上に absolute オーバーレイを追加し、インデントレベルに応じた縦線を動的に生成・管理する。
+ */
 class IndentGuidePlugin {
   overlay: HTMLDivElement;
   guideLines: HTMLDivElement[] = [];
@@ -59,6 +72,10 @@ class IndentGuidePlugin {
     this.syncLines(0);
   }
 
+  /**
+   * 表示すべきガイドライン数に合わせて DOM 要素を増減させる。
+   * 不足分は新規追加、余分は DOM から削除して配列も縮小する。
+   */
   syncLines(count: number) {
     while (this.guideLines.length < count) {
       const idx = this.guideLines.length;

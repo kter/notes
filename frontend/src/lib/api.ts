@@ -1,3 +1,16 @@
+/**
+ * バックエンド REST API へのアクセスを担うクライアントモジュール。
+ * 認証付きリクエストを統一的に処理し、エラーを ApiError として正規化する。
+ *
+ * 主なエクスポート:
+ * - ApiError: HTTP エラーをラップするカスタムエラークラス
+ * - ApiClient: トークンを保持し各エンドポイントを呼び出すクラス（createApiClient で生成）
+ * - createApiClient: ApiClient のファクトリ関数
+ * - getSharedNote: 認証不要の共有ノート取得関数
+ *
+ * 呼び出し関係: useApi フックから createApiClient を通じてインスタンス化され、
+ * 各コンポーネントおよび syncQueue / workspaceSync から利用される。
+ */
 import type {
   ChatRequest,
   ChatResponse,
@@ -33,6 +46,10 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * HTTP エラーレスポンスをラップするカスタムエラークラス。
+ * status / statusText / data を保持し、呼び出し元での分岐処理を容易にする。
+ */
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -44,9 +61,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 認証トークンを保持し、バックエンドの各 REST エンドポイントを呼び出すクラス。
+ * 外部から直接 new せず createApiClient ファクトリ経由で生成する。
+ */
 class ApiClient {
   constructor(private readonly token: string | null = null) { }
 
+  /**
+   * 共通の fetch ラッパー。Authorization ヘッダー付与・エラー正規化・204 対応を行う。
+   */
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -70,7 +94,7 @@ class ApiClient {
       try {
         errorData = await response.json();
       } catch {
-        // If parsing JSON fails, try to get text or fallback to empty object
+        // JSON パースに失敗した場合はテキスト、それも失敗したら空オブジェクトにフォールバック
         try {
           errorData = await response.text();
         } catch {
@@ -81,6 +105,7 @@ class ApiClient {
     }
 
     if (response.status === 204) {
+      // 204 No Content はボディなしのため undefined を返す
       return undefined as T;
     }
 
@@ -318,13 +343,20 @@ class ApiClient {
   }
 }
 
+/**
+ * 認証トークンを受け取り ApiClient インスタンスを生成するファクトリ関数。
+ * token が null の場合は認証ヘッダーなしでリクエストを送る。
+ */
 export function createApiClient(token: string | null): ApiClient {
   return new ApiClient(token);
 }
 
-// Public API (no auth required)
+// 認証不要のパブリック API
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * 共有トークンを使って公開ノートを取得する。認証不要のパブリックエンドポイント。
+ */
 export async function getSharedNote(token: string): Promise<SharedNote> {
   const response = await fetch(`${API_BASE}/api/shared/${token}`);
 

@@ -1,3 +1,12 @@
+"""assistantフィーチャのHTTPルーター。
+
+責務: AI機能（要約・チャット・編集・編集ジョブ）のエンドポイント定義と
+    ドメイン例外→HTTPステータスコードへのマッピング。
+主要なエクスポート: router (APIRouter)
+呼び出し関係: FastAPIアプリから include_router() でマウントされる。
+    各エンドポイントは AIInteractionUseCases / EditJobUseCases を呼び出す。
+"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -29,6 +38,12 @@ router = APIRouter()
 
 
 def _raise_ai_http_error(exc: Exception) -> None:
+    """AIドメイン例外を適切なHTTPエラーに変換して送出する。
+
+    トークン上限超過 → 429 Too Many Requests
+    タイムアウト     → 504 Gateway Timeout
+    その他           → 例外をそのまま再送出
+    """
     if isinstance(exc, AITokenLimitExceededError):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -50,7 +65,7 @@ async def summarize_note(
     user_id: UserId,
     use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
 ):
-    """Summarize a note's content using AI."""
+    """AIを使ってノートの内容を要約する。"""
     try:
         summary, tokens_used = await use_cases.summarize_note(request.note_id)
     except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
@@ -65,7 +80,7 @@ async def chat_with_context(
     user_id: UserId,
     use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
 ):
-    """Chat with AI about notes' content."""
+    """ノートのコンテキストを参照しながらAIとチャットする。"""
     try:
         answer, tokens_used = await use_cases.chat_with_context(
             scope=request.scope,
@@ -87,7 +102,7 @@ async def edit_note_content(
     user_id: UserId,
     use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
 ):
-    """Edit note content using AI based on user instructions."""
+    """ユーザーの指示に基づいてAIがノートの内容を編集する（同期）。"""
     try:
         edited_content, tokens_used = await use_cases.edit_content(
             content=request.content,
@@ -111,12 +126,17 @@ async def create_edit_job(
     user_id: UserId,
     use_cases: Annotated[EditJobUseCases, Depends(get_edit_job_use_cases)],
 ):
-    """Queue a long-running AI edit request and return a pollable job resource."""
+    """長時間かかるAI編集リクエストをジョブとしてキューに登録し、
+    202 Accepted でポーリング可能なジョブリソースを返す。
+
+    ジョブ作成後に dispatch_edit_job を呼び出してバックグラウンド処理を開始する。
+    """
     try:
         job = use_cases.create_job(request)
     except AITokenLimitExceededError as exc:
         _raise_ai_http_error(exc)
 
+    # SNS/SQSまたはFastAPI BackgroundTasksを通じてジョブを非同期ディスパッチする
     await dispatch_edit_job(job.id, background_tasks=background_tasks)
 
     return EditJobCreateResponse(job=AIEditJobRead.model_validate(job))
@@ -128,6 +148,6 @@ async def get_edit_job(
     user_id: UserId,
     use_cases: Annotated[EditJobUseCases, Depends(get_edit_job_use_cases)],
 ):
-    """Poll an AI edit job."""
+    """AI編集ジョブの現在ステータスをポーリングする。"""
     job = use_cases.get_job(job_id)
     return AIEditJobRead.model_validate(job)

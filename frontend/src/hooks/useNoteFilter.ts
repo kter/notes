@@ -1,3 +1,13 @@
+/**
+ * ノート一覧をフォルダ絞り込みと全文検索で2段階フィルタリングするフック。
+ * noteBodyStore の更新を購読してリアルタイムに検索結果を更新する。
+ * フォルダ絞り込みはフォルダ所属の変化のみに反応し、自動保存による不要な再計算を防ぐ。
+ *
+ * 主なエクスポート:
+ * - useNoteFilter: フィルタリング済みの Note 配列を返す
+ *
+ * 呼び出し関係: useWorkspaceState から呼ばれる。
+ */
 import { useMemo, useSyncExternalStore } from "react";
 import { Note } from "@/types";
 import { noteBodyStore } from "@/lib/sync/noteBodyStore";

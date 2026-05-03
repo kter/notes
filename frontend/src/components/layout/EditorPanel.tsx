@@ -1,3 +1,13 @@
+/**
+ * ノート編集エリア全体を管理するパネルコンポーネント。
+ * タイトル入力・Markdown エディタ・プレビュー分割表示・AI Edit diff 表示・
+ * 画像アップロード・自動保存・印刷・フルスクリーンなどの機能を統括する。
+ *
+ * 主なエクスポート:
+ * - EditorPanel: エディタパネルコンポーネント
+ *
+ * 呼び出し関係: AuthenticatedWorkspace から ThreeColumnLayout の editor スロットで使用される。
+ */
 "use client";
 
 import { Input } from "@/components/ui/input";
@@ -18,6 +28,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorMarkdownPreview } from "./EditorMarkdownPreview";
 import { EditorStatusBar } from "./EditorStatusBar";
 
+/** 文字列をファイルとしてダウンロードさせるユーティリティ関数。Blob URL を一時生成して即解放する。 */
 function downloadFile(fileContent: string, filename: string, mimeType: string) {
   const blob = new Blob([fileContent], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -59,6 +70,11 @@ interface EditorPanelProps {
   onRejectEdit?: () => void;
 }
 
+/**
+ * エディタパネル本体。
+ * note が null の場合は「ノートを選択してください」プレースホルダーを表示する。
+ * key={note.id} で note 切り替え時に全 state をリセットするため、親側でのマウントに依存する。
+ */
 export function EditorPanel({
   note,
   folders,
@@ -128,6 +144,10 @@ export function EditorPanel({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  /**
+   * エディタのスクロールをプレビューに同期するハンドラ。
+   * rAF でバッチ処理し、同期ループを防ぐため isScrollingRef フラグを一時的に立てる。
+   */
   const handleEditorScroll = useCallback(() => {
     if (editorScrollRafRef.current !== null) return;
     if (isScrollingRef.current) return;
@@ -144,6 +164,10 @@ export function EditorPanel({
     });
   }, []);
 
+  /**
+   * プレビューのスクロールをエディタに逆同期するハンドラ。
+   * handleEditorScroll と同様に rAF + isScrollingRef で制御する。
+   */
   const handlePreviewScroll = useCallback(() => {
     if (previewScrollRafRef.current !== null) return;
     if (isScrollingRef.current) return;
@@ -488,6 +512,11 @@ export function EditorPanel({
     editorRef.current?.setValue(value);
   }, []);
 
+  /**
+   * Markdown プレビュー用の ReactMarkdown カスタムコンポーネント定義。
+   * チェックボックスの onChange をハイジャックし、remarkSourceLine で付与した
+   * data-source-line 属性を元にエディタ内の対応行を直接書き換える（WYSIWYG チェックトグル）。
+   */
   const markdownComponents = useMemo((): Components => ({
     input(props) {
       const { disabled: _disabled, checked, ...rest } = props as React.InputHTMLAttributes<HTMLInputElement>;
@@ -530,6 +559,11 @@ export function EditorPanel({
     }
   };
 
+  /**
+   * 画像ファイルをサーバーにアップロードし、Markdown の画像記法をエディタに挿入するハンドラ。
+   * アップロード中は「uploading」プレースホルダを挿入し、完了後に本 URL で差し替える。
+   * エラー時はプレースホルダを除去する。
+   */
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
 
@@ -605,6 +639,12 @@ export function EditorPanel({
     downloadFile(text, `${currentTitleRef.current || "untitled"}.txt`, "text/plain");
   }, []);  
 
+  /**
+   * 印刷プレビューハンドラ。
+   * flushSync でスナップショットを同期的に DOM に反映した後、
+   * body にクラスを付与して印刷専用スタイルを適用し window.print() を呼び出す。
+   * afterprint イベントでクラスとスナップショットを確実にクリーンアップする。
+   */
   const handlePrintPreview = useCallback(() => {
     printCleanupRef.current?.();
 

@@ -1,3 +1,12 @@
+"""ワークスペース変更適用エンドポイント。
+
+責務: クライアントから受け取ったバッチミューテーションをサーバーに適用し、
+    適用結果と最新スナップショットを返す。
+主要なエクスポート: router (POST /changes)
+呼び出し関係: workspace ルーターからマウントされ、
+    WorkspaceChangesUseCase を呼び出す。
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -21,5 +30,5 @@ def apply_workspace_changes(
         WorkspaceChangesUseCase, Depends(get_workspace_changes_use_case)
     ],
 ):
-    """Apply batched workspace mutations and return the updated snapshot."""
+    """バッチミューテーションを適用し、更新済みスナップショットを返す。"""
     return use_case.apply_changes(request)

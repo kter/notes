@@ -1,3 +1,13 @@
+/**
+ * ワークスペースサイドバーの下部に配置されるフッターコンポーネント。
+ * ユーザーメールアドレス・設定ボタン・サインアウトボタンを表示する。
+ * isSidebarOpen が false の場合はボタンのみを中央配置にする。
+ *
+ * 主なエクスポート:
+ * - WorkspaceSidebarFooter: サイドバーフッターコンポーネント
+ *
+ * 呼び出し関係: AuthenticatedWorkspace のサイドバースロット内で使用される。
+ */
 "use client";
 
 import { memo } from "react";

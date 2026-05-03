@@ -1,3 +1,12 @@
+/**
+ * 認証済みユーザー向けのワークスペース全体を組み立てるコンポーネント。
+ * useWorkspaceState が返すすべての状態・ハンドラを ThreeColumnLayout・EditorPanel・AIChatPanel に橋渡しする。
+ *
+ * 主なエクスポート:
+ * - AuthenticatedWorkspace: ログイン済み状態で表示されるメインワークスペース
+ *
+ * 呼び出し関係: ルートページまたは認証フローの下層から使用される。
+ */
 "use client";
 
 import { AIChatPanel } from "@/components/ai";
@@ -18,6 +27,11 @@ interface AuthenticatedWorkspaceProps {
   onSignOut: () => void | Promise<void>;
 }
 
+/**
+ * ワークスペース本体。
+ * データ読み込み中はローディングスクリーンを返し、完了後に三カラムレイアウトと各パネルを描画する。
+ * AI Edit の pendingEditEntry を EditorPanel に渡して diff 表示・承認/却下フローを仲介する。
+ */
 export function AuthenticatedWorkspace({
   userEmail,
   onSignOut,

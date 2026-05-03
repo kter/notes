@@ -1,3 +1,13 @@
+/**
+ * フォルダサイドバー・ノート一覧・エディタの 3 カラムレイアウトを構築するコンポーネント。
+ * デスクトップでは各カラムをドラッグリサイズ可能にし、モバイルではタブナビゲーションで切り替える。
+ *
+ * 主なエクスポート:
+ * - ThreeColumnLayout: 3 カラムレイアウトコンポーネント
+ * - MobileView: モバイル表示切り替えタブの型定義
+ *
+ * 呼び出し関係: AuthenticatedWorkspace から使用される。
+ */
 "use client";
 
 import { ReactNode, memo } from "react";
@@ -20,6 +30,11 @@ interface ThreeColumnLayoutProps {
   onMobileViewChange: (view: MobileView) => void;
 }
 
+/**
+ * 3 カラムレイアウト本体。
+ * デスクトップでは useResizable フックを使ってサイドバーとノート一覧の幅をドラッグで変更できる。
+ * モバイルでは固定ボトムナビで各ビュー（folders / notes / editor / chat）を切り替える。
+ */
 export const ThreeColumnLayout = memo(function ThreeColumnLayout({
   sidebar,
   noteList,

@@ -1,8 +1,17 @@
+"""アプリケーション全体で使用する列挙型を定義するモジュール。
+
+責務: 文字列ベースの列挙型を一元管理し、型安全な定数として各モジュールに提供する。
+主要なエクスポート: ChatScope.
+呼び出し関係: チャット機能のルーターおよびサービス層から参照される。
+"""
+
 from enum import StrEnum
 
 
 class ChatScope(StrEnum):
-    NOTE = "note"
-    FOLDER = "folder"
-    ALL = "all"
-    SELECTION = "selection"
+    """チャット機能における検索・参照スコープを表す列挙型。"""
+
+    NOTE = "note"  # 現在開いているノートのみを対象
+    FOLDER = "folder"  # 現在のフォルダ内のノートを対象
+    ALL = "all"  # 全ノートを対象
+    SELECTION = "selection"  # ユーザーが選択したテキストのみを対象

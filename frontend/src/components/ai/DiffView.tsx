@@ -1,3 +1,12 @@
+/**
+ * AI Edit の提案内容（元テキスト vs 編集後テキスト）を行単位の diff として表示するコンポーネント。
+ * 承認・却下後はインラインでステータスバッジに切り替わる。
+ *
+ * 主なエクスポート:
+ * - DiffView: diff 表示＋承認/却下ボタンコンポーネント
+ *
+ * 呼び出し関係: EditorPanel の pendingEditProposal 表示で使用される。
+ */
 import { diffLines } from "diff";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,6 +23,11 @@ interface DiffViewProps {
   fullSize?: boolean;
 }
 
+/**
+ * 差分ビュー本体。
+ * isApplied が非 null の場合は承認/却下済みバッジを返し、それ以外は diff + 操作ボタンを描画する。
+ * fullSize=true の場合はフレックス全体に広がるレイアウトを取る（EditorPanel の全幅表示用）。
+ */
 export function DiffView({
   originalContent,
   editedContent,
@@ -23,6 +37,7 @@ export function DiffView({
   fullSize,
 }: DiffViewProps) {
   const { t } = useTranslation();
+  // 元テキストと編集後テキストを行単位で比較し、差分チャンクを生成する
   const changes = diffLines(originalContent, editedContent);
 
   if (isApplied) {

@@ -1,3 +1,12 @@
+/**
+ * エディタ下部のステータスバーコンポーネント。
+ * 同期状態・文字数・最終保存時刻を左右に、時計・天気・トークン使用量を中央に表示する。
+ *
+ * 主なエクスポート:
+ * - EditorStatusBar: エディタステータスバーコンポーネント
+ *
+ * 呼び出し関係: EditorPanel から使用される。
+ */
 "use client";
 
 import { memo } from "react";
@@ -24,6 +33,11 @@ interface EditorStatusBarProps {
   updatedAt: string;
 }
 
+/**
+ * ステータスバー本体。
+ * currentHash と savedHash を比較して未保存状態を検出し、
+ * isSaving / remoteStatus / retryCountdown に応じてアイコンとテキストを切り替える。
+ */
 export const EditorStatusBar = memo(function EditorStatusBar({
   contentLength,
   currentHash,

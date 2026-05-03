@@ -1,4 +1,10 @@
-"""Database schema bootstrap and runtime initialization helpers."""
+"""データベーススキーマのブートストラップと実行時初期化ヘルパー。
+
+責務: Alembic マイグレーションの適用、レガシースキーマのハンドオフ、DSQL対応を行う。
+主要なエクスポート: DatabaseSchemaBootstrapper, RequestDatabaseInitializer,
+    create_database_schema, run_cold_start_database_bootstrap
+呼び出し関係: アプリ起動時・リクエストミドルウェアから呼ばれ、SQLAlchemy/Alembic を呼ぶ。
+"""
 
 import logging
 import os
@@ -14,12 +20,14 @@ from sqlmodel import SQLModel
 
 from alembic import command
 
+# Alembicがバージョン管理に使うテーブル名
 ALEMBIC_VERSION_TABLE = "alembic_version"
+# ブートストラップ時に削除すべき廃止済みテーブル
 OBSOLETE_TABLES = ("mcp_tokens",)
 
 
 class DatabaseSchemaBootstrapper:
-    """Encapsulate schema bootstrap and Alembic handoff logic."""
+    """スキーマブートストラップと Alembic へのハンドオフロジックをカプセル化するクラス。"""
 
     def __init__(
         self,
@@ -31,7 +39,7 @@ class DatabaseSchemaBootstrapper:
         self.logger = logger or logging.getLogger(__name__)
 
     def run(self) -> None:
-        """Bring the database schema to the current Alembic revision."""
+        """データベーススキーマを現在の Alembic リビジョンに揃える。"""
         self.logger.info("Starting database schema initialization...")
 
         try:
@@ -99,17 +107,21 @@ class DatabaseSchemaBootstrapper:
 
     @staticmethod
     def _import_models() -> None:
+        """SQLModel のメタデータにテーブル定義を登録するためモデルをインポートする。"""
         import app.models  # noqa: F401
 
     @staticmethod
     def _sorted_tables():
+        """外部キー依存を考慮した順序でテーブル一覧を返す。"""
         return SQLModel.metadata.sorted_tables
 
     @staticmethod
     def _get_backend_root() -> Path:
+        """backend ディレクトリの絶対パスを返す。"""
         return Path(__file__).resolve().parent.parent.parent
 
     def _get_alembic_config(self, connection=None) -> Config:
+        """Alembic の設定オブジェクトを生成して返す。接続を渡すと online モードになる。"""
         config = Config(str(self._get_backend_root() / "alembic.ini"))
         config.set_main_option(
             "script_location", str(self._get_backend_root() / "alembic")
@@ -120,10 +132,12 @@ class DatabaseSchemaBootstrapper:
 
     @staticmethod
     def _is_duplicate_column_error(error: Exception) -> bool:
+        """エラーメッセージがカラム重複に起因するものか判定する。"""
         message = str(error).lower()
         return "already exists" in message or "duplicate column" in message
 
     def _commit_if_dsql_runtime(self, connection) -> None:
+        """DSQL 環境の場合のみコミットを発行する（自動コミット非対応の回避策）。"""
         if self._uses_dsql_runtime():
             connection.commit()
 
@@ -137,6 +151,7 @@ class DatabaseSchemaBootstrapper:
         update_sql: str | None = None,
         params: dict | None = None,
     ) -> None:
+        """SQLite 向けに PRAGMA でカラム存在を確認し、なければ ALTER TABLE を実行する。"""
         columns_result = connection.execute(text(f"PRAGMA table_info({table_name})"))
         columns = {row[1] for row in columns_result}
         if column_name in columns:
@@ -164,6 +179,7 @@ class DatabaseSchemaBootstrapper:
         update_sql: str | None = None,
         params: dict | None = None,
     ) -> None:
+        """SQLite/PostgreSQL 両方に対応したカラム追加ヘルパー。既存なら何もしない。"""
         dialect_name = connection.dialect.name
         if dialect_name == "sqlite":
             self._ensure_legacy_column(
@@ -203,6 +219,7 @@ class DatabaseSchemaBootstrapper:
             self._commit_if_dsql_runtime(connection)
 
     def _bootstrap_legacy_schema(self, connection) -> None:
+        """全テーブルを作成し、レガシーカラムの追加・廃止テーブルの削除を行う。"""
         from app.models.token_usage import MONTHLY_TOKEN_LIMIT
 
         self.logger.info("Bootstrapping legacy schema before Alembic stamp")
@@ -255,6 +272,7 @@ class DatabaseSchemaBootstrapper:
         self._drop_obsolete_tables(connection)
 
     def _drop_obsolete_tables(self, connection) -> None:
+        """OBSOLETE_TABLES に列挙された廃止済みテーブルを存在する場合のみ削除する。"""
         try:
             existing_tables = set(inspect(connection).get_table_names())
         except sa_exc.NoInspectionAvailable:
@@ -266,6 +284,7 @@ class DatabaseSchemaBootstrapper:
             self._commit_if_dsql_runtime(connection)
 
     def _get_alembic_head_revision(self) -> str:
+        """Alembic スクリプトディレクトリから最新のリビジョン文字列を取得する。"""
         script = ScriptDirectory.from_config(self._get_alembic_config())
         head = script.get_current_head()
         if head is None:
@@ -274,6 +293,7 @@ class DatabaseSchemaBootstrapper:
 
     @staticmethod
     def _get_current_alembic_revision(connection) -> str | None:
+        """DBに記録された現在の Alembic リビジョンを返す。テーブルがなければ None。"""
         if ALEMBIC_VERSION_TABLE not in inspect(connection).get_table_names():
             return None
 
@@ -283,9 +303,14 @@ class DatabaseSchemaBootstrapper:
 
     @staticmethod
     def _uses_dsql_runtime() -> bool:
+        """DSQL_CLUSTER_ENDPOINT 環境変数が設定されているか確認し DSQL 環境かを返す。"""
         return bool(os.environ.get("DSQL_CLUSTER_ENDPOINT"))
 
     def _stamp_head_manually(self, connection, revision: str) -> None:
+        """alembic_version テーブルを直接操作して指定リビジョンをスタンプする。
+
+        Alembic の command.stamp が使えない DSQL 環境向けの代替手段。
+        """
         if ALEMBIC_VERSION_TABLE not in inspect(connection).get_table_names():
             connection.execute(
                 text(
@@ -313,7 +338,7 @@ class DatabaseSchemaBootstrapper:
 
 
 class RequestDatabaseInitializer:
-    """Run database bootstrap lazily on the first non-health request."""
+    """最初の非ヘルスチェックリクエスト時にDBブートストラップを遅延実行するクラス。"""
 
     def __init__(
         self,
@@ -332,6 +357,7 @@ class RequestDatabaseInitializer:
         dependency_overrides: Mapping[object, object],
         session_dependency: object,
     ) -> None:
+        """必要であればDBを初期化する。テスト用オーバーライドやヘルスチェックは除外する。"""
         if session_dependency in dependency_overrides:
             return
         if self._initialized or path.endswith(self.healthcheck_path):
@@ -345,6 +371,7 @@ def create_database_schema(
     *,
     logger: logging.Logger | None = None,
 ) -> None:
+    """DatabaseSchemaBootstrapper を生成して run() を呼ぶ便利関数。"""
     DatabaseSchemaBootstrapper(engine_factory, logger=logger).run()
 
 
@@ -354,6 +381,7 @@ def run_cold_start_database_bootstrap(
     logger: logging.Logger,
     context_label: str,
 ) -> None:
+    """コールドスタート時にDBスキーマを初期化し、結果をログに記録する。"""
     logger.info("%s: initializing database schema...", context_label)
     try:
         initialize_database()

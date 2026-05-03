@@ -1,3 +1,11 @@
+/**
+ * ユーザー登録ページ。メール確認コードが必要な Cognito サインアップフローを2ステップで処理する。
+ *
+ * 主なエクスポート:
+ * - RegisterPage: 登録フォームページコンポーネント
+ *
+ * 呼び出し関係: Next.js App Router の `/register` ルート (app/register/page.tsx)。
+ */
 "use client";
 
 import { useState } from "react";
@@ -10,6 +18,10 @@ import { FileTextIcon, Loader2Icon } from "lucide-react";
 
 type Step = "register" | "confirm";
 
+/**
+ * 登録フォームコンポーネント。"register" と "confirm" の2ステップを step state で管理する。
+ * signUp が needsConfirmation を返した場合は確認コード入力画面へ遷移し、コード確認後に自動サインインしてルートへリダイレクトする。
+ */
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>("register");
   const [email, setEmail] = useState("");

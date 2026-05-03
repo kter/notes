@@ -1,3 +1,13 @@
+/**
+ * 管理者向けユーザー管理コンソール。ユーザー一覧の検索・絞り込みと、
+ * 選択ユーザーのトークン上限・AIモデル・言語・管理者権限を編集して保存できる。
+ *
+ * 主なエクスポート:
+ * - AdminConsole: 管理者コンソールコンポーネント
+ * - resolveMainAppHref: admin サブドメインから通常アプリの URL を生成するユーティリティ
+ *
+ * 呼び出し関係: /admin/page.tsx から直接マウントされる。認証・権限チェックも内部で行う。
+ */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,6 +25,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+/** ISO 日付文字列をロケールに合わせた「年/月/日 時:分」形式に整形する。null は "-" を返す。 */
 function formatDate(date: string | null): string {
   if (!date) return "-";
   return new Intl.DateTimeFormat(undefined, {
@@ -26,15 +37,21 @@ function formatDate(date: string | null): string {
   }).format(new Date(date));
 }
 
+/** 数値をロケール対応のカンマ区切り文字列に整形する。 */
 function formatNumber(value: number): string {
   return new Intl.NumberFormat().format(value);
 }
 
+/** ユーザー詳細からトークン使用率（0〜1）を計算する。上限が 0 以下の場合は 0 を返す。 */
 function usageRatio(detail: AdminUserDetailResponse | null): number {
   if (!detail || detail.token_usage.token_limit <= 0) return 0;
   return detail.token_usage.tokens_used / detail.token_usage.token_limit;
 }
 
+/**
+ * 現在の URL が admin サブドメインの場合、通常アプリのルート URL に変換して返す。
+ * 例: https://admin.example.com/... → https://example.com/
+ */
 export function resolveMainAppHref(currentHref: string): string {
   const url = new URL(currentHref);
   if (url.hostname.startsWith("admin.")) {
@@ -46,6 +63,11 @@ export function resolveMainAppHref(currentHref: string): string {
   return url.toString();
 }
 
+/**
+ * 管理者コンソール本体。
+ * 認証・管理者権限チェック → ユーザー一覧取得 → ユーザー詳細取得 の順に API を呼び出し、
+ * 選択ユーザーの設定を変更して保存する。権限不足やログイン未済の場合はガード画面を表示する。
+ */
 export function AdminConsole() {
   const { isAuthenticated, isLoading: authLoading, signOut, user } = useAuth();
   const { getApi } = useApi();
@@ -186,6 +208,7 @@ export function AdminConsole() {
     setSaveMessage(null);
   }, [detail]);
 
+  // フォームの値がサーバー上の値と一つでも異なる場合に保存ボタンを有効化する
   const canSave = useMemo(() => {
     if (!detail) return false;
     return (
@@ -196,6 +219,7 @@ export function AdminConsole() {
     );
   }, [detail, formAdmin, formLanguage, formModelId, formTokenLimit]);
 
+  // 現在保存済みのモデルが利用可能モデル一覧に含まれない場合は先頭に追加して選択肢に表示する
   const modelOptions = useMemo<AvailableModel[]>(() => {
     if (!detail) return [];
     const hasCurrent = detail.available_models.some((model) => model.id === detail.settings.llm_model_id);
@@ -223,6 +247,10 @@ export function AdminConsole() {
     setUsers(response.users);
   }
 
+  /**
+   * ユーザー設定の保存ハンドラ。
+   * 変更のあるフィールドのみ payload に含め、保存後はユーザー一覧もインプレースで更新する。
+   */
   async function handleSave() {
     if (!detail) return;
     const tokenLimit = Number(formTokenLimit);

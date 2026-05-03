@@ -1,3 +1,14 @@
+/**
+ * アプリケーションの英語翻訳定義ファイル。
+ * 全 UI テキストを名前空間ごとにまとめた定数オブジェクト en と、
+ * 翻訳キーの型定義 TranslationKeys をエクスポートする。
+ *
+ * 主なエクスポート:
+ * - en: 英語翻訳オブジェクト
+ * - TranslationKeys: 翻訳オブジェクトの構造型
+ *
+ * 呼び出し関係: LanguageContext から effectiveLanguage に応じて参照される。
+ */
 // English translations
 
 export const en = {

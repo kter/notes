@@ -1,3 +1,11 @@
+"""assistantフィーチャのFastAPI依存性注入プロバイダー。
+
+責務: ルートハンドラへユースケースインスタンスを注入する。
+主要なエクスポート: get_ai_interaction_use_cases, get_edit_job_use_cases。
+呼び出し関係: FastAPIのDependsにより各ルートから呼ばれ、
+    AIInteractionUseCases / EditJobUseCases を生成して返す。
+"""
+
 from typing import Annotated
 
 from fastapi import Depends
@@ -19,6 +27,7 @@ def get_ai_interaction_use_cases(
         WorkspaceQueryUseCases, Depends(get_workspace_query_use_cases)
     ],
 ) -> AIInteractionUseCases:
+    """要約・チャット・編集を行う AIInteractionUseCases を生成して返す。"""
     return AIInteractionUseCases(
         session=session,
         user_id=user_id,
@@ -34,6 +43,7 @@ def get_edit_job_use_cases(
         WorkspaceQueryUseCases, Depends(get_workspace_query_use_cases)
     ],
 ) -> EditJobUseCases:
+    """AI編集ジョブの作成・取得を行う EditJobUseCases を生成して返す。"""
     return EditJobUseCases(
         session=session,
         user_id=user_id,

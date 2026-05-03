@@ -1,3 +1,12 @@
+/**
+ * AI トークン使用量をインジケーターとして表示するコンポーネント。
+ * 使用率に応じて緑・黄・赤でアイコン色を変え、ホバー時にリセット日をツールチップで表示する。
+ *
+ * 主なエクスポート:
+ * - TokenUsageIndicator: トークン使用量バッジコンポーネント
+ *
+ * 呼び出し関係: EditorStatusBar から使用される。
+ */
 "use client";
 
 import { memo } from "react";
@@ -16,6 +25,10 @@ interface TokenUsageIndicatorProps {
     resetDate: string;
 }
 
+/**
+ * トークン使用量を視覚的に表示するインジケーター。
+ * usageRatio が 0.7 以上で黄色、0.9 以上で赤に変化し、上限に近づいていることをユーザーに警告する。
+ */
 export const TokenUsageIndicator = memo(function TokenUsageIndicator({
     tokensUsed,
     tokenLimit,

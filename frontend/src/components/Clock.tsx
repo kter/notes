@@ -1,3 +1,12 @@
+/**
+ * リアルタイムで現在時刻を表示するシンプルな時計コンポーネント。
+ * 1 秒ごとに時刻を更新し、サーバーサイドレンダリング時は null を返す。
+ *
+ * 主なエクスポート:
+ * - Clock: 現在時刻を HH:MM 形式で表示するコンポーネント
+ *
+ * 呼び出し関係: EditorStatusBar から使用される。
+ */
 "use client";
 
 import { useEffect, useState, memo } from "react";

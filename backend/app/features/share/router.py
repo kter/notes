@@ -1,4 +1,10 @@
-"""Share router for public note sharing."""
+"""ノート共有機能の FastAPI ルーター。
+
+責務: 共有リンクの作成・取得・削除と、共有ノートの公開取得エンドポイントを提供する。
+主要なエクスポート: router
+呼び出し関係: アプリケーションの main ルーターにマウントされ、
+    ShareUseCases を通じてビジネスロジックを呼び出す。
+"""
 
 from typing import Annotated
 from uuid import UUID
@@ -24,7 +30,7 @@ def create_share(
     note_id: UUID,
     use_cases: Annotated[ShareUseCases, Depends(get_share_use_cases)],
 ):
-    """Create a share link for a note. Only the note owner can share."""
+    """ノートの共有リンクを作成する。ノートのオーナーのみが実行可能。"""
     return use_cases.create_share(note_id)
 
 
@@ -33,7 +39,7 @@ def get_share(
     note_id: UUID,
     use_cases: Annotated[ShareUseCases, Depends(get_share_use_cases)],
 ):
-    """Get the share info for a note. Returns null if not shared."""
+    """ノートの共有情報を取得する。共有されていない場合は null を返す。"""
     return use_cases.get_share(note_id)
 
 
@@ -42,7 +48,7 @@ def delete_share(
     note_id: UUID,
     use_cases: Annotated[ShareUseCases, Depends(get_share_use_cases)],
 ):
-    """Revoke a share link for a note."""
+    """ノートの共有リンクを取り消す。"""
     use_cases.delete_share(note_id)
 
 
@@ -51,5 +57,5 @@ def get_shared_note(
     token: UUID,
     use_cases: Annotated[ShareUseCases, Depends(get_public_share_use_cases)],
 ):
-    """Get a shared note by its token. No authentication required."""
+    """トークンで共有ノートを取得する。認証不要の公開エンドポイント。"""
     return use_cases.get_shared_note(token)

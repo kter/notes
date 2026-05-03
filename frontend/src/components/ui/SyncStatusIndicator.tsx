@@ -1,3 +1,12 @@
+/**
+ * オフライン・同期中・エラーなどのネットワーク同期状態をバッジとして表示するコンポーネント。
+ * オンラインかつ同期済みの場合は何も描画しない。
+ *
+ * 主なエクスポート:
+ * - SyncStatusIndicator: 同期ステータスバッジ
+ *
+ * 呼び出し関係: AuthenticatedWorkspace から fixed 表示で使用される。
+ */
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -14,6 +23,11 @@ interface SyncStatusIndicatorProps {
   className?: string;
 }
 
+/**
+ * 同期ステータスインジケーター。
+ * isOnline / syncStatus の組み合わせに応じてアイコンとメッセージを決定し、
+ * pendingChangesCount が 0 超の場合は未反映件数を合わせて表示する。
+ */
 export function SyncStatusIndicator({
   isOnline,
   syncStatus,

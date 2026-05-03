@@ -1,3 +1,14 @@
+/**
+ * 現在の日照・夜間エリアをリアルタイムで世界地図上に描画するコンポーネント。
+ * 太陽直下点計算とターミネータライン（昼夜境界線）SVG パスを 1 分ごとに更新する。
+ *
+ * 主なエクスポート:
+ * - SunlightMap: SVG ベースの日照マップコンポーネント
+ * - calculateSubSolarPoint: 日時から太陽直下点（緯度・経度）を計算するユーティリティ
+ * - calculateTerminatorPath: 太陽直下点から夜間領域の SVG パス文字列を生成するユーティリティ
+ *
+ * 呼び出し関係: EditorToolbar から使用される。
+ */
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
@@ -10,11 +21,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+/** UTC 日付から年初からの経過日数（1 始まり）を返す。太陽赤緯計算に使用する。 */
 function getDayOfYear(date: Date): number {
   const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil((date.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
+/**
+ * 指定日時における太陽直下点（緯度・経度）を近似計算する。
+ * 緯度は太陽赤緯（最大 ±23.44°）、経度は UTC 時刻から日付変更線基準で算出する。
+ */
 export function calculateSubSolarPoint(date: Date): { lat: number; lon: number } {
   const dayOfYear = getDayOfYear(date);
   const lat = -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10));
@@ -24,6 +40,11 @@ export function calculateSubSolarPoint(date: Date): { lat: number; lon: number }
   return { lat, lon };
 }
 
+/**
+ * 太陽直下点（緯度・経度）から夜間領域の SVG パス文字列を生成する。
+ * 経度 2° ステップでターミネータラインの各点を計算し、極側を閉じて夜間ポリゴンを形成する。
+ * 赤道面付近（tan(0) の発散）を避けるため sunLat に微小オフセットを適用する。
+ */
 export function calculateTerminatorPath(sunLat: number, sunLon: number): string {
   const toRad = (d: number) => (d * Math.PI) / 180;
 
@@ -51,6 +72,7 @@ export function calculateTerminatorPath(sunLat: number, sunLon: number): string 
   return path + " Z";
 }
 
+/** 1 分ごとに太陽直下点を再計算し、最新の緯度・経度を返すカスタムフック。 */
 function useSolarTerminator() {
   const [solar, setSolar] = useState(() => calculateSubSolarPoint(new Date()));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -69,6 +91,7 @@ function useSolarTerminator() {
   return solar;
 }
 
+/** ブラウザの Geolocation API からユーザーの現在地を一度だけ取得するカスタムフック。取得失敗時は null を返す。 */
 function useGeolocation(): { lat: number; lon: number } | null {
   const [position, setPosition] = useState<{ lat: number; lon: number } | null>(null);
 
@@ -89,6 +112,10 @@ function useGeolocation(): { lat: number; lon: number } | null {
   return position;
 }
 
+/**
+ * 世界地図上に現在の昼夜分布をリアルタイム描画するコンポーネント。
+ * 大陸のアウトラインと夜間オーバーレイを SVG で重ね、ユーザー位置を赤いドットで示す。
+ */
 export const SunlightMap = memo(function SunlightMap() {
   const { t } = useTranslation();
   const { lat: sunLat, lon: sunLon } = useSolarTerminator();

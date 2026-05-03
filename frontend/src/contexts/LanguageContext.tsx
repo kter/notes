@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * アプリケーション全体の言語設定と翻訳オブジェクトを提供するコンテキスト。
+ * バックエンドから言語設定を読み込み、"auto" の場合はブラウザのロケールを自動検出する。
+ *
+ * 主なエクスポート:
+ * - LanguageProvider: 言語コンテキストを子コンポーネントへ提供するプロバイダー
+ * - useLanguage: language / effectiveLanguage / setLanguage / translations / isLoading を返すフック
+ *
+ * 呼び出し関係: アプリルートの layout.tsx でラップされ、useTranslation フック経由で全コンポーネントから参照される。
+ */
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { ja, en, type TranslationKeys, type Language } from "@/locales";
 import { useApi } from "@/hooks";

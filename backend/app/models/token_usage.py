@@ -1,20 +1,27 @@
+"""ユーザーごとの月次トークン使用量を管理するDBモデルおよびAPIスキーマを定義するモジュール。
+
+責務: AI機能の利用量を月次集計し、上限超過チェックに使用するデータの永続化。
+主要なエクスポート: TokenUsage, TokenUsageRead, MONTHLY_TOKEN_LIMIT.
+呼び出し関係: services/token_usage_service.py および routers/token_usage.py から参照される。
+"""
+
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, SQLModel
 
-# Monthly token limit per user
+# ユーザーあたりの月次トークン上限
 MONTHLY_TOKEN_LIMIT = 30_000
 
 
 def _get_period_start() -> datetime:
-    """Get the start of the current monthly period (1st of current month, UTC)."""
+    """現在の月次集計期間の開始日時を返す（UTC 当月1日 00:00:00）。"""
     now = datetime.now(UTC)
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _get_period_end() -> datetime:
-    """Get the end of the current monthly period (1st of next month, UTC)."""
+    """現在の月次集計期間の終了日時を返す（UTC 翌月1日 00:00:00）。"""
     now = datetime.now(UTC)
     if now.month == 12:
         return now.replace(
@@ -26,23 +33,27 @@ def _get_period_end() -> datetime:
 
 
 class TokenUsage(SQLModel, table=True):
-    """Monthly token usage tracking per user."""
+    """ユーザーごとの月次トークン使用量を追跡するテーブルモデル。
+
+    Aurora DSQL 互換のため user_id にインデックスは付与しない。
+    期間は period_start / period_end で管理し、月をまたぐとレコードを新規作成する。
+    """
 
     __tablename__ = "token_usage"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: str = Field()  # Cognito user sub (no index for DSQL compatibility)
-    tokens_used: int = Field(default=0)
-    period_start: datetime = Field(default_factory=_get_period_start)
-    period_end: datetime = Field(default_factory=_get_period_end)
+    user_id: str = Field()  # Cognito ユーザーサブ（DSQL互換のためインデックスなし）
+    tokens_used: int = Field(default=0)  # 当月の累積消費トークン数
+    period_start: datetime = Field(default_factory=_get_period_start)  # 集計期間開始
+    period_end: datetime = Field(default_factory=_get_period_end)  # 集計期間終了
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class TokenUsageRead(SQLModel):
-    """Schema for reading token usage info."""
+    """トークン使用量取得レスポンススキーマ。"""
 
-    tokens_used: int
-    token_limit: int
-    period_start: datetime
-    period_end: datetime
+    tokens_used: int  # 当月の累積消費トークン数
+    token_limit: int  # 上限トークン数
+    period_start: datetime  # 集計期間開始日時
+    period_end: datetime  # 集計期間終了日時

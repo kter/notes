@@ -1,3 +1,10 @@
+"""FastAPIアプリケーションのエントリポイント。
+
+責務: HTTPミドルウェア・ルーター登録・例外ハンドラの組み立て。
+主要なエクスポート: app (FastAPIインスタンス)。
+呼び出し関係: lambda_handler.py から Mangum 経由で呼ばれる。各 features ルーターを束ねる。
+"""
+
 import logging
 from contextlib import asynccontextmanager
 from time import perf_counter
@@ -40,10 +47,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan handler."""
-    # We move database initialization to the first request to avoid Lambda's 10s init timeout
+    """アプリケーションのライフサイクルを管理する。
+
+    DBの初期化はコールドスタート時の10秒タイムアウトを避けるため
+    最初のリクエスト受信時まで遅延させる。
+    """
+    # DB初期化は最初のリクエストで遅延実行するため、ここでは何もしない
     yield
-    # Shutdown: cleanup
+    # シャットダウン時のクリーンアップ（現時点では不要）
 
 
 app = FastAPI(
@@ -54,7 +65,7 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
-# Configure CORS
+# CORSミドルウェアを設定（フロントエンドからのクロスオリジンリクエストを許可）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings_app.cors_origins,
@@ -63,7 +74,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# 各機能ルーターをAPIパスプレフィックスに紐付けて登録
 app.include_router(folders_router, prefix="/api/folders", tags=["folders"])
 app.include_router(notes_router, prefix="/api/notes", tags=["notes"])
 app.include_router(changes_router, prefix="/api/workspace", tags=["workspace"])
@@ -77,6 +88,7 @@ app.include_router(admin.router)
 
 @app.exception_handler(DomainError)
 async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
+    """DomainError をキャッチして適切なHTTPステータスコードのJSONレスポンスを返す。"""
     http_error = to_http_exception(exc)
     return JSONResponse(
         status_code=http_error.status_code,
@@ -90,12 +102,13 @@ database_initializer = RequestDatabaseInitializer(create_db_and_tables)
 
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
-    """Bind request context, ensure DB readiness, and emit one access log record."""
+    """リクエストコンテキストをバインドし、DBの準備を確認したうえでアクセスログを1件出力する。"""
     request_id = request.headers.get("x-request-id") or str(uuid4())
     sentry_trace = request.headers.get("sentry-trace", "")
     traceparent = request.headers.get("traceparent", "")
     trace_id = None
 
+    # sentry-trace ヘッダーが優先。なければ W3C traceparent から trace_id を抽出する
     if sentry_trace:
         trace_id = sentry_trace.split("-", maxsplit=1)[0] or None
     elif traceparent:
@@ -134,6 +147,7 @@ async def request_logging_middleware(request: Request, call_next):
         sentry_sdk.capture_exception(exc)
         outcome = "error"
         reason = "unhandled_exception"
+        # ミドルウェア層で補足されなかった例外は500で返却
         response = JSONResponse(
             status_code=500,
             content={"detail": "Internal Server Error"},
@@ -143,6 +157,7 @@ async def request_logging_middleware(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
 
     status_code = response.status_code
+    # /health はノイズ抑制のため DEBUG レベルに落とす
     if request.url.path == "/health":
         level = logging.DEBUG
     elif status_code >= 500:
@@ -170,5 +185,5 @@ async def request_logging_middleware(request: Request, call_next):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """ロードバランサー・デプロイ検証用のヘルスチェックエンドポイント。"""
     return {"status": "healthy"}

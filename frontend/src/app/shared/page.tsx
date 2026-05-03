@@ -1,3 +1,12 @@
+/**
+ * 共有ノートの公開閲覧ページ。URL クエリパラメータのトークンを使って共有ノートを取得し、認証不要で閲覧できる。
+ *
+ * 主なエクスポート:
+ * - SharedNotePage: 共有ノートページコンポーネント (Suspense ラッパー)
+ * - SharedNoteContent: トークン取得・表示ロジックを持つ内部コンポーネント
+ *
+ * 呼び出し関係: Next.js App Router の `/shared` ルート (app/shared/page.tsx)。未認証ユーザーがアクセスする。
+ */
 "use client";
 
 import { Suspense, useEffect, useState } from "react";

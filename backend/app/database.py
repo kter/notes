@@ -1,4 +1,10 @@
-"""Database connection setup for Aurora DSQL and local development."""
+"""Aurora DSQL およびローカル開発向けのデータベース接続設定モジュール。
+
+責務: SQLModel エンジンの生成とセッション提供。
+主要なエクスポート: get_dsql_engine, create_db_and_tables, get_session。
+呼び出し関係: lambda_handler / worker_lambda_handler から初期化時に呼ばれ、
+    各ルーターでは FastAPI の Depends(get_session) 経由で使用される。
+"""
 
 import logging
 import os
@@ -22,7 +28,11 @@ _engine = None
 
 
 def get_dsql_engine():
-    """Create database engine for DSQL or local PostgreSQL."""
+    """DSQL またはローカル PostgreSQL 用のデータベースエンジンを返す。
+
+    エンジンはモジュールスコープの _engine にキャッシュされ、
+    2 回目以降の呼び出しでは既存インスタンスをそのまま返す。
+    """
     global _engine
     if _engine is not None:
         log_event(
@@ -47,6 +57,11 @@ def get_dsql_engine():
         )
 
         def get_connection():
+            """DSQL への psycopg2 接続を生成して返す。
+
+            署名期限切れや時刻ズレによる OperationalError は
+            max_retries 回まで指数バックオフで再試行する。
+            """
             max_retries = 3
             base_delay = 0.5
 
@@ -72,6 +87,7 @@ def get_dsql_engine():
                     if (
                         "Signature expired" in error_message
                         or "Signature not yet current" in error_message
+                        # Lambda の時刻とAWS認証基盤の時刻がズレた場合に発生する
                     ):
                         log_event(
                             logger,
@@ -163,12 +179,15 @@ def get_dsql_engine():
 
 
 def create_db_and_tables() -> None:
-    """Compatibility wrapper for schema bootstrap used by handlers and tests."""
+    """ハンドラーおよびテストから呼ばれるスキーマ初期化の互換ラッパー。
+
+    実装は app.bootstrap.database_bootstrap.create_database_schema に委譲する。
+    """
     create_database_schema(get_dsql_engine, logger=logger)
 
 
 def get_session() -> Generator[Session, None, None]:
-    """Dependency to get database session."""
+    """FastAPI の Depends で使用するデータベースセッションを提供するジェネレータ。"""
     engine = get_dsql_engine()
     with Session(engine) as session:
         yield session

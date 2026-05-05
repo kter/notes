@@ -107,7 +107,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
             fontSize: "1rem",
             lineHeight: "1.625",
           },
-          ".cm-content": { padding: "0", minHeight: "400px" },
+          ".cm-content": { padding: "0 0 0 1px", minHeight: "400px" },
           "&.cm-focused": { outline: "none" },
           ".cm-line": { padding: "0" },
           // Remove CM6 default selection color so Tailwind / OS selection is visible

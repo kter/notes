@@ -9,7 +9,7 @@ import uuid
 
 import boto3
 from botocore.exceptions import ClientError
-from fastapi import UploadFile
+from starlette.datastructures import UploadFile
 
 from app.config import get_settings
 from app.features.images.errors import ImageUploadFailedError

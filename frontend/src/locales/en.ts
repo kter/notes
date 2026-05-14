@@ -115,14 +115,14 @@ export const en = {
     summarizing: "Summarizing...",
     chat: "Chat",
     export: "Export",
-    preview: "Preview",
     print: "Print",
     markdown: "Markdown (.md)",
     plainText: "Plain Text (.txt)",
-    previewPlaceholder: "Start writing to see the preview...",
+    preview: "Preview",
     showEditor: "Show editor",
     hideEditor: "Hide editor",
     resizeEditorPreview: "Resize editor and preview panes",
+    previewPlaceholder: "Start writing to see the preview...",
     noteTitlePlaceholder: "Note title",
     noteContentPlaceholder: "Start writing your note in Markdown...",
     summarizeNote: "Summarize note",
@@ -135,6 +135,8 @@ export const en = {
     fullscreen: "Fullscreen",
     exitFullscreen: "Exit Fullscreen",
     imageTooLarge: "Image is too large. Please use an image under 10MB.",
+    useLivePreview: "Switch to live preview",
+    useRawText: "Switch to raw text",
   },
 
   // AI Panel
@@ -379,14 +381,14 @@ export type TranslationKeys = {
     summarizing: string;
     chat: string;
     export: string;
-    preview: string;
     print: string;
     markdown: string;
     plainText: string;
-    previewPlaceholder: string;
+    preview: string;
     showEditor: string;
     hideEditor: string;
     resizeEditorPreview: string;
+    previewPlaceholder: string;
     noteTitlePlaceholder: string;
     noteContentPlaceholder: string;
     summarizeNote: string;
@@ -399,6 +401,8 @@ export type TranslationKeys = {
     fullscreen: string;
     exitFullscreen: string;
     imageTooLarge: string;
+    useLivePreview: string;
+    useRawText: string;
   };
   ai: {
     title: string;

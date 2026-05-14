@@ -8,34 +8,8 @@ import { useApi } from '@/hooks/useApi'
 
 // Mock react-markdown
 vi.mock('react-markdown', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  default: ({ children, components }: { children: string; components?: { input?: React.ComponentType<any> } }) => {
-    const InputComp = components?.input
-    if (InputComp) {
-      const lines = String(children).split('\n')
-      const hasTask = lines.some(l => /^\s*[-*+]\s+\[[ x]\]/i.test(l))
-      if (hasTask) {
-        return (
-          <div data-testid="markdown-preview">
-            <ul>
-              {lines.map((line, i) => {
-                const isChecked = /^\s*[-*+]\s+\[x\]/i.test(line)
-                const isUnchecked = /^\s*[-*+]\s+\[ \]/.test(line)
-                if (isChecked || isUnchecked) {
-                  return (
-                    <li key={i} data-source-line={i + 1} className="task-list-item">
-                      {/* Pass data-source-line to the input so closest("[data-source-line]") resolves on the input itself */}
-                      <InputComp type="checkbox" checked={isChecked} data-source-line={i + 1} />
-                    </li>
-                  )
-                }
-                return <span key={i}>{line}</span>
-              })}
-            </ul>
-          </div>
-        )
-      }
-    }
+   
+  default: ({ children }: { children: string }) => {
     return <div data-testid="markdown-preview">{children}</div>
   },
 }))
@@ -51,7 +25,6 @@ vi.mock('@/components/ai/DiffView', () => ({
 }))
 
 // Mock MarkdownEditor with a textarea facade so existing tests work unchanged.
-// The wrapper div acts as scrollDOM so scroll-sync tests can fire events on it.
 vi.mock('@/components/editor/MarkdownEditor', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const React = require('react')
@@ -74,7 +47,7 @@ vi.mock('@/components/editor/MarkdownEditor', () => {
         dispatch: () => {},
       } : null,
     }), [value, onChange])
-     
+
     return React.createElement('div',
       { ref: scrollDOMRef, 'data-testid': 'mock-cm-scroller', className }, // eslint-disable-line react-hooks/refs
       React.createElement('textarea', {
@@ -240,13 +213,13 @@ describe('EditorPanel', () => {
     // Note: The component uses handleContentChange -> setContent (local state) -> useEffect (debounce) -> onUpdateNote
     // Because of debounce, we might not see immediate call unless we fast-forward timers.
     // However, the component ALSO calls onUpdateNote in onBlur.
-    
+
     vi.useFakeTimers()
     render(<EditorPanel {...defaultProps} />)
-    
+
     const textarea = screen.getByRole('textbox', { name: /content/i })
     fireEvent.change(textarea, { target: { value: 'New content' } })
-    
+
     // Fast forward debounce
     vi.advanceTimersByTime(600)
 
@@ -286,19 +259,6 @@ describe('EditorPanel', () => {
     }
     render(<EditorPanel {...props} />)
     expect(screen.getByText('editor.unsaved')).toBeInTheDocument()
-  })
-
-  it('renders markdown preview when toggle is clicked', () => {
-    // Verify preview toggle works correctly
-    // The actual useDeferredValue optimization is tested via code review
-    render(<EditorPanel {...defaultProps} />)
-
-    // Click preview toggle
-    const previewButton = screen.getByTestId('editor-preview-toggle')
-    fireEvent.click(previewButton)
-
-    // Preview should be visible with the content
-    expect(screen.getAllByTestId('markdown-preview')).toHaveLength(1)
   })
 
   it('does not render the print preview during normal editing', () => {
@@ -368,84 +328,6 @@ describe('EditorPanel', () => {
     })
   })
 
-  it('shows a resize handle for desktop preview mode', () => {
-    render(<EditorPanel {...defaultProps} />)
-
-    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-    expect(screen.getByTestId('editor-preview-resize-handle')).toBeInTheDocument()
-  })
-
-  it('resizes the editor pane when dragging the preview separator on desktop', () => {
-    render(<EditorPanel {...defaultProps} />)
-
-    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-    const layout = screen.getByTestId('editor-preview-desktop-layout')
-    Object.defineProperty(layout, 'clientWidth', { value: 1000, configurable: true })
-
-    const resizeHandle = screen.getByTestId('editor-preview-resize-handle')
-    fireEvent.mouseDown(resizeHandle, { clientX: 500 })
-    fireEvent.mouseMove(document, { clientX: 200 })
-    fireEvent.mouseUp(document)
-
-    expect(screen.getByTestId('editor-drop-zone')).toHaveStyle({ width: '20%' })
-    expect(localStorage.getItem('notes-editor-preview-width')).toBe('20')
-  })
-
-  it('resets the editor and preview panes to 50:50 on resize handle double click', () => {
-    render(<EditorPanel {...defaultProps} />)
-
-    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-    const layout = screen.getByTestId('editor-preview-desktop-layout')
-    Object.defineProperty(layout, 'clientWidth', { value: 1000, configurable: true })
-
-    const resizeHandle = screen.getByTestId('editor-preview-resize-handle')
-    fireEvent.mouseDown(resizeHandle, { clientX: 500 })
-    fireEvent.mouseMove(document, { clientX: 200 })
-    fireEvent.mouseUp(document)
-    expect(screen.getByTestId('editor-drop-zone')).toHaveStyle({ width: '20%' })
-
-    fireEvent.doubleClick(resizeHandle)
-
-    expect(screen.getByTestId('editor-drop-zone')).toHaveStyle({ width: '50%' })
-    expect(localStorage.getItem('notes-editor-preview-width')).toBe('50')
-  })
-
-  it('collapses to preview-only on desktop and restores the editor without closing preview', () => {
-    render(<EditorPanel {...defaultProps} />)
-
-    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-    expect(screen.getByTestId('editor-hide-button')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('editor-hide-button'))
-    expect(screen.queryByTestId('editor-content-input')).toBeNull()
-    expect(screen.getByTestId('editor-show-button')).toBeInTheDocument()
-    expect(screen.getByTestId('editor-preview-pane')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('editor-show-button'))
-    expect(screen.getByTestId('editor-content-input')).toBeInTheDocument()
-    expect(screen.getByTestId('editor-hide-button')).toBeInTheDocument()
-  })
-
-  it('uses preview-only mode on mobile and returns to the editor', () => {
-    setViewportWidth(375)
-    render(<EditorPanel {...defaultProps} />)
-
-    fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-    expect(screen.queryByTestId('editor-content-input')).toBeNull()
-    expect(screen.getByTestId('editor-preview-pane')).toBeInTheDocument()
-    expect(screen.queryByTestId('editor-preview-resize-handle')).toBeNull()
-    expect(screen.getByTestId('editor-show-button')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('editor-show-button'))
-    expect(screen.getByTestId('editor-content-input')).toBeInTheDocument()
-    expect(screen.queryByTestId('editor-preview-pane')).toBeNull()
-  })
-
   describe('Fullscreen mode', () => {
     let requestFullscreenMock: ReturnType<typeof vi.fn>
     let exitFullscreenMock: ReturnType<typeof vi.fn>
@@ -461,8 +343,10 @@ describe('EditorPanel', () => {
         document.dispatchEvent(new Event('fullscreenchange'))
         return Promise.resolve()
       })
-      HTMLElement.prototype.requestFullscreen = requestFullscreenMock
-      document.exitFullscreen = exitFullscreenMock
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      HTMLElement.prototype.requestFullscreen = requestFullscreenMock as any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      document.exitFullscreen = exitFullscreenMock as any
       Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
     })
 
@@ -704,173 +588,6 @@ describe('EditorPanel', () => {
         expect(mockCalculateHash).toHaveBeenCalledTimes(1)
         expect(mockCalculateHash).toHaveBeenCalledWith('abc')
       })
-    })
-
-    describe('Scroll RAF throttling', () => {
-      let originalRaf: typeof requestAnimationFrame
-      let originalCaf: typeof cancelAnimationFrame
-
-      beforeEach(() => {
-        originalRaf = window.requestAnimationFrame
-        originalCaf = window.cancelAnimationFrame
-      })
-
-      afterEach(() => {
-        window.requestAnimationFrame = originalRaf
-        window.cancelAnimationFrame = originalCaf
-      })
-
-      it('throttles rapid editor scroll events to one RAF per frame', () => {
-        const mockRaf = vi.fn().mockReturnValue(1)
-        window.requestAnimationFrame = mockRaf
-
-        render(<EditorPanel {...defaultProps} />)
-
-        const scroller = screen.getByTestId('mock-cm-scroller')
-
-        // Fire multiple scroll events in the same frame
-        fireEvent.scroll(scroller)
-        fireEvent.scroll(scroller)
-        fireEvent.scroll(scroller)
-
-        // Only one RAF should be scheduled (subsequent events are blocked by the ref guard)
-        expect(mockRaf).toHaveBeenCalledTimes(1)
-      })
-
-      it('allows a new RAF after previous frame completes', () => {
-        vi.useFakeTimers()
-
-        let rafCallback: FrameRequestCallback | null = null
-        const mockRaf = vi.fn().mockImplementation((cb: FrameRequestCallback) => {
-          rafCallback = cb
-          return 1
-        })
-        window.requestAnimationFrame = mockRaf
-
-        render(<EditorPanel {...defaultProps} />)
-
-        const scroller = screen.getByTestId('mock-cm-scroller')
-
-        // First scroll — schedules RAF
-        fireEvent.scroll(scroller)
-        expect(mockRaf).toHaveBeenCalledTimes(1)
-
-        // Execute the RAF callback — clears scrollRafRef.current and sets isScrollingRef.current = true
-        act(() => {
-          rafCallback?.(0)
-        })
-
-        // Advance past the 50ms timeout inside the RAF callback that resets isScrollingRef
-        vi.advanceTimersByTime(50)
-
-        // Second scroll after frame + cooldown — should schedule a new RAF
-        fireEvent.scroll(scroller)
-        expect(mockRaf).toHaveBeenCalledTimes(2)
-
-        vi.useRealTimers()
-      })
-
-      it('cancels pending RAF on unmount to prevent stale callbacks', () => {
-        const pendingRafId = 42
-        const mockRaf = vi.fn().mockReturnValue(pendingRafId)
-        const mockCaf = vi.fn()
-        window.requestAnimationFrame = mockRaf
-        window.cancelAnimationFrame = mockCaf
-
-        const { unmount } = render(<EditorPanel {...defaultProps} />)
-
-        const scroller = screen.getByTestId('mock-cm-scroller')
-        fireEvent.scroll(scroller)
-
-        // RAF is pending (callback not yet executed)
-        expect(mockRaf).toHaveBeenCalled()
-
-        // Unmount should cancel the pending RAF
-        unmount()
-        expect(mockCaf).toHaveBeenCalledWith(pendingRafId)
-      })
-
-      it('does not cancel RAF on unmount when no scroll was pending', () => {
-        const mockCaf = vi.fn()
-        window.cancelAnimationFrame = mockCaf
-
-        const { unmount } = render(<EditorPanel {...defaultProps} />)
-
-        // Unmount without triggering any scroll
-        unmount()
-        expect(mockCaf).not.toHaveBeenCalled()
-      })
-    })
-  })
-
-  describe('Interactive checkboxes in preview', () => {
-    const taskNote: Note = {
-      id: '2',
-      title: 'Task note',
-      content: '- [ ] task item\n- [x] done item',
-      user_id: 'u1',
-      folder_id: null,
-      version: 1,
-      created_at: '',
-      updated_at: '',
-      deleted_at: null,
-    }
-
-    it('clicking unchecked checkbox marks it as checked in textarea', async () => {
-      render(<EditorPanel {...defaultProps} note={taskNote} />)
-
-      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-      const checkboxes = screen.getAllByRole('checkbox')
-      // fireEvent.click triggers happy-dom's activation behavior (toggle + change),
-      // which React 19 picks up as the onChange event.
-      await act(async () => {
-        fireEvent.click(checkboxes[0])
-      })
-
-      const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
-      expect(textarea.value).toBe('- [x] task item\n- [x] done item')
-    })
-
-    it('clicking checked checkbox marks it as unchecked in textarea', async () => {
-      render(<EditorPanel {...defaultProps} note={taskNote} />)
-
-      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-      const checkboxes = screen.getAllByRole('checkbox')
-      await act(async () => {
-        fireEvent.click(checkboxes[1])
-      })
-
-      const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
-      expect(textarea.value).toBe('- [ ] task item\n- [ ] done item')
-    })
-
-    it('calls onUpdateNote after 500ms debounce following checkbox toggle', async () => {
-      vi.useFakeTimers()
-      const onUpdateNote = vi.fn()
-      render(<EditorPanel {...defaultProps} note={taskNote} onUpdateNote={onUpdateNote} />)
-
-      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
-
-      const checkboxes = screen.getAllByRole('checkbox')
-      await act(async () => {
-        fireEvent.click(checkboxes[0])
-      })
-
-      // Debounce not yet fired
-      expect(onUpdateNote).not.toHaveBeenCalledWith(
-        '2',
-        expect.objectContaining({ content: '- [x] task item\n- [x] done item' }),
-      )
-
-      act(() => { vi.advanceTimersByTime(600) })
-
-      // Only changed fields are sent; title was not modified, so only content is included.
-      expect(onUpdateNote).toHaveBeenCalledWith('2', {
-        content: '- [x] task item\n- [x] done item',
-      })
-      vi.useRealTimers()
     })
   })
 

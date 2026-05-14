@@ -1,6 +1,6 @@
 /**
  * ノート編集エリア全体を管理するパネルコンポーネント。
- * タイトル入力・Markdown エディタ・プレビュー分割表示・AI Edit diff 表示・
+ * タイトル入力・Markdown エディタ・AI Edit diff 表示・
  * 画像アップロード・自動保存・印刷・フルスクリーンなどの機能を統括する。
  *
  * 主なエクスポート:
@@ -27,6 +27,7 @@ import { createPortal, flushSync } from "react-dom";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorMarkdownPreview } from "./EditorMarkdownPreview";
 import { EditorStatusBar } from "./EditorStatusBar";
+import { useEditorDisplayMode } from "@/hooks/useEditorDisplayMode";
 
 /** 文字列をファイルとしてダウンロードさせるユーティリティ関数。Blob URL を一時生成して即解放する。 */
 function downloadFile(fileContent: string, filename: string, mimeType: string) {
@@ -41,9 +42,9 @@ function downloadFile(fileContent: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-const DESKTOP_BREAKPOINT = 768;
+const DESKTOP_BREAKPOINT = 1024;
 const DEFAULT_EDITOR_PREVIEW_WIDTH = 50;
-const MIN_PREVIEW_WIDTH_PX = 280;
+const MIN_PREVIEW_WIDTH_PX = 200;
 const PREVIEW_RESIZE_HANDLE_WIDTH_PX = 8;
 const EDITOR_PREVIEW_WIDTH_STORAGE_KEY = "notes-editor-preview-width";
 const EDITOR_PREVIEW_LAST_WIDTH_STORAGE_KEY = "notes-editor-preview-last-width";
@@ -97,6 +98,10 @@ export function EditorPanel({
 }: EditorPanelProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
+  const { mode: editorDisplayMode, setMode: setEditorDisplayMode } = useEditorDisplayMode();
+  const handleToggleEditorDisplayMode = useCallback(() => {
+    setEditorDisplayMode(editorDisplayMode === "live-preview" ? "raw" : "live-preview");
+  }, [editorDisplayMode, setEditorDisplayMode]);
   // Initialize state from props - reliance on key={note.id} in parent to reset state on switch
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
@@ -118,13 +123,13 @@ export function EditorPanel({
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
-  const editorScrollRafRef = useRef<number | null>(null);
-  const previewScrollRafRef = useRef<number | null>(null);
-  const isScrollingRef = useRef(false);
   const editorPreviewLayoutRef = useRef<HTMLDivElement>(null);
   const editorPreviewWidthRef = useRef(editorPreviewWidth);
   const lastExpandedEditorPreviewWidthRef = useRef(lastExpandedEditorPreviewWidth);
   const printCleanupRef = useRef<(() => void) | null>(null);
+  const isScrollingRef = useRef(false);
+  const editorScrollRafRef = useRef<number | null>(null);
+  const previewScrollRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     editorPreviewWidthRef.current = editorPreviewWidth;
@@ -138,69 +143,10 @@ export function EditorPanel({
     const handleResize = () => {
       setIsDesktopViewport(window.innerWidth >= DESKTOP_BREAKPOINT);
     };
-
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  /**
-   * エディタのスクロールをプレビューに同期するハンドラ。
-   * rAF でバッチ処理し、同期ループを防ぐため isScrollingRef フラグを一時的に立てる。
-   */
-  const handleEditorScroll = useCallback(() => {
-    if (editorScrollRafRef.current !== null) return;
-    if (isScrollingRef.current) return;
-    editorScrollRafRef.current = requestAnimationFrame(() => {
-      editorScrollRafRef.current = null;
-      const view = editorRef.current?.view();
-      const preview = previewContainerRef.current;
-      if (!view || !preview) return;
-      const src = view.scrollDOM;
-      const ratio = src.scrollTop / Math.max(1, src.scrollHeight - src.clientHeight);
-      isScrollingRef.current = true;
-      preview.scrollTop = ratio * Math.max(0, preview.scrollHeight - preview.clientHeight);
-      setTimeout(() => { isScrollingRef.current = false; }, 50);
-    });
-  }, []);
-
-  /**
-   * プレビューのスクロールをエディタに逆同期するハンドラ。
-   * handleEditorScroll と同様に rAF + isScrollingRef で制御する。
-   */
-  const handlePreviewScroll = useCallback(() => {
-    if (previewScrollRafRef.current !== null) return;
-    if (isScrollingRef.current) return;
-    previewScrollRafRef.current = requestAnimationFrame(() => {
-      previewScrollRafRef.current = null;
-      const view = editorRef.current?.view();
-      const preview = previewContainerRef.current;
-      if (!view || !preview) return;
-      const dst = view.scrollDOM;
-      const ratio = preview.scrollTop / Math.max(1, preview.scrollHeight - preview.clientHeight);
-      isScrollingRef.current = true;
-      dst.scrollTop = ratio * Math.max(0, dst.scrollHeight - dst.clientHeight);
-      setTimeout(() => { isScrollingRef.current = false; }, 50);
-    });
-  }, []);
-
-  useEffect(() => {
-    const view = editorRef.current?.view();
-    if (!view) return;
-    const target = view.scrollDOM;
-    target.addEventListener("scroll", handleEditorScroll, { passive: true });
-    return () => {
-      target.removeEventListener("scroll", handleEditorScroll);
-      if (editorScrollRafRef.current !== null) {
-        cancelAnimationFrame(editorScrollRafRef.current);
-        editorScrollRafRef.current = null;
-      }
-      if (previewScrollRafRef.current !== null) {
-        cancelAnimationFrame(previewScrollRafRef.current);
-        previewScrollRafRef.current = null;
-      }
-    };
-  }, [note?.id, handleEditorScroll]);
 
   // Hash-based Verification Logic
   const [currentHash, setCurrentHash] = useState("");
@@ -503,7 +449,8 @@ export function EditorPanel({
     currentContentRef.current = value;
     onContentChange?.(value);
     setContent(value);
-    startTransition(() => setCommittedContent(value));
+    setCommittedContent(value);
+    startTransition(() => {});
   }, [onContentChange]);
 
   // Called for programmatic content changes (checkbox, image paste).
@@ -512,11 +459,6 @@ export function EditorPanel({
     editorRef.current?.setValue(value);
   }, []);
 
-  /**
-   * Markdown プレビュー用の ReactMarkdown カスタムコンポーネント定義。
-   * チェックボックスの onChange をハイジャックし、remarkSourceLine で付与した
-   * data-source-line 属性を元にエディタ内の対応行を直接書き換える（WYSIWYG チェックトグル）。
-   */
   const markdownComponents = useMemo((): Components => ({
     input(props) {
       const { disabled: _disabled, checked, ...rest } = props as React.InputHTMLAttributes<HTMLInputElement>;
@@ -527,9 +469,6 @@ export function EditorPanel({
           type="checkbox"
           defaultChecked={!!checked}
           onChange={(e) => {
-            // closest("[data-source-line]") works for both the <li> (production, via
-            // remarkSourceLine) and the <input> itself (tests, where the mock passes
-            // data-source-line directly as a prop).
             const lineSource = (e.target as HTMLElement).closest("[data-source-line]");
             if (!lineSource) return;
             const lineNumber = parseInt(lineSource.getAttribute("data-source-line") ?? "0", 10);
@@ -558,6 +497,48 @@ export function EditorPanel({
       triggerServerSync(note.id);
     }
   };
+
+  const handleEditorScroll = useCallback(() => {
+    if (editorScrollRafRef.current !== null) return;
+    if (isScrollingRef.current) return;
+    editorScrollRafRef.current = requestAnimationFrame(() => {
+      editorScrollRafRef.current = null;
+      const view = editorRef.current?.view();
+      const preview = previewContainerRef.current;
+      if (!view || !preview) return;
+      const src = view.scrollDOM;
+      const ratio = src.scrollTop / Math.max(1, src.scrollHeight - src.clientHeight);
+      isScrollingRef.current = true;
+      preview.scrollTop = ratio * Math.max(0, preview.scrollHeight - preview.clientHeight);
+      setTimeout(() => { isScrollingRef.current = false; }, 50);
+    });
+  }, []);
+
+  const handlePreviewScroll = useCallback(() => {
+    if (previewScrollRafRef.current !== null) return;
+    if (isScrollingRef.current) return;
+    previewScrollRafRef.current = requestAnimationFrame(() => {
+      previewScrollRafRef.current = null;
+      const view = editorRef.current?.view();
+      const preview = previewContainerRef.current;
+      if (!view || !preview) return;
+      const dst = view.scrollDOM;
+      const ratio = preview.scrollTop / Math.max(1, preview.scrollHeight - preview.clientHeight);
+      isScrollingRef.current = true;
+      dst.scrollTop = ratio * Math.max(0, dst.scrollHeight - dst.clientHeight);
+      setTimeout(() => { isScrollingRef.current = false; }, 50);
+    });
+  }, []);
+
+  // Attach scroll sync to the editor's scrollDOM
+  useEffect(() => {
+    if (!isPreviewOpen) return;
+    const view = editorRef.current?.view();
+    if (!view) return;
+    const scrollDOM = view.scrollDOM;
+    scrollDOM.addEventListener("scroll", handleEditorScroll);
+    return () => scrollDOM.removeEventListener("scroll", handleEditorScroll);
+  }, [note?.id, handleEditorScroll, isPreviewOpen]);
 
   /**
    * 画像ファイルをサーバーにアップロードし、Markdown の画像記法をエディタに挿入するハンドラ。
@@ -593,8 +574,6 @@ export function EditorPanel({
 
 
 
-
-
   // Fullscreen API toggle
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -625,19 +604,16 @@ export function EditorPanel({
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   }, [toggleFullscreen]);
 
-  const isDesktopSplitPreview = isPreviewOpen && isDesktopViewport;
-  const isEditorCollapsed = isDesktopSplitPreview && editorPreviewWidth <= 0;
-
   // JSON export handlers
   const handleExportMarkdown = useCallback(() => {
     const markdown = `# ${currentTitleRef.current}\n\n${currentContentRef.current}`;
     downloadFile(markdown, `${currentTitleRef.current || "untitled"}.md`, "text/markdown");
-  }, []);  
+  }, []);
 
   const handleExportText = useCallback(() => {
     const text = `${currentTitleRef.current}\n\n${currentContentRef.current}`;
     downloadFile(text, `${currentTitleRef.current || "untitled"}.txt`, "text/plain");
-  }, []);  
+  }, []);
 
   /**
    * 印刷プレビューハンドラ。
@@ -674,7 +650,7 @@ export function EditorPanel({
         window.print();
       });
     });
-  }, []);  
+  }, []);
 
   const currentFolder = folders.find((f) => f.id === note?.folder_id);
   const printPreview =
@@ -695,6 +671,9 @@ export function EditorPanel({
           document.body
         )
       : null;
+
+  const isDesktopSplitPreview = isPreviewOpen && isDesktopViewport;
+  const isEditorCollapsed = isDesktopSplitPreview && editorPreviewWidth <= 0;
 
   if (!note) {
     return (
@@ -747,6 +726,8 @@ export function EditorPanel({
             onPrintPreview={handlePrintPreview}
             onToggleFullscreen={toggleFullscreen}
             onDeleteNote={onDeleteNote}
+            editorDisplayMode={editorDisplayMode}
+            onToggleEditorDisplayMode={handleToggleEditorDisplayMode}
           />
 
           {/* Editor */}
@@ -804,8 +785,7 @@ export function EditorPanel({
               ) : (
                 <>
                   {/* Markdown Editor Column */}
-                  {(!isPreviewOpen ||
-                    (isDesktopViewport && !isEditorCollapsed)) && (
+                  {(!isPreviewOpen || (isDesktopViewport && !isEditorCollapsed)) && (
                     <div
                       className={cn(
                         "relative min-h-0",
@@ -842,6 +822,7 @@ export function EditorPanel({
                         placeholder={t("editor.noteContentPlaceholder")}
                         className="h-full min-h-[400px]"
                         data-testid="editor-content-input"
+                        displayMode={editorDisplayMode}
                       />
                     </div>
                   )}

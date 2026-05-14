@@ -11,15 +11,18 @@
  */
 "use client";
 
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from "@codemirror/view";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { GFM } from "@lezer/markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import type { EditorDisplayMode } from "@/hooks/useEditorDisplayMode";
 import { markdownIndentKeymap } from "./extensions/markdownIndent";
 import { markdownListContinuationKeymap } from "./extensions/markdownListContinuation";
 import { indentGuide } from "./extensions/indentGuide";
+import { livePreview } from "./extensions/livePreview";
 
 export interface MarkdownEditorHandle {
   getValue: () => string;
@@ -37,6 +40,7 @@ interface MarkdownEditorProps {
   className?: string;
   placeholder?: string;
   "data-testid"?: string;
+  displayMode?: EditorDisplayMode;
 }
 
 /**
@@ -56,11 +60,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       className,
       placeholder: placeholderText,
       "data-testid": testId,
+      displayMode = "raw",
     },
     ref
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
+    // Stable per-instance Compartment — controls whether livePreview() is active
+    const livePreviewCompartment = useRef(new Compartment()).current;
 
     // Stable callback refs — extensions read from these so they never need to be recreated
     const onChangeRef = useRef(onChange);
@@ -83,10 +90,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           ...defaultKeymap,
           ...historyKeymap,
         ]),
-        markdown(),
+        markdown({ base: markdownLanguage, extensions: [GFM] }),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         drawSelection(),
         EditorView.lineWrapping,
+        livePreviewCompartment.of(displayMode === "live-preview" ? livePreview() : []),
         indentGuide,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -159,6 +167,17 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       // Only runs on mount/unmount — parent uses key={note.id} to force remount on note switch
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Reconfigure livePreview Compartment when displayMode changes without remounting
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: livePreviewCompartment.reconfigure(
+          displayMode === "live-preview" ? livePreview() : []
+        ),
+      });
+    }, [displayMode, livePreviewCompartment]);
 
     useImperativeHandle(ref, () => ({
       getValue: () => viewRef.current?.state.doc.toString() ?? "",

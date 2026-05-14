@@ -115,14 +115,14 @@ export const ja = {
     summarizing: "要約中...",
     chat: "チャット",
     export: "エクスポート",
-    preview: "プレビュー",
     print: "印刷",
     markdown: "Markdown (.md)",
     plainText: "プレーンテキスト (.txt)",
-    previewPlaceholder: "プレビューを見るには書き始めてください...",
+    preview: "プレビュー",
     showEditor: "エディタを表示",
     hideEditor: "エディタを隠す",
     resizeEditorPreview: "エディタとプレビューの幅を変更",
+    previewPlaceholder: "プレビューを見るには書き始めてください...",
     noteTitlePlaceholder: "ノートのタイトル",
     noteContentPlaceholder: "Markdownでノートを書き始めましょう...",
     summarizeNote: "ノートを要約",
@@ -135,6 +135,8 @@ export const ja = {
     fullscreen: "フルスクリーン",
     exitFullscreen: "フルスクリーン終了",
     imageTooLarge: "画像が大きすぎます。10MB未満の画像を使用してください。",
+    useLivePreview: "ライブプレビュー表示に切替",
+    useRawText: "生テキスト表示に切替",
   },
 
   // AI Panel
@@ -379,14 +381,14 @@ export type TranslationKeys = {
     summarizing: string;
     chat: string;
     export: string;
-    preview: string;
     print: string;
     markdown: string;
     plainText: string;
-    previewPlaceholder: string;
+    preview: string;
     showEditor: string;
     hideEditor: string;
     resizeEditorPreview: string;
+    previewPlaceholder: string;
     noteTitlePlaceholder: string;
     noteContentPlaceholder: string;
     summarizeNote: string;
@@ -399,6 +401,8 @@ export type TranslationKeys = {
     fullscreen: string;
     exitFullscreen: string;
     imageTooLarge: string;
+    useLivePreview: string;
+    useRawText: string;
   };
   ai: {
     title: string;

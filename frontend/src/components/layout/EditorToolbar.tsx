@@ -1,6 +1,6 @@
 /**
  * エディタ上部のツールバーコンポーネント。
- * フォルダ移動・AI 要約・チャット・エクスポート・プレビュー切り替え・共有・フルスクリーンなどの操作を提供する。
+ * フォルダ移動・AI 要約・チャット・エクスポート・共有・フルスクリーンなどの操作を提供する。
  * 共有ダイアログの開閉と共有リンクの取得・作成・削除も内部で管理する。
  *
  * 主なエクスポート:
@@ -24,6 +24,8 @@ import {
   DownloadIcon,
   EyeIcon,
   EyeOffIcon,
+  Wand2Icon,
+  FileTextIcon,
   Share2Icon,
   Maximize2Icon,
   Minimize2Icon,
@@ -31,6 +33,7 @@ import {
 } from "lucide-react";
 import { useApi, useTranslation } from "@/hooks";
 import { ShareDialog } from "@/components/ui/ShareDialog";
+import type { EditorDisplayMode } from "@/hooks/useEditorDisplayMode";
 
 interface EditorToolbarProps {
   noteId: string;
@@ -64,6 +67,8 @@ interface EditorToolbarProps {
   onPrintPreview: () => void;
   onToggleFullscreen: () => void;
   onDeleteNote: (id: string) => void;
+  editorDisplayMode: EditorDisplayMode;
+  onToggleEditorDisplayMode: () => void;
 }
 
 /**
@@ -98,6 +103,8 @@ export const EditorToolbar = memo(function EditorToolbar({
   onPrintPreview,
   onToggleFullscreen,
   onDeleteNote,
+  editorDisplayMode,
+  onToggleEditorDisplayMode,
 }: EditorToolbarProps) {
   const { getApi } = useApi();
   const { t } = useTranslation();
@@ -338,6 +345,21 @@ export const EditorToolbar = memo(function EditorToolbar({
         </div>
         <SunlightMap />
         <div className="flex items-center gap-1">
+          {/* Editor display mode toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleEditorDisplayMode}
+            aria-label={editorDisplayMode === "live-preview" ? t("editor.useRawText") : t("editor.useLivePreview")}
+            title={editorDisplayMode === "live-preview" ? t("editor.useRawText") : t("editor.useLivePreview")}
+            data-testid="editor-display-mode-toggle"
+          >
+            {editorDisplayMode === "live-preview" ? (
+              <FileTextIcon className="h-4 w-4" />
+            ) : (
+              <Wand2Icon className="h-4 w-4" />
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="icon"

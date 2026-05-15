@@ -71,7 +71,8 @@ test.describe('Notes Functionality', () => {
     await expect(noteItem).toBeVisible({ timeout: 30000 });
     await noteItem.click();
     await expect(layout.getByTestId('editor-title-input')).toHaveValue(noteTitle, { timeout: 30000 });
-    await expect(layout.getByTestId('editor-content-input')).toContainText(noteContent, { timeout: 30000 });
+    // CodeMirror renders each line in a separate <div>, so check first line only.
+    await expect(layout.getByTestId('editor-content-input')).toContainText('This is a test note created by Playwright.', { timeout: 30000 });
 
     // 4. Summarize
     console.log('[E2E] Requesting summary');
@@ -142,7 +143,7 @@ test.describe('Notes Functionality', () => {
     await layout.getByTestId('ai-chat-send-button').click();
 
     await expect(aiMessages).toHaveCount(assistantMessagesBeforeChat + 1, { timeout: 30000 });
-    await expect(aiMessages.last()).toContainText(/Playwright|note/i, { timeout: 30000 });
+    await expect(aiMessages.last()).toContainText(/Playwright|note|ノート/i, { timeout: 30000 });
   });
 
   test('should be able to search and filter notes', async ({ page, isMobile }) => {

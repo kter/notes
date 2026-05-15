@@ -74,7 +74,10 @@ test.describe('Sharing Functionality', () => {
       await expect(titleInput).toBeVisible({ timeout: 20000 });
     }
     await expect(titleInput).toHaveValue(noteTitle, { timeout: 30000 });
-    await expect(contentTextarea).toContainText(noteContent, { timeout: 30000 });
+    // CodeMirror renders each line in a separate <div>, so textContent has no newlines between lines.
+    // Check individual phrases instead of the full multiline string.
+    await expect(contentTextarea).toContainText('Hello World', { timeout: 30000 });
+    await expect(contentTextarea).toContainText('This is a shared note for E2E testing.', { timeout: 30000 });
 
     // Click the Share button
     console.log('[Share E2E] Opening share dialog');

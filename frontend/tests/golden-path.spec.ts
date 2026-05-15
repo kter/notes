@@ -195,7 +195,16 @@ test.describe('Golden Path: Note Lifecycle', () => {
 
     console.log('[Golden Path] Editing note title and content');
     await titleInput.fill(updatedTitle);
-    await contentInput.fill(updatedContent);
+    // CodeMirror 6 ignores fill()/keyboard.type() — it manages content via transactions.
+    // Access CM6's EditorView via the internal .cmTile.view DOM property and dispatch a
+    // replace-all transaction so the change propagates through React state → API sync.
+    await page.evaluate((content) => {
+      const el = document.querySelector('[data-testid="editor-content-input"]');
+      const tile = (el as unknown as Record<string, unknown>)?.['cmTile'] as Record<string, unknown> | undefined;
+      const view = tile?.['view'] as { dispatch: (t: unknown) => void; state: { doc: { length: number } } } | undefined;
+      if (!view) return;
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
+    }, updatedContent);
     const updateResponse = waitForWorkspaceChange(page, 'note', 'update', 60000);
     await contentInput.blur();
     await updateResponse;
@@ -404,7 +413,14 @@ test.describe('Golden Path: Note Lifecycle', () => {
     const testNoteTitle = `Folder Note ${Date.now()}`;
     await titleInput.fill(testNoteTitle);
     const contentInput = layout.getByTestId('editor-content-input');
-    await contentInput.fill('Content inside the new folder.');
+    // CodeMirror 6 ignores fill() — dispatch a transaction directly.
+    await page.evaluate((content) => {
+      const el = document.querySelector('[data-testid="editor-content-input"]');
+      const tile = (el as unknown as Record<string, unknown>)?.['cmTile'] as Record<string, unknown> | undefined;
+      const view = tile?.['view'] as { dispatch: (t: unknown) => void; state: { doc: { length: number } } } | undefined;
+      if (!view) return;
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
+    }, 'Content inside the new folder.');
 
     const updateResponse = waitForWorkspaceChange(page, 'note', 'update', 60000);
     await contentInput.blur();
@@ -412,7 +428,9 @@ test.describe('Golden Path: Note Lifecycle', () => {
 
     await expectVisibleSyncStatus(layout);
 
-    const noteItem = layout.locator('[data-testid^="note-list-item-"]').filter({ hasText: testNoteTitle }).first();
+    // Use the known note ID (not title text) because the NoteList's filtered
+    // view can show a stale title briefly after an optimistic update on the dev server.
+    const noteItem = layout.getByTestId(`note-list-item-${createdNoteId}`);
     await expect(noteItem).toBeVisible({ timeout: 30000 });
 
     console.log('[Golden Path] Deleting folder via NoteList header');

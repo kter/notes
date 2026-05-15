@@ -515,7 +515,7 @@ test-e2e: ## Run all Playwright projects on the host (use only if your host can 
 
 .PHONY: test-e2e-dev
 test-e2e-dev: ## Run E2E tests against dev environment
-	cd frontend && E2E_TARGET=dev npx playwright test $(TEST_ARGS)
+	cd frontend && PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 E2E_TARGET=dev npx playwright test $(TEST_ARGS)
 
 .PHONY: test-e2e-prd
 test-e2e-prd: ## Run E2E tests against prd environment
@@ -538,6 +538,10 @@ test-e2e-webkit-docker: ## Run WebKit E2E tests in Docker
 .PHONY: test-e2e-mobile-safari-docker
 test-e2e-mobile-safari-docker: ## Run Mobile Safari E2E tests in Docker
 	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) npx playwright test --project="Mobile Safari" $(TEST_ARGS)'
+
+.PHONY: test-e2e-regression
+test-e2e-regression: ## Run only the regression E2E suite (frontend/tests/regression/)
+	cd frontend && E2E_TARGET=$(ENV) npx playwright test tests/regression/ $(TEST_ARGS)
 
 .PHONY: test-e2e-all
 test-e2e-all: ## Run the CI-style Playwright split locally: host Chromium + Docker WebKit/Safari

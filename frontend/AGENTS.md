@@ -27,3 +27,4 @@ Required for E2E:
 - Frontend uses Next.js App Router.
 - Authentication is handled with Amplify and Cognito.
 - Keep all user-facing text wired through i18n.
+- E2E リグレッション spec は `tests/regression/` に配置する。新規 spec を追加する際は既存 testid をソースから確認し、不明なものは playwright-cli スキルで dev 環境を探索してから手書きする。

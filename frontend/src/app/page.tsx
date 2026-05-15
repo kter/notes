@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { LandingPage } from "@/components/landing";
 import { AuthenticatedWorkspace } from "@/components/workspace";
 import { useAuth } from "@/lib/auth-context";
@@ -44,5 +44,15 @@ export default function Home() {
     return <LandingPage />;
   }
 
-  return <AuthenticatedWorkspace userEmail={user?.email} onSignOut={signOut} />;
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen flex items-center justify-center bg-background">
+          <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <AuthenticatedWorkspace userEmail={user?.email} onSignOut={signOut} />
+    </Suspense>
+  );
 }

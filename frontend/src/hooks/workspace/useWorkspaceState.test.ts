@@ -9,6 +9,15 @@ const useAIChatMock = vi.fn();
 const useResizableMock = vi.fn();
 const useNoteFilterMock = vi.fn();
 
+const pushMock = vi.fn();
+const searchParamsStub = new URLSearchParams();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock, replace: vi.fn(), back: vi.fn(), forward: vi.fn() }),
+  useSearchParams: () => searchParamsStub,
+  usePathname: () => "/",
+}));
+
 vi.mock("./useWorkspaceSyncState", () => ({
   useWorkspaceSyncState: (...args: unknown[]) => useWorkspaceSyncStateMock(...args),
 }));
@@ -42,6 +51,8 @@ import { useWorkspaceState } from "./useWorkspaceState";
 describe("useWorkspaceState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsStub.delete("note");
+    searchParamsStub.delete("folder");
 
     useWorkspaceSyncStateMock.mockReturnValue({
       folders: [{ id: "folder-1", name: "Folder 1" }],
@@ -362,5 +373,86 @@ describe("useWorkspaceState", () => {
 
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
+  });
+
+  describe("URL sync", () => {
+    it("handleSelectNote pushes /?note=<id> to router", () => {
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      act(() => {
+        result.current.handleSelectNote("note-1");
+      });
+
+      expect(pushMock).toHaveBeenCalledWith("/?note=note-1", { scroll: false });
+    });
+
+    it("handleSelectFolder pushes /?folder=<id> to router, preserving selected note", () => {
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      act(() => {
+        result.current.handleSelectNote("note-1");
+      });
+      pushMock.mockClear();
+
+      act(() => {
+        result.current.handleSelectFolder("folder-1");
+      });
+
+      expect(pushMock).toHaveBeenCalledWith("/?folder=folder-1&note=note-1", { scroll: false });
+    });
+
+    it("handleSelectNote(null) pushes bare pathname to router", () => {
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      act(() => {
+        result.current.handleSelectNote(null);
+      });
+
+      expect(pushMock).toHaveBeenCalledWith("/", { scroll: false });
+    });
+
+    it("hydrates selectedNoteId from URL params when data is loaded", () => {
+      searchParamsStub.set("note", "note-1");
+
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      expect(result.current.selectedNoteId).toBe("note-1");
+    });
+
+    it("hydrates selectedFolderId from URL params when data is loaded", () => {
+      searchParamsStub.set("folder", "folder-1");
+
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      expect(result.current.selectedFolderId).toBe("folder-1");
+    });
+
+    it("ignores invalid note ID in URL and leaves selectedNoteId null", () => {
+      searchParamsStub.set("note", "nonexistent-id");
+
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      expect(result.current.selectedNoteId).toBeNull();
+    });
+
+    it("skips URL hydration while data is loading", () => {
+      searchParamsStub.set("note", "note-1");
+      useWorkspaceSyncStateMock.mockReturnValue({
+        folders: [],
+        setFolders: vi.fn(),
+        notes: [],
+        setNotes: vi.fn(),
+        isLoading: true,
+        isOnline: true,
+        syncStatus: "idle",
+        lastErrorMessage: null,
+        pendingChangesCount: 0,
+        applySnapshot: vi.fn(),
+      });
+
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      expect(result.current.selectedNoteId).toBeNull();
+    });
   });
 });

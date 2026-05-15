@@ -435,6 +435,14 @@ describe("useWorkspaceState", () => {
       expect(result.current.selectedNoteId).toBeNull();
     });
 
+    it("ignores invalid folder ID in URL and leaves selectedFolderId null", () => {
+      searchParamsStub.set("folder", "nonexistent-folder");
+
+      const { result } = renderHook(() => useWorkspaceState(true));
+
+      expect(result.current.selectedFolderId).toBeNull();
+    });
+
     it("skips URL hydration while data is loading", () => {
       searchParamsStub.set("note", "note-1");
       useWorkspaceSyncStateMock.mockReturnValue({

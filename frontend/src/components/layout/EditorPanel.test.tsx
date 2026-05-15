@@ -591,6 +591,114 @@ describe('EditorPanel', () => {
     })
   })
 
+  describe('Preview pane toggle', () => {
+    it('renders the preview toggle button', () => {
+      render(<EditorPanel {...defaultProps} />)
+      expect(screen.getByTestId('editor-preview-toggle')).toBeInTheDocument()
+    })
+
+    it('switches to desktop split layout after clicking preview toggle', () => {
+      render(<EditorPanel {...defaultProps} />)
+
+      expect(screen.getByTestId('editor-preview-layout')).toBeInTheDocument()
+      expect(screen.queryByTestId('editor-preview-desktop-layout')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      expect(screen.getByTestId('editor-preview-desktop-layout')).toBeInTheDocument()
+      expect(screen.queryByTestId('editor-preview-layout')).not.toBeInTheDocument()
+    })
+
+    it('renders preview pane content when preview is open', () => {
+      render(<EditorPanel {...defaultProps} />)
+
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      expect(screen.getByTestId('editor-preview-pane')).toBeInTheDocument()
+    })
+
+    it('renders resize handle when preview is open on desktop', () => {
+      render(<EditorPanel {...defaultProps} />)
+
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      expect(screen.getByTestId('editor-preview-resize-handle')).toBeInTheDocument()
+    })
+
+    it('closes preview pane on second toggle click', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const toggleButton = screen.getByTestId('editor-preview-toggle')
+
+      fireEvent.click(toggleButton) // open
+      expect(screen.getByTestId('editor-preview-pane')).toBeInTheDocument()
+
+      fireEvent.click(toggleButton) // close
+      expect(screen.queryByTestId('editor-preview-pane')).not.toBeInTheDocument()
+    })
+
+    it('disables preview toggle when a pending edit proposal is active', () => {
+      const proposal = { originalContent: 'original', editedContent: 'edited', status: 'pending' as const }
+      render(<EditorPanel {...defaultProps} pendingEditProposal={proposal} onAcceptEdit={vi.fn()} onRejectEdit={vi.fn()} />)
+      expect(screen.getByTestId('editor-preview-toggle')).toBeDisabled()
+    })
+
+    it('persists preview width to localStorage and restores it on mount', () => {
+      localStorage.setItem('notes-editor-preview-width', '70')
+      localStorage.setItem('notes-editor-preview-last-width', '70')
+
+      render(<EditorPanel {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('editor-preview-toggle'))
+
+      // After opening preview, the layout should reflect the stored width
+      const layout = screen.getByTestId('editor-preview-desktop-layout')
+      expect(layout).toBeInTheDocument()
+    })
+  })
+
+  describe('Editor display mode toggle', () => {
+    it('renders the display mode toggle button', () => {
+      render(<EditorPanel {...defaultProps} />)
+      expect(screen.getByTestId('editor-display-mode-toggle')).toBeInTheDocument()
+    })
+
+    it('shows useLivePreview label when in raw mode (default)', () => {
+      render(<EditorPanel {...defaultProps} />)
+      expect(screen.getByTestId('editor-display-mode-toggle'))
+        .toHaveAttribute('aria-label', 'editor.useLivePreview')
+    })
+
+    it('switches to live-preview mode on click and persists to localStorage', () => {
+      render(<EditorPanel {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('editor-display-mode-toggle'))
+
+      expect(screen.getByTestId('editor-display-mode-toggle'))
+        .toHaveAttribute('aria-label', 'editor.useRawText')
+      expect(localStorage.getItem('editor-display-mode')).toBe('live-preview')
+    })
+
+    it('returns to raw mode on second click', () => {
+      render(<EditorPanel {...defaultProps} />)
+      const button = screen.getByTestId('editor-display-mode-toggle')
+
+      fireEvent.click(button) // raw → live-preview
+      fireEvent.click(button) // live-preview → raw
+
+      expect(button).toHaveAttribute('aria-label', 'editor.useLivePreview')
+      expect(localStorage.getItem('editor-display-mode')).toBe('raw')
+    })
+
+    it('restores live-preview mode from localStorage on mount', async () => {
+      localStorage.setItem('editor-display-mode', 'live-preview')
+      render(<EditorPanel {...defaultProps} />)
+
+      // useEffect fires asynchronously; wait for state update
+      await act(async () => {})
+
+      expect(screen.getByTestId('editor-display-mode-toggle'))
+        .toHaveAttribute('aria-label', 'editor.useRawText')
+    })
+  })
+
   describe('contentOverride is scoped to its source note', () => {
     afterEach(() => {
       vi.useRealTimers()

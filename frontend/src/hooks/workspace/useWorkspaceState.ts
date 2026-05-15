@@ -10,7 +10,8 @@
  *
  * 呼び出し関係: WorkspacePage などのトップレベルページコンポーネントから呼ばれる。
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import type { MobileView } from "@/components/layout";
 import { useAIChat } from "@/hooks/useAIChat";
@@ -24,6 +25,12 @@ import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 import { useWorkspaceSyncState } from "./useWorkspaceSyncState";
 
 export function useWorkspaceState(isAuthenticated: boolean) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlNoteId = searchParams.get("note");
+  const urlFolderId = searchParams.get("folder");
+
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,19 +70,52 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     { onSnapshotSynced: applySnapshot }
   );
 
-  const handleSelectFolder = useCallback((id: string | null) => {
-    setSelectedFolderId(id);
-    setSearchQuery("");
-    setMobileView("notes");
-  }, []);
+  const buildHref = useCallback(
+    (folderId: string | null, noteId: string | null) => {
+      const params = new URLSearchParams();
+      if (folderId) params.set("folder", folderId);
+      if (noteId) params.set("note", noteId);
+      const qs = params.toString();
+      return qs ? `${pathname}?${qs}` : pathname;
+    },
+    [pathname]
+  );
 
-  const handleSelectNote = useCallback((id: string | null) => {
-    setSelectedNoteId(id);
-    setContentOverride(null);
-    if (id) {
-      setMobileView("editor");
-    }
-  }, []);
+  useEffect(() => {
+    if (isDataLoading) return;
+    const validFolderId =
+      urlFolderId && folders.some((f) => f.id === urlFolderId) ? urlFolderId : null;
+    const validNoteId =
+      urlNoteId && notes.some((n) => n.id === urlNoteId) ? urlNoteId : null;
+
+    setSelectedFolderId((prev) => (prev !== validFolderId ? validFolderId : prev));
+    setSelectedNoteId((prev) => {
+      if (prev === validNoteId) return prev;
+      setContentOverride(null);
+      if (validNoteId) setMobileView("editor");
+      return validNoteId;
+    });
+  }, [urlFolderId, urlNoteId, isDataLoading, folders, notes]);
+
+  const handleSelectFolder = useCallback(
+    (id: string | null) => {
+      setSelectedFolderId(id);
+      setSearchQuery("");
+      setMobileView("notes");
+      router.push(buildHref(id, selectedNoteId), { scroll: false });
+    },
+    [router, buildHref, selectedNoteId]
+  );
+
+  const handleSelectNote = useCallback(
+    (id: string | null) => {
+      setSelectedNoteId(id);
+      setContentOverride(null);
+      if (id) setMobileView("editor");
+      router.push(buildHref(selectedFolderId, id), { scroll: false });
+    },
+    [router, buildHref, selectedFolderId]
+  );
 
   const {
     syncStatus,

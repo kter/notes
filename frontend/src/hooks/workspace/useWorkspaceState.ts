@@ -70,6 +70,7 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     { onSnapshotSynced: applySnapshot }
   );
 
+  /** ?folder=<id>&?note=<id> を含む URL 文字列を生成するヘルパー。 */
   const buildHref = useCallback(
     (folderId: string | null, noteId: string | null) => {
       const params = new URLSearchParams();
@@ -81,6 +82,9 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     [pathname]
   );
 
+  // URL クエリパラメータから選択状態を復元する。
+  // isDataLoading が true の間は folders/notes が未確定なので ID の有効性を検証できない。
+  // prev との比較は、同一値での setState を省略して不要な再レンダーを防ぐため。
   useEffect(() => {
     if (isDataLoading) return;
     const validFolderId =

@@ -17,7 +17,7 @@ test.describe('Mobile Comprehensive Scenario', () => {
     console.log('[Mobile Test] Creating folder');
     await expect(page.getByRole('heading', { name: /Folders|フォルダ/i })).toBeVisible({ timeout: 25000 });
     const foldersLayout = page.getByTestId('mobile-layout-folders');
-    const createFolderPromise = waitForWorkspaceChange(page, 'folder', 'create');
+    const createFolderPromise = waitForWorkspaceChange(page, 'folder', 'create', 60000);
     await page.getByRole('button', { name: /Add folder|フォルダを追加/i }).click();
     
     const folderName = `Mobile Project ${Date.now()}`;

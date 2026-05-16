@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright-generated report artifacts
+    "playwright-report/**",
+    "test-results/**",
   ]),
   security.configs.recommended,
   // Temporarily downgrade React hooks rules to warnings for existing code

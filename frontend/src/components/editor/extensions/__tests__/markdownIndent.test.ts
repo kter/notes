@@ -52,6 +52,21 @@ describe("markdownIndent — Tab", () => {
     view = makeView("hello", 0);
     expect(tabRun(view)).toBe(true);
   });
+
+  it("resets ordered list number to 1 when no items at new indent level", () => {
+    view = makeView("2. item", 7); // cursor at end
+    tabRun(view);
+    expect(view.state.doc.toString()).toBe("  1. item");
+    expect(view.state.selection.main.from).toBe(9); // 7 + (4 - 2)
+  });
+
+  it("continues ordered list number from previous item at same indent level", () => {
+    const doc = "  1. nested\n2. other";
+    view = makeView(doc, doc.length); // cursor at end of "2. other"
+    tabRun(view);
+    expect(view.state.doc.toString()).toBe("  1. nested\n  2. other");
+    expect(view.state.selection.main.from).toBe(22); // 20 + 2
+  });
 });
 
 describe("markdownIndent — Shift+Tab", () => {
@@ -90,5 +105,19 @@ describe("markdownIndent — Shift+Tab", () => {
   it("returns true to consume the event", () => {
     view = makeView("  hello", 0);
     expect(shiftTabRun(view)).toBe(true);
+  });
+
+  it("corrects ordered list number at parent level on unindent", () => {
+    const doc = "1. parent\n  1. nested";
+    view = makeView(doc, doc.length); // cursor at end of "  1. nested"
+    shiftTabRun(view);
+    expect(view.state.doc.toString()).toBe("1. parent\n2. nested");
+    expect(view.state.selection.main.from).toBe(19); // 21 + (2 - 4)
+  });
+
+  it("is a no-op for top-level ordered list item", () => {
+    view = makeView("1. item", 7);
+    expect(shiftTabRun(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("1. item");
   });
 });

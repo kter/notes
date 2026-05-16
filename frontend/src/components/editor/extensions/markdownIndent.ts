@@ -9,13 +9,34 @@
  *
  * 呼び出し関係: MarkdownEditor.tsx の extensions 配列で使用される。
  */
-import { EditorSelection } from "@codemirror/state";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView, type KeyBinding } from "@codemirror/view";
 
 const INDENT = "  ";
 const LIST_LINE_RE = /^(\s*)([-*+]|\d+\.)\s/;
 const INDENTED_LINE_RE = /^\s+/;
 const LEADING_INDENT_RE = /^(\s{1,2})/;
+const OL_MARK_RE = /^(\s*)(\d+)(\.)\s/;
+
+/**
+ * targetIndent のインデントを持つ ordered list アイテムのうち、
+ * currentLineNum より前の最後のものを探し、その番号 +1 を返す。
+ * 見つからなければ 1 を返す。
+ */
+function getNextOrderedNumber(
+  state: EditorState,
+  currentLineNum: number,
+  targetIndent: string
+): number {
+  for (let n = currentLineNum - 1; n >= 1; n--) {
+    const line = state.doc.line(n);
+    const m = line.text.match(OL_MARK_RE);
+    if (m && m[1] === targetIndent) {
+      return parseInt(m[2], 10) + 1;
+    }
+  }
+  return 1;
+}
 
 /**
  * Tab キーに対応するインデントコマンド。
@@ -51,6 +72,24 @@ function indentCommand(view: EditorView): boolean {
 
   // Single line
   const line = state.doc.lineAt(from);
+
+  // Ordered list: renumber based on the new (deeper) indent level
+  const olMatch = line.text.match(OL_MARK_RE);
+  if (olMatch) {
+    const currentIndent = olMatch[1];
+    const dot = olMatch[3];
+    const newIndent = currentIndent + INDENT;
+    const newNum = getNextOrderedNumber(state, line.number, newIndent);
+    const oldPrefix = currentIndent + olMatch[2] + dot;
+    const newPrefix = newIndent + String(newNum) + dot;
+    view.dispatch(state.update({
+      changes: { from: line.from, to: line.from + oldPrefix.length, insert: newPrefix },
+      selection: EditorSelection.cursor(from + (newPrefix.length - oldPrefix.length)),
+      userEvent: "input.indent",
+    }));
+    return true;
+  }
+
   const isListLine = LIST_LINE_RE.test(line.text);
   const isIndentedLine = INDENTED_LINE_RE.test(line.text);
 
@@ -112,8 +151,30 @@ function unindentCommand(view: EditorView): boolean {
     }
   }
 
-  // Single line: remove 1–2 leading spaces
+  // Single line
   const line = state.doc.lineAt(from);
+
+  // Ordered list: renumber based on the new (shallower) indent level
+  const olMatch = line.text.match(OL_MARK_RE);
+  if (olMatch) {
+    const currentIndent = olMatch[1];
+    if (currentIndent.length === 0) return true; // already at top level
+    const indentMatch = currentIndent.match(LEADING_INDENT_RE);
+    if (!indentMatch) return true;
+    const removedSpaces = indentMatch[1].length;
+    const newIndent = currentIndent.slice(removedSpaces);
+    const dot = olMatch[3];
+    const newNum = getNextOrderedNumber(state, line.number, newIndent);
+    const oldPrefix = currentIndent + olMatch[2] + dot;
+    const newPrefix = newIndent + String(newNum) + dot;
+    view.dispatch(state.update({
+      changes: { from: line.from, to: line.from + oldPrefix.length, insert: newPrefix },
+      selection: EditorSelection.cursor(Math.max(line.from, from + (newPrefix.length - oldPrefix.length))),
+      userEvent: "delete.dedent",
+    }));
+    return true;
+  }
+
   const m = line.text.match(LEADING_INDENT_RE);
   if (!m) return true;
   const len = m[1].length;

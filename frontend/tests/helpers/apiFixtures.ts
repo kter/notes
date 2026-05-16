@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { APIResponse, Page } from '@playwright/test';
 
 interface FolderFixture {
   id: string;
@@ -25,7 +25,7 @@ interface AuthenticatedRawResponse {
   text: string;
 }
 
-async function getAuthenticatedRequestContext(page: Page): Promise<AuthenticatedRequestContext> {
+export async function getAuthenticatedRequestContext(page: Page): Promise<AuthenticatedRequestContext> {
   return page.evaluate(() => {
     const tokenKey = Object.keys(localStorage).find((key) => key.endsWith('.idToken'));
     if (!tokenKey) {
@@ -44,7 +44,7 @@ async function getAuthenticatedRequestContext(page: Page): Promise<Authenticated
   });
 }
 
-async function authenticatedRawRequest(
+export async function authenticatedRawRequest(
   page: Page,
   path: string,
   method: string,
@@ -180,6 +180,26 @@ export async function updateNoteFixture(
     }
   );
   return result.applied[0].note;
+}
+
+export async function apiKeyRawRequest(
+  page: Page,
+  path: string,
+  method: string,
+  apiKey: string,
+  body?: JsonObject,
+  timeoutMs = 30000
+): Promise<APIResponse> {
+  const { apiOrigin } = await getAuthenticatedRequestContext(page);
+  return page.request.fetch(`${apiOrigin}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': apiKey,
+    },
+    data: body,
+    timeout: timeoutMs,
+  });
 }
 
 export async function waitForNoteContentFixture(

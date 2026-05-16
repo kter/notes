@@ -459,6 +459,7 @@ export function SettingsDialog({
                     apiKeys.map((key) => (
                       <div
                         key={key.id}
+                        data-testid={`api-key-row-${key.id}`}
                         className="flex items-center justify-between rounded-md border p-3"
                       >
                         <div className="min-w-0">

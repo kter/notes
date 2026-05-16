@@ -70,8 +70,14 @@ describe("buildBlockquoteDecorations — basic", () => {
     const state = makeState(doc, 5); // cursor inside "quoted text" on blockquote line
     const decs = buildBlockquoteDecorations(state, makeFakeView(state));
     const replaces = getReplaceDecs(decs);
-    // No replace decoration should start at position 0
     expect(replaces.some((d) => d.from === 0)).toBe(false);
+  });
+
+  it("emits cm-md-marker on QuoteMark when cursor IS on blockquote line", () => {
+    const state = makeState(doc, 5); // cursor inside "quoted text"
+    const decs = buildBlockquoteDecorations(state, makeFakeView(state));
+    const markers = getLineDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 0)).toBe(true);
   });
 });
 

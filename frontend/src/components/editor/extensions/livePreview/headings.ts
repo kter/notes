@@ -71,10 +71,15 @@ export function buildHeadingDecorations(
           let cursor = node.node.firstChild;
           while (cursor) {
             if (cursor.name === "HeaderMark") {
-              // カーソルが HeaderMark と同じ行にない場合は非表示
               if (!isCursorOnLine(state, cursor.from)) {
+                // カーソルが同じ行にない場合は非表示
                 decorations.push(
                   Decoration.replace({}).range(cursor.from, cursor.to)
+                );
+              } else {
+                // カーソルが同じ行にある場合はマーカー色で表示
+                decorations.push(
+                  Decoration.mark({ class: "cm-md-marker" }).range(cursor.from, cursor.to)
                 );
               }
               break;

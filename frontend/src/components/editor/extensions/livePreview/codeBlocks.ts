@@ -55,10 +55,18 @@ export function buildCodeBlockDecorations(
             decorations.push(
               Decoration.replace({}).range(openLine.from, openLine.to)
             );
+          } else {
+            decorations.push(
+              Decoration.mark({ class: "cm-md-marker" }).range(openLine.from, openLine.to)
+            );
           }
           if (!isCursorOnLine(state, closeLine.from)) {
             decorations.push(
               Decoration.replace({}).range(closeLine.from, closeLine.to)
+            );
+          } else {
+            decorations.push(
+              Decoration.mark({ class: "cm-md-marker" }).range(closeLine.from, closeLine.to)
             );
           }
         }

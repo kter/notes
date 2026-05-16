@@ -3,7 +3,9 @@
  * CM6 デコレーションを生成する。
  *
  * BulletList: カーソルが ListMark と同じ行にない場合、ListMark を BulletWidget（•）で置換する。
- * OrderedList: 常に ListMark に cm-md-ol-mark クラスを付与する（番号は常に表示）。
+ * OrderedList: カーソルが同じ行にない場合は OrderedListMarkWidget でウィジェット置換する。
+ *              ウィジェットはシンタックスハイライトの影響を受けないため通常テキスト色で表示される。
+ *              カーソルが同じ行にある場合は cm-md-marker クラスを付与する。
  *
  * タスクリストマーカー（TaskMarker）はここでは扱わない。taskList.ts が担当する。
  *
@@ -42,6 +44,36 @@ class BulletWidget extends WidgetType {
 }
 
 /**
+ * 番号付きリストマーカー（1.、2. など）をウィジェットで置換するクラス。
+ * ウィジェットとして描画することでシンタックスハイライトの色の影響を受けず、
+ * 通常テキスト色で表示される。
+ */
+class OrderedListMarkWidget extends WidgetType {
+  constructor(private text: string) {
+    super();
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "cm-md-ol-mark";
+    span.textContent = this.text;
+    return span;
+  }
+
+  eq(other: OrderedListMarkWidget): boolean {
+    return other instanceof OrderedListMarkWidget && other.text === this.text;
+  }
+
+  get estimatedHeight(): number {
+    return -1;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+/**
  * 可視範囲内の BulletList / OrderedList ノードを走査し、
  * ListMark に対してデコレーションを返す。
  */
@@ -65,12 +97,17 @@ export function buildListDecorations(
               let child = item.firstChild;
               while (child) {
                 if (child.name === "ListMark") {
-                  // カーソルが同じ行にない場合のみ置換
                   if (!isCursorOnLine(state, child.from)) {
+                    // カーソルが同じ行にない場合のみ bullet ウィジェットで置換
                     decorations.push(
                       Decoration.replace({
                         widget: new BulletWidget(),
                       }).range(child.from, child.to)
+                    );
+                  } else {
+                    // カーソルが同じ行にある場合はマーカー色で表示
+                    decorations.push(
+                      Decoration.mark({ class: "cm-md-marker" }).range(child.from, child.to)
                     );
                   }
                   break;
@@ -83,7 +120,7 @@ export function buildListDecorations(
           return false; // 子ノードの重複走査を避ける
         }
 
-        // OrderedList: ListItem の ListMark に cm-md-ol-mark クラスを付与（常時）
+        // OrderedList: カーソルが同じ行にない場合はウィジェット置換、ある場合はマーカー色で表示
         if (node.name === "OrderedList") {
           let item = node.node.firstChild;
           while (item) {
@@ -91,12 +128,20 @@ export function buildListDecorations(
               let child = item.firstChild;
               while (child) {
                 if (child.name === "ListMark") {
-                  decorations.push(
-                    Decoration.mark({ class: "cm-md-ol-mark" }).range(
-                      child.from,
-                      child.to
-                    )
-                  );
+                  if (!isCursorOnLine(state, child.from)) {
+                    // ウィジェット置換でシンタックスハイライトの影響を受けずに通常色で表示
+                    const markText = state.sliceDoc(child.from, child.to);
+                    decorations.push(
+                      Decoration.replace({
+                        widget: new OrderedListMarkWidget(markText),
+                      }).range(child.from, child.to)
+                    );
+                  } else {
+                    // カーソルが同じ行にある場合はマーカー色で表示
+                    decorations.push(
+                      Decoration.mark({ class: "cm-md-marker" }).range(child.from, child.to)
+                    );
+                  }
                   break;
                 }
                 child = child.nextSibling;

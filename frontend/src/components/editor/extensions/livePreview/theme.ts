@@ -26,10 +26,9 @@ export const livePreviewBaseTheme = EditorView.baseTheme({
     borderRadius: "3px",
     padding: "0 3px",
   },
-  // カーソルが同一行にある場合のフォールバック: マーカーを薄く小さく表示する
+  // カーソルが同一行にある場合: マーカーを色付きで表示する
   ".cm-md-marker": {
-    opacity: "0.3",
-    fontSize: "0.85em",
+    color: "var(--muted-foreground, #6b7280)",
   },
 
   // 見出し (ATX: #〜######)
@@ -79,13 +78,11 @@ export const livePreviewBaseTheme = EditorView.baseTheme({
   ".cm-md-bullet": {
     display: "inline-block",
     width: "1em",
-    color: "#888",
+    color: "var(--muted-foreground, #6b7280)",
   },
 
-  // 番号付きリストマーカー
-  ".cm-md-ol-mark": {
-    color: "#888",
-  },
+  // 番号付きリストマーカーウィジェット（色指定なし: 親から通常テキスト色を継承）
+  ".cm-md-ol-mark": {},
 
   // タスクリストチェックボックス
   ".cm-md-task-checkbox": {

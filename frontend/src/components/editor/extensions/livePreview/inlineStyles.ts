@@ -37,45 +37,35 @@ export function buildInlineDecorations(
             Decoration.mark({ class: "cm-md-strong" }).range(nFrom, nTo)
           );
           if (!isCursorInRange(state, nFrom, nTo)) {
-            // Opening marker (**  or __)
-            decorations.push(
-              Decoration.replace({}).range(nFrom, nFrom + 2)
-            );
-            // Closing marker
-            decorations.push(
-              Decoration.replace({}).range(nTo - 2, nTo)
-            );
+            decorations.push(Decoration.replace({}).range(nFrom, nFrom + 2));
+            decorations.push(Decoration.replace({}).range(nTo - 2, nTo));
+          } else {
+            decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nFrom, nFrom + 2));
+            decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nTo - 2, nTo));
           }
         } else if (name === "Emphasis") {
           decorations.push(
             Decoration.mark({ class: "cm-md-em" }).range(nFrom, nTo)
           );
           if (!isCursorInRange(state, nFrom, nTo)) {
-            // Opening marker (* or _)
-            decorations.push(
-              Decoration.replace({}).range(nFrom, nFrom + 1)
-            );
-            // Closing marker
-            decorations.push(
-              Decoration.replace({}).range(nTo - 1, nTo)
-            );
+            decorations.push(Decoration.replace({}).range(nFrom, nFrom + 1));
+            decorations.push(Decoration.replace({}).range(nTo - 1, nTo));
+          } else {
+            decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nFrom, nFrom + 1));
+            decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nTo - 1, nTo));
           }
         } else if (name === "Strikethrough") {
           decorations.push(
             Decoration.mark({ class: "cm-md-strikethrough" }).range(nFrom, nTo)
           );
           if (!isCursorInRange(state, nFrom, nTo)) {
-            // Opening marker (~~)
-            decorations.push(
-              Decoration.replace({}).range(nFrom, nFrom + 2)
-            );
-            // Closing marker
-            decorations.push(
-              Decoration.replace({}).range(nTo - 2, nTo)
-            );
+            decorations.push(Decoration.replace({}).range(nFrom, nFrom + 2));
+            decorations.push(Decoration.replace({}).range(nTo - 2, nTo));
+          } else {
+            decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nFrom, nFrom + 2));
+            decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nTo - 2, nTo));
           }
         } else if (name === "InlineCode") {
-          // Determine backtick length from actual text
           const text = state.sliceDoc(nFrom, nTo);
           let tickLen = 0;
           while (tickLen < text.length && text[tickLen] === "`") {
@@ -92,12 +82,13 @@ export function buildInlineDecorations(
           }
           if (!isCursorInRange(state, nFrom, nTo)) {
             if (tickLen > 0) {
-              decorations.push(
-                Decoration.replace({}).range(nFrom, contentFrom)
-              );
-              decorations.push(
-                Decoration.replace({}).range(contentTo, nTo)
-              );
+              decorations.push(Decoration.replace({}).range(nFrom, contentFrom));
+              decorations.push(Decoration.replace({}).range(contentTo, nTo));
+            }
+          } else {
+            if (tickLen > 0) {
+              decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(nFrom, contentFrom));
+              decorations.push(Decoration.mark({ class: "cm-md-marker" }).range(contentTo, nTo));
             }
           }
         }

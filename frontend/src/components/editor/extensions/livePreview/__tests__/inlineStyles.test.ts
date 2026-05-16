@@ -165,6 +165,46 @@ describe("buildInlineDecorations — InlineCode", () => {
 });
 
 // ---------------------------------------------------------------
+// cm-md-marker — delimiter color when cursor is inside
+// ---------------------------------------------------------------
+describe("buildInlineDecorations — cm-md-marker on delimiters", () => {
+  it("emits cm-md-marker on ** markers when cursor is inside StrongEmphasis", () => {
+    const doc = "hello **world** end";
+    const state = makeState(doc, 10); // cursor inside "world"
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 6 && d.to === 8)).toBe(true);
+    expect(markers.some((d) => d.from === 13 && d.to === 15)).toBe(true);
+  });
+
+  it("emits cm-md-marker on * markers when cursor is inside Emphasis", () => {
+    const doc = "hello *italic* end";
+    const state = makeState(doc, 9); // cursor inside "italic"
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 6 && d.to === 7)).toBe(true);
+    expect(markers.some((d) => d.from === 13 && d.to === 14)).toBe(true);
+  });
+
+  it("emits cm-md-marker on backtick markers when cursor is inside InlineCode", () => {
+    const doc = "hello `code` end";
+    const state = makeState(doc, 8); // cursor inside "code"
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 6 && d.to === 7)).toBe(true);
+    expect(markers.some((d) => d.from === 11 && d.to === 12)).toBe(true);
+  });
+
+  it("does NOT emit cm-md-marker when cursor is outside the range", () => {
+    const doc = "hello **world** end";
+    const state = makeState(doc, 0); // cursor outside
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------
 // Multiple inline elements on the same line
 // ---------------------------------------------------------------
 describe("buildInlineDecorations — multiple elements", () => {

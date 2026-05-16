@@ -65,12 +65,17 @@ export function buildListDecorations(
               let child = item.firstChild;
               while (child) {
                 if (child.name === "ListMark") {
-                  // カーソルが同じ行にない場合のみ置換
                   if (!isCursorOnLine(state, child.from)) {
+                    // カーソルが同じ行にない場合のみ bullet ウィジェットで置換
                     decorations.push(
                       Decoration.replace({
                         widget: new BulletWidget(),
                       }).range(child.from, child.to)
+                    );
+                  } else {
+                    // カーソルが同じ行にある場合はマーカー色で表示
+                    decorations.push(
+                      Decoration.mark({ class: "cm-md-marker" }).range(child.from, child.to)
                     );
                   }
                   break;

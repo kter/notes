@@ -65,15 +65,18 @@ describe("buildListDecorations — BulletList", () => {
   });
 
   it("does NOT emit replace on line 1 mark when cursor is on line 1, still emits on line 2", () => {
-    // cursor on line 1 (pos 5 = inside "item one")
-    // Note: this uses the same extended doc
     const state = makeState(doc, 5);
     const decs = buildListDecorations(state, makeFakeView(state));
     const widgets = getWidgetDecs(decs);
-    // Line 1 mark should NOT be replaced
     expect(widgets.some((d) => d.from === 0 && d.to === 1)).toBe(false);
-    // Line 2 mark should still be replaced
     expect(widgets.some((d) => d.from === 11 && d.to === 12)).toBe(true);
+  });
+
+  it("emits cm-md-marker on ListMark when cursor is on the same line", () => {
+    const state = makeState(doc, 5); // cursor inside "item one"
+    const decs = buildListDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 0 && d.to === 1)).toBe(true);
   });
 });
 

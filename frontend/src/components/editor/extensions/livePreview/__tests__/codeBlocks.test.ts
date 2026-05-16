@@ -126,11 +126,25 @@ describe("buildCodeBlockDecorations — fence-line hiding", () => {
     expect(replaceDecs.some((d) => d.from === openFenceFrom)).toBe(false);
   });
 
+  it("emits cm-md-marker on opening fence line when cursor is on that line", () => {
+    const state = makeState(doc, 8); // cursor on "```js" line
+    const decs = buildCodeBlockDecorations(state, makeFakeView(state));
+    const markers = getLineDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === openFenceFrom && d.to === openFenceTo)).toBe(true);
+  });
+
   it("does NOT hide closing fence when cursor is on that line", () => {
     const state = makeState(doc, closeFenceFrom); // cursor on closing "```" line
     const decs = buildCodeBlockDecorations(state, makeFakeView(state));
     const replaceDecs = getReplaceDecs(decs);
     expect(replaceDecs.some((d) => d.from === closeFenceFrom)).toBe(false);
+  });
+
+  it("emits cm-md-marker on closing fence line when cursor is on that line", () => {
+    const state = makeState(doc, closeFenceFrom); // cursor on closing "```" line
+    const decs = buildCodeBlockDecorations(state, makeFakeView(state));
+    const markers = getLineDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === closeFenceFrom && d.to === closeFenceTo)).toBe(true);
   });
 
   it("still emits cm-md-fenced line decorations for all lines even when cursor is inside", () => {

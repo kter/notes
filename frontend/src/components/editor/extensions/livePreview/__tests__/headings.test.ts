@@ -74,6 +74,13 @@ describe("buildHeadingDecorations — ATXHeading1", () => {
     // Should NOT have a replace at [0, 1] (the "#" HeaderMark)
     expect(replaces.some((d) => d.from === 0 && d.to === 1)).toBe(false);
   });
+
+  it("emits cm-md-marker decoration on HeaderMark when cursor IS on heading line", () => {
+    const state = makeState(doc, 4); // cursor inside "Hello" on heading line
+    const decs = buildHeadingDecorations(state, makeFakeView(state));
+    const markers = getLineDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 0 && d.to === 1)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------

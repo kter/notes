@@ -81,7 +81,7 @@ export const livePreviewBaseTheme = EditorView.baseTheme({
     color: "var(--muted-foreground, #6b7280)",
   },
 
-  // 番号付きリストマーカー（色指定なし: デフォルトのテキスト色を継承）
+  // 番号付きリストマーカーウィジェット（色指定なし: 親から通常テキスト色を継承）
   ".cm-md-ol-mark": {},
 
   // タスクリストチェックボックス

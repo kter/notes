@@ -1,6 +1,6 @@
 /**
  * buildListDecorations のユニットテスト。
- * BulletList の ListMark 置換と OrderedList の cm-md-ol-mark マーク付与を検証する。
+ * BulletList / OrderedList の ListMark ウィジェット置換とマーカー色付与を検証する。
  */
 import { describe, expect, it } from "vitest";
 import { EditorState, EditorSelection, type Range } from "@codemirror/state";
@@ -84,32 +84,33 @@ describe("buildListDecorations — BulletList", () => {
 // OrderedList
 // ---------------------------------------------------------------
 describe("buildListDecorations — OrderedList", () => {
-  const doc = "1. first\n2. second";
+  const doc = "1. first\n2. second\n\nsome text";
   // line 1: "1. first"   from=0   to=8   ListMark at [0, 2]
   // line 2: "2. second"  from=9  to=18  ListMark at [9, 11]
+  // line 4: "some text"  from=20 to=29
 
-  it("always emits cm-md-ol-mark on both ListMarks (cursor-independent)", () => {
-    // cursor on line 1
-    const stateOnLine1 = makeState(doc, 4);
-    const decs1 = buildListDecorations(stateOnLine1, makeFakeView(stateOnLine1));
-    const marks1 = getMarkDecs(decs1, "cm-md-ol-mark");
-    expect(marks1.some((d) => d.from === 0 && d.to === 2)).toBe(true);
-    expect(marks1.some((d) => d.from === 9 && d.to === 11)).toBe(true);
-  });
-
-  it("cursor on line 2 still emits ol-mark on both lines", () => {
-    const state = makeState(doc, 12);
-    const decs = buildListDecorations(state, makeFakeView(state));
-    const marks = getMarkDecs(decs, "cm-md-ol-mark");
-    expect(marks.some((d) => d.from === 0 && d.to === 2)).toBe(true);
-    expect(marks.some((d) => d.from === 9 && d.to === 11)).toBe(true);
-  });
-
-  it("emits no widget replace decorations for ordered lists", () => {
-    const state = makeState(doc, doc.length);
+  it("emits widget replace on both ListMarks when cursor is elsewhere", () => {
+    const state = makeState(doc, 22); // cursor on "some text"
     const decs = buildListDecorations(state, makeFakeView(state));
     const widgets = getWidgetDecs(decs);
-    expect(widgets.length).toBe(0);
+    expect(widgets.some((d) => d.from === 0 && d.to === 2)).toBe(true);
+    expect(widgets.some((d) => d.from === 9 && d.to === 11)).toBe(true);
+  });
+
+  it("does NOT emit widget on line 1 mark when cursor is on line 1", () => {
+    const state = makeState(doc, 4); // cursor inside "first"
+    const decs = buildListDecorations(state, makeFakeView(state));
+    const widgets = getWidgetDecs(decs);
+    expect(widgets.some((d) => d.from === 0 && d.to === 2)).toBe(false);
+    // line 2 still gets widget
+    expect(widgets.some((d) => d.from === 9 && d.to === 11)).toBe(true);
+  });
+
+  it("emits cm-md-marker on line 1 ListMark when cursor is on line 1", () => {
+    const state = makeState(doc, 4);
+    const decs = buildListDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 0 && d.to === 2)).toBe(true);
   });
 });
 

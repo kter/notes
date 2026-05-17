@@ -2,10 +2,14 @@
  * Markdown 箇条書き（BulletList）および番号付きリスト（OrderedList）に対して
  * CM6 デコレーションを生成する。
  *
- * BulletList: カーソルが ListMark と同じ行にない場合、ListMark を BulletWidget（•）で置換する。
- * OrderedList: カーソルが同じ行にない場合は OrderedListMarkWidget でウィジェット置換する。
- *              ウィジェットはシンタックスハイライトの影響を受けないため通常テキスト色で表示される。
- *              カーソルが同じ行にある場合は cm-md-marker クラスを付与する。
+ * カーソルが同じ行にある ListMark には装飾を付与しない。
+ * Raw Edit モードと同様に、編集中の行は CM6 本来のシンタックスハイライトだけで表示する。
+ * これにより、IME 変換中に mark スパンが挿入位置付近に存在することで起きる
+ * カーソルドリフト不具合（Issue #89）を回避する。
+ *
+ * カーソルが別行にある ListMark には Decoration.mark を付与する（replace は使わない）。
+ * Decoration.replace（widget）は IME composition と組み合わせると DOM/Selection の
+ * ズレを引き起こすため廃止した。
  *
  * タスクリストマーカー（TaskMarker）はここでは扱わない。taskList.ts が担当する。
  *
@@ -14,68 +18,14 @@
  *
  * 呼び出し関係: index.ts の ViewPlugin.build() から呼び出される。
  */
-import { Decoration, EditorView, WidgetType } from "@codemirror/view";
+import { Decoration, EditorView } from "@codemirror/view";
 import { Range, EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { isCursorOnLine } from "./cursorRange";
 
 /**
- * 箇条書きマーカー（-、*、+）を • (U+2022) に置き換えるウィジェット。
- */
-class BulletWidget extends WidgetType {
-  toDOM(): HTMLElement {
-    const span = document.createElement("span");
-    span.className = "cm-md-bullet";
-    span.textContent = "•";
-    return span;
-  }
-
-  eq(other: BulletWidget): boolean {
-    return other instanceof BulletWidget;
-  }
-
-  get estimatedHeight(): number {
-    return -1;
-  }
-
-  ignoreEvent(): boolean {
-    return true;
-  }
-}
-
-/**
- * 番号付きリストマーカー（1.、2. など）をウィジェットで置換するクラス。
- * ウィジェットとして描画することでシンタックスハイライトの色の影響を受けず、
- * 通常テキスト色で表示される。
- */
-class OrderedListMarkWidget extends WidgetType {
-  constructor(private text: string) {
-    super();
-  }
-
-  toDOM(): HTMLElement {
-    const span = document.createElement("span");
-    span.className = "cm-md-ol-mark";
-    span.textContent = this.text;
-    return span;
-  }
-
-  eq(other: OrderedListMarkWidget): boolean {
-    return other instanceof OrderedListMarkWidget && other.text === this.text;
-  }
-
-  get estimatedHeight(): number {
-    return -1;
-  }
-
-  ignoreEvent(): boolean {
-    return true;
-  }
-}
-
-/**
  * 可視範囲内の BulletList / OrderedList ノードを走査し、
- * ListMark に対してデコレーションを返す。
+ * カーソルがいない行の ListMark に対してデコレーションを返す。
  */
 export function buildListDecorations(
   state: EditorState,
@@ -89,7 +39,6 @@ export function buildListDecorations(
       from,
       to,
       enter(node) {
-        // BulletList: ListItem の ListMark を bullet ウィジェットで置換
         if (node.name === "BulletList") {
           let item = node.node.firstChild;
           while (item) {
@@ -97,17 +46,10 @@ export function buildListDecorations(
               let child = item.firstChild;
               while (child) {
                 if (child.name === "ListMark") {
+                  // カーソル行は装飾しない（Raw Edit と同じ見た目 → IME 干渉なし）
                   if (!isCursorOnLine(state, child.from)) {
-                    // カーソルが同じ行にない場合のみ bullet ウィジェットで置換
                     decorations.push(
-                      Decoration.replace({
-                        widget: new BulletWidget(),
-                      }).range(child.from, child.to)
-                    );
-                  } else {
-                    // カーソルが同じ行にある場合はマーカー色で表示
-                    decorations.push(
-                      Decoration.mark({ class: "cm-md-marker" }).range(child.from, child.to)
+                      Decoration.mark({ class: "cm-md-bullet" }).range(child.from, child.to)
                     );
                   }
                   break;
@@ -117,10 +59,9 @@ export function buildListDecorations(
             }
             item = item.nextSibling;
           }
-          return false; // 子ノードの重複走査を避ける
+          return false;
         }
 
-        // OrderedList: カーソルが同じ行にない場合はウィジェット置換、ある場合はマーカー色で表示
         if (node.name === "OrderedList") {
           let item = node.node.firstChild;
           while (item) {
@@ -128,18 +69,10 @@ export function buildListDecorations(
               let child = item.firstChild;
               while (child) {
                 if (child.name === "ListMark") {
+                  // カーソル行は装飾しない
                   if (!isCursorOnLine(state, child.from)) {
-                    // ウィジェット置換でシンタックスハイライトの影響を受けずに通常色で表示
-                    const markText = state.sliceDoc(child.from, child.to);
                     decorations.push(
-                      Decoration.replace({
-                        widget: new OrderedListMarkWidget(markText),
-                      }).range(child.from, child.to)
-                    );
-                  } else {
-                    // カーソルが同じ行にある場合はマーカー色で表示
-                    decorations.push(
-                      Decoration.mark({ class: "cm-md-marker" }).range(child.from, child.to)
+                      Decoration.mark({ class: "cm-md-ol-mark" }).range(child.from, child.to)
                     );
                   }
                   break;

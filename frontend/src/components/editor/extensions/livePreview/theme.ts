@@ -74,15 +74,15 @@ export const livePreviewBaseTheme = EditorView.baseTheme({
     pointerEvents: "none",
   },
 
-  // 箇条書きマーカー置換ウィジェット
+  // 箇条書きマーカー（- * + をそのまま表示し、色のみ弱める）
   ".cm-md-bullet": {
-    display: "inline-block",
-    width: "1em",
     color: "var(--muted-foreground, #6b7280)",
   },
 
-  // 番号付きリストマーカーウィジェット（色指定なし: 親から通常テキスト色を継承）
-  ".cm-md-ol-mark": {},
+  // 番号付きリストマーカー（syntaxHighlighting の色を通常テキスト色で上書き）
+  ".cm-md-ol-mark": {
+    color: "inherit",
+  },
 
   // タスクリストチェックボックス
   ".cm-md-task-checkbox": {

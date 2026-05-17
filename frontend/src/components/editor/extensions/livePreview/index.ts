@@ -99,6 +99,13 @@ const livePreviewPlugin = ViewPlugin.fromClass(
         event.preventDefault();
         return true;
       },
+      // IME 変換確定後にデコレーションを強制再構築する。
+      // !composing ガードにより変換中は更新をスキップするが、
+      // compositionend 時点で update イベントが来ない場合があるため明示的に再描画する。
+      compositionend(_event: CompositionEvent, view: EditorView) {
+        this.decorations = this.build(view);
+        return false;
+      },
     },
   }
 );

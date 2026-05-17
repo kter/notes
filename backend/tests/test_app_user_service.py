@@ -136,6 +136,40 @@ def test_should_bootstrap_admin_allows_dev_integration_users():
     )
 
 
+def test_should_bootstrap_admin_allows_local_dev_user_in_local():
+    service = AppUserService(
+        session=Mock(),
+        settings=make_settings(environment="local"),
+    )
+    assert service.should_bootstrap_admin({"sub": "local-dev-user-id"}) is True
+
+
+def test_should_bootstrap_admin_allows_local_dev_user_in_dev():
+    service = AppUserService(
+        session=Mock(),
+        settings=make_settings(environment="dev"),
+    )
+    assert service.should_bootstrap_admin({"sub": "local-dev-user-id"}) is True
+
+
+def test_should_bootstrap_admin_blocks_local_dev_user_in_prd():
+    service = AppUserService(
+        session=Mock(),
+        settings=make_settings(environment="prd"),
+    )
+    assert service.should_bootstrap_admin({"sub": "local-dev-user-id"}) is False
+
+
+def test_should_bootstrap_admin_blocks_dev_integration_users_in_local():
+    service = AppUserService(
+        session=Mock(),
+        settings=make_settings(environment="local"),
+    )
+    assert (
+        service.should_bootstrap_admin({"sub": "integration-test-user-id-123"}) is False
+    )
+
+
 def test_get_current_app_user_rejects_missing_subject():
     from app.auth.dependencies import get_current_app_user
 

@@ -172,6 +172,63 @@ async def test_verify_token_invalid_kid(rsa_key_pair, mock_settings):
 
 
 @pytest.mark.asyncio
+async def test_local_dev_token_bypass_in_local(mock_settings):
+    mock_settings.environment = "local"
+    verifier = CognitoJWTVerifier()
+    result = await verifier.verify_token("local-dev-token")
+    assert result["sub"] == "local-dev-user-id"
+    assert result["email"] == "local-dev-user@example.com"
+
+
+@pytest.mark.asyncio
+async def test_local_dev_token_bypass_in_dev(mock_settings):
+    mock_settings.environment = "dev"
+    verifier = CognitoJWTVerifier()
+    result = await verifier.verify_token("local-dev-token")
+    assert result["sub"] == "local-dev-user-id"
+
+
+@pytest.mark.asyncio
+async def test_local_dev_token_blocked_in_prd(mock_settings):
+    mock_settings.environment = "prd"
+    verifier = CognitoJWTVerifier()
+    with patch("httpx.AsyncClient", autospec=True) as MockClient:
+        mock_instance = MockClient.return_value
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_response = Mock()
+        mock_response.json.return_value = {"keys": []}
+        mock_response.raise_for_status.return_value = None
+        mock_instance.get = mock.AsyncMock(return_value=mock_response)
+        with pytest.raises(JWTError):
+            await verifier.verify_token("local-dev-token")
+
+
+@pytest.mark.asyncio
+async def test_dev_integration_token_blocked_in_local(mock_settings):
+    mock_settings.environment = "local"
+    verifier = CognitoJWTVerifier()
+    with patch("httpx.AsyncClient", autospec=True) as MockClient:
+        mock_instance = MockClient.return_value
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_response = Mock()
+        mock_response.json.return_value = {"keys": []}
+        mock_response.raise_for_status.return_value = None
+        mock_instance.get = mock.AsyncMock(return_value=mock_response)
+        with pytest.raises(JWTError):
+            await verifier.verify_token("dev-integration-test-token")
+
+
+@pytest.mark.asyncio
+async def test_dev_integration_token_bypass_in_dev(mock_settings):
+    mock_settings.environment = "dev"
+    verifier = CognitoJWTVerifier()
+    result = await verifier.verify_token("dev-integration-test-token")
+    assert result["sub"] == "integration-test-user-id"
+
+
+@pytest.mark.asyncio
 async def test_jwks_caching(rsa_key_pair, mock_settings):
     _, public_jwk = rsa_key_pair
     verifier = CognitoJWTVerifier()

@@ -125,9 +125,11 @@ test.describe('Golden Path: Note Lifecycle', () => {
 
   test.beforeAll(async ({ browser, baseURL }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({
-      storageState: 'playwright/.auth/user.json',
-    });
+    const context = await browser.newContext(
+      process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'true'
+        ? {}
+        : { storageState: 'playwright/.auth/user.json' }
+    );
     const page = await context.newPage();
 
     try {

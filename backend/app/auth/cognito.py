@@ -70,20 +70,29 @@ class CognitoJWTVerifier:
         # ----------------------------------------------------------------------
         # 開発環境での結合テスト用バイパス
         # ----------------------------------------------------------------------
-        if settings.environment == "dev" and token == "dev-integration-test-token":  # noqa: S105
-            return {
-                "sub": "integration-test-user-id",
-                "username": "integration-test-user",
-                "email": "integration-test-user@example.com",
-                "token_use": "access",
-                "scope": "aws.cognito.signin.user.admin",
-            }
+        if settings.environment == "dev":
+            if token == "dev-integration-test-token":  # noqa: S105
+                return {
+                    "sub": "integration-test-user-id",
+                    "username": "integration-test-user",
+                    "email": "integration-test-user@example.com",
+                    "token_use": "access",
+                    "scope": "aws.cognito.signin.user.admin",
+                }
+            if token == "dev-integration-test-token-2":  # noqa: S105
+                return {
+                    "sub": "integration-test-user-id-2",
+                    "username": "integration-test-user-2",
+                    "email": "integration-test-user-2@example.com",
+                    "token_use": "access",
+                    "scope": "aws.cognito.signin.user.admin",
+                }
 
-        if settings.environment == "dev" and token == "dev-integration-test-token-2":  # noqa: S105
+        if settings.environment in {"dev", "local"} and token == "local-dev-token":  # noqa: S105
             return {
-                "sub": "integration-test-user-id-2",
-                "username": "integration-test-user-2",
-                "email": "integration-test-user-2@example.com",
+                "sub": "local-dev-user-id",
+                "username": "local-dev-user",
+                "email": "local-dev-user@example.com",
                 "token_use": "access",
                 "scope": "aws.cognito.signin.user.admin",
             }

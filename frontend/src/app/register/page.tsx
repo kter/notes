@@ -8,13 +8,14 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { FileTextIcon, Loader2Icon } from "lucide-react";
+import { isDevAuthBypass } from "@/lib/dev-bypass";
 
 type Step = "register" | "confirm";
 
@@ -32,6 +33,10 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { signUp, confirmSignUp, signIn } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (isDevAuthBypass) router.replace("/");
+  }, [router]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

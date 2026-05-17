@@ -30,6 +30,7 @@ import {
   type ConfirmSignUpInput,
 } from "aws-amplify/auth";
 import { logger } from "@/lib/logger";
+import { isDevAuthBypass, BYPASS_TOKEN, BYPASS_USER } from "@/lib/dev-bypass";
 
 interface User {
   userId: string;
@@ -55,14 +56,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * マウント時にセッションを確認し、ユーザー情報を state に反映する。
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(
+    isDevAuthBypass ? { ...BYPASS_USER } : null
+  );
+  const [isLoading, setIsLoading] = useState(!isDevAuthBypass);
 
   /**
    * Cognito の現在ユーザーを取得して state を更新する。
    * サインイン後にも呼び出してセッションを再取得する。
    */
   const checkUser = useCallback(async () => {
+    if (isDevAuthBypass) return;
     try {
       const currentUser = await getCurrentUser();
       setUser({
@@ -87,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** メールアドレスとパスワードでサインインし、ユーザー情報を再取得する。 */
   const handleSignIn = async (email: string, password: string) => {
+    if (isDevAuthBypass) return;
     const input: SignInInput = { username: email, password };
     await signIn(input);
     await checkUser();
@@ -97,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * 確認コードが必要な場合は needsConfirmation: true を返す。
    */
   const handleSignUp = async (email: string, password: string) => {
+    if (isDevAuthBypass) return { needsConfirmation: false };
     const input: SignUpInput = {
       username: email,
       password,
@@ -109,16 +115,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const handleConfirmSignUp = async (email: string, code: string) => {
+    if (isDevAuthBypass) return;
     const input: ConfirmSignUpInput = { username: email, confirmationCode: code };
     await confirmSignUp(input);
   };
 
   const handleSignOut = async () => {
+    if (isDevAuthBypass) return;
     await signOut();
     setUser(null);
   };
 
   const getAccessToken = useCallback(async (): Promise<string | null> => {
+    if (isDevAuthBypass) return BYPASS_TOKEN;
     try {
       const session = await fetchAuthSession();
       return session.tokens?.idToken?.toString() || null;

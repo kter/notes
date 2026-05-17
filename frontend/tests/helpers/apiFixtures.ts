@@ -26,6 +26,13 @@ interface AuthenticatedRawResponse {
 }
 
 export async function getAuthenticatedRequestContext(page: Page): Promise<AuthenticatedRequestContext> {
+  // In local bypass mode, use the hardcoded dev token and localhost API origin
+  if (process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'true') {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiOrigin = new URL(apiUrl).origin;
+    return { token: 'local-dev-token', apiOrigin };
+  }
+
   return page.evaluate(() => {
     const tokenKey = Object.keys(localStorage).find((key) => key.endsWith('.idToken'));
     if (!tokenKey) {

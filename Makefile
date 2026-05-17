@@ -48,6 +48,57 @@ dev: ## Run both backend and frontend (requires tmux or run in separate terminal
 	@echo "  make dev-backend"
 	@echo "  make dev-frontend"
 
+# =============================================================================
+# Local Bypass Stack (auth bypass + dev DSQL)
+# =============================================================================
+
+.PHONY: dev-stack-backend
+dev-stack-backend: tf-switch ## Run bypass-mode backend against dev DSQL (ENVIRONMENT=local, no login required)
+	$(eval DSQL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw dsql_identifier))
+	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
+	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
+	cd backend && \
+	  ENVIRONMENT=local \
+	  AWS_PROFILE=$(AWS_PROFILE) \
+	  AWS_REGION=$(AWS_REGION) \
+	  DSQL_CLUSTER_ENDPOINT=$(DSQL_ID) \
+	  COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) \
+	  COGNITO_APP_CLIENT_ID=$(COGNITO_CLIENT_ID) \
+	  CORS_ORIGINS='["http://localhost:3000"]' \
+	  uv run uvicorn app.main:app --reload --port 8000
+
+.PHONY: dev-stack
+dev-stack: tf-switch ## Run backend (8000) + frontend (3000) with auth bypass against dev DSQL
+	$(eval DSQL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw dsql_identifier))
+	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
+	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
+	@echo "Starting local dev stack:"
+	@echo "  backend  -> http://localhost:8000 (ENVIRONMENT=local, DSQL=$(DSQL_ID))"
+	@echo "  frontend -> http://localhost:3000 (DEV_AUTH_BYPASS=true)"
+	@echo "Press Ctrl-C to stop both."
+	@trap 'kill 0' INT TERM EXIT; \
+	  ( cd backend && \
+	    ENVIRONMENT=local \
+	    AWS_PROFILE=$(AWS_PROFILE) \
+	    AWS_REGION=$(AWS_REGION) \
+	    DSQL_CLUSTER_ENDPOINT=$(DSQL_ID) \
+	    COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) \
+	    COGNITO_APP_CLIENT_ID=$(COGNITO_CLIENT_ID) \
+	    CORS_ORIGINS='["http://localhost:3000"]' \
+	    uv run uvicorn app.main:app --reload --port 8000 ) & \
+	  ( cd frontend && \
+	    NEXT_PUBLIC_API_URL=http://localhost:8000 \
+	    NEXT_PUBLIC_ENVIRONMENT=local \
+	    NEXT_PUBLIC_DEV_AUTH_BYPASS=true \
+	    NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) \
+	    NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) \
+	    npm run dev ) & \
+	  wait
+
+.PHONY: smoke-local
+smoke-local: ## Quick smoke test against local stack using bypass token (requires running dev-stack-backend)
+	@./scripts/smoke_local.sh
+
 .PHONY: db-upgrade
 db-upgrade: ## Apply backend database migrations locally
 	cd backend && uv run alembic upgrade head
@@ -542,6 +593,14 @@ test-e2e-mobile-safari-docker: ## Run Mobile Safari E2E tests in Docker
 .PHONY: test-e2e-regression
 test-e2e-regression: ## Run only the regression E2E suite (frontend/tests/regression/)
 	cd frontend && E2E_TARGET=$(ENV) npx playwright test tests/regression/ $(TEST_ARGS)
+
+.PHONY: test-e2e-local
+test-e2e-local: ## Run Playwright Chromium against the local bypass stack (requires make dev-stack-backend running)
+	cd frontend && E2E_TARGET=local npx playwright test --project=chromium $(TEST_ARGS)
+
+.PHONY: test-e2e-local-regression
+test-e2e-local-regression: ## Run regression suite against local bypass stack
+	cd frontend && E2E_TARGET=local npx playwright test --project=chromium tests/regression/ $(TEST_ARGS)
 
 .PHONY: test-e2e-all
 test-e2e-all: ## Run the CI-style Playwright split locally: host Chromium + Docker WebKit/Safari

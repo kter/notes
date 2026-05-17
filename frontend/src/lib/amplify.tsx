@@ -12,6 +12,7 @@
 import { useEffect, useState, ReactNode } from "react";
 import { Amplify, ResourcesConfig } from "aws-amplify";
 import { logger } from "@/lib/logger";
+import { isDevAuthBypass } from "@/lib/dev-bypass";
 
 // Cognito configuration from environment variables
 const amplifyConfig: ResourcesConfig = {
@@ -47,11 +48,14 @@ export function AmplifyProvider({ children }: { children: ReactNode }) {
   const [isConfigured, setIsConfigured] = useState(false);
 
   useEffect(() => {
+    if (isDevAuthBypass) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsConfigured(true);
+      return;
+    }
     // Configure Amplify only on client side
     try {
       Amplify.configure(amplifyConfig);
-
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsConfigured(true);
     } catch (error) {
       logger.error("Failed to configure Amplify", error);

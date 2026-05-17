@@ -8,13 +8,14 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { FileTextIcon, Loader2Icon } from "lucide-react";
+import { isDevAuthBypass } from "@/lib/dev-bypass";
 
 /**
  * ログインフォームコンポーネント。送信時に signIn を呼び出し、成功するとルートへリダイレクトする。
@@ -27,6 +28,10 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (isDevAuthBypass) router.replace("/");
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -74,6 +74,11 @@ class AppUserService:
             "integration-test-user-id"
         ):
             return True
+        if (
+            self.settings.environment in {"dev", "local"}
+            and user_id == "local-dev-user-id"
+        ):
+            return True
         return user_id in self.settings.bootstrap_admin_user_id_list or email in {
             item.lower() for item in self.settings.bootstrap_admin_email_list
         }

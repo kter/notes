@@ -1,6 +1,7 @@
 # AWS Backup Vault
 resource "aws_backup_vault" "main" {
-  name = "${var.project_name}-backup-vault-${terraform.workspace}"
+  name        = "${var.project_name}-backup-vault-${terraform.workspace}"
+  kms_key_arn = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alias/aws/backup"
 }
 
 # AWS Backup Plan（日次バックアップ）

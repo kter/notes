@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
+from app.logging_utils import log_event
 from app.models.token_usage import (
     MONTHLY_TOKEN_LIMIT,
     TokenUsage,
@@ -44,8 +45,12 @@ def get_or_create_current_period(session: Session, user_id: str) -> TokenUsage:
         session.add(usage)
         commit_with_error_handling(session, "TokenUsage")
         session.refresh(usage)
-        logger.info(
-            f"Created new token usage period for user {user_id}: {period_start}"
+        log_event(
+            logger,
+            logging.INFO,
+            "ops.token_usage.period_created",
+            user_id=user_id,
+            period_start=period_start,
         )
 
     return usage
@@ -83,8 +88,14 @@ def record_usage(session: Session, user_id: str, tokens: int) -> TokenUsage:
     session.add(usage)
     commit_with_error_handling(session, "TokenUsage")
     session.refresh(usage)
-    logger.info(
-        f"Recorded {tokens} tokens for user {user_id}. Total: {usage.tokens_used}/{MONTHLY_TOKEN_LIMIT}"
+    log_event(
+        logger,
+        logging.INFO,
+        "ops.token_usage.recorded",
+        user_id=user_id,
+        tokens_added=tokens,
+        tokens_used=usage.tokens_used,
+        token_limit=MONTHLY_TOKEN_LIMIT,
     )
     return usage
 

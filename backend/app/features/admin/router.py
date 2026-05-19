@@ -32,7 +32,7 @@ def get_admin_me(admin_user: AdminUser):
 def list_admin_users(
     admin_user: AdminUser,
     use_cases: Annotated[AdminUseCases, Depends(get_admin_use_cases)],
-    q: str | None = Query(default=None, min_length=1),
+    q: str | None = Query(default=None, min_length=1, max_length=200),
     admin_only: bool | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),

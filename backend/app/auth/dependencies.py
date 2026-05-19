@@ -58,10 +58,11 @@ async def _verify_bearer_token(token: str) -> dict:
             "security.auth.failed",
             outcome="failure",
             reason=exc.__class__.__name__,
+            exc_info=exc,
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
+            detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

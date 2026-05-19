@@ -29,6 +29,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useState, useEffect, memo } from "react";
 import { useTranslation } from "@/hooks";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface NoteListProps {
   notes: Note[];
@@ -66,6 +67,7 @@ export const NoteList = memo(function NoteList({
   const [isEditing, setIsEditing] = useState(false);
   const [editingName, setEditingName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -105,9 +107,7 @@ export const NoteList = memo(function NoteList({
 
   const handleDelete = () => {
     if (folderId && onDeleteFolder) {
-      if (confirm(t("sidebar.deleteConfirm"))) {
-        onDeleteFolder(folderId);
-      }
+      setConfirmDeleteOpen(true);
     }
   };
 
@@ -253,6 +253,14 @@ export const NoteList = memo(function NoteList({
             : t("noteList.noteCount").replace("{{count}}", String(notes.length))}
         </p>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title={t("noteList.deleteFolder")}
+        description={t("sidebar.deleteConfirm")}
+        onConfirm={() => { if (folderId && onDeleteFolder) onDeleteFolder(folderId); }}
+      />
 
       {/* Note list */}
       <ScrollArea className="flex-1 min-h-0">

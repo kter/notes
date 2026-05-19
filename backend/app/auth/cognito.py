@@ -13,6 +13,8 @@ from app.config import get_settings
 
 settings = get_settings()
 
+JWKS_CACHE_TTL_SECONDS = 3600
+
 
 class CognitoJWTVerifier:
     """Cognito JWT トークンを検証するクラス。
@@ -25,6 +27,7 @@ class CognitoJWTVerifier:
         self.user_pool_id = settings.cognito_user_pool_id
         self.app_client_id = settings.cognito_app_client_id
         self._jwks = None  # 初回取得後にメモリキャッシュする
+        self._jwks_fetched_at: float = 0.0
         self._jwks_url = (
             f"https://cognito-idp.{self.region}.amazonaws.com/"
             f"{self.user_pool_id}/.well-known/jwks.json"
@@ -33,13 +36,15 @@ class CognitoJWTVerifier:
     async def _get_jwks(self) -> dict:
         """Cognito から JWKS を取得してキャッシュする。
 
-        一度取得した JWKS はインスタンス変数に保持し、再リクエストを省く。
+        TTL (JWKS_CACHE_TTL_SECONDS) を超えた場合は再取得する。
         """
-        if self._jwks is None:
+        now = time.monotonic()
+        if self._jwks is None or (now - self._jwks_fetched_at) > JWKS_CACHE_TTL_SECONDS:
             async with httpx.AsyncClient() as client:
                 response = await client.get(self._jwks_url)
                 response.raise_for_status()
                 self._jwks = response.json()
+                self._jwks_fetched_at = now
         return self._jwks
 
     def _get_signing_key(self, token: str, jwks: dict) -> dict | None:

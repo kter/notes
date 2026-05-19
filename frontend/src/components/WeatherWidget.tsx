@@ -17,9 +17,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+
+const CONSENT_KEY = "weather-geolocation-consent";
 
 type WeatherState =
-  | { status: "idle" | "loading" | "error" }
+  | { status: "idle" | "loading" | "error" | "consent-needed" }
   | { status: "success"; temperature: number; weatherCode: number; updatedAt: Date };
 
 type WeatherConditionKey =
@@ -68,16 +71,20 @@ function getWeatherInfo(code: number): { emoji: string; labelKey: WeatherConditi
 /**
  * 位置情報を取得して天気データを管理するカスタムフック。
  * 取得失敗・位置情報拒否・AbortError はすべて適切にハンドリングする。
+ * 初回マウント時にローカルストレージで同意確認を行い、未同意の場合は consent-needed 状態を返す。
  */
-function useWeather(): WeatherState {
+function useWeather(): { state: WeatherState; grantConsent: () => void } {
   const [state, setState] = useState<WeatherState>({ status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedRef = useRef(false);
 
-  useEffect(() => {
+  const startGeolocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       return;
     }
+    if (startedRef.current) return;
+    startedRef.current = true;
 
     const fetchWeather = (lat: number, lon: number) => {
       abortRef.current?.abort();
@@ -123,23 +130,78 @@ function useWeather(): WeatherState {
       },
       { timeout: 10_000 }
     );
+  };
+
+  useEffect(() => {
+    const alreadyGranted =
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(CONSENT_KEY) === "granted";
+
+    if (alreadyGranted) {
+      startGeolocation();
+    } else {
+      setState({ status: "consent-needed" });
+    }
 
     return () => {
       abortRef.current?.abort();
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
+     
   }, []);
 
-  return state;
+  const grantConsent = () => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(CONSENT_KEY, "granted");
+    }
+    startGeolocation();
+  };
+
+  return { state, grantConsent };
 }
 
 /**
  * 天気情報をコンパクトに表示するウィジェット。
- * 取得成功時のみ描画し、ホバーでツールチップに詳細（気温・天気状況・最終更新時刻）を表示する。
+ * 未同意の場合は位置情報の用途を説明するチップを表示し、同意後に天気データを取得・表示する。
+ * 取得成功時のみ気温を描画し、ホバーでツールチップに詳細（気温・天気状況・最終更新時刻）を表示する。
  */
 export const WeatherWidget = memo(function WeatherWidget() {
   const { t } = useTranslation();
-  const state = useWeather();
+  const { state, grantConsent } = useWeather();
+
+  if (state.status === "consent-needed") {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className="flex items-center gap-1 text-xs font-mono cursor-pointer bg-accent/50 hover:bg-accent px-2 py-1 rounded-md transition-colors text-muted-foreground"
+              data-testid="weather-consent-chip"
+            >
+              <span>📍</span>
+              <span>?</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent align="center" sideOffset={5} className="max-w-xs">
+            <div className="space-y-2 text-sm font-sans p-1">
+              {/* TODO: add i18n */}
+              <p className="font-semibold">Weather Widget</p>
+              <p>Location is used for weather data and never stored.</p>
+              <Button
+                size="sm"
+                className="w-full mt-1"
+                onClick={grantConsent}
+                data-testid="weather-consent-allow"
+              >
+                {/* TODO: add i18n */}
+                Allow
+              </Button>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   if (state.status !== "success") {
     return null;

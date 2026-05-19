@@ -36,8 +36,9 @@ resource "aws_lambda_function" "api" {
   role          = aws_iam_role.backend.arn
   package_type  = "Image"
   image_uri     = length(regexall("@?sha256:", var.lambda_image_tag)) > 0 ? "${aws_ecr_repository.api.repository_url}@${var.lambda_image_tag}" : "${aws_ecr_repository.api.repository_url}:${var.lambda_image_tag}"
-  timeout       = 60
-  memory_size   = 512
+  timeout                        = 60
+  memory_size                    = 512
+  reserved_concurrent_executions = 50
 
   environment {
     variables = local.backend_lambda_environment
@@ -59,8 +60,9 @@ resource "aws_lambda_function" "ai_edit_worker" {
   role          = aws_iam_role.backend.arn
   package_type  = "Image"
   image_uri     = length(regexall("@?sha256:", var.lambda_image_tag)) > 0 ? "${aws_ecr_repository.api.repository_url}@${var.lambda_image_tag}" : "${aws_ecr_repository.api.repository_url}:${var.lambda_image_tag}"
-  timeout       = 180
-  memory_size   = 1024
+  timeout                        = 180
+  memory_size                    = 1024
+  reserved_concurrent_executions = 10
 
   environment {
     variables = local.backend_lambda_environment

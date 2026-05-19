@@ -5,6 +5,8 @@
 呼び出し関係: app.auth.dependencies から呼ばれ、httpx / python-jose を呼ぶ。
 """
 
+import time
+
 import httpx
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError

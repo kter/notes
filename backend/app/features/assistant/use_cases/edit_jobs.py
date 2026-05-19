@@ -11,6 +11,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
+from app.db_commit import commit_with_error_handling
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     require_non_empty,
@@ -50,7 +51,7 @@ class EditJobUseCases:
             status="pending",
         )
         self.session.add(job)
-        self.session.commit()
+        commit_with_error_handling(self.session, "AIEditJob")
         self.session.refresh(job)
         return job
 

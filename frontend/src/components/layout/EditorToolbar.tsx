@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useApi, useTranslation } from "@/hooks";
 import { ShareDialog } from "@/components/ui/ShareDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { EditorDisplayMode } from "@/hooks/useEditorDisplayMode";
 
 interface EditorToolbarProps {
@@ -113,6 +114,7 @@ export const EditorToolbar = memo(function EditorToolbar({
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [currentShare, setCurrentShare] = useState<NoteShare | null>(null);
+  const [confirmDeleteNoteOpen, setConfirmDeleteNoteOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -379,9 +381,7 @@ export const EditorToolbar = memo(function EditorToolbar({
             size="icon"
             className="text-destructive hover:text-destructive"
             onClick={() => {
-              if (confirm(t("noteList.deleteConfirm"))) {
-                onDeleteNote(noteId);
-              }
+              setConfirmDeleteNoteOpen(true);
             }}
             data-testid="editor-delete-note-button"
           >
@@ -389,6 +389,14 @@ export const EditorToolbar = memo(function EditorToolbar({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteNoteOpen}
+        onOpenChange={setConfirmDeleteNoteOpen}
+        title={t("noteList.deleteConfirm")}
+        description={t("noteList.deleteConfirm")}
+        onConfirm={() => onDeleteNote(noteId)}
+      />
 
       <ShareDialog
         isOpen={isShareDialogOpen}

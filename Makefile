@@ -438,7 +438,7 @@ test-integration-full: test-integration ## Run all integration tests against dep
 
 .PHONY: test-backend
 test-backend: ## Run backend unit/integration-free tests locally
-	cd backend && uv run --extra dev python -m pytest -v
+	cd backend && uv run --extra dev python -m pytest -v --ignore=tests/integration
 
 .PHONY: test-frontend
 test-frontend: ## Run frontend Vitest unit tests

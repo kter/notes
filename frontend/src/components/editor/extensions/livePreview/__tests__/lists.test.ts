@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { EditorState, EditorSelection, type Range } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { buildListDecorations } from "../lists";
 
 function makeFakeView(state: EditorState, composing = false): EditorView {
@@ -21,11 +22,13 @@ function makeFakeView(state: EditorState, composing = false): EditorView {
 }
 
 function makeState(doc: string, cursorPos = 0): EditorState {
-  return EditorState.create({
+  const state = EditorState.create({
     doc,
     selection: EditorSelection.cursor(cursorPos),
     extensions: [markdown()],
   });
+  ensureSyntaxTree(state, state.doc.length, 100);
+  return state;
 }
 
 /** 指定クラスの mark デコレーションを取得する */

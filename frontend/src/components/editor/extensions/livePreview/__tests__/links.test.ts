@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { EditorState, EditorSelection, type Range } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { GFM } from "@lezer/markdown";
 import { buildLinkDecorations } from "../links";
 
@@ -19,11 +20,13 @@ function makeFakeView(state: EditorState): EditorView {
 }
 
 function makeState(doc: string, cursorPos: number): EditorState {
-  return EditorState.create({
+  const state = EditorState.create({
     doc,
     selection: EditorSelection.cursor(cursorPos),
     extensions: [markdown({ base: markdownLanguage, extensions: [GFM] })],
   });
+  ensureSyntaxTree(state, state.doc.length, 100);
+  return state;
 }
 
 /** cm-md-link マークデコレーションを抽出する */

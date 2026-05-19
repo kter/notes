@@ -731,7 +731,7 @@ export function EditorPanel({
           />
 
           {/* Editor */}
-          <div className="flex-1 flex flex-col overflow-hidden" role="main">
+          <div className="flex-1 flex flex-col overflow-hidden" role="main" data-sentry-block>
             {/* Fixed Title Area */}
             <div className="p-4 md:p-6 pb-0 flex-none bg-background z-10">
               <div className="relative mb-4">

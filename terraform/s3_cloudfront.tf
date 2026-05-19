@@ -119,6 +119,36 @@ function handler(event) {
 EOF
 }
 
+# CloudFront Response Headers Policy (security headers)
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name = "${var.project_name}-security-headers-${terraform.workspace}"
+
+  security_headers_config {
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+    xss_protection {
+      mode_block = true
+      protection = true
+      override   = true
+    }
+  }
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
@@ -152,11 +182,12 @@ resource "aws_cloudfront_distribution" "main" {
       }
     }
 
-    viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 86400
-    max_ttl                = 31536000
-    compress               = true
+    viewer_protocol_policy      = "redirect-to-https"
+    min_ttl                     = 0
+    default_ttl                 = 86400
+    max_ttl                     = 31536000
+    compress                    = true
+    response_headers_policy_id  = aws_cloudfront_response_headers_policy.security.id
   }
 
   default_cache_behavior {
@@ -171,11 +202,12 @@ resource "aws_cloudfront_distribution" "main" {
       }
     }
 
-    viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 3600
-    max_ttl                = 86400
-    compress               = true
+    viewer_protocol_policy      = "redirect-to-https"
+    min_ttl                     = 0
+    default_ttl                 = 3600
+    max_ttl                     = 86400
+    compress                    = true
+    response_headers_policy_id  = aws_cloudfront_response_headers_policy.security.id
 
     function_association {
       event_type   = "viewer-request"

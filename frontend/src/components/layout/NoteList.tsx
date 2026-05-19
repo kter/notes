@@ -115,7 +115,8 @@ export const NoteList = memo(function NoteList({
   const HighlightedText = ({ text, highlight }: { text: string; highlight: string }) => {
     if (!highlight.trim()) return <>{text}</>;
 
-    const parts = text.split(new RegExp(`(${highlight})`, "gi"));
+    const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const parts = text.split(new RegExp(`(${escaped})`, "gi"));
     return (
       <>
         {parts.map((part, i) => 

@@ -283,6 +283,31 @@ export const ja = {
     description: "地球上の現在の昼夜エリア",
     yourLocation: "現在地",
   },
+  // Shared note public page
+  shared: {
+    errorNoToken: "無効な共有リンクです（トークンがありません）",
+    errorNotFound: "この共有ノートは見つからないか、共有が解除されています。",
+    errorExpired: "この共有リンクは有効期限切れです。",
+    errorFailed: "共有ノートの読み込みに失敗しました。",
+    notFoundTitle: "見つかりません",
+    errorFallback: "この共有ノートを読み込めませんでした。",
+    goHome: "ホームへ",
+    appName: "Notes App",
+    logIn: "ログイン",
+    signUpFree: "無料で登録",
+    sharedNoteBadge: "共有ノート",
+    readOnly: "読み取り専用",
+    untitled: "無題",
+    lastUpdated: "最終更新：",
+    noContent: "*内容なし*",
+    ctaTitle: "AIでノートを作成しましょう",
+    ctaDescription:
+      "AIを活用したノートアプリで、多くのユーザーが思考を整理しています。自動タグ付け、要約、スマート検索が無料で利用できます。",
+    getStartedFree: "無料で始める",
+    allRightsReserved: "All rights reserved.",
+    home: "ホーム",
+    signUp: "新規登録",
+  },
 } as const;
 
 // Structural type for translations (allows different string values)
@@ -528,5 +553,28 @@ export type TranslationKeys = {
     title: string;
     description: string;
     yourLocation: string;
+  };
+  shared: {
+    errorNoToken: string;
+    errorNotFound: string;
+    errorExpired: string;
+    errorFailed: string;
+    notFoundTitle: string;
+    errorFallback: string;
+    goHome: string;
+    appName: string;
+    logIn: string;
+    signUpFree: string;
+    sharedNoteBadge: string;
+    readOnly: string;
+    untitled: string;
+    lastUpdated: string;
+    noContent: string;
+    ctaTitle: string;
+    ctaDescription: string;
+    getStartedFree: string;
+    allRightsReserved: string;
+    home: string;
+    signUp: string;
   };
 };

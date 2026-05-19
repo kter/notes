@@ -283,6 +283,31 @@ export const en = {
     description: "Current day and night areas on Earth",
     yourLocation: "Your current location",
   },
+  // Shared note public page
+  shared: {
+    errorNoToken: "Invalid share link - no token provided",
+    errorNotFound: "This shared note was not found or has been revoked.",
+    errorExpired: "This share link has expired.",
+    errorFailed: "Failed to load the shared note.",
+    notFoundTitle: "Not Found",
+    errorFallback: "This shared note could not be loaded.",
+    goHome: "Go to Home",
+    appName: "Notes App",
+    logIn: "Log In",
+    signUpFree: "Sign Up Free",
+    sharedNoteBadge: "Shared Note",
+    readOnly: "Read-only",
+    untitled: "Untitled",
+    lastUpdated: "Last updated:",
+    noContent: "*No content*",
+    ctaTitle: "Create your own notes with AI",
+    ctaDescription:
+      "Join thousands of users organizing their thoughts with our AI-powered note-taking app. Auto-tagging, summarization, and smart search included for free.",
+    getStartedFree: "Get Started Free",
+    allRightsReserved: "All rights reserved.",
+    home: "Home",
+    signUp: "Sign Up",
+  },
 };
 
 // Export type
@@ -528,5 +553,28 @@ export type TranslationKeys = {
     title: string;
     description: string;
     yourLocation: string;
+  };
+  shared: {
+    errorNoToken: string;
+    errorNotFound: string;
+    errorExpired: string;
+    errorFailed: string;
+    notFoundTitle: string;
+    errorFallback: string;
+    goHome: string;
+    appName: string;
+    logIn: string;
+    signUpFree: string;
+    sharedNoteBadge: string;
+    readOnly: string;
+    untitled: string;
+    lastUpdated: string;
+    noContent: string;
+    ctaTitle: string;
+    ctaDescription: string;
+    getStartedFree: string;
+    allRightsReserved: string;
+    home: string;
+    signUp: string;
   };
 };

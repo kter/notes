@@ -15,6 +15,14 @@ resource "aws_s3_bucket_public_access_block" "images" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_versioning" "images" {
+  bucket = aws_s3_bucket.images.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 # CloudFront OAC for images bucket
 resource "aws_cloudfront_origin_access_control" "images" {
   name                              = "${var.project_name}-images-oac-${terraform.workspace}"

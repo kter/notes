@@ -31,3 +31,11 @@ resource "aws_s3_bucket_public_access_block" "cache" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+resource "aws_s3_bucket_versioning" "cache" {
+  bucket = aws_s3_bucket.cache.id
+
+  versioning_configuration {
+    status = "Suspended"
+  }
+}

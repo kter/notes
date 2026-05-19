@@ -108,7 +108,7 @@ resource "aws_cloudwatch_log_group" "api_gateway" {
 # ECR Repository for Lambda container image
 resource "aws_ecr_repository" "api" {
   name                 = "${var.project_name}-api-${terraform.workspace}"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = terraform.workspace != "prd"
 
   image_scanning_configuration {

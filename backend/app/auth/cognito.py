@@ -88,7 +88,7 @@ class CognitoJWTVerifier:
                     "scope": "aws.cognito.signin.user.admin",
                 }
 
-        if settings.environment in {"dev", "local"} and token == "local-dev-token":  # noqa: S105
+        if settings.environment == "local" and token == "local-dev-token":  # noqa: S105
             return {
                 "sub": "local-dev-user-id",
                 "username": "local-dev-user",

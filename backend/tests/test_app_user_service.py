@@ -144,12 +144,13 @@ def test_should_bootstrap_admin_allows_local_dev_user_in_local():
     assert service.should_bootstrap_admin({"sub": "local-dev-user-id"}) is True
 
 
-def test_should_bootstrap_admin_allows_local_dev_user_in_dev():
+def test_should_bootstrap_admin_blocks_local_dev_user_in_dev():
+    """local-dev-user-id must NOT get admin in dev: dev shares the production DSQL cluster."""
     service = AppUserService(
         session=Mock(),
         settings=make_settings(environment="dev"),
     )
-    assert service.should_bootstrap_admin({"sub": "local-dev-user-id"}) is True
+    assert service.should_bootstrap_admin({"sub": "local-dev-user-id"}) is False
 
 
 def test_should_bootstrap_admin_blocks_local_dev_user_in_prd():

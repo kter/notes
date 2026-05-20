@@ -181,11 +181,20 @@ async def test_local_dev_token_bypass_in_local(mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_local_dev_token_bypass_in_dev(mock_settings):
+async def test_local_dev_token_blocked_in_dev(mock_settings):
+    """local-dev-token must NOT work in dev: dev shares the production DSQL cluster."""
     mock_settings.environment = "dev"
     verifier = CognitoJWTVerifier()
-    result = await verifier.verify_token("local-dev-token")
-    assert result["sub"] == "local-dev-user-id"
+    with patch("httpx.AsyncClient", autospec=True) as MockClient:
+        mock_instance = MockClient.return_value
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_response = Mock()
+        mock_response.json.return_value = {"keys": []}
+        mock_response.raise_for_status.return_value = None
+        mock_instance.get = mock.AsyncMock(return_value=mock_response)
+        with pytest.raises(JWTError):
+            await verifier.verify_token("local-dev-token")
 
 
 @pytest.mark.asyncio

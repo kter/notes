@@ -18,6 +18,7 @@ from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError
 
 from app.config import get_settings
 from app.core.prompts import get_prompt
+from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.summary_cache import get_summary_cache
 from app.logging_utils import log_event
 

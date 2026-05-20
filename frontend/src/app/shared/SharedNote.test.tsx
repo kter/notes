@@ -5,6 +5,37 @@ import { useSearchParams } from "next/navigation";
 import { getSharedNote } from "@/lib/api";
 
 // Mocks
+vi.mock("@/hooks/useTranslation", () => ({
+    useTranslation: () => ({
+        t: (key: string) => {
+            const translations: Record<string, string> = {
+                "shared.errorNoToken": "Invalid share link - no token provided",
+                "shared.errorNotFound": "This shared note was not found or has been revoked.",
+                "shared.errorExpired": "This share link has expired.",
+                "shared.errorFailed": "Failed to load the shared note.",
+                "shared.notFoundTitle": "Not Found",
+                "shared.errorFallback": "This shared note could not be loaded.",
+                "shared.goHome": "Go to Home",
+                "shared.appName": "Notes App",
+                "shared.logIn": "Log In",
+                "shared.signUpFree": "Sign Up Free",
+                "shared.sharedNoteBadge": "Shared Note",
+                "shared.readOnly": "Read-only",
+                "shared.untitled": "Untitled",
+                "shared.lastUpdated": "Last updated:",
+                "shared.noContent": "*No content*",
+                "shared.ctaTitle": "Create your own notes with AI",
+                "shared.ctaDescription": "Join thousands of users organizing their thoughts with our AI-powered note-taking app.",
+                "shared.getStartedFree": "Get Started Free",
+                "shared.allRightsReserved": "All rights reserved.",
+                "shared.home": "Home",
+                "shared.signUp": "Sign Up",
+            };
+            return translations[key] ?? key;
+        },
+    }),
+}));
+
 vi.mock("next/navigation", () => ({
     useSearchParams: vi.fn(),
 }));

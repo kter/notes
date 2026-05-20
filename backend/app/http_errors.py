@@ -10,8 +10,6 @@ import logging
 
 from fastapi import HTTPException, status
 
-logger = logging.getLogger(__name__)
-
 from app.shared import (
     ConflictDetected,
     DomainError,
@@ -21,6 +19,8 @@ from app.shared import (
     ShareExpired,
     ValidationFailed,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def to_http_exception(error: DomainError) -> HTTPException:
@@ -43,7 +43,9 @@ def to_http_exception(error: DomainError) -> HTTPException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error.detail,
         )
-    logger.error("Unhandled DomainError type %s: %s", type(error).__name__, error.detail)
+    logger.error(
+        "Unhandled DomainError type %s: %s", type(error).__name__, error.detail
+    )
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="An internal error occurred.",

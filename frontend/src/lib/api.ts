@@ -351,14 +351,11 @@ export function createApiClient(token: string | null): ApiClient {
   return new ApiClient(token);
 }
 
-// 認証不要のパブリック API
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 /**
  * 共有トークンを使って公開ノートを取得する。認証不要のパブリックエンドポイント。
  */
 export async function getSharedNote(token: string): Promise<SharedNote> {
-  const response = await fetch(`${API_BASE}/api/shared/${token}`);
+  const response = await fetch(`${API_BASE_URL}/api/shared/${token}`);
 
   if (!response.ok) {
     throw new ApiError(response.status, response.statusText, await response.json().catch(() => ({})));

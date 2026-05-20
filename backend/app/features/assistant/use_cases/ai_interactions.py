@@ -15,6 +15,7 @@ from sqlmodel import Session
 from app.features.assistant.context_builder import ContextBuilder
 from app.features.assistant.errors import AI_TIMEOUT_MESSAGE, AIApplicationTimeoutError
 from app.features.assistant.gateway import AIGateway, AIGatewayTimeoutError
+from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.usage_policy import record_usage
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,

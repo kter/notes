@@ -61,13 +61,22 @@ const setupFetchFailure = (status = 500) => {
   });
 };
 
+const CONSENT_KEY = "weather-geolocation-consent";
+
 describe("WeatherWidget", () => {
   const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    // Simulate already-granted consent so existing geolocation/fetch tests run
+    // without hitting the consent-needed gate introduced by PR #119.
+    localStorage.setItem(CONSENT_KEY, "granted");
+  });
 
   afterEach(() => {
     global.fetch = originalFetch;
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+    localStorage.removeItem(CONSENT_KEY);
   });
 
   // -------------------------
@@ -146,6 +155,20 @@ describe("WeatherWidget", () => {
   it("React.memo でラップされている", () => {
     const widgetType = (WeatherWidget as unknown as { $$typeof?: symbol })?.$$typeof;
     expect(widgetType).toBe(Symbol.for("react.memo"));
+  });
+
+  // -------------------------
+  // 同意フロー
+  // -------------------------
+
+  it("同意未設定時は consent chip を表示する", () => {
+    localStorage.removeItem(CONSENT_KEY);
+    mockGeolocationSuccess();
+    setupFetchMock();
+
+    const { getByTestId } = render(<WeatherWidget />);
+
+    expect(getByTestId("weather-consent-chip")).toBeInTheDocument();
   });
 
   // -------------------------

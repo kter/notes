@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { EditorState, EditorSelection, type Range } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { buildHorizontalRuleDecorations } from "../horizontalRule";
 
 function makeFakeView(state: EditorState): EditorView {
@@ -19,11 +20,14 @@ function makeFakeView(state: EditorState): EditorView {
 }
 
 function makeState(doc: string, cursorPos = 0): EditorState {
-  return EditorState.create({
+  const state = EditorState.create({
     doc,
     selection: EditorSelection.cursor(cursorPos),
     extensions: [markdown()],
   });
+  // lezer-markdown は遅延パースするため強制フルパース（5000ms で JIT 未ウォームアップ時も対応）
+  ensureSyntaxTree(state, state.doc.length, 5000);
+  return state;
 }
 
 function getLineDecs(decs: Range<Decoration>[]): Range<Decoration>[] {

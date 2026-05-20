@@ -98,7 +98,8 @@ class TestUploadImage:
 
     def test_upload_oversized_file_returns_400(self, client: TestClient):
         """Files larger than 10MB should return 400."""
-        large_content = b"A" * (10 * 1024 * 1024 + 1)
+        png_header = b"\x89PNG\r\n\x1a\n"
+        large_content = png_header + b"A" * (10 * 1024 * 1024 + 1 - len(png_header))
 
         response = client.post(
             "/api/images",
@@ -110,7 +111,8 @@ class TestUploadImage:
 
     def test_upload_file_exactly_at_size_limit_returns_201(self, client: TestClient):
         """File exactly at 10MB (not exceeding) should be accepted (boundary: > not >=)."""
-        exact_content = b"A" * (10 * 1024 * 1024)
+        png_header = b"\x89PNG\r\n\x1a\n"
+        exact_content = png_header + b"A" * (10 * 1024 * 1024 - len(png_header))
 
         with patch("app.features.images.use_cases.boto3") as mock_boto3:
             mock_s3 = MagicMock()

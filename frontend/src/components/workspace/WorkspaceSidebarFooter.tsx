@@ -15,6 +15,7 @@ import { LogOutIcon, SettingsIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks";
 
 interface WorkspaceSidebarFooterProps {
   isSidebarOpen: boolean;
@@ -29,6 +30,7 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooter({
   onOpenSettings,
   onSignOut,
 }: WorkspaceSidebarFooterProps) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -51,7 +53,8 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooter({
           size="icon"
           className="h-7 w-7"
           onClick={onOpenSettings}
-          title="Settings"
+          title={t("sidebar.settings")}
+          aria-label={t("sidebar.settings")}
         >
           <SettingsIcon className="h-4 w-4" />
         </Button>
@@ -60,7 +63,8 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooter({
           size="icon"
           className="h-7 w-7"
           onClick={onSignOut}
-          title="Sign out"
+          title={t("sidebar.logout")}
+          aria-label={t("sidebar.logout")}
         >
           <LogOutIcon className="h-4 w-4" />
         </Button>

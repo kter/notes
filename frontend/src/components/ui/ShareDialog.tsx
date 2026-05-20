@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { CopyIcon, CheckIcon, Trash2Icon, Loader2Icon, LinkIcon } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface ShareDialogProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export function ShareDialog({
 }: ShareDialogProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
 
   /** 共有 URL をクリップボードにコピーし、2 秒間コピー完了フィードバックを表示する。 */
   const handleCopy = async () => {
@@ -58,12 +60,18 @@ export function ShareDialog({
 
   /** 確認ダイアログを表示し、ユーザーが承認した場合のみ共有リンクを削除する。 */
   const handleRevoke = () => {
-    if (confirm(t("share.revokeConfirm"))) {
-      onRevokeShare();
-    }
+    setConfirmRevokeOpen(true);
   };
 
   return (
+    <>
+    <ConfirmDialog
+      open={confirmRevokeOpen}
+      onOpenChange={setConfirmRevokeOpen}
+      title={t("share.revokeShare")}
+      description={t("share.revokeConfirm")}
+      onConfirm={onRevokeShare}
+    />
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md" data-testid="share-dialog">
         <DialogHeader>
@@ -129,5 +137,6 @@ export function ShareDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

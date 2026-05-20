@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   Dialog,
   DialogContent,
@@ -75,6 +76,7 @@ export function SettingsDialog({
   const [isExporting, setIsExporting] = useState(false);
   const [isCreatingApiKey, setIsCreatingApiKey] = useState(false);
   const [revokingApiKeyId, setRevokingApiKeyId] = useState<string | null>(null);
+  const [confirmRevokeKeyId, setConfirmRevokeKeyId] = useState<string | null>(null);
   const [secretCopied, setSecretCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorKey, setErrorKey] = useState<SettingsErrorKey | null>(null);
@@ -263,10 +265,6 @@ export function SettingsDialog({
   };
 
   const handleRevokeApiKey = async (keyId: string) => {
-    if (!confirm(t("settings.apiKeysRevokeConfirm"))) {
-      return;
-    }
-
     setRevokingApiKeyId(keyId);
     setApiKeysErrorKey(null);
 
@@ -291,6 +289,14 @@ export function SettingsDialog({
   };
 
   return (
+    <>
+    <ConfirmDialog
+      open={confirmRevokeKeyId !== null}
+      onOpenChange={(isOpen) => { if (!isOpen) setConfirmRevokeKeyId(null); }}
+      title={t("settings.apiKeysRevokeButton")}
+      description={t("settings.apiKeysRevokeConfirm")}
+      onConfirm={() => { if (confirmRevokeKeyId) void handleRevokeApiKey(confirmRevokeKeyId); }}
+    />
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -473,7 +479,7 @@ export function SettingsDialog({
                         </div>
                         <Button
                           variant="outline"
-                          onClick={() => handleRevokeApiKey(key.id)}
+                          onClick={() => setConfirmRevokeKeyId(key.id)}
                           disabled={revokingApiKeyId === key.id}
                         >
                           {revokingApiKeyId === key.id ? (
@@ -552,5 +558,6 @@ export function SettingsDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

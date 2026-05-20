@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger";
 import { FolderIcon, FolderPlusIcon, TrashIcon, PencilIcon, PanelLeftCloseIcon, CheckIcon, XIcon, Loader2Icon } from "lucide-react";
 import { useState, memo } from "react";
 import { useTranslation } from "@/hooks";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface SidebarProps {
   folders: Folder[];
@@ -49,6 +50,7 @@ export const Sidebar = memo(function Sidebar({
   const [newFolderName, setNewFolderName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [confirmDeleteFolderId, setConfirmDeleteFolderId] = useState<string | null>(null);
 
   const handleCreateFolder = async () => {
     if (newFolderName.trim()) {
@@ -110,6 +112,14 @@ export const Sidebar = memo(function Sidebar({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteFolderId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteFolderId(null); }}
+        title={t("noteList.deleteFolder")}
+        description={t("sidebar.deleteConfirm")}
+        onConfirm={() => { if (confirmDeleteFolderId) onDeleteFolder(confirmDeleteFolderId); }}
+      />
 
       {/* Folder list */}
       <ScrollArea className="flex-1 min-h-0">
@@ -232,9 +242,7 @@ export const Sidebar = memo(function Sidebar({
                       className="h-6 w-6 text-destructive hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(t("sidebar.deleteConfirm"))) {
-                          onDeleteFolder(folder.id);
-                        }
+                        setConfirmDeleteFolderId(folder.id);
                       }}
                       data-testid="sidebar-folder-delete-button"
                     >

@@ -130,7 +130,7 @@ export const EditorStatusBar = memo(function EditorStatusBar({
 
       <div className="whitespace-nowrap">
         {t("editor.lastSaved")}:{" "}
-        {new Date(updatedAt).toLocaleString("ja-JP", {
+        {new Date(updatedAt).toLocaleString(undefined, {
           year: "numeric",
           month: "2-digit",
           day: "2-digit",

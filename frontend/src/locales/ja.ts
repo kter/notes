@@ -16,6 +16,7 @@ export const ja = {
   common: {
     save: "保存",
     cancel: "キャンセル",
+    confirm: "確認",
     delete: "削除",
     edit: "編集",
     create: "作成",
@@ -87,6 +88,7 @@ export const ja = {
     noNotes: "ノートがありません",
     searchPlaceholder: "ノートを検索...",
     untitled: "無題",
+    deleteNote: "ノートを削除",
     deleteConfirm: "このノートを削除しますか？",
     noContent: "内容なし",
     createOne: "作成する",

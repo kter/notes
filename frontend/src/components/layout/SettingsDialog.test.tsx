@@ -25,6 +25,7 @@ const mockT = vi.fn((key: string) => {
     "common.save": "Save",
     "common.saved": "Saved",
     "common.cancel": "Cancel",
+    "common.confirm": "Confirm",
     "common.error": "Error",
     "settings.title": "Settings",
     "settings.description": "Manage your settings",
@@ -135,7 +136,6 @@ describe("SettingsDialog", () => {
     currentTranslationFn = mockT;
     window.URL.createObjectURL = createObjectURLMock;
     window.URL.revokeObjectURL = revokeObjectURLMock;
-    vi.stubGlobal("confirm", vi.fn(() => true));
     Object.defineProperty(window.navigator, "clipboard", {
       configurable: true,
       value: {
@@ -244,6 +244,9 @@ describe("SettingsDialog", () => {
     });
 
     fireEvent.click(screen.getByText("Revoke"));
+
+    const confirmButton = await screen.findByRole("button", { name: "Confirm" });
+    fireEvent.click(confirmButton);
 
     await waitFor(() => {
       expect(mockApi.revokeApiKey).toHaveBeenCalledWith("key-1");

@@ -5,6 +5,8 @@ import { ShareDialog } from "./ShareDialog";
 // Mock useTranslation
 const mockT = vi.fn((key: string) => {
   const translations: Record<string, string> = {
+    "common.confirm": "Confirm",
+    "common.cancel": "Cancel",
     "share.title": "Share Note",
     "share.description": "Anyone with the link can view this note",
     "share.copied": "Link copied to clipboard!",
@@ -33,9 +35,6 @@ Object.defineProperty(navigator, "clipboard", {
   writable: true,
 });
 
-// Mock window.confirm
-const mockConfirm = vi.fn();
-window.confirm = mockConfirm;
 
 describe("ShareDialog", () => {
   const defaultProps = {
@@ -123,24 +122,24 @@ describe("ShareDialog", () => {
     });
 
     it("calls onRevokeShare when revoke is confirmed", () => {
-      mockConfirm.mockReturnValue(true);
       render(<ShareDialog {...propsWithUrl} />);
-      
+
       fireEvent.click(screen.getByTestId("share-revoke-button"));
-      
-      expect(mockConfirm).toHaveBeenCalledWith(
-        "Are you sure you want to revoke this share link?"
-      );
+
+      const confirmButton = screen.getByRole("button", { name: "Confirm" });
+      fireEvent.click(confirmButton);
+
       expect(propsWithUrl.onRevokeShare).toHaveBeenCalledTimes(1);
     });
 
     it("does not call onRevokeShare when revoke is cancelled", () => {
-      mockConfirm.mockReturnValue(false);
       render(<ShareDialog {...propsWithUrl} />);
-      
+
       fireEvent.click(screen.getByTestId("share-revoke-button"));
-      
-      expect(mockConfirm).toHaveBeenCalled();
+
+      const cancelButton = screen.getByRole("button", { name: "Cancel" });
+      fireEvent.click(cancelButton);
+
       expect(propsWithUrl.onRevokeShare).not.toHaveBeenCalled();
     });
 

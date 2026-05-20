@@ -393,7 +393,7 @@ export const EditorToolbar = memo(function EditorToolbar({
       <ConfirmDialog
         open={confirmDeleteNoteOpen}
         onOpenChange={setConfirmDeleteNoteOpen}
-        title={t("noteList.deleteConfirm")}
+        title={t("noteList.deleteNote")}
         description={t("noteList.deleteConfirm")}
         onConfirm={() => onDeleteNote(noteId)}
       />

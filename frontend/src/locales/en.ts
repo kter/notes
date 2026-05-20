@@ -16,6 +16,7 @@ export const en = {
   common: {
     save: "Save",
     cancel: "Cancel",
+    confirm: "Confirm",
     delete: "Delete",
     edit: "Edit",
     create: "Create",
@@ -87,6 +88,7 @@ export const en = {
     noNotes: "No notes",
     searchPlaceholder: "Search notes...",
     untitled: "Untitled",
+    deleteNote: "Delete note",
     deleteConfirm: "Delete this note?",
     noContent: "No content",
     createOne: "Create one",
@@ -290,6 +292,7 @@ export type TranslationKeys = {
   common: {
     save: string;
     cancel: string;
+    confirm: string;
     delete: string;
     edit: string;
     create: string;
@@ -355,6 +358,7 @@ export type TranslationKeys = {
     noNotes: string;
     searchPlaceholder: string;
     untitled: string;
+    deleteNote: string;
     deleteConfirm: string;
     noContent: string;
     createOne: string;

@@ -312,10 +312,12 @@ class ApiClient {
   }
 
   async exportNotes(): Promise<Blob> {
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
     const response = await fetch(`${API_BASE_URL}/api/notes/export/all`, {
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-      },
+      headers,
     });
 
     if (!response.ok) {

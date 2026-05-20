@@ -55,7 +55,7 @@ class AIGateway(ABC):
         self,
         content: str,
         question: str,
-        history: list[dict] | None = None,
+        history: list[BedrockMessage] | None = None,
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
@@ -174,7 +174,7 @@ class BedrockGateway(AIGateway):
         self,
         content: str,
         question: str,
-        history: list[dict] | None = None,
+        history: list[BedrockMessage] | None = None,
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
@@ -191,13 +191,7 @@ class BedrockGateway(AIGateway):
         messages = []
         if history:
             # 過去の会話履歴をメッセージリストに展開する
-            for item in history:
-                messages.append(
-                    {
-                        "role": item.get("role", "user"),
-                        "content": item.get("content", ""),
-                    }
-                )
+            messages.extend([msg.model_dump() for msg in history])
 
         messages.append(
             {

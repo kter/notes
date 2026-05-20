@@ -6,12 +6,20 @@
 呼び出し関係: router.py のエンドポイント関数から参照される。
 """
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
 
 from app.models import AIEditJobRead
 from app.models.enums import ChatScope
+
+
+class BedrockMessage(BaseModel):
+    """Bedrockへ送信する単一の会話ターンを表すモデル。"""
+
+    role: Literal["user", "assistant"]
+    content: str
 
 
 class SummarizeRequest(BaseModel):
@@ -39,7 +47,7 @@ class ChatRequest(BaseModel):
     note_id: UUID | None = None
     folder_id: UUID | None = None
     question: str
-    history: list[dict] | None = None
+    history: list[BedrockMessage] | None = None
     selected_content: str | None = None
 
 

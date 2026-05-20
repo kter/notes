@@ -58,7 +58,7 @@ class AIInteractionUseCases:
         *,
         scope: ChatScope,
         question: str,
-        history: list[dict] | None = None,
+        history: list[BedrockMessage] | None = None,
         note_id: UUID | None = None,
         folder_id: UUID | None = None,
         selected_content: str | None = None,

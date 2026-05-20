@@ -19,10 +19,12 @@ import { Loader2Icon } from "lucide-react";
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/hooks/useTranslation";
 
 function SharedNoteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const { t } = useTranslation();
 
   const [note, setNote] = useState<SharedNote | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ function SharedNoteContent() {
   useEffect(() => {
     async function fetchNote() {
       if (!token) {
-        setError("Invalid share link - no token provided");
+        setError(t("shared.errorNoToken"));
         setIsLoading(false);
         return;
       }
@@ -42,14 +44,14 @@ function SharedNoteContent() {
       } catch (err) {
         if (err instanceof ApiError) {
           if (err.status === 404) {
-            setError("This shared note was not found or has been revoked.");
+            setError(t("shared.errorNotFound"));
           } else if (err.status === 410) {
-            setError("This share link has expired.");
+            setError(t("shared.errorExpired"));
           } else {
-            setError("Failed to load the shared note.");
+            setError(t("shared.errorFailed"));
           }
         } else {
-          setError("Failed to load the shared note.");
+          setError(t("shared.errorFailed"));
         }
       } finally {
         setIsLoading(false);
@@ -57,7 +59,7 @@ function SharedNoteContent() {
     }
 
     fetchNote();
-  }, [token]);
+  }, [token, t]);
 
   if (isLoading) {
     return (
@@ -71,11 +73,15 @@ function SharedNoteContent() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-foreground mb-4">Not Found</h1>
-          <p className="text-muted-foreground mb-8">{error || "This shared note could not be loaded."}</p>
+          <h1 className="text-2xl font-bold text-foreground mb-4">
+            {t("shared.notFoundTitle")}
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            {error || t("shared.errorFallback")}
+          </p>
           <div className="flex justify-center gap-4">
             <Button asChild>
-              <Link href="/">Go to Home</Link>
+              <Link href="/">{t("shared.goHome")}</Link>
             </Button>
           </div>
         </div>
@@ -89,14 +95,14 @@ function SharedNoteContent() {
       <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <Link href="/" className="font-bold text-lg flex items-center gap-2">
-            Notes App
+            {t("shared.appName")}
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Log In</Link>
+              <Link href="/login">{t("shared.logIn")}</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="/register">Sign Up Free</Link>
+              <Link href="/register">{t("shared.signUpFree")}</Link>
             </Button>
           </div>
         </div>
@@ -109,18 +115,19 @@ function SharedNoteContent() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                  Shared Note
+                  {t("shared.sharedNoteBadge")}
                 </span>
                 <span>•</span>
-                <span>Read-only</span>
+                <span>{t("shared.readOnly")}</span>
               </div>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2 break-words">
-              {note.title || "Untitled"}
+              {note.title || t("shared.untitled")}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Last updated: {new Date(note.updated_at).toLocaleDateString(undefined, {
+              {t("shared.lastUpdated")}{" "}
+              {new Date(note.updated_at).toLocaleDateString(undefined, {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
@@ -133,7 +140,7 @@ function SharedNoteContent() {
           {/* Content */}
           <article className="markdown-preview prose prose-sm sm:prose-base dark:prose-invert max-w-none mb-16">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {note.content || "*No content*"}
+              {note.content || t("shared.noContent")}
             </ReactMarkdown>
           </article>
 
@@ -160,15 +167,16 @@ function SharedNoteContent() {
 
             <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
               <div className="max-w-lg">
-                <h3 className="text-xl font-semibold mb-2">Create your own notes with AI</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  {t("shared.ctaTitle")}
+                </h3>
                 <p className="text-muted-foreground mb-0">
-                  Join thousands of users organizing their thoughts with our AI-powered note-taking app.
-                  Auto-tagging, summarization, and smart search included for free.
+                  {t("shared.ctaDescription")}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <Button size="lg" asChild className="w-full sm:w-auto">
-                  <Link href="/register">Get Started Free</Link>
+                  <Link href="/register">{t("shared.getStartedFree")}</Link>
                 </Button>
               </div>
             </div>
@@ -179,11 +187,25 @@ function SharedNoteContent() {
       {/* Footer */}
       <footer className="border-t py-8 bg-muted/30">
         <div className="max-w-4xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Notes App. All rights reserved.</p>
+          <p>
+            © {new Date().getFullYear()} {t("shared.appName")}. {t("shared.allRightsReserved")}
+          </p>
           <div className="mt-2 flex justify-center gap-4">
-            <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-            <Link href="/register" className="hover:text-foreground transition-colors">Sign Up</Link>
-            <Link href="/login" className="hover:text-foreground transition-colors">Log In</Link>
+            <Link href="/" className="hover:text-foreground transition-colors">
+              {t("shared.home")}
+            </Link>
+            <Link
+              href="/register"
+              className="hover:text-foreground transition-colors"
+            >
+              {t("shared.signUp")}
+            </Link>
+            <Link
+              href="/login"
+              className="hover:text-foreground transition-colors"
+            >
+              {t("shared.logIn")}
+            </Link>
           </div>
         </div>
       </footer>
@@ -193,11 +215,13 @@ function SharedNoteContent() {
 
 export default function SharedNotePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
       <SharedNoteContent />
     </Suspense>
   );

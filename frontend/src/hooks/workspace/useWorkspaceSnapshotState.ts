@@ -105,6 +105,7 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
 
     return () => {
       isActive = false;
+      hasFetchedRef.current = false;
     };
   }, [authLoading, getApi, isAuthenticated]);
 

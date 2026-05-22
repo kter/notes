@@ -71,7 +71,14 @@ app.add_middleware(
     allow_origins=settings_app.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-API-Key",
+        "X-Request-ID",
+        "baggage",
+        "sentry-trace",
+    ],
 )
 
 # 各機能ルーターをAPIパスプレフィックスに紐付けて登録

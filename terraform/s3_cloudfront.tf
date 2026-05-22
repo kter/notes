@@ -201,12 +201,12 @@ resource "aws_cloudfront_distribution" "main" {
       }
     }
 
-    viewer_protocol_policy      = "redirect-to-https"
-    min_ttl                     = 0
-    default_ttl                 = 86400
-    max_ttl                     = 31536000
-    compress                    = true
-    response_headers_policy_id  = aws_cloudfront_response_headers_policy.security.id
+    viewer_protocol_policy     = "redirect-to-https"
+    min_ttl                    = 0
+    default_ttl                = 86400
+    max_ttl                    = 31536000
+    compress                   = true
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
   default_cache_behavior {
@@ -221,12 +221,12 @@ resource "aws_cloudfront_distribution" "main" {
       }
     }
 
-    viewer_protocol_policy      = "redirect-to-https"
-    min_ttl                     = 0
-    default_ttl                 = 3600
-    max_ttl                     = 86400
-    compress                    = true
-    response_headers_policy_id  = aws_cloudfront_response_headers_policy.security.id
+    viewer_protocol_policy     = "redirect-to-https"
+    min_ttl                    = 0
+    default_ttl                = 3600
+    max_ttl                    = 86400
+    compress                   = true
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
 
     function_association {
       event_type   = "viewer-request"

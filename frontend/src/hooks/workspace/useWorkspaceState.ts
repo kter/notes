@@ -18,6 +18,7 @@ import { useAIChat } from "@/hooks/useAIChat";
 import { useFolders } from "@/hooks/useFolders";
 import { useNoteFilter } from "@/hooks/useNoteFilter";
 import { useNotes } from "@/hooks/useNotes";
+import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
 import { useResizable } from "@/hooks/useResizable";
 import { useTokenUsage } from "@/hooks/useTokenUsage";
 import { noteBodyStore } from "@/lib/sync/noteBodyStore";
@@ -35,8 +36,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isNoteListOpen, setIsNoteListOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = usePersistedBoolean("notes-sidebar-open", true);
+  const [isNoteListOpen, setIsNoteListOpen] = usePersistedBoolean("notes-notelist-open", true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("folders");
   const [contentOverride, setContentOverride] = useState<{
@@ -205,8 +206,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     direction: "right",
   });
 
-  const handleToggleSidebar = useCallback(() => setIsSidebarOpen((v) => !v), []);
-  const handleToggleNoteList = useCallback(() => setIsNoteListOpen((v) => !v), []);
+  const handleToggleSidebar = useCallback(() => setIsSidebarOpen((v) => !v), [setIsSidebarOpen]);
+  const handleToggleNoteList = useCallback(() => setIsNoteListOpen((v) => !v), [setIsNoteListOpen]);
   const handleToggleChat = useCallback(() => setIsChatOpen((v) => !v), []);
 
   const handleMobileViewChange = useCallback((view: MobileView) => {

@@ -587,7 +587,75 @@ describe("useNoteSyncEngine", () => {
       vi.useRealTimers();
     });
 
-    it("exhausts after maxRetryAttempts and stays failed with no countdown", async () => {
+    it("keeps retrying beyond 3 attempts until success (no upper limit)", async () => {
+      vi.useFakeTimers();
+
+      const initialNote = buildNote();
+      const updatedServerNote = buildNote({ content: "Finally synced", version: 6 });
+      const snapshot = {
+        folders: [],
+        notes: [updatedServerNote],
+        cursor: "cursor-6",
+        server_time: "2024-01-06T00:00:00.000Z",
+      };
+      // Fail 5 times, then succeed on the 6th call
+      const applyWorkspaceChanges = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockRejectedValueOnce(new Error("Server error"))
+        .mockResolvedValueOnce({
+          applied: [{ entity: "note", operation: "update", entity_id: initialNote.id, client_mutation_id: null, folder: null, note: updatedServerNote }],
+          snapshot,
+        });
+      getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+      const { result } = renderHook(() =>
+        useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+      );
+
+      await act(async () => {
+        await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
+      });
+
+      // Initial call (via debounce) → fail → countdown 2s
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+        await result.current.triggerServerSync(initialNote.id);
+      });
+      expect(result.current.syncStatus.retryCountdown).toBe(2);
+
+      // Attempt 0 (2s delay) → fail → countdown 4s
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(4);
+
+      // Attempt 1 (4s delay) → fail → countdown 8s
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(8);
+
+      // Attempt 2 (8s delay) — would have been the last under old maxRetryAttempts=3, but now continues
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
+      expect(result.current.syncStatus.remote).toBe("failed");
+      expect(result.current.syncStatus.retryCountdown).toBe(16); // still retrying!
+
+      // Attempt 3 (16s delay) → fail → countdown 30s (clamped)
+      await act(async () => { await vi.advanceTimersByTimeAsync(16000); });
+      expect(result.current.syncStatus.retryCountdown).toBe(30);
+
+      // Attempt 4 (30s delay) → finally succeeds
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+      expect(result.current.syncStatus.remote).toBe("synced");
+      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
+
+      // 1 initial + 5 retries = 6 total calls
+      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(6);
+
+      vi.useRealTimers();
+    });
+
+    it("clamps backoff delay at retryMaxDelayMs (30s) and holds steady", async () => {
       vi.useFakeTimers();
 
       const initialNote = buildNote();
@@ -602,28 +670,23 @@ describe("useNoteSyncEngine", () => {
         await result.current.handleUpdateNote(initialNote.id, { content: "edit" });
       });
 
-      // Initial call
+      // Initial call → fail
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
         await result.current.triggerServerSync(initialNote.id);
       });
-      expect(result.current.syncStatus.retryCountdown).toBe(2);
 
-      // Attempt 0 (2s delay)
-      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-      expect(result.current.syncStatus.retryCountdown).toBe(4);
+      // Advance through 2s, 4s, 8s, 16s attempts
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });  // attempt 0
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });  // attempt 1
+      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });  // attempt 2
+      await act(async () => { await vi.advanceTimersByTimeAsync(16000); }); // attempt 3 → countdown 30s
 
-      // Attempt 1 (4s delay)
-      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
-      expect(result.current.syncStatus.retryCountdown).toBe(8);
+      expect(result.current.syncStatus.retryCountdown).toBe(30);
 
-      // Attempt 2 (8s delay) — last attempt (maxRetryAttempts = 3)
-      await act(async () => { await vi.advanceTimersByTimeAsync(8000); });
-      expect(result.current.syncStatus.remote).toBe("failed");
-      expect(result.current.syncStatus.retryCountdown).toBeUndefined();
-
-      // 1 initial + 3 retries = 4 total calls
-      expect(applyWorkspaceChanges).toHaveBeenCalledTimes(4);
+      // attempt 4 also clamps to 30s (not 64s)
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000); }); // attempt 4 → countdown 30s
+      expect(result.current.syncStatus.retryCountdown).toBe(30);
 
       vi.useRealTimers();
     });

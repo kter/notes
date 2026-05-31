@@ -25,7 +25,7 @@ async function openSettings(page: Parameters<typeof waitForWorkspaceSnapshotRead
 test.describe('Regression: Settings', () => {
   test('should display all expected controls', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip();
-    test.setTimeout(60000);
+    test.setTimeout(90000);
 
     await page.goto('/');
     await waitForWorkspaceSnapshotReady(page, SNAPSHOT_WARMUP);

@@ -235,6 +235,8 @@ export const ja = {
     localSaveFailed: "ローカル保存に失敗しました",
     conflictReloaded: "競合を検出したため最新状態を再読み込みしました",
     retryingIn: "{{seconds}}秒後にリトライ...",
+    sessionExpired: "セッションが切れました。再度サインインしてください。",
+    retryExhausted: "複数回試行しましたが同期に失敗しました（ローカルに保存済み）。",
   },
 
   // Share

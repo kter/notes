@@ -19,6 +19,8 @@ const translationMap = {
   "sync.localSaveFailed": "Failed to save locally",
   "sync.conflictReloaded": "Conflict reloaded",
   "sync.retryingIn": "Retrying in {{seconds}}s...",
+  "sync.sessionExpired": "Your session expired. Please sign in again.",
+  "sync.retryExhausted": "Sync failed after multiple attempts (saved locally).",
 } as const;
 const refreshWorkspaceSnapshotMock = vi.fn();
 const onSnapshotSyncedMock = vi.fn();
@@ -64,8 +66,17 @@ vi.mock("@/lib/workspaceSync", () => ({
     refreshWorkspaceSnapshotMock(...args),
   isConflictApiError: (error: unknown) =>
     error instanceof ApiError && error.status === 409,
+  isAuthApiError: (error: unknown) =>
+    error instanceof ApiError && error.status === 401,
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
   withSnippet: (note: Note) => ({ ...note, snippet: (note.content ?? "").slice(0, 80) }),
+}));
+
+const notifySessionExpiredMock = vi.fn();
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({
+    notifySessionExpired: notifySessionExpiredMock,
+  }),
 }));
 
 import { useNoteSyncEngine } from "./useNoteSyncEngine";

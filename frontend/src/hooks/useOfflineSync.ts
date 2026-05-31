@@ -17,6 +17,7 @@ import { logger } from "@/lib/logger";
 import { syncQueue, type SyncStatus } from "@/lib/syncQueue";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useApi } from "./useApi";
+import { useAuth } from "@/lib/auth-context";
 import type { WorkspaceSnapshotResponse } from "@/types";
 
 const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceSnapshotResponse) => void = () => {};
@@ -45,6 +46,7 @@ export function useOfflineSync(
   const [pendingChangesCount, setPendingChangesCount] = useState(0);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const { getApi } = useApi();
+  const { sessionExpired, notifySessionExpired } = useAuth();
   const { t } = useTranslation();
   const syncInProgressRef = useRef(false);
   const onSnapshotSynced = options.onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
@@ -61,7 +63,8 @@ export function useOfflineSync(
 
   // Sync function
   const performSync = useCallback(async () => {
-    if (syncInProgressRef.current || !navigator.onLine) {
+    // セッション失効中はキュー処理をスキップする。再ログイン後に通常フローで再開される。
+    if (syncInProgressRef.current || !navigator.onLine || sessionExpired) {
       return;
     }
 
@@ -79,6 +82,10 @@ export function useOfflineSync(
       } else if (result.errorCode === "conflict") {
         setSyncStatus("error");
         setLastErrorMessage(t("sync.conflictReloaded"));
+      } else if (result.errorCode === "auth") {
+        setSyncStatus("error");
+        setLastErrorMessage(t("sync.sessionExpired"));
+        notifySessionExpired();
       } else if (result.failedCount > 0) {
         setSyncStatus("error");
         setLastErrorMessage(t("sync.serverSyncFailed"));
@@ -93,7 +100,7 @@ export function useOfflineSync(
     } finally {
       syncInProgressRef.current = false;
     }
-  }, [getApi, onSnapshotSynced, t, updatePendingCount]);
+  }, [getApi, notifySessionExpired, onSnapshotSynced, sessionExpired, t, updatePendingCount]);
 
   // Force sync exposed to consumers
   const forceSync = useCallback(async () => {

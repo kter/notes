@@ -58,7 +58,15 @@ vi.mock("@/lib/workspaceSync", () => ({
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
   withSnippet: (note: Note) => ({ ...note, snippet: (note.content ?? "").slice(0, 80) }),
   isConflictApiError: () => false,
+  isAuthApiError: () => false,
   refreshWorkspaceSnapshot: vi.fn(),
+}));
+
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({
+    sessionExpired: false,
+    notifySessionExpired: vi.fn(),
+  }),
 }));
 
 import { useNotes } from "./useNotes";

@@ -130,6 +130,28 @@ class TestDeleteFolder:
         response = client.delete(f"/api/folders/{fake_id}")
         assert response.status_code == 404
 
+    def test_delete_folder_orphans_child_notes(self, client: TestClient):
+        """Deleting a folder must detach (not lose) its notes.
+
+        Child notes survive (deleted_at stays None) but their folder_id is
+        cleared so they no longer reference a tombstoned folder and remain
+        visible in "All Notes".
+        """
+        folder_id = client.post("/api/folders", json={"name": "Box"}).json()["id"]
+        note_id = client.post(
+            "/api/notes", json={"title": "Child", "folder_id": folder_id}
+        ).json()["id"]
+
+        delete_response = client.delete(f"/api/folders/{folder_id}")
+        assert delete_response.status_code == 204
+
+        snapshot = client.get("/api/workspace/snapshot").json()
+        note = next(n for n in snapshot["notes"] if n["id"] == note_id)
+        assert note["deleted_at"] is None
+        assert note["folder_id"] is None
+        # version bumped because the note was modified during folder deletion
+        assert note["version"] >= 2
+
 
 class TestFolderAuthorization:
     """Tests for folder authorization (user isolation)."""

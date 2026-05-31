@@ -26,7 +26,7 @@ function makeState(doc: string, cursorPos = 0): EditorState {
     extensions: [markdown()],
   });
   // lezer-markdown は遅延パースするため強制フルパース（5000ms で JIT 未ウォームアップ時も対応）
-  ensureSyntaxTree(state, state.doc.length, 5000);
+  ensureSyntaxTree(state, state.doc.length, 1e9);
   return state;
 }
 

@@ -29,7 +29,7 @@ function makeState(doc: string, cursorPos = 0): EditorState {
   });
   // lezer-markdown は遅延パースするため、テストでは強制的にフルパースしておく
   // 5000ms に設定: JIT未ウォームアップ時でも確実にパースが完了する余裕を持たせる
-  ensureSyntaxTree(state, state.doc.length, 5000);
+  ensureSyntaxTree(state, state.doc.length, 1e9);
   return state;
 }
 

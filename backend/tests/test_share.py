@@ -1,9 +1,12 @@
 """Tests for share API endpoints."""
 
-from uuid import uuid4
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
+from app.models import NoteShare
 from tests.conftest import TEST_USER_ID
 
 
@@ -129,6 +132,32 @@ class TestGetSharedNote:
         fake_token = str(uuid4())
         response = client.get(f"/api/shared/{fake_token}")
         assert response.status_code == 404
+
+    def test_get_expired_shared_note_returns_410(
+        self, client: TestClient, session: Session
+    ):
+        """An expired share link must return 410 Gone.
+
+        Exercises the ShareExpired branch in get_shared_note, which was
+        previously untested by any unit/integration test.
+        """
+        note_response = client.post(
+            "/api/notes", json={"title": "Expiring", "content": "soon gone"}
+        )
+        note_id = note_response.json()["id"]
+        share_token = client.post(f"/api/notes/{note_id}/share").json()["share_token"]
+
+        # Force the share into the past directly in the DB.
+        share = session.exec(
+            select(NoteShare).where(NoteShare.share_token == UUID(share_token))
+        ).first()
+        assert share is not None
+        share.expires_at = datetime.now(UTC) - timedelta(hours=1)
+        session.add(share)
+        session.commit()
+
+        response = client.get(f"/api/shared/{share_token}")
+        assert response.status_code == 410
 
     def test_get_shared_note_no_auth_required(self, make_client):
         """Test that shared notes don't require authentication."""

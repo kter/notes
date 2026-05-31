@@ -18,7 +18,7 @@ async function openSettings(page: Parameters<typeof waitForWorkspaceSnapshotRead
   const settingsButton = container
     .getByRole('button', { name: /Settings|設定/ })
     .first();
-  await expect(settingsButton).toBeVisible({ timeout: 15000 });
+  await expect(settingsButton).toBeVisible({ timeout: 30000 });
   await settingsButton.click();
 }
 

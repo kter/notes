@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     cognito_user_pool_id: str = ""
     cognito_app_client_id: str = ""
 
+    # 結合テスト用バイパストークン（dev 環境限定・デプロイ時に SSM 経由で注入）。
+    # ソースコードにハードコードせず、未設定（空文字）の場合はバイパスを一切行わない。
+    integration_test_bypass_token: str = ""
+    integration_test_bypass_token_2: str = ""
+
     # Amazon Bedrock (AI) 設定
     bedrock_region: str = "us-east-1"
     bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"

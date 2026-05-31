@@ -43,10 +43,16 @@ dev-frontend: ## Run frontend locally
 	cd frontend && npm run dev
 
 .PHONY: dev
-dev: ## Run both backend and frontend (requires tmux or run in separate terminals)
-	@echo "Run in separate terminals:"
-	@echo "  make dev-backend"
-	@echo "  make dev-frontend"
+dev: ## Show how to start the local dev environment (use `make dev-stack` for one-command startup)
+	@echo "Choose a local development mode:"
+	@echo ""
+	@echo "  make dev-stack        # RECOMMENDED: starts backend (8000) + frontend (3000)"
+	@echo "                        # together with auth bypass against the dev DSQL cluster."
+	@echo "                        # Requires: AWS '$(ENV)' profile + 'make tf-init ENV=$(ENV)'."
+	@echo ""
+	@echo "  Or run each process in its own terminal:"
+	@echo "    make dev-backend    # uvicorn on :8000 (needs a local Postgres / DATABASE_URL)"
+	@echo "    make dev-frontend   # next dev on :3000"
 
 # =============================================================================
 # Local Bypass Stack (auth bypass + dev DSQL)
@@ -260,7 +266,12 @@ ifeq ($(ENV),prd)
 	@echo "Skipping integration tests in prd (backdoor auth not available)"
 else
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
-	cd backend && API_URL=$(API_URL) uv run --extra dev python -m pytest tests/integration -v
+	$(eval BYPASS_TOKEN := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token))
+	$(eval BYPASS_TOKEN_2 := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token_2))
+	cd backend && API_URL=$(API_URL) \
+		INTEGRATION_TEST_BYPASS_TOKEN=$(BYPASS_TOKEN) \
+		INTEGRATION_TEST_BYPASS_TOKEN_2=$(BYPASS_TOKEN_2) \
+		uv run --extra dev python -m pytest tests/integration -v
 endif
 
 # =============================================================================
@@ -447,7 +458,12 @@ test-frontend: ## Run frontend Vitest unit tests
 .PHONY: test-integration
 test-integration: tf-switch ## Run backend integration tests against the deployed environment selected by ENV
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
-	cd backend && API_URL=$(API_URL) uv run --extra dev python -m pytest tests/integration -v
+	$(eval BYPASS_TOKEN := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token))
+	$(eval BYPASS_TOKEN_2 := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token_2))
+	cd backend && API_URL=$(API_URL) \
+		INTEGRATION_TEST_BYPASS_TOKEN=$(BYPASS_TOKEN) \
+		INTEGRATION_TEST_BYPASS_TOKEN_2=$(BYPASS_TOKEN_2) \
+		uv run --extra dev python -m pytest tests/integration -v
 
 .PHONY: test-lint
 test-lint: lint-backend lint-frontend ## Run all linters

@@ -76,9 +76,14 @@ class CognitoJWTVerifier:
         """
         # ----------------------------------------------------------------------
         # 開発環境での結合テスト用バイパス
+        #
+        # トークンはソースにハードコードせず、デプロイ時に環境変数
+        # (INTEGRATION_TEST_BYPASS_TOKEN) として注入された秘密値とのみ照合する。
+        # 環境変数が未設定（本番および注入されていない環境）の場合はバイパスを
+        # 一切行わず、通常の JWT 検証にフォールスルーする。
         # ----------------------------------------------------------------------
-        if settings.environment == "dev":
-            if token == "dev-integration-test-token":  # noqa: S105
+        if settings.environment == "dev" and settings.integration_test_bypass_token:
+            if token == settings.integration_test_bypass_token:
                 return {
                     "sub": "integration-test-user-id",
                     "username": "integration-test-user",
@@ -86,7 +91,10 @@ class CognitoJWTVerifier:
                     "token_use": "access",
                     "scope": "aws.cognito.signin.user.admin",
                 }
-            if token == "dev-integration-test-token-2":  # noqa: S105
+            if (
+                settings.integration_test_bypass_token_2
+                and token == settings.integration_test_bypass_token_2
+            ):
                 return {
                     "sub": "integration-test-user-id-2",
                     "username": "integration-test-user-2",

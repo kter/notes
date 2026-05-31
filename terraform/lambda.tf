@@ -3,7 +3,18 @@
 locals {
   sentry_backend_dsn_parameter_name = "/${var.project_name}/${terraform.workspace}/sentry-dsn-backend"
 
+  # 結合テスト用バイパストークンは dev 環境でのみ有効。値は Terraform が生成し
+  # SSM SecureString に保存したうえで Lambda 環境変数に注入する。
+  # ソースコードには一切ハードコードしない。
+  enable_integration_bypass = terraform.workspace == "dev"
+
+  integration_bypass_env = local.enable_integration_bypass ? {
+    INTEGRATION_TEST_BYPASS_TOKEN   = random_password.integration_test_bypass_token[0].result
+    INTEGRATION_TEST_BYPASS_TOKEN_2 = random_password.integration_test_bypass_token_2[0].result
+  } : {}
+
   backend_lambda_environment = merge(
+    local.integration_bypass_env,
     {
       COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
       COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
@@ -28,6 +39,44 @@ locals {
       SENTRY_TRACES_SAMPLE_RATE = tostring(var.sentry_traces_sample_rate)
     }
   )
+}
+
+# Integration-test bypass tokens (dev only).
+# Terraform generates random secrets, stores them in SSM SecureString for
+# auditability/retrieval by the test runner, and injects them into the Lambda
+# environment above. Never hardcoded in source.
+resource "random_password" "integration_test_bypass_token" {
+  count   = local.enable_integration_bypass ? 1 : 0
+  length  = 48
+  special = false
+}
+
+resource "random_password" "integration_test_bypass_token_2" {
+  count   = local.enable_integration_bypass ? 1 : 0
+  length  = 48
+  special = false
+}
+
+resource "aws_ssm_parameter" "integration_test_bypass_token" {
+  count = local.enable_integration_bypass ? 1 : 0
+  name  = "/${var.project_name}/${terraform.workspace}/integration-test-bypass-token"
+  type  = "SecureString"
+  value = random_password.integration_test_bypass_token[0].result
+
+  tags = {
+    Name = "${var.project_name}-integration-bypass-token-${terraform.workspace}"
+  }
+}
+
+resource "aws_ssm_parameter" "integration_test_bypass_token_2" {
+  count = local.enable_integration_bypass ? 1 : 0
+  name  = "/${var.project_name}/${terraform.workspace}/integration-test-bypass-token-2"
+  type  = "SecureString"
+  value = random_password.integration_test_bypass_token_2[0].result
+
+  tags = {
+    Name = "${var.project_name}-integration-bypass-token-2-${terraform.workspace}"
+  }
 }
 
 # Lambda function
@@ -131,7 +180,7 @@ resource "aws_apigatewayv2_api" "api" {
       "https://${local.current_env.admin_domain_name}"
     ]
     allow_methods     = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers     = ["Authorization", "Content-Type", "sentry-trace", "baggage"]
+    allow_headers     = ["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "sentry-trace", "baggage"]
     allow_credentials = true
     max_age           = 86400
   }
@@ -266,4 +315,18 @@ output "api_url" {
 output "ecr_repository_url" {
   description = "ECR repository URL for API container"
   value       = aws_ecr_repository.api.repository_url
+}
+
+# Integration-test bypass tokens (dev only). Sensitive: consumed by the test
+# runner via `terraform output -raw`. Empty string in non-dev workspaces.
+output "integration_test_bypass_token" {
+  description = "Integration test bypass token (dev only)"
+  value       = local.enable_integration_bypass ? random_password.integration_test_bypass_token[0].result : ""
+  sensitive   = true
+}
+
+output "integration_test_bypass_token_2" {
+  description = "Second integration test bypass token (dev only)"
+  value       = local.enable_integration_bypass ? random_password.integration_test_bypass_token_2[0].result : ""
+  sensitive   = true
 }

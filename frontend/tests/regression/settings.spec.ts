@@ -12,6 +12,9 @@ async function openSettings(page: Parameters<typeof waitForWorkspaceSnapshotRead
   const container = isMobile
     ? page.getByTestId('mobile-layout-folders')
     : page.getByTestId('desktop-layout');
+  // Wait for the workspace to finish loading (desktop-layout is replaced by a spinner
+  // while isDataLoading=true, e.g. during Lambda cold-start + snapshot fetch on dev).
+  await expect(container).toBeVisible({ timeout: 60000 });
   // The settings button title/aria-label is localized (en: "Settings", ja: "設定"),
   // so match by accessible name in either language to keep the helper
   // language-agnostic regardless of the shared dev account's saved locale.
@@ -48,7 +51,7 @@ test.describe('Regression: Settings', () => {
 
   test('should switch language and persist after save', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip();
-    test.setTimeout(90000);
+    test.setTimeout(150000);
 
     await page.goto('/');
     await waitForWorkspaceSnapshotReady(page, SNAPSHOT_WARMUP);

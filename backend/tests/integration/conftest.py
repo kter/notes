@@ -19,8 +19,26 @@ def api_base_url():
 
 @pytest.fixture(scope="session")
 def auth_token():
-    """Return the backdoor token for integration tests."""
-    return "dev-integration-test-token"
+    """Return the backdoor token for integration tests.
+
+    The token is no longer hardcoded in source. It is injected at deploy time
+    (Terraform-generated SecureString in SSM) and supplied to the test runner
+    via the INTEGRATION_TEST_BYPASS_TOKEN environment variable. Tests are
+    skipped when it is not provided.
+    """
+    token = os.getenv("INTEGRATION_TEST_BYPASS_TOKEN")
+    if not token:
+        pytest.skip("INTEGRATION_TEST_BYPASS_TOKEN is not set")
+    return token
+
+
+@pytest.fixture(scope="session")
+def auth_token_2():
+    """Return the second integration-test backdoor token (from the environment)."""
+    token = os.getenv("INTEGRATION_TEST_BYPASS_TOKEN_2")
+    if not token:
+        pytest.skip("INTEGRATION_TEST_BYPASS_TOKEN_2 is not set")
+    return token
 
 
 @pytest.fixture(scope="session")
@@ -30,12 +48,12 @@ def test_user_id():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def set_integration_test_token_limits(api_base_url, auth_token):
+def set_integration_test_token_limits(api_base_url, auth_token, auth_token_2):
     """
     Set a large token limit for integration test users at the start of the session.
     This prevents AI endpoint tests from hitting the monthly token limit.
     """
-    for token in (auth_token, "dev-integration-test-token-2"):
+    for token in (auth_token, auth_token_2):
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -67,13 +85,13 @@ def client(api_base_url, auth_token):
 
 
 @pytest.fixture
-def another_client(api_base_url):
+def another_client(api_base_url, auth_token_2):
     """
     Create an httpx Client authenticated as a SECOND integration test user.
     Used to verify that user A cannot access user B's resources.
     """
     headers = {
-        "Authorization": "Bearer dev-integration-test-token-2",
+        "Authorization": f"Bearer {auth_token_2}",
         "Content-Type": "application/json",
     }
     with httpx.Client(base_url=api_base_url, headers=headers, timeout=30.0) as client:

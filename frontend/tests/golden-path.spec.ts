@@ -278,7 +278,7 @@ test.describe("Golden Path: Note Lifecycle", () => {
       60000,
     );
     await deleteButton.click();
-    await page.getByRole("button", { name: "Confirm" }).click();
+    await page.getByRole("button", { name: /Confirm|確認/ }).click();
     await deleteResponse;
     markNoteDeleted(note.id);
 
@@ -344,7 +344,7 @@ test.describe("Golden Path: Note Lifecycle", () => {
       60000,
     );
     await deleteButton.click();
-    await page.getByRole("button", { name: "Confirm" }).click();
+    await page.getByRole("button", { name: /Confirm|確認/ }).click();
     await deleteResponse;
     markFolderDeleted(folder.id);
 
@@ -588,7 +588,7 @@ test.describe("Golden Path: Note Lifecycle", () => {
       60000,
     );
     await deleteFolderButton.click();
-    await page.getByRole("button", { name: "Confirm" }).click();
+    await page.getByRole("button", { name: /Confirm|確認/ }).click();
     await deleteFolderResponse;
     markFolderDeleted(createdFolderId);
     markNoteDeleted(createdNoteId);

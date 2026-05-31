@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeNotes, mergeFolders } from './merge';
+import { mergeNotes, mergeFolders, reconcileNotesDelta } from './merge';
 import { Note, Folder } from '../types';
 
 describe('mergeNotes', () => {
@@ -64,6 +64,75 @@ describe('mergeNotes', () => {
 
     const result = mergeNotes([local], [server]);
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('reconcileNotesDelta', () => {
+  const baseNote: Note = {
+    id: '1',
+    title: 'Test Note',
+    content: 'Content',
+    user_id: 'u1',
+    folder_id: null,
+    version: 1,
+    created_at: '2023-01-01T10:00:00Z',
+    updated_at: '2023-01-01T10:00:00Z',
+    deleted_at: null,
+  };
+
+  it('keeps local notes that are absent from the delta', () => {
+    const localA = { ...baseNote, id: 'a' };
+    const localB = { ...baseNote, id: 'b' };
+    const deltaB = { ...baseNote, id: 'b', title: 'B updated', version: 2 };
+
+    const result = reconcileNotesDelta([localA, localB], [deltaB]);
+    expect(result).toHaveLength(2);
+    expect(result.find((n) => n.id === 'a')).toEqual(localA);
+    expect(result.find((n) => n.id === 'b')?.title).toBe('B updated');
+  });
+
+  it('upserts new notes from the delta', () => {
+    const localA = { ...baseNote, id: 'a' };
+    const deltaC = { ...baseNote, id: 'c', title: 'New' };
+
+    const result = reconcileNotesDelta([localA], [deltaC]);
+    expect(result).toHaveLength(2);
+    expect(result.find((n) => n.id === 'c')?.title).toBe('New');
+  });
+
+  it('removes notes that arrive as tombstones in the delta', () => {
+    const localA = { ...baseNote, id: 'a' };
+    const localB = { ...baseNote, id: 'b' };
+    const tombstoneB = {
+      ...baseNote,
+      id: 'b',
+      version: 2,
+      deleted_at: '2023-01-02T10:00:00Z',
+    };
+
+    const result = reconcileNotesDelta([localA, localB], [tombstoneB]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('a');
+  });
+
+  it('preserves a newer unsynced local edit over an older delta entry', () => {
+    const localNewer = {
+      ...baseNote,
+      id: 'a',
+      title: 'Local offline edit',
+      version: 3,
+      updated_at: '2023-01-05T10:00:00Z',
+    };
+    const deltaOlder = {
+      ...baseNote,
+      id: 'a',
+      title: 'Stale server',
+      version: 2,
+      updated_at: '2023-01-03T10:00:00Z',
+    };
+
+    const result = reconcileNotesDelta([localNewer], [deltaOlder]);
+    expect(result[0].title).toBe('Local offline edit');
   });
 });
 

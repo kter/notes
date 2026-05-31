@@ -232,9 +232,56 @@ async def test_dev_integration_token_blocked_in_local(mock_settings):
 @pytest.mark.asyncio
 async def test_dev_integration_token_bypass_in_dev(mock_settings):
     mock_settings.environment = "dev"
+    mock_settings.integration_test_bypass_token = "injected-secret-token"
+    mock_settings.integration_test_bypass_token_2 = "injected-secret-token-2"
     verifier = CognitoJWTVerifier()
-    result = await verifier.verify_token("dev-integration-test-token")
+    result = await verifier.verify_token("injected-secret-token")
     assert result["sub"] == "integration-test-user-id"
+    result2 = await verifier.verify_token("injected-secret-token-2")
+    assert result2["sub"] == "integration-test-user-id-2"
+
+
+@pytest.mark.asyncio
+async def test_bypass_disabled_when_token_unset_in_dev(mock_settings):
+    """バイパストークンが未設定なら、dev でも結合テストトークンは通常検証され拒否される。
+
+    これがセキュリティ修正の要: ソースにハードコードされた推測可能トークンを廃し、
+    デプロイ時に注入された秘密値が無い限りバイパスは成立しない。
+    """
+    mock_settings.environment = "dev"
+    mock_settings.integration_test_bypass_token = ""
+    mock_settings.integration_test_bypass_token_2 = ""
+    verifier = CognitoJWTVerifier()
+    with patch("httpx.AsyncClient", autospec=True) as MockClient:
+        mock_instance = MockClient.return_value
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_response = Mock()
+        mock_response.json.return_value = {"keys": []}
+        mock_response.raise_for_status.return_value = None
+        mock_instance.get = mock.AsyncMock(return_value=mock_response)
+        # かつての推測可能トークンはもはやバイパスされず、署名検証で失敗する
+        with pytest.raises(JWTError):
+            await verifier.verify_token("dev-integration-test-token")
+
+
+@pytest.mark.asyncio
+async def test_bypass_rejects_wrong_token_in_dev(mock_settings):
+    """バイパストークンが設定されていても、一致しないトークンは通常検証へ回す。"""
+    mock_settings.environment = "dev"
+    mock_settings.integration_test_bypass_token = "injected-secret-token"
+    mock_settings.integration_test_bypass_token_2 = ""
+    verifier = CognitoJWTVerifier()
+    with patch("httpx.AsyncClient", autospec=True) as MockClient:
+        mock_instance = MockClient.return_value
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_response = Mock()
+        mock_response.json.return_value = {"keys": []}
+        mock_response.raise_for_status.return_value = None
+        mock_instance.get = mock.AsyncMock(return_value=mock_response)
+        with pytest.raises(JWTError):
+            await verifier.verify_token("dev-integration-test-token")
 
 
 @pytest.mark.asyncio

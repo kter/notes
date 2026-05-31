@@ -373,6 +373,74 @@ describe("useNoteSyncEngine", () => {
     vi.useRealTimers();
   });
 
+  it("coalesces a rapid title + content edit into a single change so neither field is lost", async () => {
+    vi.useFakeTimers();
+
+    const initialNote = buildNote();
+    const serverNote = buildNote({
+      title: "New Title",
+      content: "New body",
+      version: 2,
+      updated_at: "2024-01-02T00:00:00.000Z",
+    });
+    const applyWorkspaceChanges = vi.fn().mockResolvedValue({
+      applied: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: serverNote.id,
+          client_mutation_id: null,
+          folder: null,
+          note: serverNote,
+        },
+      ],
+      snapshot: {
+        folders: [],
+        notes: [serverNote],
+        cursor: "cursor-2",
+        server_time: "2024-01-02T00:00:00.000Z",
+      },
+    });
+    getApiMock.mockResolvedValue({ applyWorkspaceChanges });
+
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    // Title edit followed immediately by a content edit, both inside the debounce window.
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, { title: "New Title" });
+    });
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, { content: "New body" });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+      await result.current.triggerServerSync(initialNote.id);
+    });
+
+    // A single coalesced update carrying BOTH fields with one expected_version —
+    // no second version-checked request that could 409 and drop the title.
+    expect(applyWorkspaceChanges).toHaveBeenCalledTimes(1);
+    expect(applyWorkspaceChanges).toHaveBeenCalledWith({
+      device_id: "device-1",
+      base_cursor: "cursor-1",
+      changes: [
+        {
+          entity: "note",
+          operation: "update",
+          entity_id: initialNote.id,
+          expected_version: 1,
+          payload: { title: "New Title", content: "New body" },
+        },
+      ],
+    });
+    expect(result.current.syncStatus.remote).toBe("synced");
+
+    vi.useRealTimers();
+  });
+
   it("metadata-only update calls saveNote, not saveNoteBody", async () => {
     const initialNote = buildNote();
     const { result } = renderHook(() =>

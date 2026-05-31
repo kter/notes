@@ -1,55 +1,35 @@
 "use client";
 
 /**
- * ワークスペース全体の UI 状態・データ・操作を集約するルートフック。
- * フォルダ/ノート/チャット/エディタ/モバイルビューなど全画面に関わるステートと
- * ハンドラーをまとめ、ページコンポーネントへ一括提供する。
+ * ワークスペース全体の状態・データ・操作を合成するルートフック。
+ *
+ * 実際の状態は責務ごとに分割された 4 つのスライスが保持する:
+ * - useWorkspaceSyncState     : データ層（folders / notes / 同期ステータス）
+ * - useWorkspaceUIState       : パネル開閉・モバイルビュー・チャット幅
+ * - useWorkspaceNavigationState: 選択・検索・URL 同期・絞り込み
+ * - useWorkspaceAIState       : チャット・トークン使用量・AI 編集
+ *
+ * このフックはそれらを配線し、エディタ連携の橋渡しを加えて、ページコンポーネントへ
+ * 従来どおり一括のフラットなインターフェースで提供する。
  *
  * 主なエクスポート:
  * - useWorkspaceState: ワークスペースに必要なすべての状態・ハンドラーを返す
  *
  * 呼び出し関係: WorkspacePage などのトップレベルページコンポーネントから呼ばれる。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useRef } from "react";
 
-import type { MobileView } from "@/components/layout";
-import { useAIChat } from "@/hooks/useAIChat";
 import { useFolders } from "@/hooks/useFolders";
-import { useNoteFilter } from "@/hooks/useNoteFilter";
 import { useNotes } from "@/hooks/useNotes";
-import { usePersistedBoolean } from "@/hooks/usePersistedBoolean";
-import { useResizable } from "@/hooks/useResizable";
-import { useTokenUsage } from "@/hooks/useTokenUsage";
 import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 
+import { useWorkspaceAIState } from "./useWorkspaceAIState";
+import { useWorkspaceNavigationState } from "./useWorkspaceNavigationState";
 import { useWorkspaceSyncState } from "./useWorkspaceSyncState";
+import { useWorkspaceUIState } from "./useWorkspaceUIState";
 
 export function useWorkspaceState(isAuthenticated: boolean) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const urlNoteId = searchParams.get("note");
-  const urlFolderId = searchParams.get("folder");
-
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = usePersistedBoolean("notes-sidebar-open", true);
-  const [isNoteListOpen, setIsNoteListOpen] = usePersistedBoolean("notes-notelist-open", true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [mobileView, setMobileView] = useState<MobileView>("folders");
-  const [contentOverride, setContentOverride] = useState<{
-    noteId: string;
-    content: string;
-    version: number;
-  } | null>(null);
-
-  const editorContentRef = useRef("");
-  const editorSelectedTextRef = useRef("");
-  const selectionSubscribersRef = useRef(new Set<() => void>());
-
+  // データ層: フォルダ・ノート・同期ステータス
   const {
     folders,
     setFolders,
@@ -63,63 +43,23 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     applySnapshot,
   } = useWorkspaceSyncState(isAuthenticated);
 
+  // UI 層: パネル開閉・モバイルビュー・チャット幅
+  const ui = useWorkspaceUIState();
+
+  // ナビゲーション層: 選択・検索・URL 同期・派生値
+  const nav = useWorkspaceNavigationState({
+    isDataLoading,
+    folders,
+    notes,
+    setMobileView: ui.setMobileView,
+  });
+
   const { handleCreateFolder, handleRenameFolder, handleDeleteFolder } = useFolders(
     folders,
     setFolders,
-    selectedFolderId,
-    setSelectedFolderId,
+    nav.selectedFolderId,
+    nav.setSelectedFolderId,
     { onSnapshotSynced: applySnapshot }
-  );
-
-  /** ?folder=<id>&?note=<id> を含む URL 文字列を生成するヘルパー。 */
-  const buildHref = useCallback(
-    (folderId: string | null, noteId: string | null) => {
-      const params = new URLSearchParams();
-      if (folderId) params.set("folder", folderId);
-      if (noteId) params.set("note", noteId);
-      const qs = params.toString();
-      return qs ? `${pathname}?${qs}` : pathname;
-    },
-    [pathname]
-  );
-
-  // URL クエリパラメータから選択状態を復元する。
-  // isDataLoading が true の間は folders/notes が未確定なので ID の有効性を検証できない。
-  // prev との比較は、同一値での setState を省略して不要な再レンダーを防ぐため。
-  useEffect(() => {
-    if (isDataLoading) return;
-    const validFolderId =
-      urlFolderId && folders.some((f) => f.id === urlFolderId) ? urlFolderId : null;
-    const validNoteId =
-      urlNoteId && notes.some((n) => n.id === urlNoteId) ? urlNoteId : null;
-
-    setSelectedFolderId((prev) => (prev !== validFolderId ? validFolderId : prev));
-    setSelectedNoteId((prev) => {
-      if (prev === validNoteId) return prev;
-      setContentOverride(null);
-      if (validNoteId) setMobileView("editor");
-      return validNoteId;
-    });
-  }, [urlFolderId, urlNoteId, isDataLoading, folders, notes]);
-
-  const handleSelectFolder = useCallback(
-    (id: string | null) => {
-      setSelectedFolderId(id);
-      setSearchQuery("");
-      setMobileView("notes");
-      router.push(buildHref(id, selectedNoteId), { scroll: false });
-    },
-    [router, buildHref, selectedNoteId]
-  );
-
-  const handleSelectNote = useCallback(
-    (id: string | null) => {
-      setSelectedNoteId(id);
-      setContentOverride(null);
-      if (id) setMobileView("editor");
-      router.push(buildHref(selectedFolderId, id), { scroll: false });
-    },
-    [router, buildHref, selectedFolderId]
   );
 
   const {
@@ -132,149 +72,64 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   } = useNotes(
     notes,
     setNotes,
-    selectedFolderId,
-    selectedNoteId,
-    handleSelectNote,
+    nav.selectedFolderId,
+    nav.selectedNoteId,
+    nav.handleSelectNote,
     { onSnapshotSynced: applySnapshot }
   );
 
-  const { tokenUsage, recordUsage } = useTokenUsage(isAuthenticated);
-  const {
-    chatMessages,
-    isAILoading,
-    isEditMode,
-    setIsEditMode,
-    handleSummarize,
-    handleSendMessage,
-    handleSendEditRequest,
-    handleAcceptEdit,
-    handleRejectEdit,
-    clearChat,
-  } = useAIChat(recordUsage);
+  // AI 層: チャット・トークン使用量・AI 編集（ノート更新と UI トグルへ橋渡し）
+  const ai = useWorkspaceAIState({
+    isAuthenticated,
+    selectedNoteId: nav.selectedNoteId,
+    setContentOverride: nav.setContentOverride,
+    handleUpdateNote,
+    triggerServerSync,
+    setIsChatOpen: ui.setIsChatOpen,
+    setMobileView: ui.setMobileView,
+  });
 
-  const handleEditorContentChange = useCallback((content: string) => {
-    editorContentRef.current = content;
-    if (selectedNoteId) noteBodyStore.set(selectedNoteId, content);
-  }, [selectedNoteId]);
+  // エディタ連携: 本文・選択範囲の最新値を ref で保持し、購読者へ通知する
+  const editorContentRef = useRef("");
+  const editorSelectedTextRef = useRef("");
+  const selectionSubscribersRef = useRef(new Set<() => void>());
+
+  const handleEditorContentChange = useCallback(
+    (content: string) => {
+      editorContentRef.current = content;
+      if (nav.selectedNoteId) noteBodyStore.set(nav.selectedNoteId, content);
+    },
+    [nav.selectedNoteId]
+  );
 
   const handleEditorSelectionChange = useCallback((selectedText: string) => {
     editorSelectedTextRef.current = selectedText;
     selectionSubscribersRef.current.forEach((cb) => cb());
   }, []);
 
-  const subscribeToEditorSelectionChange = useCallback(
-    (callback: () => void) => {
-      selectionSubscribersRef.current.add(callback);
-      return () => { selectionSubscribersRef.current.delete(callback); };
-    },
-    []
-  );
-
-  const handleAcceptEditAndApply = useCallback(
-    (messageIndex: number) => {
-      const editedContent = handleAcceptEdit(messageIndex);
-      if (editedContent && selectedNoteId) {
-        setContentOverride((prev) => ({
-          noteId: selectedNoteId,
-          content: editedContent,
-          version: (prev?.version ?? 0) + 1,
-        }));
-        handleUpdateNote(selectedNoteId, { content: editedContent }, { immediate: true });
-      }
-    },
-    [handleAcceptEdit, handleUpdateNote, selectedNoteId]
-  );
-
-  const pendingEditEntry = useMemo(
-    () =>
-      chatMessages.reduce<{
-        message: (typeof chatMessages)[0];
-        index: number;
-      } | null>(
-        (found, message, index) =>
-          message.editProposal?.status === "pending" ? { message, index } : found,
-        null
-      ),
-    [chatMessages]
-  );
-
-  const chatPanelResize = useResizable({
-    storageKey: "notes-chat-width",
-    defaultWidth: 320,
-    minWidth: 280,
-    maxWidth: 600,
-    direction: "right",
-  });
-
-  const handleToggleSidebar = useCallback(() => setIsSidebarOpen((v) => !v), [setIsSidebarOpen]);
-  const handleToggleNoteList = useCallback(() => setIsNoteListOpen((v) => !v), [setIsNoteListOpen]);
-  const handleToggleChat = useCallback(() => setIsChatOpen((v) => !v), []);
-
-  const handleMobileViewChange = useCallback((view: MobileView) => {
-    setMobileView(view);
-    setIsChatOpen(view === "chat");
+  const subscribeToEditorSelectionChange = useCallback((callback: () => void) => {
+    selectionSubscribersRef.current.add(callback);
+    return () => {
+      selectionSubscribersRef.current.delete(callback);
+    };
   }, []);
 
-  const selectedNote = useMemo(
-    () => notes.find((note) => note.id === selectedNoteId) ?? null,
-    [notes, selectedNoteId]
-  );
-  const selectedFolder = useMemo(
-    () => folders.find((folder) => folder.id === selectedFolderId) ?? null,
-    [folders, selectedFolderId]
-  );
-  const selectedFolderName = selectedFolder?.name;
-  const filteredNotes = useNoteFilter(notes, selectedFolderId, searchQuery);
-
-  const handleSummarizeNote = useCallback(
-    async (id: string) => {
-      await triggerServerSync(id);
-      await handleSummarize(id);
-      setIsChatOpen(true);
-      setMobileView("chat");
-    },
-    [triggerServerSync, handleSummarize]
-  );
-
-  const handleSendEditRequestFromPanel = useCallback(
-    (
-      instruction: string,
-      content: string,
-      noteId?: string,
-      selectionRange?: { start: number; end: number }
-    ) => handleSendEditRequest(instruction, content, noteId, selectionRange),
-    [handleSendEditRequest]
-  );
-
-  const handlePendingAcceptEdit = useMemo(
-    () =>
-      pendingEditEntry
-        ? () => handleAcceptEditAndApply(pendingEditEntry.index)
-        : undefined,
-    [pendingEditEntry, handleAcceptEditAndApply]
-  );
-
-  const handlePendingRejectEdit = useMemo(
-    () =>
-      pendingEditEntry
-        ? () => handleRejectEdit(pendingEditEntry.index)
-        : undefined,
-    [pendingEditEntry, handleRejectEdit]
-  );
-
   const getCurrentEditorContent = useCallback((): string => {
-    return (selectedNoteId && noteBodyStore.get(selectedNoteId)) || editorContentRef.current;
-  }, [selectedNoteId]);
+    return (
+      (nav.selectedNoteId && noteBodyStore.get(nav.selectedNoteId)) ||
+      editorContentRef.current
+    );
+  }, [nav.selectedNoteId]);
 
   return {
-    selectedFolderId,
-    selectedNoteId,
-    searchQuery,
-    isChatOpen,
-    isSidebarOpen,
-    isNoteListOpen,
-    isSettingsOpen,
-    mobileView,
+    selectedFolderId: nav.selectedFolderId,
+    selectedNoteId: nav.selectedNoteId,
+    searchQuery: nav.searchQuery,
+    isChatOpen: ui.isChatOpen,
+    isSidebarOpen: ui.isSidebarOpen,
+    isNoteListOpen: ui.isNoteListOpen,
+    isSettingsOpen: ui.isSettingsOpen,
+    mobileView: ui.mobileView,
     folders,
     notes,
     isDataLoading,
@@ -284,49 +139,49 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     offlineSyncStatus,
     offlineSyncErrorMessage,
     pendingChangesCount,
-    tokenUsage,
-    chatMessages,
-    isAILoading,
-    isEditMode,
-    contentOverride,
-    chatPanelResize,
-    selectedNote,
-    selectedFolder,
-    selectedFolderName,
-    filteredNotes,
-    pendingEditEntry,
-    setSearchQuery,
-    setIsChatOpen,
-    setIsSidebarOpen,
-    setIsNoteListOpen,
-    setIsSettingsOpen,
-    setMobileView,
-    setIsEditMode,
+    tokenUsage: ai.tokenUsage,
+    chatMessages: ai.chatMessages,
+    isAILoading: ai.isAILoading,
+    isEditMode: ai.isEditMode,
+    contentOverride: nav.contentOverride,
+    chatPanelResize: ui.chatPanelResize,
+    selectedNote: nav.selectedNote,
+    selectedFolder: nav.selectedFolder,
+    selectedFolderName: nav.selectedFolderName,
+    filteredNotes: nav.filteredNotes,
+    pendingEditEntry: ai.pendingEditEntry,
+    setSearchQuery: nav.setSearchQuery,
+    setIsChatOpen: ui.setIsChatOpen,
+    setIsSidebarOpen: ui.setIsSidebarOpen,
+    setIsNoteListOpen: ui.setIsNoteListOpen,
+    setIsSettingsOpen: ui.setIsSettingsOpen,
+    setMobileView: ui.setMobileView,
+    setIsEditMode: ai.setIsEditMode,
     handleCreateFolder,
     handleRenameFolder,
     handleDeleteFolder,
-    handleSelectFolder,
-    handleSelectNote,
+    handleSelectFolder: nav.handleSelectFolder,
+    handleSelectNote: nav.handleSelectNote,
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
     triggerServerSync,
-    handleSummarize,
-    handleSendMessage,
-    handleSendEditRequest,
-    handleAcceptEditAndApply,
-    handleRejectEdit,
-    clearChat,
+    handleSummarize: ai.handleSummarize,
+    handleSendMessage: ai.handleSendMessage,
+    handleSendEditRequest: ai.handleSendEditRequest,
+    handleAcceptEditAndApply: ai.handleAcceptEditAndApply,
+    handleRejectEdit: ai.handleRejectEdit,
+    clearChat: ai.clearChat,
     handleEditorContentChange,
     handleEditorSelectionChange,
-    handleToggleSidebar,
-    handleToggleNoteList,
-    handleToggleChat,
-    handleMobileViewChange,
-    handleSummarizeNote,
-    handleSendEditRequestFromPanel,
-    handlePendingAcceptEdit,
-    handlePendingRejectEdit,
+    handleToggleSidebar: ui.handleToggleSidebar,
+    handleToggleNoteList: ui.handleToggleNoteList,
+    handleToggleChat: ui.handleToggleChat,
+    handleMobileViewChange: ui.handleMobileViewChange,
+    handleSummarizeNote: ai.handleSummarizeNote,
+    handleSendEditRequestFromPanel: ai.handleSendEditRequestFromPanel,
+    handlePendingAcceptEdit: ai.handlePendingAcceptEdit,
+    handlePendingRejectEdit: ai.handlePendingRejectEdit,
     getCurrentEditorContent,
     getCurrentEditorSelectedText: () => editorSelectedTextRef.current,
     subscribeToEditorSelectionChange,

@@ -99,8 +99,13 @@ class ShareUseCases:
         if share is None:
             raise NotFound("Shared note not found")
 
-        if share.expires_at and share.expires_at < datetime.now(UTC):
-            raise ShareExpired("Share link has expired")
+        if share.expires_at is not None:
+            # DB によっては tzinfo が欠落した datetime が返るため、naive 値は UTC とみなす。
+            expires_at = share.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if expires_at < datetime.now(UTC):
+                raise ShareExpired("Share link has expired")
 
         note = self.session.get(Note, share.note_id)
         if note is None or note.deleted_at is not None:

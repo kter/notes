@@ -150,6 +150,24 @@ class TestUpdateNote:
         assert response.status_code == 200
         assert response.json()["folder_id"] == folder_id
 
+    def test_update_note_move_out_of_folder_with_explicit_null(
+        self, client: TestClient
+    ):
+        """Sending folder_id: null must move a note out to "All Notes".
+
+        Regression test: exclude_unset previously dropped an explicit null
+        because it could not be distinguished from the default, so the move
+        was silently ignored.
+        """
+        folder_id = client.post("/api/folders", json={"name": "Folder"}).json()["id"]
+        note_id = client.post(
+            "/api/notes", json={"title": "Note", "folder_id": folder_id}
+        ).json()["id"]
+
+        response = client.patch(f"/api/notes/{note_id}", json={"folder_id": None})
+        assert response.status_code == 200
+        assert response.json()["folder_id"] is None
+
     def test_update_note_not_found(self, client: TestClient):
         """Test updating a non-existent note."""
         fake_id = "00000000-0000-0000-0000-000000000000"

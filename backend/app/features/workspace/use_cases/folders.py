@@ -11,7 +11,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.features.workspace.repositories import FolderRepository
+from app.features.workspace.repositories import FolderRepository, NoteRepository
 from app.logging_utils import log_event
 from app.models import Folder, FolderCreate, FolderUpdate
 
@@ -23,6 +23,7 @@ class FolderUseCases:
 
     def __init__(self, session: Session, user_id: str):
         self.repository = FolderRepository(session, user_id)
+        self.note_repository = NoteRepository(session, user_id)
 
     def list_folders(self) -> list[Folder]:
         """ユーザーが所有するフォルダを一覧取得する。
@@ -73,12 +74,16 @@ class FolderUseCases:
         """フォルダを soft delete（deleted_at を現在時刻に設定）し、監査ログを記録する。
 
         物理削除は行わず、スナップショット取得時に削除済みとして返される。
+        所有者確認のためまずフォルダを soft delete し、その後フォルダに属する
+        未削除ノートの folder_id を解除して「孤立ノート」を防ぐ。
         """
         self.repository.soft_delete(folder_id)
+        orphaned = self.note_repository.clear_folder(folder_id)
         log_event(
             logger,
             logging.INFO,
             "audit.folder.deleted",
             folder_id=folder_id,
+            orphaned_note_count=len(orphaned),
             outcome="success",
         )

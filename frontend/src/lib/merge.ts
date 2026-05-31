@@ -97,3 +97,52 @@ export function mergeNotes(localNotes: Note[], serverNotes: Note[]): Note[] {
 export function mergeFolders(localFolders: Folder[], serverFolders: Folder[]): Folder[] {
   return mergeWorkspaceEntities(localFolders, serverFolders);
 }
+
+/**
+ * サーバーからの差分（delta）スナップショットを既存のローカルリストへ適用する。
+ *
+ * mergeWorkspaceEntities がサーバー側を基準（全件スナップショット前提）にするのに対し、
+ * こちらは「現在のローカルリストを基準」に delta だけを反映するため、delta に含まれない
+ * 既存エンティティを取りこぼさない。差分同期（GET /snapshot?since=cursor）専用。
+ *
+ * - 論理削除済み（tombstone）の到着エンティティはローカルから除去する。
+ * - それ以外は upsert する。ただしローカルの方が新しい（未同期のオフライン編集）場合は
+ *   ローカルを保持し、古いサーバー値で上書きしない。
+ */
+function reconcileDeltaEntities<T extends {
+  id: string;
+  version: number;
+  updated_at: string;
+  deleted_at: string | null;
+}>(localEntities: T[], deltaEntities: T[]): T[] {
+  const mergedMap = new Map<string, T>(
+    localEntities.map((entity) => [entity.id, entity])
+  );
+
+  for (const deltaEntity of deltaEntities) {
+    if (isDeletedEntity(deltaEntity)) {
+      mergedMap.delete(deltaEntity.id);
+      continue;
+    }
+
+    const localEntity = mergedMap.get(deltaEntity.id);
+    if (localEntity && isLocalEntityNewer(localEntity, deltaEntity)) {
+      // 未同期のローカル編集の方が新しい場合は上書きしない
+      continue;
+    }
+    mergedMap.set(deltaEntity.id, deltaEntity);
+  }
+
+  return Array.from(mergedMap.values());
+}
+
+export function reconcileNotesDelta(localNotes: Note[], deltaNotes: Note[]): Note[] {
+  return reconcileDeltaEntities(localNotes, deltaNotes);
+}
+
+export function reconcileFoldersDelta(
+  localFolders: Folder[],
+  deltaFolders: Folder[]
+): Folder[] {
+  return reconcileDeltaEntities(localFolders, deltaFolders);
+}

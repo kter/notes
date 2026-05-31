@@ -7,6 +7,7 @@
     ワークスペース自身のルーターから利用される。
 """
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlmodel import Session
@@ -30,14 +31,34 @@ class WorkspaceQueryUseCases:
         """ユーザーが所有するフォルダを取得する。存在しない場合は NotFound を送出。"""
         return self.folder_repository.get_owned(folder_id)
 
-    def list_folders(self, *, include_deleted: bool = False) -> list[Folder]:
-        """ユーザーのフォルダ一覧を返す。削除済みを含めるかは include_deleted で制御。"""
-        return self.folder_repository.list(include_deleted=include_deleted)
+    def list_folders(
+        self,
+        *,
+        include_deleted: bool = False,
+        updated_after: datetime | None = None,
+    ) -> list[Folder]:
+        """ユーザーのフォルダ一覧を返す。
+
+        include_deleted で削除済みの包含を、updated_after で差分同期の起点時刻を制御する。
+        """
+        return self.folder_repository.list(
+            include_deleted=include_deleted, updated_after=updated_after
+        )
 
     def list_folder_notes(self, folder_id: UUID) -> list[Note]:
         """指定フォルダ内のノート一覧を返す。"""
         return self.note_repository.list(folder_id)
 
-    def list_all_notes(self, *, include_deleted: bool = False) -> list[Note]:
-        """全ノート一覧を返す。削除済みを含めるかは include_deleted で制御。"""
-        return self.note_repository.list(include_deleted=include_deleted)
+    def list_all_notes(
+        self,
+        *,
+        include_deleted: bool = False,
+        updated_after: datetime | None = None,
+    ) -> list[Note]:
+        """全ノート一覧を返す。
+
+        include_deleted で削除済みの包含を、updated_after で差分同期の起点時刻を制御する。
+        """
+        return self.note_repository.list(
+            include_deleted=include_deleted, updated_after=updated_after
+        )

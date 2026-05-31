@@ -25,7 +25,7 @@ function makeState(doc: string, cursorPos: number): EditorState {
     selection: EditorSelection.cursor(cursorPos),
     extensions: [markdown({ base: markdownLanguage, extensions: [GFM] })],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
+  ensureSyntaxTree(state, state.doc.length, 1e9);
   return state;
 }
 

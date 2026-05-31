@@ -91,6 +91,56 @@ class TestWorkspaceSnapshot:
         assert [folder["name"] for folder in data["folders"]] == ["Visible Folder"]
         assert [note["title"] for note in data["notes"]] == ["Visible Note"]
 
+    def test_snapshot_since_cursor_returns_only_changes(self, client: TestClient):
+        """A `since` cursor must return only entities updated after it."""
+        # Seed two notes, then capture the cursor (full snapshot).
+        client.post("/api/notes", json={"title": "Old A", "content": "x"})
+        client.post("/api/notes", json={"title": "Old B", "content": "y"})
+        cursor = client.get("/api/workspace/snapshot").json()["cursor"]
+
+        # A change after the cursor.
+        new_note_id = client.post(
+            "/api/notes", json={"title": "New", "content": "z"}
+        ).json()["id"]
+
+        delta = client.get("/api/workspace/snapshot", params={"since": cursor}).json()
+        delta_ids = [n["id"] for n in delta["notes"]]
+        assert delta_ids == [new_note_id]
+        # Cursor advances past the new change.
+        assert delta["cursor"] >= cursor
+
+    def test_snapshot_since_cursor_includes_deletion_tombstones(
+        self, client: TestClient
+    ):
+        """Deletions after the cursor must appear as tombstones in the delta."""
+        note_id = client.post(
+            "/api/notes", json={"title": "ToDelete", "content": "x"}
+        ).json()["id"]
+        cursor = client.get("/api/workspace/snapshot").json()["cursor"]
+
+        client.delete(f"/api/notes/{note_id}")
+
+        delta = client.get("/api/workspace/snapshot", params={"since": cursor}).json()
+        tombstone = next(n for n in delta["notes"] if n["id"] == note_id)
+        assert tombstone["deleted_at"] is not None
+
+    def test_snapshot_since_latest_cursor_returns_empty_delta(self, client: TestClient):
+        """Requesting changes since the latest cursor yields an empty delta."""
+        client.post("/api/notes", json={"title": "Only", "content": "x"})
+        cursor = client.get("/api/workspace/snapshot").json()["cursor"]
+
+        delta = client.get("/api/workspace/snapshot", params={"since": cursor}).json()
+        assert delta["notes"] == []
+        assert delta["folders"] == []
+        # Empty delta must not rewind the cursor.
+        assert delta["cursor"] == cursor
+
+    def test_snapshot_invalid_cursor_falls_back_to_full(self, client: TestClient):
+        """An unparseable cursor is ignored and a full snapshot is returned."""
+        client.post("/api/notes", json={"title": "Note", "content": "x"})
+        delta = client.get("/api/workspace/snapshot?since=not-a-date").json()
+        assert len(delta["notes"]) == 1
+
     def test_snapshot_includes_deleted_tombstones(self, client: TestClient):
         folder = client.post("/api/folders", json={"name": "Deleted Folder"}).json()
         note = client.post(

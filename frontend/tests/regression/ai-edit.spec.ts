@@ -6,6 +6,7 @@ import {
   getNoteFixture,
   waitForWorkspaceSnapshotReady,
 } from '../helpers/apiFixtures';
+import { waitForWorkspaceChange } from '../helpers/workspaceSync';
 
 const SNAPSHOT_WARMUP = { attempts: 12, delayMs: 5000, timeoutMs: 30000 };
 
@@ -35,6 +36,31 @@ test.describe('Regression: AI Edit (#78 / #79 contentOverride scope)', () => {
     await noteItem.click();
     await expect(layout.getByTestId('editor-title-input')).toHaveValue(noteTitle, { timeout: 20000 });
 
+    // Mock the edit-jobs API: Lambda/Bedrock is too slow in dev for an unguarded real call.
+    // The accept flow (diff view → accept → persist) is what we're testing here; actual AI
+    // output quality is covered by the integration test suite.
+    const mockedEditedContent = 'This sentence has been improved. It is a formal test case.';
+    await page.route('**/api/ai/edit-jobs', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            job: {
+              id: 'mock-accept-job',
+              status: 'completed',
+              edited_content: mockedEditedContent,
+              tokens_used: 10,
+              error_message: null,
+              note_id: null,
+            },
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     // Open AI chat panel
     await layout.getByTestId('editor-chat-button').click();
 
@@ -49,8 +75,8 @@ test.describe('Regression: AI Edit (#78 / #79 contentOverride scope)', () => {
     await chatInput.fill('Make this text more formal and concise.');
 
     const editResponsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/api/ai/edit') && resp.status() < 400,
-      { timeout: 120000 }
+      (resp) => resp.url().includes('/api/ai/edit-jobs') && resp.request().method() === 'POST' && resp.status() < 400,
+      { timeout: 10000 }
     );
     await layout.getByTestId('ai-chat-send-button').click();
     await editResponsePromise;
@@ -67,14 +93,17 @@ test.describe('Regression: AI Edit (#78 / #79 contentOverride scope)', () => {
     await expect(acceptButton).toBeVisible({ timeout: 10000 });
     await acceptButton.click();
 
-    // After accepting, the diff panel should collapse and the editor re-appear
+    // After accepting, the diff panel should collapse and the editor re-appear.
+    // The accept triggers an immediate server sync — wait for it before reading the API.
+    const syncResponse = waitForWorkspaceChange(page, 'note', 'update', 30000);
     await expect(diffPanel).not.toBeVisible({ timeout: 15000 });
     await expect(layout.getByTestId('editor-content-input')).toBeVisible({ timeout: 10000 });
+    await syncResponse;
 
-    // Verify the note content changed (was updated to the edited version)
+    // Verify the note content changed to the mocked edited version
     const updatedNote = await getNoteFixture(page, note.id);
     expect(updatedNote.content).not.toBe(originalContent);
-    expect(updatedNote.content.trim().length).toBeGreaterThan(0);
+    expect(updatedNote.content.trim()).toBe(mockedEditedContent);
 
     await deleteNoteFixture(page, note.id);
   });

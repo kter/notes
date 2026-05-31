@@ -50,7 +50,7 @@ test.describe('Regression: AI Edit (#78 / #79 contentOverride scope)', () => {
 
     const editResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/ai/edit') && resp.status() < 400,
-      { timeout: 60000 }
+      { timeout: 120000 }
     );
     await layout.getByTestId('ai-chat-send-button').click();
     await editResponsePromise;

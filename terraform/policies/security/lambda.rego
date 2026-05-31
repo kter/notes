@@ -38,11 +38,15 @@ deny contains msg if {
 
 # --- Check 3: Every Lambda must have an explicit CloudWatch log group ---
 
-# Collect log group names that are being created/updated
+# Collect log group names that will exist after apply.
+# This includes no-op log groups (already provisioned, unchanged in this plan),
+# not just those being created/updated — otherwise an incremental plan that only
+# updates a Lambda (e.g. a new image digest or environment variable) would falsely
+# fail because its pre-existing log group is a no-op in resource_changes.
 _log_group_names contains name if {
 	rc := input.resource_changes[_]
 	rc.type == "aws_cloudwatch_log_group"
-	resource_applies(rc)
+	rc.change.after != null
 	name := rc.change.after.name
 }
 

@@ -153,3 +153,80 @@ class TestUploadImage:
 
         assert response.status_code == 201
         assert response.json()["url"].endswith(".jpg")
+
+    def test_upload_spoofed_png_header_with_jpeg_content_returns_400(
+        self, client: TestClient
+    ):
+        """A request claiming image/png but carrying JPEG bytes must be rejected.
+
+        This exercises the magic-byte mismatch branch (header vs. content), the
+        core of the recently added anti-spoofing defense.
+        """
+        jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 10
+
+        response = client.post(
+            "/api/images",
+            files={"file": ("evil.png", io.BytesIO(jpeg_bytes), "image/png")},
+        )
+
+        assert response.status_code == 400
+        assert "mismatch" in response.json()["detail"]
+
+    def test_upload_spoofed_jpeg_header_with_png_content_returns_400(
+        self, client: TestClient
+    ):
+        """A request claiming image/jpeg but carrying PNG bytes must be rejected."""
+        png_bytes = make_png_bytes()
+
+        response = client.post(
+            "/api/images",
+            files={"file": ("evil.jpg", io.BytesIO(png_bytes), "image/jpeg")},
+        )
+
+        assert response.status_code == 400
+        assert "mismatch" in response.json()["detail"]
+
+    def test_upload_unrecognized_magic_bytes_returns_400(self, client: TestClient):
+        """Binary that matches no supported format signature must be rejected."""
+        garbage = b"\x00\x01\x02\x03" + b"A" * 100
+
+        response = client.post(
+            "/api/images",
+            files={"file": ("data.png", io.BytesIO(garbage), "image/png")},
+        )
+
+        assert response.status_code == 400
+        assert "does not match" in response.json()["detail"]
+
+    def test_upload_valid_webp_returns_201(self, client: TestClient):
+        """A minimal valid WebP (RIFF....WEBP) should pass magic-byte validation."""
+        # RIFF + 4-byte little-endian size + "WEBP" + minimal padding
+        webp_bytes = b"RIFF" + b"\x24\x00\x00\x00" + b"WEBP" + b"VP8 " + b"\x00" * 20
+
+        with patch("app.features.images.use_cases.boto3") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.client.return_value = mock_s3
+
+            response = client.post(
+                "/api/images",
+                files={"file": ("img.webp", io.BytesIO(webp_bytes), "image/webp")},
+            )
+
+        assert response.status_code == 201
+        assert response.json()["url"].endswith(".webp")
+
+    def test_upload_valid_gif_returns_201(self, client: TestClient):
+        """A minimal valid GIF (GIF89a) should pass magic-byte validation."""
+        gif_bytes = b"GIF89a" + b"\x00" * 20
+
+        with patch("app.features.images.use_cases.boto3") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.client.return_value = mock_s3
+
+            response = client.post(
+                "/api/images",
+                files={"file": ("img.gif", io.BytesIO(gif_bytes), "image/gif")},
+            )
+
+        assert response.status_code == 201
+        assert response.json()["url"].endswith(".gif")

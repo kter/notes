@@ -100,6 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** メールアドレスとパスワードでサインインし、ユーザー情報を再取得する。 */
   const handleSignIn = async (email: string, password: string) => {
     if (isDevAuthBypass) return;
+    // セッション失効中は Amplify のローカルストレージに古いセッションが残っており、
+    // signIn() を呼ぶと UserAlreadyAuthenticatedException が発生する。
+    // 先に signOut() で Amplify セッションをクリアしてから再サインインする。
+    if (sessionExpired) {
+      try { await signOut(); } catch { /* 旧セッションのクリアに失敗しても続行 */ }
+    }
     const input: SignInInput = { username: email, password };
     await signIn(input);
     setSessionExpired(false);

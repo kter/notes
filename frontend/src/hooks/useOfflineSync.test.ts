@@ -19,6 +19,15 @@ vi.mock('./useApi', () => ({
   }),
 }))
 
+// Mock auth-context
+const notifySessionExpiredMock = vi.fn()
+vi.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({
+    sessionExpired: false,
+    notifySessionExpired: notifySessionExpiredMock,
+  }),
+}))
+
 vi.mock('@/hooks/useTranslation', () => ({
   useTranslation: () => ({
     t: (key: string) => {

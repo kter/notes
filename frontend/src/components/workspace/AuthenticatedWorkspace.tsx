@@ -18,6 +18,7 @@ import {
   ThreeColumnLayout,
 } from "@/components/layout";
 import { SyncStatusIndicator } from "@/components/ui/SyncStatusIndicator";
+import { SessionExpiredBanner } from "@/components/ui/SessionExpiredBanner";
 import { WorkspaceSidebarFooter } from "@/components/workspace/WorkspaceSidebarFooter";
 import { useTranslation } from "@/hooks";
 import { useWorkspaceState } from "@/hooks/workspace/useWorkspaceState";
@@ -150,6 +151,7 @@ export function AuthenticatedWorkspace({
         savedLocally={false}
         className="fixed bottom-20 md:bottom-4 right-4 z-50"
       />
+      <SessionExpiredBanner className="fixed bottom-32 md:bottom-16 right-4 z-50" />
       <SettingsDialog
         open={workspace.isSettingsOpen}
         onOpenChange={workspace.setIsSettingsOpen}

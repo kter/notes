@@ -235,6 +235,8 @@ export const en = {
     localSaveFailed: "Failed to save locally",
     conflictReloaded: "A sync conflict was detected, so the latest server state was reloaded",
     retryingIn: "Retrying in {{seconds}}s...",
+    sessionExpired: "Your session expired. Please sign in again.",
+    retryExhausted: "Sync failed after multiple attempts (saved locally).",
   },
 
   // Share
@@ -516,6 +518,8 @@ export type TranslationKeys = {
     localSaveFailed: string;
     conflictReloaded: string;
     retryingIn: string;
+    sessionExpired: string;
+    retryExhausted: string;
   };
   share: {
     title: string;

@@ -18,12 +18,14 @@ import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
 import {
   getWorkspaceSyncRequestMetadata,
+  isAuthApiError,
   isConflictApiError,
   persistWorkspaceSnapshotIncremental,
   refreshWorkspaceSnapshot,
   withSnippet,
 } from "@/lib/workspaceSync";
 import { useApi } from "@/hooks/useApi";
+import { useAuth } from "@/lib/auth-context";
 import type { Note, WorkspaceSnapshotResponse } from "@/types";
 
 import { useDebouncedAsync } from "./useDebouncedAsync";
@@ -69,6 +71,7 @@ export function useNoteSyncEngine({
   onSnapshotSynced,
 }: NoteSyncEngineParams): NoteSyncEngineResult {
   const { getApi } = useApi();
+  const { notifySessionExpired } = useAuth();
   const { t } = useTranslation();
   const [localStatus, setLocalStatus] = useState<LocalSyncStatus>("saved");
   const [remoteStatus, setRemoteStatus] = useState<RemoteSyncStatus>("synced");
@@ -201,6 +204,24 @@ export function useNoteSyncEngine({
               setLastError(t("sync.conflictReloaded"));
               return;
             }
+            // 401: セッション失効。リトライでは回復しないため即時中断しバナーを表示する。
+            if (isAuthApiError(error)) {
+              logger.warn("Session expired during note sync", error);
+              await syncQueue.addChange("update", "note", id, updates, {
+                expectedVersion,
+              });
+              clearTimeout(retryTimeoutRef.current ?? undefined);
+              clearInterval(retryIntervalRef.current ?? undefined);
+              retryTimeoutRef.current = null;
+              retryIntervalRef.current = null;
+              retryAttemptRef.current = 0;
+              retryArgsRef.current = null;
+              setRetryCountdown(undefined);
+              setRemoteStatus("failed");
+              setLastError(t("sync.sessionExpired"));
+              notifySessionExpired();
+              return;
+            }
             logger.error("Failed to sync note to server", error);
             await syncQueue.addChange("update", "note", id, updates, {
               expectedVersion,
@@ -210,7 +231,11 @@ export function useNoteSyncEngine({
 
             const attempt = retryAttemptRef.current;
             // 指数バックオフで次のリトライ遅延を計算し、最大値でクランプする。
-            // 一時的な失敗は成功するまで無限にリトライし続ける（上限なし）。
+            // maxRetryAttempts 回を超えた場合はリトライを打ち切り failed で終端する。
+            if (attempt >= SYNC_RETRY_CONFIG.maxRetryAttempts) {
+              setLastError(t("sync.retryExhausted"));
+              return;
+            }
             const delayMs = Math.min(
               SYNC_RETRY_CONFIG.retryBaseDelayMs * Math.pow(2, attempt),
               SYNC_RETRY_CONFIG.retryMaxDelayMs
@@ -264,6 +289,7 @@ export function useNoteSyncEngine({
     [
       getApi,
       handleSnapshotSynced,
+      notifySessionExpired,
       setNotes,
       setServerVersion,
       syncServerVersionsFromSnapshot,
@@ -361,6 +387,18 @@ export function useNoteSyncEngine({
           setLastError(t("sync.conflictReloaded"));
           return;
         }
+        if (isAuthApiError(error)) {
+          logger.warn("Session expired during note create", error);
+          await syncQueue.addChange("create", "note", tempId, {
+            title: "",
+            content: "",
+            folder_id: selectedFolderId,
+          });
+          setRemoteStatus("failed");
+          setLastError(t("sync.sessionExpired"));
+          notifySessionExpired();
+          return;
+        }
         logger.error("Failed to create note on server", error);
         await syncQueue.addChange("create", "note", tempId, {
           title: "",
@@ -381,6 +419,7 @@ export function useNoteSyncEngine({
   }, [
     getApi,
     handleSnapshotSynced,
+    notifySessionExpired,
     selectedFolderId,
     setNotes,
     setSelectedNoteId,
@@ -557,6 +596,18 @@ export function useNoteSyncEngine({
               setLastError(t("sync.conflictReloaded"));
               return;
             }
+            if (isAuthApiError(error)) {
+              logger.warn("Session expired during note delete", error);
+              if (!id.startsWith("temp-")) {
+                await syncQueue.addChange("delete", "note", id, undefined, {
+                  expectedVersion,
+                });
+              }
+              setRemoteStatus("failed");
+              setLastError(t("sync.sessionExpired"));
+              notifySessionExpired();
+              return;
+            }
             logger.error("Failed to delete note on server", error);
             if (!id.startsWith("temp-")) {
               await syncQueue.addChange("delete", "note", id, undefined, {
@@ -581,6 +632,7 @@ export function useNoteSyncEngine({
       getApi,
       getExpectedVersion,
       handleSnapshotSynced,
+      notifySessionExpired,
       selectedNoteId,
       setNotes,
       setSelectedNoteId,

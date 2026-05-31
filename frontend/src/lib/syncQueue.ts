@@ -14,6 +14,7 @@ import { ApiError } from "./api";
 import {
   getWorkspaceSyncRequestMetadata,
   persistWorkspaceSnapshot,
+  isAuthApiError,
   isConflictApiError,
   refreshWorkspaceSnapshot,
 } from "./workspaceSync";
@@ -34,7 +35,7 @@ interface SyncResult {
   failedCount: number;
   errors: Error[];
   snapshot?: WorkspaceChangesResponse["snapshot"];
-  errorCode?: "conflict";
+  errorCode?: "conflict" | "auth";
 }
 
 interface ProcessQueueOptions {
@@ -179,6 +180,11 @@ class SyncQueueManager {
           result.snapshot = snapshot;
           result.errorCode = "conflict";
           result.success = false;
+        } else if (isAuthApiError(error)) {
+          // 401 セッション失効: 変更は保留のまま残す（破棄しない）。
+          // 呼び出し元が notifySessionExpired() を呼んでバナーを表示する。
+          result.errorCode = "auth";
+          result.success = false;
         } else if (this.isPermanentError(error)) {
           for (const change of changes) {
             await notesDB.removePendingChange(change.id);
@@ -251,6 +257,7 @@ class SyncQueueManager {
   /**
    * リトライ不要な永続的エラーかを判定する。
    * 4xx のうち認証・権限・タイムアウト・競合・レート制限を除いたものを永続エラーとみなす。
+   * 401 は auth 分岐で別処理（変更を保留したまま呼び出し元がバナーを表示する）。
    */
   private isPermanentError(error: unknown): boolean {
     if (!(error instanceof ApiError)) {
@@ -258,7 +265,7 @@ class SyncQueueManager {
     }
 
     const status = error.status;
-    // 401/403/408/409/429 はリトライ対象のため除外する
+    // 401 は isAuthApiError で先に捕捉される。403/408/409/429 はリトライ対象のため除外する
     return status >= 400 && status < 500 && ![401, 403, 408, 409, 429].includes(status);
   }
 }

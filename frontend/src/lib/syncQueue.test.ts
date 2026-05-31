@@ -29,6 +29,8 @@ vi.mock("./workspaceSync", () => ({
   }),
   isConflictApiError: (error: unknown) =>
     error instanceof ApiError && error.status === 409,
+  isAuthApiError: (error: unknown) =>
+    error instanceof ApiError && error.status === 401,
   refreshWorkspaceSnapshot: vi.fn(async (apiClient: {
     getWorkspaceSnapshot: () => Promise<{
       cursor: string;

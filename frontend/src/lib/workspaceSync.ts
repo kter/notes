@@ -184,6 +184,14 @@ export function isConflictApiError(error: unknown): error is ApiError {
 }
 
 /**
+ * HTTP 401 認証エラーかどうかを型ガード付きで判定する。
+ * セッション完全失効時に返される。リトライでは回復しないため非リトライ扱いとする。
+ */
+export function isAuthApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 401;
+}
+
+/**
  * サーバーから最新のワークスペーススナップショットを取得し、IndexedDB に保存して返す。
  * 競合エラー（409）発生時にローカル状態をサーバーの真実で上書きするために使用する。
  */

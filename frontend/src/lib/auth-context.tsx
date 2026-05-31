@@ -42,6 +42,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  sessionExpired: boolean;
+  notifySessionExpired: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   confirmSignUp: (email: string, code: string) => Promise<void>;
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isDevAuthBypass ? { ...BYPASS_USER } : null
   );
   const [isLoading, setIsLoading] = useState(!isDevAuthBypass);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   /**
    * Cognito の現在ユーザーを取得して state を更新する。
@@ -89,11 +92,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.setUser(user?.userId ?? null);
   }, [user]);
 
+  /** セッション失効フラグを立てる。autosave / オフラインキューから呼ばれる。 */
+  const notifySessionExpired = useCallback(() => {
+    setSessionExpired(true);
+  }, []);
+
   /** メールアドレスとパスワードでサインインし、ユーザー情報を再取得する。 */
   const handleSignIn = async (email: string, password: string) => {
     if (isDevAuthBypass) return;
     const input: SignInInput = { username: email, password };
     await signIn(input);
+    setSessionExpired(false);
     await checkUser();
   };
 
@@ -124,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isDevAuthBypass) return;
     await signOut();
     setUser(null);
+    setSessionExpired(false);
   };
 
   const getAccessToken = useCallback(async (): Promise<string | null> => {
@@ -142,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        sessionExpired,
+        notifySessionExpired,
         signIn: handleSignIn,
         signUp: handleSignUp,
         confirmSignUp: handleConfirmSignUp,

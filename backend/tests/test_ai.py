@@ -158,6 +158,37 @@ def test_edit_note_content(client: TestClient, session: Session, mock_ai_service
     assert data["tokens_used"] == 30
 
 
+def test_edit_oversized_content_returns_422(
+    client: TestClient, session: Session, mock_ai_service
+):
+    """Content beyond the max size must be rejected before reaching Bedrock.
+
+    Guards against token/cost exhaustion via unbounded AI input payloads.
+    """
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "A" * 100_001,
+            "instruction": "Summarize",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_edit_oversized_instruction_returns_422(
+    client: TestClient, session: Session, mock_ai_service
+):
+    """Instruction beyond the max size must be rejected."""
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "Hello world",
+            "instruction": "x" * 2_001,
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_edit_with_note_id(client: TestClient, session: Session, mock_ai_service):
     user_id = "test-user-123"
     note = Note(title="Test Note", content="Test Content", user_id=user_id)

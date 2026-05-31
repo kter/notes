@@ -9,10 +9,16 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models import AIEditJobRead
 from app.models.enums import ChatScope
+
+# AI 入力の上限値。Bedrock への過大入力によるトークン枯渇・コスト濫用を防ぐ。
+# content は長文ノート全体を許容しつつ、無制限の巨大ペイロードは拒否する。
+MAX_AI_CONTENT_CHARS = 100_000
+MAX_AI_INSTRUCTION_CHARS = 2_000
+MAX_AI_QUESTION_CHARS = 4_000
 
 
 class BedrockMessage(BaseModel):
@@ -46,9 +52,9 @@ class ChatRequest(BaseModel):
     scope: ChatScope = ChatScope.NOTE
     note_id: UUID | None = None
     folder_id: UUID | None = None
-    question: str
+    question: str = Field(max_length=MAX_AI_QUESTION_CHARS)
     history: list[BedrockMessage] | None = None
-    selected_content: str | None = None
+    selected_content: str | None = Field(default=None, max_length=MAX_AI_CONTENT_CHARS)
 
 
 class ChatResponse(BaseModel):
@@ -61,8 +67,8 @@ class ChatResponse(BaseModel):
 class EditRequest(BaseModel):
     """同期AI編集エンドポイントへのリクエスト。"""
 
-    content: str
-    instruction: str
+    content: str = Field(max_length=MAX_AI_CONTENT_CHARS)
+    instruction: str = Field(max_length=MAX_AI_INSTRUCTION_CHARS)
     note_id: UUID | None = None
 
 

@@ -26,24 +26,35 @@ class WorkspaceSnapshotUseCase:
     def __init__(self, session: Session, user_id: str):
         self.workspace_queries = WorkspaceQueryUseCases(session, user_id)
 
-    def get_snapshot(self) -> WorkspaceSnapshotResponse:
-        """全フォルダ・ノートを取得しスナップショットを返す。
+    def get_snapshot(
+        self, since_cursor: str | None = None
+    ) -> WorkspaceSnapshotResponse:
+        """フォルダ・ノートのスナップショットを返す。
 
-        include_deleted=True を指定することで soft delete 済みエントリも含める。
-        クライアントはこの一覧でローカル DB と差分同期を行う。
+        since_cursor が指定された場合は、そのカーソル時刻より後に更新された
+        エントリのみ（削除済みの tombstone を含む）を差分として返す。未指定の
+        場合は全件を返す（初回ブートストラップ用）。いずれも soft delete 済みを
+        含めることで、クライアントは削除も含めてローカル DB と同期できる。
         失敗時はエラーログを記録して例外を再送出する。
         """
         try:
+            updated_after = self._parse_cursor(since_cursor)
             folders = [
                 FolderRead.model_validate(folder)
-                for folder in self.workspace_queries.list_folders(include_deleted=True)
+                for folder in self.workspace_queries.list_folders(
+                    include_deleted=True, updated_after=updated_after
+                )
             ]
             notes = [
                 NoteRead.model_validate(note)
-                for note in self.workspace_queries.list_all_notes(include_deleted=True)
+                for note in self.workspace_queries.list_all_notes(
+                    include_deleted=True, updated_after=updated_after
+                )
             ]
             server_time = datetime.now(UTC)
-            cursor = self._build_cursor(folders, notes, server_time)
+            # 差分が空のときは起点カーソルを維持し、巻き戻りを防ぐ。
+            fallback = updated_after or server_time
+            cursor = self._build_cursor(folders, notes, fallback)
             return WorkspaceSnapshotResponse(
                 folders=folders,
                 notes=notes,
@@ -60,16 +71,34 @@ class WorkspaceSnapshotUseCase:
             raise
 
     @staticmethod
+    def _parse_cursor(since_cursor: str | None) -> datetime | None:
+        """カーソル文字列を tz-aware な datetime に変換する。
+
+        None・空文字・解析不能な値は None（差分なし＝全件取得）として扱う。
+        tzinfo が欠落している場合は UTC を補完する。
+        """
+        if not since_cursor:
+            return None
+        try:
+            parsed = datetime.fromisoformat(since_cursor)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed
+
+    @staticmethod
     def _build_cursor(
-        folders: list[FolderRead], notes: list[NoteRead], server_time: datetime
+        folders: list[FolderRead], notes: list[NoteRead], fallback: datetime
     ) -> str:
         """スナップショットのカーソルを算出して返す。
 
-        全フォルダ・ノートの updated_at の最大値を ISO 8601 文字列にして返す。
-        エントリが1件もない場合は server_time をデフォルト値として使用する。
+        返却したフォルダ・ノートの updated_at の最大値を ISO 8601 文字列にして返す。
+        差分が空の場合は fallback（起点カーソルまたはサーバー時刻）を使用し、
+        カーソルが過去に巻き戻らないようにする。
         """
         latest_updated_at = max(
             [item.updated_at for item in folders] + [item.updated_at for item in notes],
-            default=server_time,
+            default=fallback,
         )
         return latest_updated_at.isoformat()

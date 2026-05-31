@@ -9,7 +9,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.features.workspace.dependencies import get_workspace_snapshot_use_case
 from app.features.workspace.schemas import WorkspaceSnapshotResponse
@@ -23,6 +23,18 @@ def get_workspace_snapshot(
     use_case: Annotated[
         WorkspaceSnapshotUseCase, Depends(get_workspace_snapshot_use_case)
     ],
+    since: Annotated[
+        str | None,
+        Query(
+            description=(
+                "差分同期用カーソル。指定するとこの時刻より後に更新された"
+                "エンティティ（削除済み tombstone を含む）のみを返す。"
+            )
+        ),
+    ] = None,
 ):
-    """ブートストラップおよび同期用のワークスペーススナップショットを返す。"""
-    return use_case.get_snapshot()
+    """ブートストラップおよび同期用のワークスペーススナップショットを返す。
+
+    since を指定すると差分のみ、未指定だと全件を返す。
+    """
+    return use_case.get_snapshot(since_cursor=since)

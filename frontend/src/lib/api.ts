@@ -19,14 +19,7 @@ import type {
   EditJobRequest,
   EditRequest,
   EditResponse,
-  Folder,
-  FolderCreate,
-  FolderUpdate,
-
-  Note,
-  NoteCreate,
   NoteShare,
-  NoteUpdate,
   SettingsResponse,
   SharedNote,
   SummarizeRequest,
@@ -112,68 +105,21 @@ class ApiClient {
     return response.json();
   }
 
-  // Folders API
-  async listFolders(): Promise<Folder[]> {
-    return this.request<Folder[]>("/api/folders");
-  }
-
-  async createFolder(data: FolderCreate): Promise<Folder> {
-    return this.request<Folder>("/api/folders", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getFolder(id: string): Promise<Folder> {
-    return this.request<Folder>(`/api/folders/${id}`);
-  }
-
-  async updateFolder(id: string, data: FolderUpdate): Promise<Folder> {
-    return this.request<Folder>(`/api/folders/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteFolder(id: string): Promise<void> {
-    return this.request<void>(`/api/folders/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  // Notes API
-  async listNotes(folderId?: string): Promise<Note[]> {
-    const query = folderId ? `?folder_id=${folderId}` : "";
-    return this.request<Note[]>(`/api/notes${query}`);
-  }
-
-  async createNote(data: NoteCreate): Promise<Note> {
-    return this.request<Note>("/api/notes", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getNote(id: string): Promise<Note> {
-    return this.request<Note>(`/api/notes/${id}`);
-  }
-
-  async updateNote(id: string, data: NoteUpdate): Promise<Note> {
-    return this.request<Note>(`/api/notes/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteNote(id: string): Promise<void> {
-    return this.request<void>(`/api/notes/${id}`, {
-      method: "DELETE",
-    });
-  }
-
   // Workspace Sync API
-  async getWorkspaceSnapshot(): Promise<WorkspaceSnapshotResponse> {
-    return this.request<WorkspaceSnapshotResponse>("/api/workspace/snapshot");
+  //
+  // All note/folder reads and writes flow through the workspace snapshot and
+  // changes endpoints below. The per-entity REST methods (listNotes,
+  // createFolder, ...) were removed as dead code — the backend routers remain
+  // for the external API-key integration, but the in-app client never used them.
+  async getWorkspaceSnapshot(
+    sinceCursor?: string
+  ): Promise<WorkspaceSnapshotResponse> {
+    const query = sinceCursor
+      ? `?since=${encodeURIComponent(sinceCursor)}`
+      : "";
+    return this.request<WorkspaceSnapshotResponse>(
+      `/api/workspace/snapshot${query}`
+    );
   }
 
   async applyWorkspaceChanges(

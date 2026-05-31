@@ -16,10 +16,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { notesDB } from "@/lib/indexedDB";
 import { logger } from "@/lib/logger";
-import { mergeFolders, mergeNotes } from "@/lib/merge";
+import {
+  mergeFolders,
+  mergeNotes,
+  reconcileFoldersDelta,
+  reconcileNotesDelta,
+} from "@/lib/merge";
 import {
   getActiveFolders,
   getActiveNotes,
+  getWorkspaceCursor,
+  isDeletedEntity,
   persistWorkspaceSnapshot,
   withSnippet,
 } from "@/lib/workspaceSync";
@@ -75,16 +82,31 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
 
         if (navigator.onLine) {
           const apiClient = await getApi();
-          const snapshot = await apiClient.getWorkspaceSnapshot();
+          // ローカルキャッシュとカーソルがある再訪時は差分のみ取得し、初回は全件取得する。
+          const cursor = getWorkspaceCursor();
+          const useDelta =
+            cursor !== null &&
+            (localFolders.length > 0 || localNotes.length > 0);
+          const snapshot = await apiClient.getWorkspaceSnapshot(
+            useDelta ? cursor : undefined
+          );
           if (!isActive) {
             return;
           }
 
-          const serverFolders = getActiveFolders(snapshot);
-          const serverNotes = getActiveNotes(snapshot);
-
-          setFolders(mergeFolders(localFolders, serverFolders));
-          setNotes(mergeNotes(localNotes, serverNotes));
+          if (useDelta) {
+            // 差分: tombstone を含む delta をローカルへ適用（取りこぼし防止）
+            const deltaNotes = snapshot.notes.map((note) =>
+              isDeletedEntity(note) ? note : withSnippet(note)
+            );
+            setFolders(reconcileFoldersDelta(localFolders, snapshot.folders));
+            setNotes(reconcileNotesDelta(localNotes, deltaNotes));
+          } else {
+            const serverFolders = getActiveFolders(snapshot);
+            const serverNotes = getActiveNotes(snapshot);
+            setFolders(mergeFolders(localFolders, serverFolders));
+            setNotes(mergeNotes(localNotes, serverNotes));
+          }
 
           await persistWorkspaceSnapshot(snapshot);
         }

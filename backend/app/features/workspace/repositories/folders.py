@@ -21,11 +21,22 @@ class FolderRepository(UserScopedRepository[Folder]):
     model = Folder
     resource_name = "Folder"
 
-    def list(self, *, include_deleted: bool = False) -> list[Folder]:
-        """ユーザーのフォルダ一覧を更新日時の降順で返す。削除済み除外に対応。"""
+    def list(
+        self,
+        *,
+        include_deleted: bool = False,
+        updated_after: datetime | None = None,
+    ) -> list[Folder]:
+        """ユーザーのフォルダ一覧を更新日時の降順で返す。
+
+        削除済み除外に加え、updated_after を指定するとその時刻より後に更新された
+        フォルダのみを返す（差分同期用）。
+        """
         statement = select(Folder).where(Folder.user_id == self.user_id)
         if not include_deleted:
             statement = statement.where(Folder.deleted_at.is_(None))
+        if updated_after is not None:
+            statement = statement.where(Folder.updated_at > updated_after)
         folders = self.session.exec(statement).all()
         for folder in folders:
             normalize_version(folder)

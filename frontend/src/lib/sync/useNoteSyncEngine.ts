@@ -82,6 +82,10 @@ export function useNoteSyncEngine({
   const retryArgsRef = useRef<{ id: string; updates: NoteSyncUpdates; expectedVersion?: number } | null>(null);
   const syncNoteToServerRef = useRef<((id: string, updates: NoteSyncUpdates, expectedVersion?: number) => Promise<void>) | null>(null);
   const serverVersionByNoteIdRef = useRef<Record<string, number>>({});
+  // ノート ID ごとに、デバウンス窓の間に発生した更新フィールドを統合して保持する。
+  // タイトルと本文を相次いで編集した場合に、両方を 1 件の変更にまとめて送ることで
+  // 同一 expected_version の競合 (409) によるフィールド消失を防ぐ。
+  const pendingUpdatesByNoteIdRef = useRef<Record<string, NoteSyncUpdates>>({});
   const handleSnapshotSynced = onSnapshotSynced ?? NOOP_SNAPSHOT_SYNC;
 
   /**
@@ -141,6 +145,9 @@ export function useNoteSyncEngine({
    */
   const syncNoteToServer = useCallback(
     async (id: string, updates: NoteSyncUpdates, expectedVersion?: number) => {
+      // 送信時点で当該ノートの保留統合バッファを確定・クリアする。
+      // これ以降に到着する編集は、新しい expected_version を基にした次の同期へ蓄積される。
+      delete pendingUpdatesByNoteIdRef.current[id];
       if (navigator.onLine) {
         const task = async () => {
           setRemoteStatus("syncing");
@@ -477,13 +484,22 @@ export function useNoteSyncEngine({
         }
       }
 
+      // デバウンス窓内の更新フィールドを統合する。
+      // 例: 先にタイトル {title}、続いて本文 {content} が来た場合、{title, content} に
+      // まとめて 1 件の変更として送信し、同一 expected_version での競合を回避する。
+      const mergedUpdates: NoteSyncUpdates = {
+        ...pendingUpdatesByNoteIdRef.current[id],
+        ...updates,
+      };
+      pendingUpdatesByNoteIdRef.current[id] = mergedUpdates;
+
       const expectedVersion = getExpectedVersion(id, noteForLocalSave?.version);
       setRemoteStatus("unsynced");
       if (options?.immediate) {
         cancelServerSync();
-        void syncNoteToServer(id, updates, expectedVersion);
+        void syncNoteToServer(id, mergedUpdates, expectedVersion);
       } else {
-        debouncedServerSync(id, updates, expectedVersion);
+        debouncedServerSync(id, mergedUpdates, expectedVersion);
       }
     },
     [cancelServerSync, debouncedServerSync, getExpectedVersion, setNotes, syncNoteToServer, t]
@@ -497,6 +513,8 @@ export function useNoteSyncEngine({
     async (id: string) => {
       try {
         cancelServerSync();
+        // 削除されるノートの保留統合バッファを破棄し、不要な更新送信を防ぐ。
+        delete pendingUpdatesByNoteIdRef.current[id];
         const noteToDelete = await notesDB.getNote(id);
         const expectedVersion = getExpectedVersion(id, noteToDelete?.version);
 

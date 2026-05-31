@@ -202,42 +202,39 @@ export function useNoteSyncEngine({
             setLastError(t("sync.serverSyncFailed"));
 
             const attempt = retryAttemptRef.current;
-            if (attempt < SYNC_RETRY_CONFIG.maxRetryAttempts) {
-              // 指数バックオフで次のリトライ遅延を計算し、最大値でクランプする
-              const delayMs = Math.min(
-                SYNC_RETRY_CONFIG.retryBaseDelayMs * Math.pow(2, attempt),
-                SYNC_RETRY_CONFIG.retryMaxDelayMs
-              );
-              const delaySec = Math.round(delayMs / 1000);
-              retryArgsRef.current = { id, updates, expectedVersion };
-              setRetryCountdown(delaySec);
+            // 指数バックオフで次のリトライ遅延を計算し、最大値でクランプする。
+            // 一時的な失敗は成功するまで無限にリトライし続ける（上限なし）。
+            const delayMs = Math.min(
+              SYNC_RETRY_CONFIG.retryBaseDelayMs * Math.pow(2, attempt),
+              SYNC_RETRY_CONFIG.retryMaxDelayMs
+            );
+            const delaySec = Math.round(delayMs / 1000);
+            retryArgsRef.current = { id, updates, expectedVersion };
+            setRetryCountdown(delaySec);
 
-              retryIntervalRef.current = setInterval(() => {
-                setRetryCountdown((prev) => {
-                  if (prev === undefined || prev <= 1) {
-                    clearInterval(retryIntervalRef.current!);
-                    retryIntervalRef.current = null;
-                    return 0;
-                  }
-                  return prev - 1;
-                });
-              }, 1000);
-
-              retryTimeoutRef.current = setTimeout(() => {
-                retryTimeoutRef.current = null;
-                clearInterval(retryIntervalRef.current!);
-                retryIntervalRef.current = null;
-                setRetryCountdown(undefined);
-                const args = retryArgsRef.current;
-                retryArgsRef.current = null;
-                if (args && syncNoteToServerRef.current) {
-                  retryAttemptRef.current += 1;
-                  void syncNoteToServerRef.current(args.id, args.updates, args.expectedVersion);
+            retryIntervalRef.current = setInterval(() => {
+              setRetryCountdown((prev) => {
+                if (prev === undefined || prev <= 1) {
+                  clearInterval(retryIntervalRef.current!);
+                  retryIntervalRef.current = null;
+                  return 0;
                 }
-              }, delayMs);
-            } else {
-              setRetryCountdown(undefined); // exhausted, stay failed
-            }
+                return prev - 1;
+              });
+            }, 1000);
+
+            retryTimeoutRef.current = setTimeout(() => {
+              retryTimeoutRef.current = null;
+              clearInterval(retryIntervalRef.current!);
+              retryIntervalRef.current = null;
+              setRetryCountdown(undefined);
+              const args = retryArgsRef.current;
+              retryArgsRef.current = null;
+              if (args && syncNoteToServerRef.current) {
+                retryAttemptRef.current += 1;
+                void syncNoteToServerRef.current(args.id, args.updates, args.expectedVersion);
+              }
+            }, delayMs);
           } finally {
             if (activeSavePromiseRef.current === currentPromise) {
               activeSavePromiseRef.current = null;

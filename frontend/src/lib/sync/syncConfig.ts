@@ -2,14 +2,14 @@
  * サーバー同期失敗時の指数バックオフリトライ設定。
  *
  * リトライ間隔は retryBaseDelayMs * 2^attempt で計算し、
- * retryMaxDelayMs を上限として打ち切る。
- * maxRetryAttempts を超えた場合はリトライを中止し、"failed" 状態のままにする。
+ * retryMaxDelayMs を上限として頭打ちにする。
+ * 一時的なエラー（ネットワーク障害など）は成功するまでリトライし続ける。
+ * 409 競合エラーのみリトライ対象外（スナップショット再取得で解決）。
+ * オフライン時は syncQueue に積み、再接続時にフラッシュする。
  */
 export const SYNC_RETRY_CONFIG = {
-  /** 最大リトライ回数。これを超えると自動リトライを諦める */
-  maxRetryAttempts: 3,
   /** リトライ間隔の基準値 (ms)。指数バックオフの底として使用 */
   retryBaseDelayMs: 2000,
-  /** リトライ間隔の上限 (ms)。バックオフが際限なく伸びないよう制限 */
+  /** リトライ間隔の上限 (ms)。バックオフが際限なく伸びないよう制限（例: 2s→4s→8s→16s→30s→30s…） */
   retryMaxDelayMs: 30000,
 } as const;

@@ -1,9 +1,12 @@
+# Tool versions for the project. Run `mise install` after cloning.
+# All versions are pinned to concrete releases for reproducibility across
+# machines and CI — do not use "latest" (a floating version makes the
+# pre-commit hooks and lint output non-deterministic between contributors).
 [tools]
 node = "24.14.0"
 python = "3.12.3"
-go = "1.26.0"
-terraform = "1"
-"awscli" = "latest"
-uv = "latest"
-lefthook = "latest"
-"github:open-policy-agent/conftest" = "latest"
+terraform = "1.15.5"
+awscli = "2.34.57"
+uv = "0.11.17"
+lefthook = "2.1.9"
+"github:open-policy-agent/conftest" = "0.68.2"

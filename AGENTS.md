@@ -26,7 +26,9 @@ This repository is a Mac Notes app clone with AI-powered features built on a ser
 ## Common Commands
 
 ```bash
-make dev
+make dev          # prints local dev startup options
+make dev-stack    # one command: backend + frontend with auth bypass against dev DSQL
+                  # (requires the AWS dev profile and `make tf-init ENV=dev`)
 make test
 make install-hooks
 make deploy ENV=prd

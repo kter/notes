@@ -19,7 +19,12 @@ async function openSettings(
   const container = isMobile
     ? page.getByTestId('mobile-layout-folders')
     : page.getByTestId('desktop-layout');
-  const settingsButton = container.locator('button[title="Settings"]').first();
+  // The settings button title/aria-label is localized (en: "Settings", ja: "設定"),
+  // so match by accessible name in either language to keep the helper
+  // language-agnostic regardless of the shared dev account's saved locale.
+  const settingsButton = container
+    .getByRole('button', { name: /Settings|設定/ })
+    .first();
   await expect(settingsButton).toBeVisible({ timeout: 15000 });
   await settingsButton.click();
 }
@@ -184,7 +189,6 @@ test.describe('Regression: API Key Lifecycle', () => {
 
       // D. Revoke via UI — navigate from the unique key name up to its row div
       const keyRow = dialog.locator('p').filter({ hasText: keyName }).locator('xpath=ancestor::div[button][1]');
-      page.once('dialog', (d) => d.accept());
       const revokeRespPromise = page.waitForResponse(
         (r) =>
           r.url().includes(`/api/settings/api-keys/${createdKeyId}`) &&
@@ -192,6 +196,9 @@ test.describe('Regression: API Key Lifecycle', () => {
         { timeout: 30_000 },
       );
       await keyRow.getByRole('button', { name: /Revoke|失効/i }).click();
+      // Revoke opens an in-app confirm modal (migrated from native window.confirm
+      // in #129); confirm it. Label is localized: en "Confirm" / ja "確認".
+      await page.getByRole('button', { name: /^(Confirm|確認)$/ }).click();
       const revokeResp = await revokeRespPromise;
       expect(revokeResp.status()).toBe(204);
       createdKeyId = null;

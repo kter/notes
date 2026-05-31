@@ -12,7 +12,12 @@ async function openSettings(page: Parameters<typeof waitForWorkspaceSnapshotRead
   const container = isMobile
     ? page.getByTestId('mobile-layout-folders')
     : page.getByTestId('desktop-layout');
-  const settingsButton = container.locator('button[title="Settings"]').first();
+  // The settings button title/aria-label is localized (en: "Settings", ja: "設定"),
+  // so match by accessible name in either language to keep the helper
+  // language-agnostic regardless of the shared dev account's saved locale.
+  const settingsButton = container
+    .getByRole('button', { name: /Settings|設定/ })
+    .first();
   await expect(settingsButton).toBeVisible({ timeout: 15000 });
   await settingsButton.click();
 }

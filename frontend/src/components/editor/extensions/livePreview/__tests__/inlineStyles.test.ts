@@ -7,8 +7,9 @@
 import { describe, expect, it } from "vitest";
 import { EditorState, EditorSelection, type Range } from "@codemirror/state";
 import { Decoration, EditorView } from "@codemirror/view";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
+import { GFM } from "@lezer/markdown";
 import { buildInlineDecorations } from "../inlineStyles";
 
 /** DOM なしで動作する最小限の EditorView シム */
@@ -27,7 +28,24 @@ function makeState(doc: string, cursorPos = 0): EditorState {
     extensions: [markdown()],
   });
   ensureSyntaxTree(state, state.doc.length, 1e9);
-  return state;
+  // LanguageState.tree は state 生成時のスナップショット。初期パース（20ms 予算）が
+  // CPU 負荷で時間切れになると syntaxTree(state) が部分木を返し flaky になるため、
+  // 空トランザクションを適用して ensureSyntaxTree 完了後の完全な木を反映した state を返す。
+  return state.update({}).state;
+}
+
+/** Strikethrough（~~）は GFM 拡張のノードなので GFM 入りでパースする */
+function makeGfmState(doc: string, cursorPos = 0): EditorState {
+  const state = EditorState.create({
+    doc,
+    selection: EditorSelection.cursor(cursorPos),
+    extensions: [markdown({ base: markdownLanguage, extensions: [GFM] })],
+  });
+  ensureSyntaxTree(state, state.doc.length, 1e9);
+  // LanguageState.tree は state 生成時のスナップショット。初期パース（20ms 予算）が
+  // CPU 負荷で時間切れになると syntaxTree(state) が部分木を返し flaky になるため、
+  // 空トランザクションを適用して ensureSyntaxTree 完了後の完全な木を反映した state を返す。
+  return state.update({}).state;
 }
 
 // ---------------------------------------------------------------
@@ -164,6 +182,53 @@ describe("buildInlineDecorations — InlineCode", () => {
     const decs = buildInlineDecorations(state, makeFakeView(state));
     const marks = getMarkDecs(decs, "cm-md-code");
     expect(marks.some((d) => d.from === 7 && d.to === 11)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------
+// Strikethrough  (~~gone~~) — GFM extension node
+// ---------------------------------------------------------------
+describe("buildInlineDecorations — Strikethrough (GFM)", () => {
+  const doc = "hello ~~gone~~ end";
+  //           0123456789...
+  // ~~gone~~ spans [6, 14]: ~~ at [6,8], "gone" at [8,12], ~~ at [12,14]
+
+  it("emits a cm-md-strikethrough mark decoration covering the full node", () => {
+    const state = makeGfmState(doc);
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const marks = getMarkDecs(decs, "cm-md-strikethrough");
+    expect(marks.length).toBeGreaterThanOrEqual(1);
+    expect(marks.some((d) => d.from === 6 && d.to === 14)).toBe(true);
+  });
+
+  it("emits replace decorations for both ~~ markers when cursor is outside", () => {
+    const state = makeGfmState(doc, 0);
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const replaces = getReplaceDecs(decs);
+    expect(replaces.some((d) => d.from === 6 && d.to === 8)).toBe(true);
+    expect(replaces.some((d) => d.from === 12 && d.to === 14)).toBe(true);
+  });
+
+  it("does NOT emit replace decorations when cursor is inside ~~gone~~", () => {
+    const state = makeGfmState(doc, 10); // cursor inside "gone"
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const replaces = getReplaceDecs(decs);
+    expect(replaces.some((d) => d.from === 6 && d.to === 8)).toBe(false);
+    expect(replaces.some((d) => d.from === 12 && d.to === 14)).toBe(false);
+  });
+
+  it("emits cm-md-marker on ~~ markers when cursor is inside", () => {
+    const state = makeGfmState(doc, 10);
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    const markers = getMarkDecs(decs, "cm-md-marker");
+    expect(markers.some((d) => d.from === 6 && d.to === 8)).toBe(true);
+    expect(markers.some((d) => d.from === 12 && d.to === 14)).toBe(true);
+  });
+
+  it("emits no strikethrough decorations without GFM-parseable syntax", () => {
+    const state = makeGfmState("plain text only");
+    const decs = buildInlineDecorations(state, makeFakeView(state));
+    expect(getMarkDecs(decs, "cm-md-strikethrough").length).toBe(0);
   });
 });
 

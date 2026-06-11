@@ -24,6 +24,13 @@ async function navigateToLogin(page: Page): Promise<void> {
 }
 
 test.describe('Authentication', () => {
+  // In local bypass mode there is no Cognito login page — /login/ redirects
+  // straight into the authenticated workspace, so these tests are meaningless.
+  test.skip(
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === 'true',
+    'Cognito login is bypassed in local mode'
+  );
+
   test('should login successfully', async ({ page, isMobile }) => {
     await navigateToLogin(page);
     

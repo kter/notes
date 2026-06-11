@@ -82,4 +82,30 @@ describe("markdownListContinuation — Enter", () => {
     view = makeView("- item", 6);
     expect(enterRun(view)).toBe(true);
   });
+
+  it("continues a GFM task list line as a list (marker carried to next line)", () => {
+    // この拡張単体ではチェックボックス `[ ]` を引き継がず `- ` のみ継続する。
+    // 実エディタでは @codemirror/lang-markdown の Prec.high キーマップ
+    // (insertNewlineContinueMarkup) が先に Enter を処理するため `- [ ] ` が継続される
+    // （E2E: tests/regression/markdown-typing.spec.ts が実挙動を担保）。
+    view = makeView("- [ ] task", 10);
+    expect(enterRun(view)).toBe(true);
+    const lines = view.state.doc.toString().split("\n");
+    expect(lines[0]).toBe("- [ ] task");
+    expect(lines[1]).toMatch(/^- /);
+  });
+
+  it("continues mid-line: text after cursor stays on the original line", () => {
+    // "- item" でカーソルが "it|em" の位置 — 改行後 "em" は次行へ移動せず
+    // 現実装は beforeCursor のみで継続行を作るため "em" は元の行末に残る
+    view = makeView("- item", 4);
+    enterRun(view);
+    expect(view.state.doc.toString()).toBe("- it\n- em");
+  });
+
+  it("does not continue when cursor is before the marker", () => {
+    // 行頭（マーカーより前）で Enter — マーカー情報が beforeCursor に無いので false
+    view = makeView("- item", 0);
+    expect(enterRun(view)).toBe(false);
+  });
 });

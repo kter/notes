@@ -25,7 +25,10 @@ function makeState(doc: string, cursorPos = 0): EditorState {
     extensions: [markdown()],
   });
   ensureSyntaxTree(state, state.doc.length, 1e9);
-  return state;
+  // LanguageState.tree は state 生成時のスナップショット。初期パース（20ms 予算）が
+  // CPU 負荷で時間切れになると syntaxTree(state) が部分木を返し flaky になるため、
+  // 空トランザクションを適用して ensureSyntaxTree 完了後の完全な木を反映した state を返す。
+  return state.update({}).state;
 }
 
 function getLineDecs(

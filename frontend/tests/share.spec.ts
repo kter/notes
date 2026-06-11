@@ -134,7 +134,8 @@ test.describe('Sharing Functionality', () => {
     console.log('[Share E2E] Navigated to shared URL');
 
     // Verify the shared note page displays correctly
-    await expect(sharedPage.getByText('Read-only')).toBeVisible();
+    // The shared page renders in the user's saved language — accept EN or JA
+    await expect(sharedPage.getByText(/Read-only|読み取り専用/)).toBeVisible();
     await expect(sharedPage.getByText(noteTitle).first()).toBeVisible({ timeout: 10000 });
 
     // Verify content is rendered
@@ -155,15 +156,19 @@ test.describe('Sharing Functionality', () => {
     const revokeButton = page.getByTestId('share-revoke-button');
     await expect(revokeButton).toBeVisible();
 
-    // Handle the confirmation dialog
-    page.once('dialog', dialog => dialog.accept());
-
     const deletePromise = page.waitForResponse(
       resp => resp.url().includes('/share') && resp.request().method() === 'DELETE' && resp.status() < 400,
       { timeout: 15000 }
     );
 
     await revokeButton.click();
+
+    // The app shows a custom in-page ConfirmDialog (window.confirm was replaced
+    // in 284cd1c) — click its Confirm button (EN or JA label)
+    const confirmButton = page.getByRole('button', { name: /^(Confirm|確認)$/ });
+    await expect(confirmButton).toBeVisible({ timeout: 5000 });
+    await confirmButton.click();
+
     await deletePromise;
     console.log('[Share E2E] Share revoked');
 
@@ -174,8 +179,8 @@ test.describe('Sharing Functionality', () => {
     const verifyPage = await context.newPage();
     await verifyPage.goto(shareUrl);
 
-    // Should show not found or error
-    await expect(verifyPage.getByRole('heading', { name: /not found/i })).toBeVisible({ timeout: 15000 });
+    // Should show not found or error (EN or JA)
+    await expect(verifyPage.getByRole('heading', { name: /not found|見つかりません/i })).toBeVisible({ timeout: 15000 });
     console.log('[Share E2E] Revoked link shows not found');
 
     await verifyPage.close();

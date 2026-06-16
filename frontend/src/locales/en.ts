@@ -58,6 +58,18 @@ export const en = {
     apiKeysCreatedDescription: "Copy this secret now. It will only be shown once.",
     apiKeysLastUsed: "Last used",
     apiKeysNeverUsed: "Never used",
+    passkeysTitle: "Passkeys",
+    passkeysDescription:
+      "Register a passkey to sign in without a password using your device biometrics or security key.",
+    passkeysEmpty: "No passkeys registered yet.",
+    passkeysAddButton: "Add a passkey",
+    passkeysAddError: "Failed to register passkey",
+    passkeysListError: "Failed to load passkeys",
+    passkeysDeleteButton: "Delete",
+    passkeysDeleteConfirm: "Delete this passkey?",
+    passkeysDeleteError: "Failed to delete passkey",
+    passkeysCreatedAt: "Registered",
+    passkeysUnnamed: "Passkey",
     exportTitle: "Data Export",
     exportDescription: "Export all notes as a ZIP file.",
     exportButton: "Download ZIP",
@@ -359,6 +371,17 @@ export type TranslationKeys = {
     apiKeysCreatedDescription: string;
     apiKeysLastUsed: string;
     apiKeysNeverUsed: string;
+    passkeysTitle: string;
+    passkeysDescription: string;
+    passkeysEmpty: string;
+    passkeysAddButton: string;
+    passkeysAddError: string;
+    passkeysListError: string;
+    passkeysDeleteButton: string;
+    passkeysDeleteConfirm: string;
+    passkeysDeleteError: string;
+    passkeysCreatedAt: string;
+    passkeysUnnamed: string;
     exportTitle: string;
     exportDescription: string;
     exportButton: string;

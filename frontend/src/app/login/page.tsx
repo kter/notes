@@ -14,7 +14,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { FileTextIcon, Loader2Icon } from "lucide-react";
+import { FileTextIcon, Loader2Icon, KeyRoundIcon } from "lucide-react";
 import { isDevAuthBypass } from "@/lib/dev-bypass";
 
 /**
@@ -26,12 +26,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const { signIn, signInWithPasskey } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (isDevAuthBypass) router.replace("/");
   }, [router]);
+
+  // WebAuthn 非対応ブラウザではパスキーボタンを表示しない。
+  useEffect(() => {
+    setPasskeySupported(
+      typeof window !== "undefined" && !!window.PublicKeyCredential
+    );
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +51,24 @@ export default function LoginPage() {
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasskeySignIn = async () => {
+    if (!email) {
+      setError("Enter your email to sign in with a passkey");
+      return;
+    }
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await signInWithPasskey(email);
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Passkey sign in failed");
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +145,27 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          {passkeySupported && (
+            <>
+              <div className="my-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-zinc-700/50" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="h-px flex-1 bg-zinc-700/50" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handlePasskeySignIn}
+                disabled={isLoading}
+                data-testid="login-passkey-button"
+              >
+                <KeyRoundIcon className="h-4 w-4 mr-2" />
+                Sign in with a passkey
+              </Button>
+            </>
+          )}
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don&apos;t have an account? </span>

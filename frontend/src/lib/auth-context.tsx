@@ -25,9 +25,13 @@ import {
   confirmSignUp,
   getCurrentUser,
   fetchAuthSession,
+  associateWebAuthnCredential,
+  listWebAuthnCredentials,
+  deleteWebAuthnCredential,
   type SignInInput,
   type SignUpInput,
   type ConfirmSignUpInput,
+  type AuthWebAuthnCredential,
 } from "aws-amplify/auth";
 import { logger } from "@/lib/logger";
 import { isDevAuthBypass, BYPASS_TOKEN, BYPASS_USER } from "@/lib/dev-bypass";
@@ -45,10 +49,14 @@ interface AuthContextType {
   sessionExpired: boolean;
   notifySessionExpired: () => void;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithPasskey: (email: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   confirmSignUp: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   getAccessToken: () => Promise<string | null>;
+  registerPasskey: () => Promise<void>;
+  listPasskeys: () => Promise<AuthWebAuthnCredential[]>;
+  deletePasskey: (credentialId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -113,6 +121,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /**
+   * パスキー (WebAuthn) でパスワードレスにサインインする。
+   * USER_AUTH (choice-based) フローで WEB_AUTHN チャレンジを優先する。
+   * 事前にパスキーを登録済みであることが前提。
+   */
+  const handleSignInWithPasskey = async (email: string) => {
+    if (isDevAuthBypass) return;
+    // パスワードログインと同様、セッション失効中は旧セッションを先にクリアする。
+    if (sessionExpired) {
+      try { await signOut(); } catch { /* 旧セッションのクリアに失敗しても続行 */ }
+    }
+    await signIn({
+      username: email,
+      options: { authFlowType: "USER_AUTH", preferredChallenge: "WEB_AUTHN" },
+    });
+    setSessionExpired(false);
+    await checkUser();
+  };
+
+  /**
+   * 認証済みユーザーのアカウントにパスキーを登録する。
+   * ブラウザの WebAuthn プロンプトが表示される。
+   */
+  const handleRegisterPasskey = async () => {
+    if (isDevAuthBypass) return;
+    await associateWebAuthnCredential();
+  };
+
+  /** 登録済みパスキーの一覧を取得する。 */
+  const handleListPasskeys = useCallback(async (): Promise<AuthWebAuthnCredential[]> => {
+    if (isDevAuthBypass) return [];
+    const result = await listWebAuthnCredentials();
+    return result.credentials ?? [];
+  }, []);
+
+  /** 指定したパスキーを削除する。 */
+  const handleDeletePasskey = async (credentialId: string) => {
+    if (isDevAuthBypass) return;
+    await deleteWebAuthnCredential({ credentialId });
+  };
+
+  /**
    * 新規アカウントを作成する。
    * 確認コードが必要な場合は needsConfirmation: true を返す。
    */
@@ -161,10 +210,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionExpired,
         notifySessionExpired,
         signIn: handleSignIn,
+        signInWithPasskey: handleSignInWithPasskey,
         signUp: handleSignUp,
         confirmSignUp: handleConfirmSignUp,
         signOut: handleSignOut,
         getAccessToken,
+        registerPasskey: handleRegisterPasskey,
+        listPasskeys: handleListPasskeys,
+        deletePasskey: handleDeletePasskey,
       }}
     >
       {children}

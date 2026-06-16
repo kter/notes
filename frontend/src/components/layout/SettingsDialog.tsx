@@ -28,8 +28,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logger } from "@/lib/logger";
-import { CheckIcon, Loader2Icon } from "lucide-react";
+import { CheckIcon, Loader2Icon, KeyRoundIcon } from "lucide-react";
 import { useApi, useTranslation } from "@/hooks";
+import { useAuth } from "@/lib/auth-context";
+import type { AuthWebAuthnCredential } from "aws-amplify/auth";
 import type {
   AvailableLanguage,
   AvailableModel,
@@ -49,6 +51,11 @@ type ApiKeysErrorKey =
   | "settings.apiKeysCreateError"
   | "settings.apiKeysRevokeError"
   | "common.error";
+type PasskeysErrorKey =
+  | "settings.passkeysListError"
+  | "settings.passkeysAddError"
+  | "settings.passkeysDeleteError"
+  | "common.error";
 
 /**
  * 設定ダイアログ本体。
@@ -61,6 +68,7 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const { getApi } = useApi();
   const { t, language, setLanguage } = useTranslation();
+  const { registerPasskey, listPasskeys, deletePasskey } = useAuth();
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language);
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
@@ -77,6 +85,17 @@ export function SettingsDialog({
   const [isCreatingApiKey, setIsCreatingApiKey] = useState(false);
   const [revokingApiKeyId, setRevokingApiKeyId] = useState<string | null>(null);
   const [confirmRevokeKeyId, setConfirmRevokeKeyId] = useState<string | null>(null);
+  const [passkeys, setPasskeys] = useState<AuthWebAuthnCredential[]>([]);
+  const [isPasskeysLoading, setIsPasskeysLoading] = useState(false);
+  const [isAddingPasskey, setIsAddingPasskey] = useState(false);
+  const [deletingPasskeyId, setDeletingPasskeyId] = useState<string | null>(null);
+  const [confirmDeletePasskeyId, setConfirmDeletePasskeyId] = useState<string | null>(
+    null
+  );
+  const [passkeysErrorKey, setPasskeysErrorKey] = useState<PasskeysErrorKey | null>(
+    null
+  );
+  const [passkeySupported, setPasskeySupported] = useState(false);
   const [secretCopied, setSecretCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorKey, setErrorKey] = useState<SettingsErrorKey | null>(null);
@@ -107,6 +126,28 @@ export function SettingsDialog({
       } finally {
         if (isMounted) {
           setIsApiKeysLoading(false);
+        }
+      }
+    }
+
+    async function loadPasskeys() {
+      if (typeof window === "undefined" || !window.PublicKeyCredential) {
+        return;
+      }
+      setIsPasskeysLoading(true);
+      setPasskeysErrorKey(null);
+
+      try {
+        const credentials = await listPasskeys();
+        if (!isMounted) return;
+        setPasskeys(credentials);
+      } catch (err) {
+        if (!isMounted) return;
+        logger.error("Failed to load passkeys", err);
+        setPasskeysErrorKey("settings.passkeysListError");
+      } finally {
+        if (isMounted) {
+          setIsPasskeysLoading(false);
         }
       }
     }
@@ -144,6 +185,7 @@ export function SettingsDialog({
 
         setIsLoading(false);
         void loadApiKeys(apiClient);
+        void loadPasskeys();
       } catch (err) {
         if (!isMounted) return;
 
@@ -161,7 +203,13 @@ export function SettingsDialog({
     return () => {
       isMounted = false;
     };
-  }, [open, getApi]);
+  }, [open, getApi, listPasskeys]);
+
+  useEffect(() => {
+    setPasskeySupported(
+      typeof window !== "undefined" && !!window.PublicKeyCredential
+    );
+  }, []);
 
   useEffect(() => {
     if (open) return;
@@ -171,6 +219,7 @@ export function SettingsDialog({
     setSecretCopied(false);
     setErrorKey(null);
     setApiKeysErrorKey(null);
+    setPasskeysErrorKey(null);
     setSaveSuccess(false);
   }, [open]);
 
@@ -280,6 +329,44 @@ export function SettingsDialog({
     }
   };
 
+  /**
+   * 認証済みユーザーにパスキーを登録するハンドラ。
+   * associateWebAuthnCredential がブラウザの WebAuthn プロンプトを起動し、
+   * 完了後に一覧を再取得する。
+   */
+  const handleAddPasskey = async () => {
+    setIsAddingPasskey(true);
+    setPasskeysErrorKey(null);
+
+    try {
+      await registerPasskey();
+      const credentials = await listPasskeys();
+      setPasskeys(credentials);
+    } catch (err) {
+      logger.error("Failed to register passkey", err);
+      setPasskeysErrorKey("settings.passkeysAddError");
+    } finally {
+      setIsAddingPasskey(false);
+    }
+  };
+
+  const handleDeletePasskey = async (credentialId: string) => {
+    setDeletingPasskeyId(credentialId);
+    setPasskeysErrorKey(null);
+
+    try {
+      await deletePasskey(credentialId);
+      setPasskeys((prev) =>
+        prev.filter((credential) => credential.credentialId !== credentialId)
+      );
+    } catch (err) {
+      logger.error("Failed to delete passkey", err);
+      setPasskeysErrorKey("settings.passkeysDeleteError");
+    } finally {
+      setDeletingPasskeyId(null);
+    }
+  };
+
   const formatLastUsed = (value: string | null) => {
     if (!value) {
       return t("settings.apiKeysNeverUsed");
@@ -296,6 +383,13 @@ export function SettingsDialog({
       title={t("settings.apiKeysRevokeButton")}
       description={t("settings.apiKeysRevokeConfirm")}
       onConfirm={() => { if (confirmRevokeKeyId) void handleRevokeApiKey(confirmRevokeKeyId); }}
+    />
+    <ConfirmDialog
+      open={confirmDeletePasskeyId !== null}
+      onOpenChange={(isOpen) => { if (!isOpen) setConfirmDeletePasskeyId(null); }}
+      title={t("settings.passkeysDeleteButton")}
+      description={t("settings.passkeysDeleteConfirm")}
+      onConfirm={() => { if (confirmDeletePasskeyId) void handleDeletePasskey(confirmDeletePasskeyId); }}
     />
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -492,6 +586,84 @@ export function SettingsDialog({
                   )}
                 </div>
               </div>
+
+              {passkeySupported && (
+                <div className="space-y-4 border-t pt-6">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium leading-none">
+                      {t("settings.passkeysTitle")}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.passkeysDescription")}
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={handleAddPasskey}
+                    disabled={isAddingPasskey}
+                    data-testid="add-passkey-button"
+                  >
+                    {isAddingPasskey ? (
+                      <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <KeyRoundIcon className="mr-2 h-4 w-4" />
+                    )}
+                    {t("settings.passkeysAddButton")}
+                  </Button>
+
+                  {passkeysErrorKey ? (
+                    <p className="text-sm text-red-500">{t(passkeysErrorKey)}</p>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    {isPasskeysLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2Icon className="h-4 w-4 animate-spin" />
+                        <span>{t("common.loading")}</span>
+                      </div>
+                    ) : passkeys.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.passkeysEmpty")}
+                      </p>
+                    ) : (
+                      passkeys.map((credential) => (
+                        <div
+                          key={credential.credentialId}
+                          data-testid={`passkey-row-${credential.credentialId}`}
+                          className="flex items-center justify-between rounded-md border p-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {credential.friendlyCredentialName ||
+                                t("settings.passkeysUnnamed")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t("settings.passkeysCreatedAt")}:{" "}
+                              {credential.createdAt
+                                ? new Date(credential.createdAt).toLocaleString()
+                                : "-"}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              if (credential.credentialId) {
+                                setConfirmDeletePasskeyId(credential.credentialId);
+                              }
+                            }}
+                            disabled={deletingPasskeyId === credential.credentialId}
+                          >
+                            {deletingPasskeyId === credential.credentialId ? (
+                              <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            {t("settings.passkeysDeleteButton")}
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4 border-t pt-6">
                 <div className="space-y-1">

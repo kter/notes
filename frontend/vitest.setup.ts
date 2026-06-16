@@ -40,6 +40,10 @@ vi.mock('aws-amplify/auth', () => ({
   signUp: vi.fn(),
   signOut: vi.fn(),
   confirmSignUp: vi.fn(),
+  confirmSignIn: vi.fn(),
+  associateWebAuthnCredential: vi.fn().mockResolvedValue(undefined),
+  listWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
+  deleteWebAuthnCredential: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Mock IndexedDB

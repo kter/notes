@@ -58,6 +58,18 @@ export const ja = {
     apiKeysCreatedDescription: "このシークレットは今だけ表示されます。必ず控えてください。",
     apiKeysLastUsed: "最終使用",
     apiKeysNeverUsed: "未使用",
+    passkeysTitle: "パスキー",
+    passkeysDescription:
+      "パスキーを登録すると、デバイスの生体認証やセキュリティキーでパスワードなしにサインインできます。",
+    passkeysEmpty: "パスキーはまだ登録されていません。",
+    passkeysAddButton: "パスキーを追加",
+    passkeysAddError: "パスキーの登録に失敗しました",
+    passkeysListError: "パスキーの読み込みに失敗しました",
+    passkeysDeleteButton: "削除",
+    passkeysDeleteConfirm: "このパスキーを削除しますか？",
+    passkeysDeleteError: "パスキーの削除に失敗しました",
+    passkeysCreatedAt: "登録日",
+    passkeysUnnamed: "パスキー",
     exportTitle: "データエクスポート",
     exportDescription: "すべてのノートをZIP形式でエクスポートします。",
     exportButton: "ZIPをダウンロード",
@@ -358,6 +370,17 @@ export type TranslationKeys = {
     apiKeysCreatedDescription: string;
     apiKeysLastUsed: string;
     apiKeysNeverUsed: string;
+    passkeysTitle: string;
+    passkeysDescription: string;
+    passkeysEmpty: string;
+    passkeysAddButton: string;
+    passkeysAddError: string;
+    passkeysListError: string;
+    passkeysDeleteButton: string;
+    passkeysDeleteConfirm: string;
+    passkeysDeleteError: string;
+    passkeysCreatedAt: string;
+    passkeysUnnamed: string;
     exportTitle: string;
     exportDescription: string;
     exportButton: string;

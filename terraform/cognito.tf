@@ -59,6 +59,22 @@ resource "aws_cognito_user_pool" "main" {
   # MFA configuration (optional)
   mfa_configuration = "OFF"
 
+  # Feature plan tier. ESSENTIALS 以上で WebAuthn (パスキー) 設定が有効になる。
+  user_pool_tier = "ESSENTIALS"
+
+  # パスキー (WebAuthn) 設定。relying_party_id は env ごとのドメインに合わせる。
+  web_authn_configuration {
+    relying_party_id  = local.current_env.domain_name
+    user_verification = "preferred"
+  }
+
+  # choice-based 認証で許可する第一認証ファクター。
+  # WEB_AUTHN を含めないとプールで WebAuthn が有効にならない (WebAuthnNotEnabledException)。
+  # PASSWORD は必須。既存のパスワードログインを維持しつつパスキーを追加する。
+  sign_in_policy {
+    allowed_first_auth_factors = ["PASSWORD", "WEB_AUTHN"]
+  }
+
   tags = {
     Name = "${var.project_name}-user-pool-${terraform.workspace}"
   }
@@ -100,7 +116,8 @@ resource "aws_cognito_user_pool_client" "main" {
   prevent_user_existence_errors = "ENABLED"
   explicit_auth_flows = [
     "ALLOW_REFRESH_TOKEN_AUTH",
-    "ALLOW_USER_SRP_AUTH"
+    "ALLOW_USER_SRP_AUTH",
+    "ALLOW_USER_AUTH" # choice-based 認証 (パスキー / WebAuthn) 用
   ]
 
   generate_secret = false

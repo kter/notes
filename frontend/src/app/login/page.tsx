@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { FileTextIcon, Loader2Icon, KeyRoundIcon } from "lucide-react";
 import { isDevAuthBypass } from "@/lib/dev-bypass";
+import { getRememberedEmail, rememberEmail } from "@/lib/remembered-email";
 
 /**
  * ログインフォームコンポーネント。送信時に signIn を呼び出し、成功するとルートへリダイレクトする。
@@ -36,10 +37,13 @@ export default function LoginPage() {
   }, [router]);
 
   // WebAuthn 非対応ブラウザではパスキーボタンを表示しない。
+  // あわせて前回ログインのメールをプリフィルし、パスキーの擬似ワンクリックを可能にする。
+  // （localStorage 依存のため初期 state ではなく useEffect で設定しハイドレーション差異を避ける）
   useEffect(() => {
     setPasskeySupported(
       typeof window !== "undefined" && !!window.PublicKeyCredential
     );
+    setEmail((current) => current || getRememberedEmail());
   }, []);
 
   // パスワードログイン。メール・パスワード両方を JS で検証する
@@ -55,6 +59,7 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
+      rememberEmail(email);
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
@@ -75,6 +80,7 @@ export default function LoginPage() {
 
     try {
       await signInWithPasskey(email);
+      rememberEmail(email);
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Passkey sign in failed");

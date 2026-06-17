@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [passkeySupported, setPasskeySupported] = useState(false);
   const { signIn, signInWithPasskey } = useAuth();
   const router = useRouter();
+  const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isDevAuthBypass) router.replace("/");
@@ -41,8 +42,14 @@ export default function LoginPage() {
     );
   }, []);
 
+  // パスワードログイン。メール・パスワード両方を JS で検証する
+  // （HTML5 の required には頼らず、パスキー経路に干渉させない）。
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) {
+      setError("Enter your email and password");
+      return;
+    }
     setError(null);
     setIsLoading(true);
 
@@ -56,9 +63,11 @@ export default function LoginPage() {
     }
   };
 
+  // パスキーログインはメールのみで完了する（パスワードは不要）。
   const handlePasskeySignIn = async () => {
     if (!email) {
-      setError("Enter your email to sign in with a passkey");
+      setError("Enter your email above, then tap the passkey button");
+      emailRef.current?.focus();
       return;
     }
     setError(null);
@@ -96,12 +105,12 @@ export default function LoginPage() {
                 Email
               </label>
               <Input
+                ref={emailRef}
                 id="email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 disabled={isLoading}
                 data-testid="login-email-input"
               />
@@ -117,7 +126,6 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 disabled={isLoading}
                 data-testid="login-password-input"
               />
@@ -164,6 +172,9 @@ export default function LoginPage() {
                 <KeyRoundIcon className="h-4 w-4 mr-2" />
                 Sign in with a passkey
               </Button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Just your email — no password needed
+              </p>
             </>
           )}
 

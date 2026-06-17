@@ -68,6 +68,13 @@ resource "aws_cognito_user_pool" "main" {
     user_verification = "preferred"
   }
 
+  # choice-based 認証で許可する第一認証ファクター。
+  # WEB_AUTHN を含めないとプールで WebAuthn が有効にならない (WebAuthnNotEnabledException)。
+  # PASSWORD は必須。既存のパスワードログインを維持しつつパスキーを追加する。
+  sign_in_policy {
+    allowed_first_auth_factors = ["PASSWORD", "WEB_AUTHN"]
+  }
+
   tags = {
     Name = "${var.project_name}-user-pool-${terraform.workspace}"
   }

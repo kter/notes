@@ -1,12 +1,15 @@
 """Tests for token usage tracking and limit enforcement."""
 
+import asyncio
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
+from app.features.assistant.job_runner import process_chat_job, process_summarize_job
 from app.features.assistant.usage_policy import (
     check_limit,
     get_or_create_current_period,
@@ -17,6 +20,24 @@ from app.main import app
 from app.models import Note
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
 from tests.conftest import TEST_USER_ID
+
+
+async def _noop_dispatch(*args, **kwargs):
+    """テストでは SNS ディスパッチを無効化し、処理は明示的に実行する。"""
+    return None
+
+
+def _run_ai_job(process_fn, job_id, session, ai_gateway):
+    """非同期 AI ジョブをテスト内で同期実行する（worker 相当）。"""
+    engine = session.get_bind()
+    assert engine is not None
+    asyncio.run(
+        process_fn(
+            UUID(job_id),
+            session_factory=lambda: Session(engine),
+            ai_gateway=ai_gateway,
+        )
+    )
 
 
 # Mock AI Service that returns token counts
@@ -145,41 +166,55 @@ class TestTokenLimitInAIEndpoints:
     """Tests for token limit enforcement in AI endpoints."""
 
     def test_summarize_records_tokens(
-        self, client: TestClient, session: Session, mock_ai_service
+        self,
+        client: TestClient,
+        session: Session,
+        mock_ai_service,
+        monkeypatch: pytest.MonkeyPatch,
     ):
-        """Test that summarize endpoint records token usage."""
+        """Test that the summarize job records token usage (during processing)."""
+        monkeypatch.setattr(
+            "app.features.assistant.router.dispatch_ai_job", _noop_dispatch
+        )
         note = Note(title="Test Note", content="Test Content", user_id=TEST_USER_ID)
         session.add(note)
         session.commit()
 
-        response = client.post("/api/ai/summarize", json={"note_id": str(note.id)})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["tokens_used"] == 150
+        response = client.post("/api/ai/summarize-jobs", json={"note_id": str(note.id)})
+        assert response.status_code == 202
+        _run_ai_job(
+            process_summarize_job, response.json()["id"], session, mock_ai_service
+        )
 
-        # Check usage was recorded
+        # トークンは worker 処理時に記録される
         info = get_usage_info(session, TEST_USER_ID)
         assert info.tokens_used == 150
 
     def test_chat_records_tokens(
-        self, client: TestClient, session: Session, mock_ai_service
+        self,
+        client: TestClient,
+        session: Session,
+        mock_ai_service,
+        monkeypatch: pytest.MonkeyPatch,
     ):
-        """Test that chat endpoint records token usage."""
+        """Test that the chat job records token usage (during processing)."""
+        monkeypatch.setattr(
+            "app.features.assistant.router.dispatch_ai_job", _noop_dispatch
+        )
         note = Note(title="Test Note", content="Test Content", user_id=TEST_USER_ID)
         session.add(note)
         session.commit()
 
         response = client.post(
-            "/api/ai/chat",
+            "/api/ai/chat-jobs",
             json={
                 "scope": "note",
                 "note_id": str(note.id),
                 "question": "What is this?",
             },
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["tokens_used"] == 200
+        assert response.status_code == 202
+        _run_ai_job(process_chat_job, response.json()["id"], session, mock_ai_service)
 
         info = get_usage_info(session, TEST_USER_ID)
         assert info.tokens_used == 200
@@ -187,7 +222,7 @@ class TestTokenLimitInAIEndpoints:
     def test_summarize_limit_exceeded(
         self, client: TestClient, session: Session, mock_ai_service
     ):
-        """Test that summarize returns 429 when limit is exceeded."""
+        """Test that summarize job creation returns 429 when limit is exceeded."""
         note = Note(title="Test Note", content="Test Content", user_id=TEST_USER_ID)
         session.add(note)
         session.commit()
@@ -198,14 +233,14 @@ class TestTokenLimitInAIEndpoints:
         session.add(usage)
         session.commit()
 
-        response = client.post("/api/ai/summarize", json={"note_id": str(note.id)})
+        response = client.post("/api/ai/summarize-jobs", json={"note_id": str(note.id)})
         assert response.status_code == 429
         assert "token limit" in response.json()["detail"].lower()
 
     def test_chat_limit_exceeded(
         self, client: TestClient, session: Session, mock_ai_service
     ):
-        """Test that chat returns 429 when limit is exceeded."""
+        """Test that chat job creation returns 429 when limit is exceeded."""
         note = Note(title="Test Note", content="Test Content", user_id=TEST_USER_ID)
         session.add(note)
         session.commit()
@@ -217,7 +252,7 @@ class TestTokenLimitInAIEndpoints:
         session.commit()
 
         response = client.post(
-            "/api/ai/chat",
+            "/api/ai/chat-jobs",
             json={
                 "scope": "note",
                 "note_id": str(note.id),
@@ -227,24 +262,32 @@ class TestTokenLimitInAIEndpoints:
         assert response.status_code == 429
 
     def test_token_usage_accumulates(
-        self, client: TestClient, session: Session, mock_ai_service
+        self,
+        client: TestClient,
+        session: Session,
+        mock_ai_service,
+        monkeypatch: pytest.MonkeyPatch,
     ):
-        """Test that token usage accumulates across multiple requests."""
+        """Test that token usage accumulates across multiple jobs."""
+        monkeypatch.setattr(
+            "app.features.assistant.router.dispatch_ai_job", _noop_dispatch
+        )
         note = Note(title="Test Note", content="Test Content", user_id=TEST_USER_ID)
         session.add(note)
         session.commit()
 
-        # First request
-        client.post("/api/ai/summarize", json={"note_id": str(note.id)})
-        # Second request
-        client.post(
-            "/api/ai/chat",
-            json={
-                "scope": "note",
-                "note_id": str(note.id),
-                "question": "What?",
-            },
+        summarize = client.post(
+            "/api/ai/summarize-jobs", json={"note_id": str(note.id)}
         )
+        _run_ai_job(
+            process_summarize_job, summarize.json()["id"], session, mock_ai_service
+        )
+
+        chat = client.post(
+            "/api/ai/chat-jobs",
+            json={"scope": "note", "note_id": str(note.id), "question": "What?"},
+        )
+        _run_ai_job(process_chat_job, chat.json()["id"], session, mock_ai_service)
 
         info = get_usage_info(session, TEST_USER_ID)
         assert info.tokens_used == 350  # 150 + 200
@@ -269,15 +312,25 @@ class TestTokenUsageInSettings:
         assert token_usage["token_limit"] == MONTHLY_TOKEN_LIMIT
 
     def test_settings_reflects_usage(
-        self, client: TestClient, session: Session, mock_ai_service
+        self,
+        client: TestClient,
+        session: Session,
+        mock_ai_service,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """Test that settings token_usage reflects actual usage."""
+        monkeypatch.setattr(
+            "app.features.assistant.router.dispatch_ai_job", _noop_dispatch
+        )
         note = Note(title="Test Note", content="Test Content", user_id=TEST_USER_ID)
         session.add(note)
         session.commit()
 
-        # Make an AI call
-        client.post("/api/ai/summarize", json={"note_id": str(note.id)})
+        # Make an AI call (async job → process it)
+        response = client.post("/api/ai/summarize-jobs", json={"note_id": str(note.id)})
+        _run_ai_job(
+            process_summarize_job, response.json()["id"], session, mock_ai_service
+        )
 
         # Check settings
         response = client.get("/api/settings")

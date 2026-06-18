@@ -1,9 +1,10 @@
 """assistantフィーチャのリクエスト/レスポンス Pydanticスキーマ定義。
 
 責務: APIエンドポイントの入出力型を定義し、バリデーションを担う。
-主要なエクスポート: SummarizeRequest/Response, ChatRequest/Response,
+主要なエクスポート: SummarizeRequest, ChatRequest, BedrockMessage,
     EditRequest/Response, EditJobCreateResponse
 呼び出し関係: router.py のエンドポイント関数から参照される。
+    要約・チャットは非同期ジョブ化されたため専用レスポンス型は持たず AIJobRead を返す。
 """
 
 from typing import Literal
@@ -29,16 +30,9 @@ class BedrockMessage(BaseModel):
 
 
 class SummarizeRequest(BaseModel):
-    """要約エンドポイントへのリクエスト。"""
+    """要約ジョブ作成エンドポイントへのリクエスト。"""
 
     note_id: UUID
-
-
-class SummarizeResponse(BaseModel):
-    """要約エンドポイントのレスポンス。tokens_used は消費トークン数。"""
-
-    summary: str
-    tokens_used: int = 0
 
 
 class ChatRequest(BaseModel):
@@ -55,13 +49,6 @@ class ChatRequest(BaseModel):
     question: str = Field(max_length=MAX_AI_QUESTION_CHARS)
     history: list[BedrockMessage] | None = None
     selected_content: str | None = Field(default=None, max_length=MAX_AI_CONTENT_CHARS)
-
-
-class ChatResponse(BaseModel):
-    """チャットエンドポイントのレスポンス。tokens_used は消費トークン数。"""
-
-    answer: str
-    tokens_used: int = 0
 
 
 class EditRequest(BaseModel):

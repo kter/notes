@@ -3,13 +3,21 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
+    from app.features.assistant.use_cases import (
+        AIInteractionUseCases,
+        AIJobUseCases,
+        EditJobUseCases,
+    )
 
 __all__ = [
     "AIInteractionUseCases",
+    "AIJobUseCases",
     "EditJobUseCases",
+    "dispatch_ai_job",
     "dispatch_edit_job",
+    "process_chat_job",
     "process_edit_job",
+    "process_summarize_job",
     "router",
     "run_edit_job_queue_records",
 ]
@@ -21,14 +29,17 @@ def __getattr__(name: str) -> Any:
 
         return router
     if name in {
+        "dispatch_ai_job",
         "dispatch_edit_job",
+        "process_chat_job",
         "process_edit_job",
+        "process_summarize_job",
         "run_edit_job_queue_records",
     }:
         from app.features.assistant import job_runner
 
         return getattr(job_runner, name)
-    if name in {"AIInteractionUseCases", "EditJobUseCases"}:
+    if name in {"AIInteractionUseCases", "AIJobUseCases", "EditJobUseCases"}:
         from app.features.assistant import use_cases
 
         return getattr(use_cases, name)

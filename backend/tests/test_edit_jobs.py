@@ -5,7 +5,9 @@ import pytest
 
 from app.features.assistant.job_runner import (
     EDIT_JOB_TOPIC_ARN_ENV,
+    PROCESS_CHAT_JOB_TASK,
     PROCESS_EDIT_JOB_TASK,
+    PROCESS_SUMMARIZE_JOB_TASK,
     dispatch_edit_job,
     process_edit_job,
     process_edit_job_queue_records,
@@ -94,7 +96,7 @@ async def test_process_edit_job_queue_records_reports_partial_failures():
 
     result = await process_edit_job_queue_records(
         records,
-        process_job_fn=fake_process_job,
+        handlers={PROCESS_EDIT_JOB_TASK: fake_process_job},
     )
 
     assert processed == ["job-1"]
@@ -104,3 +106,42 @@ async def test_process_edit_job_queue_records_reports_partial_failures():
             {"itemIdentifier": "msg-3"},
         ]
     }
+
+
+@pytest.mark.asyncio
+async def test_process_queue_records_routes_by_task():
+    """編集・要約・チャットの各 task が既定のディスパッチ表で正しい handler に振り分けられる。"""
+    routed: list[str] = []
+
+    def make_handler(label: str):
+        async def handler(job_id: str) -> None:
+            routed.append(f"{label}:{job_id}")
+
+        return handler
+
+    records = [
+        {
+            "messageId": "m1",
+            "body": json.dumps({"task": PROCESS_EDIT_JOB_TASK, "job_id": "edit-1"}),
+        },
+        {
+            "messageId": "m2",
+            "body": json.dumps({"task": PROCESS_SUMMARIZE_JOB_TASK, "job_id": "sum-1"}),
+        },
+        {
+            "messageId": "m3",
+            "body": json.dumps({"task": PROCESS_CHAT_JOB_TASK, "job_id": "chat-1"}),
+        },
+    ]
+
+    result = await process_edit_job_queue_records(
+        records,
+        handlers={
+            PROCESS_EDIT_JOB_TASK: make_handler("edit"),
+            PROCESS_SUMMARIZE_JOB_TASK: make_handler("summarize"),
+            PROCESS_CHAT_JOB_TASK: make_handler("chat"),
+        },
+    )
+
+    assert routed == ["edit:edit-1", "summarize:sum-1", "chat:chat-1"]
+    assert result == {"batchItemFailures": []}

@@ -19,8 +19,28 @@ import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/types";
 
 export type ChatScope = "note" | "folder" | "all" | "selection";
-const EDIT_JOB_POLL_INTERVAL_MS = 1500;
-const EDIT_JOB_TIMEOUT_MS = 120000;
+const JOB_POLL_INTERVAL_MS = 1500;
+const JOB_TIMEOUT_MS = 120000;
+
+/**
+ * 非同期 AI ジョブ（要約・チャット・編集）を完了/失敗まで一定間隔でポーリングする共通ヘルパ。
+ * pending/running の間ポーリングし、タイムアウト時は例外を送出する。
+ */
+async function pollJob<T extends { id: string; status: string }>(
+  initial: T,
+  fetchJob: (id: string) => Promise<T>
+): Promise<T> {
+  const startedAt = Date.now();
+  let job = initial;
+  while (job.status === "pending" || job.status === "running") {
+    if (Date.now() - startedAt >= JOB_TIMEOUT_MS) {
+      throw new Error("AI job polling timed out");
+    }
+    await new Promise((resolve) => setTimeout(resolve, JOB_POLL_INTERVAL_MS));
+    job = await fetchJob(job.id);
+  }
+  return job;
+}
 
 interface UseAIChatReturn {
   chatMessages: ChatMessage[];
@@ -60,16 +80,21 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
     setIsAILoading(true);
     try {
       const apiClient = await getApi();
-      const result = await apiClient.summarizeNote({ note_id: noteId });
+      // 非同期ジョブを作成しポーリングで結果を取得する（30 秒同期上限の回避）
+      const created = await apiClient.createSummarizeJob({ note_id: noteId });
+      const job = await pollJob(created, (id) => apiClient.getAIJob(id));
 
-      if (result.tokens_used && onTokenUsage) {
-        onTokenUsage(result.tokens_used);
+      if (job.status === "failed") {
+        throw new Error(job.error_message || "Summarize failed");
       }
 
-      // Add summary as a chat message
+      if (job.tokens_used && onTokenUsage) {
+        onTokenUsage(job.tokens_used);
+      }
+
       const summaryMessage: ChatMessage = {
         role: "assistant",
-        content: result.summary,
+        content: job.result ?? "",
       };
       setChatMessages((prev) => [...prev, summaryMessage]);
     } catch (error: unknown) {
@@ -95,7 +120,8 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
 
     try {
       const apiClient = await getApi();
-      const result = await apiClient.chatWithNote({
+      // 非同期ジョブを作成しポーリングで回答を取得する（30 秒同期上限の回避）
+      const created = await apiClient.createChatJob({
         scope,
         note_id: noteId || undefined,
         folder_id: folderId || undefined,
@@ -103,14 +129,19 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
         history: chatMessages,
         selected_content: scope === "selection" ? selectedContent : undefined,
       });
+      const job = await pollJob(created, (id) => apiClient.getAIJob(id));
 
-      if (result.tokens_used && onTokenUsage) {
-        onTokenUsage(result.tokens_used);
+      if (job.status === "failed") {
+        throw new Error(job.error_message || "Chat failed");
+      }
+
+      if (job.tokens_used && onTokenUsage) {
+        onTokenUsage(job.tokens_used);
       }
 
       const assistantMessage: ChatMessage = {
         role: "assistant",
-        content: result.answer,
+        content: job.result ?? "",
       };
       setChatMessages((prev) => [...prev, assistantMessage]);
     } catch (error: unknown) {
@@ -145,17 +176,9 @@ export function useAIChat(onTokenUsage?: (tokens: number) => void): UseAIChatRet
         note_id: noteId,
       });
 
-      const startedAt = Date.now();
-      let job = createResult.job;
-
-      while (job.status === "pending" || job.status === "running") {
-        if (Date.now() - startedAt >= EDIT_JOB_TIMEOUT_MS) {
-          throw new Error("Edit job polling timed out");
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, EDIT_JOB_POLL_INTERVAL_MS));
-        job = await apiClient.getEditJob(job.id);
-      }
+      const job = await pollJob(createResult.job, (id) =>
+        apiClient.getEditJob(id)
+      );
 
       if (job.status === "failed") {
         throw new Error(job.error_message || "Edit job failed");

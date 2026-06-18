@@ -103,9 +103,18 @@ export interface SummarizeRequest {
   note_id: string;
 }
 
-export interface SummarizeResponse {
-  summary: string;
+// 要約・チャットの非同期ジョブ。作成後 getAIJob でポーリングし result を取得する。
+export interface AIJob {
+  id: string;
+  kind: "summarize" | "chat";
+  status: "pending" | "running" | "completed" | "failed";
+  result: string | null;
+  error_message: string | null;
   tokens_used: number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
 }
 
 export interface EditProposal {
@@ -128,11 +137,6 @@ export interface ChatRequest {
   question: string;
   history?: ChatMessage[];
   selected_content?: string;
-}
-
-export interface ChatResponse {
-  answer: string;
-  tokens_used: number;
 }
 
 export interface EditRequest {

@@ -12,8 +12,8 @@
  * 各コンポーネントおよび syncQueue / workspaceSync から利用される。
  */
 import type {
+  AIJob,
   ChatRequest,
-  ChatResponse,
   EditJob,
   EditJobCreateResponse,
   EditJobRequest,
@@ -23,7 +23,6 @@ import type {
   SettingsResponse,
   SharedNote,
   SummarizeRequest,
-  SummarizeResponse,
   UserSettingsUpdate,
   UserApiKey,
   UserApiKeyCreate,
@@ -132,18 +131,24 @@ class ApiClient {
   }
 
   // AI API
-  async summarizeNote(data: SummarizeRequest): Promise<SummarizeResponse> {
-    return this.request<SummarizeResponse>("/api/ai/summarize", {
+  // 要約・チャットは非同期ジョブ化されている（同期だと API Gateway の 30 秒上限で 503 になるため）。
+  // ジョブを作成し getAIJob でポーリングして結果を取得する。
+  async createSummarizeJob(data: SummarizeRequest): Promise<AIJob> {
+    return this.request<AIJob>("/api/ai/summarize-jobs", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
-  async chatWithNote(data: ChatRequest): Promise<ChatResponse> {
-    return this.request<ChatResponse>("/api/ai/chat", {
+  async createChatJob(data: ChatRequest): Promise<AIJob> {
+    return this.request<AIJob>("/api/ai/chat-jobs", {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  async getAIJob(jobId: string): Promise<AIJob> {
+    return this.request<AIJob>(`/api/ai/jobs/${jobId}`);
   }
 
   async editNoteContent(data: EditRequest): Promise<EditResponse> {

@@ -15,24 +15,32 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app.auth import UserId
 from app.features.assistant.dependencies import (
     get_ai_interaction_use_cases,
+    get_ai_job_use_cases,
     get_edit_job_use_cases,
 )
 from app.features.assistant.errors import (
     AIApplicationTimeoutError,
     AITokenLimitExceededError,
 )
-from app.features.assistant.job_runner import dispatch_edit_job
+from app.features.assistant.job_runner import (
+    PROCESS_CHAT_JOB_TASK,
+    PROCESS_SUMMARIZE_JOB_TASK,
+    dispatch_ai_job,
+    dispatch_edit_job,
+)
 from app.features.assistant.schemas import (
     ChatRequest,
-    ChatResponse,
     EditJobCreateResponse,
     EditRequest,
     EditResponse,
     SummarizeRequest,
-    SummarizeResponse,
 )
-from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
-from app.models import AIEditJobCreate, AIEditJobRead
+from app.features.assistant.use_cases import (
+    AIInteractionUseCases,
+    AIJobUseCases,
+    EditJobUseCases,
+)
+from app.models import AIEditJobCreate, AIEditJobRead, AIJobRead
 
 router = APIRouter()
 
@@ -59,30 +67,46 @@ def _raise_ai_http_error(exc: Exception) -> None:
     raise exc
 
 
-@router.post("/summarize", response_model=SummarizeResponse)
-async def summarize_note(
+@router.post(
+    "/summarize-jobs",
+    response_model=AIJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_summarize_job(
     request: SummarizeRequest,
+    background_tasks: BackgroundTasks,
     user_id: UserId,
-    use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
+    use_cases: Annotated[AIJobUseCases, Depends(get_ai_job_use_cases)],
 ):
-    """AIを使ってノートの内容を要約する。"""
+    """要約を非同期ジョブとしてキューに登録し、202 でポーリング可能なジョブを返す。
+
+    同期だと Bedrock 生成が API Gateway の 30 秒上限を超え 503 になるため非同期化している。
+    """
     try:
-        summary, tokens_used = await use_cases.summarize_note(request.note_id)
-    except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
+        job = use_cases.create_summarize_job(request.note_id)
+    except AITokenLimitExceededError as exc:
         _raise_ai_http_error(exc)
 
-    return SummarizeResponse(summary=summary, tokens_used=tokens_used)
+    await dispatch_ai_job(
+        job.id, PROCESS_SUMMARIZE_JOB_TASK, background_tasks=background_tasks
+    )
+    return AIJobRead.model_validate(job)
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat_with_context(
+@router.post(
+    "/chat-jobs",
+    response_model=AIJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_chat_job(
     request: ChatRequest,
+    background_tasks: BackgroundTasks,
     user_id: UserId,
-    use_cases: Annotated[AIInteractionUseCases, Depends(get_ai_interaction_use_cases)],
+    use_cases: Annotated[AIJobUseCases, Depends(get_ai_job_use_cases)],
 ):
-    """ノートのコンテキストを参照しながらAIとチャットする。"""
+    """チャットを非同期ジョブとしてキューに登録し、202 でポーリング可能なジョブを返す。"""
     try:
-        answer, tokens_used = await use_cases.chat_with_context(
+        job = use_cases.create_chat_job(
             scope=request.scope,
             question=request.question,
             history=request.history,
@@ -90,10 +114,23 @@ async def chat_with_context(
             folder_id=request.folder_id,
             selected_content=request.selected_content,
         )
-    except (AITokenLimitExceededError, AIApplicationTimeoutError) as exc:
+    except AITokenLimitExceededError as exc:
         _raise_ai_http_error(exc)
 
-    return ChatResponse(answer=answer, tokens_used=tokens_used)
+    await dispatch_ai_job(
+        job.id, PROCESS_CHAT_JOB_TASK, background_tasks=background_tasks
+    )
+    return AIJobRead.model_validate(job)
+
+
+@router.get("/jobs/{job_id}", response_model=AIJobRead)
+async def get_ai_job(
+    job_id: UUID,
+    user_id: UserId,
+    use_cases: Annotated[AIJobUseCases, Depends(get_ai_job_use_cases)],
+):
+    """要約・チャットの非同期ジョブの現在ステータスをポーリングする。"""
+    return AIJobRead.model_validate(use_cases.get_job(job_id))
 
 
 @router.post("/edit", response_model=EditResponse)

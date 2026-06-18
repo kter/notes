@@ -5,6 +5,7 @@ from app.models.admin import (
     AdminUserUpdateRequest,
 )
 from app.models.ai_edit_job import AIEditJob, AIEditJobCreate, AIEditJobRead
+from app.models.ai_job import AIJob, AIJobRead
 from app.models.app_user import AppUser, AppUserRead
 from app.models.applied_mutation import AppliedMutation
 from app.models.folder import Folder, FolderCreate, FolderRead, FolderUpdate
@@ -49,6 +50,8 @@ __all__ = [
     "AIEditJob",
     "AIEditJobCreate",
     "AIEditJobRead",
+    "AIJob",
+    "AIJobRead",
     "AppUser",
     "AppUserRead",
     "AvailableLanguage",

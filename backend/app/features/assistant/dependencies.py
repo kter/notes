@@ -14,7 +14,11 @@ from sqlmodel import Session
 from app.auth import UserId
 from app.database import get_session
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
-from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
+from app.features.assistant.use_cases import (
+    AIInteractionUseCases,
+    AIJobUseCases,
+    EditJobUseCases,
+)
 from app.features.workspace.dependencies import get_workspace_query_use_cases
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 
@@ -45,6 +49,21 @@ def get_edit_job_use_cases(
 ) -> EditJobUseCases:
     """AI編集ジョブの作成・取得を行う EditJobUseCases を生成して返す。"""
     return EditJobUseCases(
+        session=session,
+        user_id=user_id,
+        workspace_queries=workspace_queries,
+    )
+
+
+def get_ai_job_use_cases(
+    session: Annotated[Session, Depends(get_session)],
+    user_id: UserId,
+    workspace_queries: Annotated[
+        WorkspaceQueryUseCases, Depends(get_workspace_query_use_cases)
+    ],
+) -> AIJobUseCases:
+    """要約・チャットの非同期ジョブの作成・取得を行う AIJobUseCases を生成して返す。"""
+    return AIJobUseCases(
         session=session,
         user_id=user_id,
         workspace_queries=workspace_queries,

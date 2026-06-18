@@ -1,4 +1,5 @@
 import datetime
+import time
 import uuid
 
 import pytest
@@ -9,6 +10,40 @@ TEST_PREFIX = "[IntegrationTest]"
 
 def generate_title(base):
     return f"{TEST_PREFIX} {base} {datetime.datetime.now().isoformat()}"
+
+
+def poll_ai_job(client, job_id, timeout_s=120, interval_s=1.5):
+    """要約・チャットの非同期ジョブを完了/失敗まで GET /api/ai/jobs/{id} でポーリングする。"""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        resp = client.get(f"/api/ai/jobs/{job_id}")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        if data["status"] in ("completed", "failed"):
+            return data
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f"AI job {job_id} did not finish in {timeout_s}s (status={data['status']})"
+            )
+        time.sleep(interval_s)
+
+
+def run_summarize_job(client, note_id):
+    """要約ジョブを作成しポーリングして完了したジョブを返す。"""
+    resp = client.post("/api/ai/summarize-jobs", json={"note_id": note_id})
+    assert resp.status_code == 202, resp.text
+    job = poll_ai_job(client, resp.json()["id"])
+    assert job["status"] == "completed", job.get("error_message")
+    return job
+
+
+def run_chat_job(client, payload):
+    """チャットジョブを作成しポーリングして完了したジョブを返す。"""
+    resp = client.post("/api/ai/chat-jobs", json=payload)
+    assert resp.status_code == 202, resp.text
+    job = poll_ai_job(client, resp.json()["id"])
+    assert job["status"] == "completed", job.get("error_message")
+    return job
 
 
 class TestAISummarize:
@@ -32,35 +67,27 @@ class TestAISummarize:
         client.delete(f"/api/notes/{note['id']}")
 
     def test_summarize_note(self, client, test_note):
-        """Create a note with substantial content, call summarize, verify response structure."""
-        response = client.post("/api/ai/summarize", json={"note_id": test_note["id"]})
-        assert response.status_code == 200
-        data = response.json()
-        assert "summary" in data
-        assert isinstance(data["summary"], str)
-        assert len(data["summary"]) > 0
-        assert "tokens_used" in data
-        assert isinstance(data["tokens_used"], int)
-        assert data["tokens_used"] >= 0
+        """Create a note, run the async summarize job, verify the completed job structure."""
+        job = run_summarize_job(client, test_note["id"])
+        assert job["kind"] == "summarize"
+        assert isinstance(job["result"], str)
+        assert len(job["result"]) > 0
+        assert isinstance(job["tokens_used"], int)
+        assert job["tokens_used"] >= 0
 
     def test_summarize_caching(self, client, test_note):
-        """Call summarize twice and verify the second response is served from cache."""
-        response1 = client.post("/api/ai/summarize", json={"note_id": test_note["id"]})
-        assert response1.status_code == 200
-        data1 = response1.json()
-        assert len(data1["summary"]) > 0
+        """Run summarize twice and verify the second job is served from cache (0 tokens)."""
+        job1 = run_summarize_job(client, test_note["id"])
+        assert len(job1["result"]) > 0
 
-        response2 = client.post("/api/ai/summarize", json={"note_id": test_note["id"]})
-        assert response2.status_code == 200
-        data2 = response2.json()
-
-        assert len(data2["summary"]) > 0
-        assert data2["tokens_used"] == 0
+        job2 = run_summarize_job(client, test_note["id"])
+        assert len(job2["result"]) > 0
+        assert job2["tokens_used"] == 0
 
     def test_summarize_nonexistent_note(self, client):
-        """Call summarize with a fake UUID, verify 404."""
+        """Creating a summarize job for a fake UUID must be rejected at creation (404)."""
         fake_id = str(uuid.uuid4())
-        response = client.post("/api/ai/summarize", json={"note_id": fake_id})
+        response = client.post("/api/ai/summarize-jobs", json={"note_id": fake_id})
         assert response.status_code == 404
 
 
@@ -130,64 +157,51 @@ class TestAIChat:
         client.delete(f"/api/folders/{folder['id']}")
 
     def test_chat_note_scope(self, client, test_note):
-        """Create a note, ask a question about it using scope 'note' and note_id, verify response structure."""
-        response = client.post(
-            "/api/ai/chat",
-            json={
+        """Ask a question about a note via an async chat job (scope 'note')."""
+        job = run_chat_job(
+            client,
+            {
                 "scope": "note",
                 "note_id": test_note["id"],
                 "question": "What programming language is this note about?",
             },
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert isinstance(data["answer"], str)
-        assert len(data["answer"]) > 0
-        assert "tokens_used" in data
-        assert isinstance(data["tokens_used"], int)
-        assert data["tokens_used"] >= 0
+        assert job["kind"] == "chat"
+        assert isinstance(job["result"], str)
+        assert len(job["result"]) > 0
+        assert isinstance(job["tokens_used"], int)
+        assert job["tokens_used"] >= 0
 
     def test_chat_folder_scope(self, client, test_folder_with_notes):
-        """Create a folder with 2 notes, ask question using scope 'folder' and folder_id, verify 200 and response structure."""
+        """Ask a question via an async chat job scoped to a folder."""
         folder_id = test_folder_with_notes["folder"]["id"]
-        response = client.post(
-            "/api/ai/chat",
-            json={
+        job = run_chat_job(
+            client,
+            {
                 "scope": "folder",
                 "folder_id": folder_id,
                 "question": "What topics are covered in these notes?",
             },
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert isinstance(data["answer"], str)
-        assert len(data["answer"]) > 0
-        assert "tokens_used" in data
-        assert isinstance(data["tokens_used"], int)
-        assert data["tokens_used"] >= 0
+        assert isinstance(job["result"], str)
+        assert len(job["result"]) > 0
+        assert job["tokens_used"] >= 0
 
     def test_chat_all_scope(self, client, test_note):
-        """Ask question using scope 'all' (no note_id/folder_id), verify 200 and response structure."""
-        response = client.post(
-            "/api/ai/chat",
-            json={
+        """Ask a question via an async chat job scoped to all notes."""
+        job = run_chat_job(
+            client,
+            {
                 "scope": "all",
                 "question": "Give me a brief summary of all my notes.",
             },
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert isinstance(data["answer"], str)
-        assert len(data["answer"]) > 0
-        assert "tokens_used" in data
-        assert isinstance(data["tokens_used"], int)
-        assert data["tokens_used"] >= 0
+        assert isinstance(job["result"], str)
+        assert len(job["result"]) > 0
+        assert job["tokens_used"] >= 0
 
     def test_chat_with_history(self, client, test_note):
-        """Create a note, ask a follow-up question with history list containing one previous exchange, verify 200."""
+        """Ask a follow-up question with history via an async chat job."""
         history = [
             {
                 "role": "user",
@@ -198,23 +212,18 @@ class TestAIChat:
                 "content": "The note is about Python programming.",
             },
         ]
-        response = client.post(
-            "/api/ai/chat",
-            json={
+        job = run_chat_job(
+            client,
+            {
                 "scope": "note",
                 "note_id": test_note["id"],
                 "question": "Who created that language?",
                 "history": history,
             },
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert "answer" in data
-        assert isinstance(data["answer"], str)
-        assert len(data["answer"]) > 0
-        assert "tokens_used" in data
-        assert isinstance(data["tokens_used"], int)
-        assert data["tokens_used"] >= 0
+        assert isinstance(job["result"], str)
+        assert len(job["result"]) > 0
+        assert job["tokens_used"] >= 0
 
 
 class TestTokenUsage:
@@ -256,16 +265,13 @@ class TestTokenUsage:
         assert usage["tokens_used"] >= 0
 
     def test_ai_call_increments_token_usage(self, client, test_note):
-        """Verify that a non-cached AI summarize call increases tokens_used in settings."""
+        """Verify that a non-cached AI summarize job increases tokens_used in settings."""
         # Capture usage before
         before = client.get("/api/settings").json()["token_usage"]["tokens_used"]
 
-        # Make a summarize call (unique content ensures no S3 cache hit)
-        ai_response = client.post(
-            "/api/ai/summarize", json={"note_id": test_note["id"]}
-        )
-        assert ai_response.status_code == 200
-        tokens_charged = ai_response.json()["tokens_used"]
+        # Run a summarize job (unique content ensures no S3 cache hit)
+        job = run_summarize_job(client, test_note["id"])
+        tokens_charged = job["tokens_used"]
 
         # If the call was a cache miss, tokens_charged > 0 and settings must reflect it
         if tokens_charged > 0:

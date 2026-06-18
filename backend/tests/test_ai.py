@@ -10,9 +10,29 @@ from app.features.assistant.gateway import (
     AIGatewayTimeoutError,
     get_ai_gateway,
 )
-from app.features.assistant.job_runner import process_edit_job
+from app.features.assistant.job_runner import (
+    process_chat_job,
+    process_edit_job,
+    process_summarize_job,
+)
 from app.main import app
 from app.models import AIEditJob, Folder, Note
+
+
+def _run_ai_job(process_fn, job_id, session, ai_gateway):
+    """非同期 AI ジョブをテスト内で同期実行するヘルパー。
+
+    SNS 未設定のテストでは dispatch をモックし、worker 相当の処理を直接走らせる。
+    """
+    engine = session.get_bind()
+    assert engine is not None
+    asyncio.run(
+        process_fn(
+            UUID(job_id),
+            session_factory=lambda: Session(engine),
+            ai_gateway=ai_gateway,
+        )
+    )
 
 
 # Mock AI Service
@@ -50,27 +70,66 @@ def mock_ai_service():
     app.dependency_overrides.pop(get_ai_gateway, None)
 
 
-def test_summarize_note(client: TestClient, session: Session, mock_ai_service):
-    # Setup test data
+def test_summarize_note(
+    client: TestClient,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.features.assistant.router.dispatch_ai_job", noop_dispatch)
+
     user_id = "test-user-123"
     note = Note(title="Test Note", content="Test Content", user_id=user_id)
     session.add(note)
     session.commit()
 
-    response = client.post("/api/ai/summarize", json={"note_id": str(note.id)})
-    assert response.status_code == 200
-    assert response.json()["summary"] == "Summary: Test Conte..."
+    response = client.post("/api/ai/summarize-jobs", json={"note_id": str(note.id)})
+    assert response.status_code == 202
+    job = response.json()
+    assert job["status"] == "pending"
+    assert job["kind"] == "summarize"
+
+    _run_ai_job(process_summarize_job, job["id"], session, mock_ai_service)
+
+    poll = client.get(f"/api/ai/jobs/{job['id']}")
+    assert poll.status_code == 200
+    data = poll.json()
+    assert data["status"] == "completed"
+    assert data["result"] == "Summary: Test Conte..."
+    assert data["tokens_used"] == 20
 
 
-def test_summarize_empty_note(client: TestClient, session: Session, mock_ai_service):
+def test_summarize_empty_note(
+    client: TestClient,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.features.assistant.router.dispatch_ai_job", noop_dispatch)
+
     user_id = "test-user-123"
     note = Note(title="Empty Note", content="  ", user_id=user_id)
     session.add(note)
     session.commit()
 
-    response = client.post("/api/ai/summarize", json={"note_id": str(note.id)})
-    assert response.status_code == 400
-    assert "empty" in response.json()["detail"].lower()
+    # 空ノートの検証は worker 処理時に行われるため、ジョブは受理(202)後に failed になる
+    response = client.post("/api/ai/summarize-jobs", json={"note_id": str(note.id)})
+    assert response.status_code == 202
+    job = response.json()
+
+    _run_ai_job(process_summarize_job, job["id"], session, mock_ai_service)
+
+    poll = client.get(f"/api/ai/jobs/{job['id']}")
+    assert poll.status_code == 200
+    data = poll.json()
+    assert data["status"] == "failed"
+    assert "empty" in (data["error_message"] or "").lower()
 
 
 def test_summarize_unowned_note(make_client, session: Session, mock_ai_service):
@@ -79,30 +138,60 @@ def test_summarize_unowned_note(make_client, session: Session, mock_ai_service):
     session.add(note)
     session.commit()
 
+    # 所有権チェックはジョブ作成時に行われるため 404 で即拒否される
     client = make_client("test-user-123")
-    response = client.post("/api/ai/summarize", json={"note_id": str(note.id)})
+    response = client.post("/api/ai/summarize-jobs", json={"note_id": str(note.id)})
     assert response.status_code == 404
 
 
-def test_chat_note_scope(client: TestClient, session: Session, mock_ai_service):
+def test_chat_note_scope(
+    client: TestClient,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.features.assistant.router.dispatch_ai_job", noop_dispatch)
+
     user_id = "test-user-123"
     note = Note(title="Test Note", content="Sample content for chat", user_id=user_id)
     session.add(note)
     session.commit()
 
     response = client.post(
-        "/api/ai/chat",
+        "/api/ai/chat-jobs",
         json={
             "scope": "note",
             "note_id": str(note.id),
             "question": "What is in the note?",
         },
     )
-    assert response.status_code == 200
-    assert "What is in the note?" in response.json()["answer"]
+    assert response.status_code == 202
+    job = response.json()
+    assert job["kind"] == "chat"
+
+    _run_ai_job(process_chat_job, job["id"], session, mock_ai_service)
+
+    poll = client.get(f"/api/ai/jobs/{job['id']}")
+    assert poll.status_code == 200
+    data = poll.json()
+    assert data["status"] == "completed"
+    assert "What is in the note?" in data["result"]
 
 
-def test_chat_folder_scope(client: TestClient, session: Session, mock_ai_service):
+def test_chat_folder_scope(
+    client: TestClient,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.features.assistant.router.dispatch_ai_job", noop_dispatch)
+
     user_id = "test-user-123"
     folder = Folder(name="Test Folder", user_id=user_id)
     session.add(folder)
@@ -119,18 +208,36 @@ def test_chat_folder_scope(client: TestClient, session: Session, mock_ai_service
     session.commit()
 
     response = client.post(
-        "/api/ai/chat",
+        "/api/ai/chat-jobs",
         json={
             "scope": "folder",
             "folder_id": str(folder.id),
             "question": "Ask about folder",
         },
     )
-    assert response.status_code == 200
-    assert "Ask about folder" in response.json()["answer"]
+    assert response.status_code == 202
+    job = response.json()
+
+    _run_ai_job(process_chat_job, job["id"], session, mock_ai_service)
+
+    poll = client.get(f"/api/ai/jobs/{job['id']}")
+    assert poll.status_code == 200
+    data = poll.json()
+    assert data["status"] == "completed"
+    assert "Ask about folder" in data["result"]
 
 
-def test_chat_all_scope(client: TestClient, session: Session, mock_ai_service):
+def test_chat_all_scope(
+    client: TestClient,
+    session: Session,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def noop_dispatch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.features.assistant.router.dispatch_ai_job", noop_dispatch)
+
     user_id = "test-user-123"
     note1 = Note(title="Note 1", content="Content 1", user_id=user_id)
     note2 = Note(title="Note 2", content="Content 2", user_id=user_id)
@@ -139,9 +246,16 @@ def test_chat_all_scope(client: TestClient, session: Session, mock_ai_service):
     session.commit()
 
     response = client.post(
-        "/api/ai/chat", json={"scope": "all", "question": "Ask about everything"}
+        "/api/ai/chat-jobs", json={"scope": "all", "question": "Ask about everything"}
     )
-    assert response.status_code == 200
+    assert response.status_code == 202
+    job = response.json()
+
+    _run_ai_job(process_chat_job, job["id"], session, mock_ai_service)
+
+    poll = client.get(f"/api/ai/jobs/{job['id']}")
+    assert poll.status_code == 200
+    assert poll.json()["status"] == "completed"
 
 
 def test_edit_note_content(client: TestClient, session: Session, mock_ai_service):

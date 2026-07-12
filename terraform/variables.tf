@@ -63,6 +63,18 @@ variable "bootstrap_admin_user_ids" {
   default     = ""
 }
 
+variable "ses_email_identity_arn" {
+  description = "ARN of the SES verified email identity for Cognito user pool emails"
+  type        = string
+  default     = ""
+}
+
+variable "cognito_from_email" {
+  description = "From email address for Cognito user pool emails (must be verified in SES)"
+  type        = string
+  default     = ""
+}
+
 variable "sentry_traces_sample_rate" {
   description = "Optional backend Sentry trace sample rate override"
   type        = number

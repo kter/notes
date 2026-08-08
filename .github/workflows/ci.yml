@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend unit tests and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.11.17
+          python-version: 3.12.3
+
+      - name: Install backend dependencies
+        run: cd backend && uv sync --extra dev
+
+      - name: Run backend unit tests
+        run: make test-backend
+
+      - name: Lint backend
+        run: make lint-backend
+
+      - name: Check backend formatting
+        run: make format-check-backend
+
+  frontend:
+    name: Frontend unit tests, lint, and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Run frontend unit tests
+        run: make test-frontend
+
+      - name: Lint frontend
+        run: make lint-frontend
+
+      # Non-blocking for now: `tsc --noEmit` currently reports 7 pre-existing
+      # errors, all in test files and all predating this workflow --
+      #   src/hooks/useFolders.test.ts        TS2783 (duplicate `folders` key,
+      #                                       silently overwritten by the spread)
+      #   src/instrumentation-client.test.ts  TS2540 \
+      #   src/lib/logger.test.ts              TS2540  } `process.env.NODE_ENV` is
+      #   src/lib/sentry.test.ts              TS2540 /  read-only; use vi.stubEnv
+      # Fixing them is out of scope for "add a CI gate", but shipping a workflow
+      # that is red on day one would train everyone to ignore it. So the step
+      # runs and stays visible in the logs without blocking the merge.
+      # TODO: fix the 7 errors, then delete this continue-on-error line.
+      - name: Typecheck frontend
+        continue-on-error: true
+        run: cd frontend && npx tsc --noEmit
+
+  terraform:
+    name: Terraform static checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.5
+
+      # make tf-init enters tf-switch, which selects a remote backend and requires a configured profile.
+      - name: Initialize Terraform without a backend
+        run: terraform -chdir=terraform init -backend=false
+
+      - name: Validate Terraform
+        run: terraform -chdir=terraform validate
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive terraform/
+
+      - name: Install conftest
+        env:
+          CONFTEST_VERSION: 0.68.2
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" \
+            --output "${RUNNER_TEMP}/conftest.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/conftest.tar.gz" -C "${RUNNER_TEMP}" conftest
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Verify Conftest policies
+        run: make conftest-verify

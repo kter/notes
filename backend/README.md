@@ -87,8 +87,8 @@ Once running:
 | `COGNITO_REGION` | AWS Cognito region | `ap-northeast-1` |
 | `COGNITO_USER_POOL_ID` | Cognito User Pool ID | - |
 | `COGNITO_APP_CLIENT_ID` | Cognito App Client ID | - |
-| `BEDROCK_REGION` | AWS Bedrock region | `us-east-1` |
-| `BEDROCK_MODEL_ID` | Bedrock model ID | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| `BEDROCK_REGION` | AWS Bedrock region | `ap-northeast-1` |
+| `BEDROCK_MODEL_ID` | Bedrock model ID | `jp.anthropic.claude-sonnet-4-6` |
 | `SENTRY_DSN` | Local-only Sentry DSN loaded from `.env` | - |
 | `SENTRY_DSN_PARAMETER_NAME` | Backend AWS SSM SecureString parameter name used outside local development | - |
 | `SENTRY_TRACES_SAMPLE_RATE` | Optional trace sample rate override | `1.0` in `local`/`dev`, `0.1` otherwise |

@@ -19,8 +19,10 @@ locals {
       COGNITO_USER_POOL_ID  = aws_cognito_user_pool.main.id
       COGNITO_APP_CLIENT_ID = aws_cognito_user_pool_client.main.id
       COGNITO_REGION        = var.aws_region
-      BEDROCK_REGION        = "us-east-1"
-      BEDROCK_MODEL_ID      = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+      # `jp.` 推論プロファイルは ap-northeast-1 にしか存在しない。リージョンと
+      # モデル ID は必ず一組で変更すること。接頭辞 `jp.` は推論を日本国内に閉じる。
+      BEDROCK_REGION        = "ap-northeast-1"
+      BEDROCK_MODEL_ID      = "jp.anthropic.claude-sonnet-4-6"
       DSQL_CLUSTER_ENDPOINT = aws_dsql_cluster.main.identifier
       CORS_ORIGINS = jsonencode([
         "https://${local.current_env.domain_name}",

@@ -45,8 +45,12 @@ class Settings(BaseSettings):
     integration_test_bypass_token_2: str = ""
 
     # Amazon Bedrock (AI) 設定
-    bedrock_region: str = "us-east-1"
-    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    # モデル ID は ap-northeast-1 の推論プロファイルを指す。`jp.` 接頭辞は推論を
+    # 日本国内に閉じるため、個人のノート本文を送る本アプリではこれを維持すること。
+    # `jp.` プロファイルは ap-northeast-1 にしか存在しないので、リージョンとモデル
+    # ID は必ず一組で変更する。
+    bedrock_region: str = "ap-northeast-1"
+    bedrock_model_id: str = "jp.anthropic.claude-sonnet-4-6"
 
     # CORS 設定
     cors_origins: list[str] = ["http://localhost:3000"]

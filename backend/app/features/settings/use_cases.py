@@ -29,6 +29,7 @@ from app.models import (
     UserSettings,
     UserSettingsRead,
     UserSettingsUpdate,
+    resolve_model_id,
 )
 from app.shared import ValidationFailed
 
@@ -124,7 +125,10 @@ class SettingsUseCases:
         """UserSettings を UserSettingsRead に変換して返す。"""
         return UserSettingsRead(
             user_id=settings.user_id,
-            llm_model_id=settings.llm_model_id,
+            # 選択可能でなくなったモデルを保存しているユーザーには既定値を見せる。
+            # 生の値を返すと、この API 自身が受け付けない ID を返すことになり、
+            # 読み出した値をそのまま書き戻すと 400 になってしまう。
+            llm_model_id=resolve_model_id(settings.llm_model_id),
             language=settings.language,
             token_limit=settings.token_limit,
             created_at=settings.created_at,

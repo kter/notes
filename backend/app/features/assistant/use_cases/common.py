@@ -12,7 +12,7 @@ from app.features.assistant.errors import (
     AITokenLimitExceededError,
 )
 from app.features.assistant.usage_policy import check_limit
-from app.models import DEFAULT_LLM_MODEL_ID, UserSettings
+from app.models import DEFAULT_LLM_MODEL_ID, UserSettings, resolve_model_id
 from app.shared import ValidationFailed
 
 
@@ -32,5 +32,5 @@ def get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
     """ユーザー設定から (llm_model_id, language) を返す。未設定の場合はデフォルト値を返す。"""
     settings = session.get(UserSettings, user_id)
     if settings:
-        return settings.llm_model_id, settings.language
+        return resolve_model_id(settings.llm_model_id), settings.language
     return DEFAULT_LLM_MODEL_ID, "auto"

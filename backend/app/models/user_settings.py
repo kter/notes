@@ -12,32 +12,45 @@ from sqlmodel import Field, SQLModel
 
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT
 
-# デフォルトLLMモデルID（クロスリージョン推論プロファイル経由のClaude 3.5 Haiku）
-DEFAULT_LLM_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+# デフォルトLLMモデルID。
+#
+# ここは実際に InvokeModel へ渡る値であり、`BEDROCK_MODEL_ID` 環境変数ではない。
+# 環境変数のほうはフォールバック用の既定値にすぎない点に注意すること。
+#
+# `jp.` は日本国内に閉じた推論プロファイル。ユーザーのノート本文を送信するため
+# これを採用している。`jp.` プロファイルは ap-northeast-1 にしか存在しないので、
+# BEDROCK_REGION（terraform/lambda.tf・config.py）と必ず一組で変更する。
+DEFAULT_LLM_MODEL_ID = "jp.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 # ユーザーが選択可能なモデル一覧
-# "us." プレフィックス付きモデルはUSリージョンのクロスリージョン推論プロファイルを使用
-# プレフィックスなしは旧モデル向けのオンデマンド呼び出し
 #
-# 注意: 現時点ではコスト効率を優先してHaikuモデルのみ提供。
+# 注意: コスト効率を優先してHaikuモデルのみ提供する方針は維持している。
 # Sonnetモデルは将来のプレミアムプランで追加予定。
+#
+# 履歴: 以前ここに並んでいた `us.anthropic.claude-3-5-haiku-20241022-v1:0` と
+# `anthropic.claude-3-haiku-20240307-v1:0` は退役・退役予定で、前者は既定値だった
+# ため AI 機能が全面停止していた。退役日を書き添えて交換すること。
 AVAILABLE_MODELS = [
     {
-        "id": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "id": "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
         "name": "Claude Haiku 4.5",
-        "description": "最新・高性能・低コスト",
-    },
-    {
-        "id": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "name": "Claude 3.5 Haiku",
         "description": "高速・低コスト（推奨）",
     },
-    {
-        "id": "anthropic.claude-3-haiku-20240307-v1:0",
-        "name": "Claude 3 Haiku",
-        "description": "高速・最低コスト",
-    },
 ]
+
+
+def resolve_model_id(stored_model_id: str | None) -> str:
+    """保存済みモデル ID が現在も選択可能ならそれを、そうでなければ既定値を返す。
+
+    AVAILABLE_MODELS からモデルを外す（退役・リージョン移行など）と、その ID を
+    保存していたユーザーは InvokeModel が失敗し続ける。設定 API が「自分では
+    受け付けない ID」を返してしまう問題も同じ原因なので、読み出し側と AI 呼び出し
+    側の両方でここを通す。
+    """
+    if any(model["id"] == stored_model_id for model in AVAILABLE_MODELS):
+        return stored_model_id  # type: ignore[return-value]
+    return DEFAULT_LLM_MODEL_ID
+
 
 # Default language setting (auto-detect from browser)
 DEFAULT_LANGUAGE = "auto"

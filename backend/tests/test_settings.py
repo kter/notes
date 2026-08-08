@@ -88,7 +88,8 @@ class TestUpdateSettings:
     def test_update_settings_change_model(self, client: TestClient):
         """Test updating the LLM model selection."""
         # Get valid model ID from available models
-        valid_model_id = AVAILABLE_MODELS[1]["id"]  # Pick second model
+        # 末尾を選ぶ。候補が1件でも動き、2件以上に戻れば [0] とは別のモデルになる。
+        valid_model_id = AVAILABLE_MODELS[-1]["id"]
 
         response = client.put(
             "/api/settings",
@@ -198,7 +199,7 @@ class TestUpdateLanguageSettings:
 
     def test_update_model_and_language_together(self, client: TestClient):
         """Test updating both model and language at once."""
-        valid_model_id = AVAILABLE_MODELS[1]["id"]
+        valid_model_id = AVAILABLE_MODELS[-1]["id"]
 
         response = client.put(
             "/api/settings",

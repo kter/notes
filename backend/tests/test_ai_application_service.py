@@ -6,7 +6,13 @@ from app.features.assistant.gateway import AIGateway
 from app.features.assistant.usage_policy import get_usage_info, record_usage
 from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
-from app.models import AIEditJob, Note, UserSettings
+from app.models import (
+    AVAILABLE_MODELS,
+    DEFAULT_LLM_MODEL_ID,
+    AIEditJob,
+    Note,
+    UserSettings,
+)
 from app.models.enums import ChatScope
 from app.shared import NotFound, ValidationFailed
 from tests.conftest import OTHER_USER_ID, TEST_USER_ID
@@ -72,7 +78,7 @@ async def test_summarize_note_uses_user_settings_and_records_usage(session: Sess
     session.add(
         UserSettings(
             user_id=TEST_USER_ID,
-            llm_model_id="custom-model",
+            llm_model_id=AVAILABLE_MODELS[0]["id"],
             language="ja",
         )
     )
@@ -94,11 +100,43 @@ async def test_summarize_note_uses_user_settings_and_records_usage(session: Sess
         {
             "operation": "summarize",
             "content": "Hello world",
-            "model_id": "custom-model",
+            "model_id": AVAILABLE_MODELS[0]["id"],
             "language": "ja",
         }
     ]
     assert get_usage_info(session, TEST_USER_ID).tokens_used == 12
+
+
+@pytest.mark.asyncio
+async def test_summarize_note_falls_back_when_stored_model_is_retired(session: Session):
+    """選択可能でなくなったモデル ID を保存済みのユーザーが既定値に寄せられること。
+
+    退役やリージョン移行で AVAILABLE_MODELS からモデルを外すと、その ID を保存して
+    いたユーザーは InvokeModel で失敗し続ける。実際にこれで AI 機能が全面停止したため
+    回帰テストとして固定する。
+    """
+    note = Note(title="Test", content="Hello world", user_id=TEST_USER_ID)
+    session.add(note)
+    session.add(
+        UserSettings(
+            user_id=TEST_USER_ID,
+            llm_model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",  # 2026-02-19 退役
+            language="ja",
+        )
+    )
+    session.commit()
+
+    ai_gateway = CapturingAIGateway()
+    use_cases = AIInteractionUseCases(
+        session,
+        TEST_USER_ID,
+        ai_gateway,
+        WorkspaceQueryUseCases(session, TEST_USER_ID),
+    )
+
+    await use_cases.summarize_note(note.id)
+
+    assert ai_gateway.calls[0]["model_id"] == DEFAULT_LLM_MODEL_ID
 
 
 @pytest.mark.asyncio

@@ -40,7 +40,12 @@ resource "aws_iam_role_policy" "bedrock_access" {
         Resource = [
           # Foundation models (on-demand)
           "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
-          # Cross-region inference profiles
+          # Cross-region inference profiles.
+          # `jp.` is the one actually in use (see BEDROCK_MODEL_ID in lambda.tf):
+          # it keeps inference inside Japan, which matters because we send users'
+          # personal note content. Without this entry the invoke fails with
+          # AccessDenied even though the model itself is available.
+          "arn:aws:bedrock:*:*:inference-profile/jp.anthropic.claude-*",
           "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-*",
           "arn:aws:bedrock:*:*:inference-profile/eu.anthropic.claude-*"
         ]

@@ -228,3 +228,56 @@ async def test_edit_large_content_uses_chunking(mock_boto_client, mock_settings)
     assert len(calls) > 1
     assert edited == content.replace("teh", "the")
     assert total_tokens == 11 * len(calls)
+
+
+# 退役済み Bedrock モデル ID の一覧。
+# 2026-08-09 時点で、この2つは実際に InvokeModel が
+# ResourceNotFoundException("This model version has reached the end of its life")
+# を返す。以前これが本番に入り込み、AI 要約・チャットが停止した。
+RETIRED_BEDROCK_MODEL_IDS = frozenset(
+    {
+        "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "anthropic.claude-3-sonnet-20240229-v1:0",
+    }
+)
+
+
+def _declared_default(field_name: str) -> str:
+    """Settings クラスが宣言している既定値を返す。
+
+    `get_settings()` ではなくクラスの既定値を見るのは意図的。前者はローカルの
+    `backend/.env` に上書きされるため、開発者の手元の設定次第で結果が変わって
+    しまう。ここで検証したいのは「リポジトリが出荷する値」なので、環境に依存
+    しないクラス既定値を対象にする。
+    """
+    from app.config import Settings
+
+    return Settings.model_fields[field_name].default
+
+
+def test_default_bedrock_model_is_not_retired():
+    """既定のモデル ID が退役済みモデルに逆戻りしていないことを検査する。
+
+    ここが通らない場合、AI 機能はデプロイした瞬間に沈黙する。
+    """
+    model_id = _declared_default("bedrock_model_id")
+    assert model_id not in RETIRED_BEDROCK_MODEL_IDS, (
+        f"BEDROCK_MODEL_ID={model_id!r} は退役済みで InvokeModel が失敗する。"
+        " 現行世代の推論プロファイルに更新すること。"
+    )
+
+
+def test_jp_inference_profile_is_paired_with_its_region():
+    """`jp.` 推論プロファイルは ap-northeast-1 にしか存在しない。
+
+    リージョンとモデル ID は必ず一組で設定する必要があり、
+    片方だけ変えると実行時に落ちる。
+    """
+    model_id = _declared_default("bedrock_model_id")
+    region = _declared_default("bedrock_region")
+    if model_id.startswith("jp."):
+        assert region == "ap-northeast-1", (
+            f"jp. プロファイル {model_id!r} には ap-northeast-1 が必要だが"
+            f" bedrock_region={region!r} になっている。"
+        )

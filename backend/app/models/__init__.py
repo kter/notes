@@ -37,6 +37,7 @@ from app.models.user_settings import (
     UserSettings,
     UserSettingsRead,
     UserSettingsUpdate,
+    resolve_model_id,
 )
 
 __all__ = [
@@ -58,6 +59,7 @@ __all__ = [
     "AvailableModel",
     "DEFAULT_LANGUAGE",
     "DEFAULT_LLM_MODEL_ID",
+    "resolve_model_id",
     "Folder",
     "FolderCreate",
     "FolderRead",

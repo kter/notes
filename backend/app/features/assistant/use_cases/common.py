@@ -12,7 +12,7 @@ from app.features.assistant.errors import (
     AITokenLimitExceededError,
 )
 from app.features.assistant.usage_policy import check_limit
-from app.models import AVAILABLE_MODELS, DEFAULT_LLM_MODEL_ID, UserSettings
+from app.models import DEFAULT_LLM_MODEL_ID, UserSettings, resolve_model_id
 from app.shared import ValidationFailed
 
 
@@ -32,17 +32,5 @@ def get_user_settings(session: Session, user_id: str) -> tuple[str, str]:
     """ユーザー設定から (llm_model_id, language) を返す。未設定の場合はデフォルト値を返す。"""
     settings = session.get(UserSettings, user_id)
     if settings:
-        return _usable_model_id(settings.llm_model_id), settings.language
+        return resolve_model_id(settings.llm_model_id), settings.language
     return DEFAULT_LLM_MODEL_ID, "auto"
-
-
-def _usable_model_id(stored_model_id: str) -> str:
-    """保存済みモデル ID が現在も選択可能なら採用し、そうでなければ既定値に戻す。
-
-    AVAILABLE_MODELS からモデルを外す（退役・リージョン移行など）と、その ID を
-    保存済みのユーザーは InvokeModel で失敗し続ける。設定画面を開き直すまで AI
-    機能が動かないことになるため、ここで既定値へ寄せる。
-    """
-    if any(model["id"] == stored_model_id for model in AVAILABLE_MODELS):
-        return stored_model_id
-    return DEFAULT_LLM_MODEL_ID

@@ -38,6 +38,20 @@ AVAILABLE_MODELS = [
     },
 ]
 
+
+def resolve_model_id(stored_model_id: str | None) -> str:
+    """保存済みモデル ID が現在も選択可能ならそれを、そうでなければ既定値を返す。
+
+    AVAILABLE_MODELS からモデルを外す（退役・リージョン移行など）と、その ID を
+    保存していたユーザーは InvokeModel が失敗し続ける。設定 API が「自分では
+    受け付けない ID」を返してしまう問題も同じ原因なので、読み出し側と AI 呼び出し
+    側の両方でここを通す。
+    """
+    if any(model["id"] == stored_model_id for model in AVAILABLE_MODELS):
+        return stored_model_id  # type: ignore[return-value]
+    return DEFAULT_LLM_MODEL_ID
+
+
 # Default language setting (auto-detect from browser)
 DEFAULT_LANGUAGE = "auto"
 

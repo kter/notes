@@ -2,14 +2,15 @@
 
 責務: Cognito が発行した JWT をオンライン検証し、クレームを返す。
 主要なエクスポート: CognitoJWTVerifier クラス、cognito_verifier シングルトン。
-呼び出し関係: app.auth.dependencies から呼ばれ、httpx / python-jose を呼ぶ。
+呼び出し関係: app.auth.dependencies から呼ばれ、httpx / PyJWT を呼ぶ。
 """
 
+import asyncio
+import secrets
 import time
 
 import httpx
-from jose import JWTError, jwt
-from jose.exceptions import ExpiredSignatureError
+import jwt
 
 from app.config import get_settings
 
@@ -30,18 +31,23 @@ class CognitoJWTVerifier:
         self.app_client_id = settings.cognito_app_client_id
         self._jwks = None  # 初回取得後にメモリキャッシュする
         self._jwks_fetched_at: float = 0.0
+        self._jwks_refetch_lock = asyncio.Lock()
         self._jwks_url = (
             f"https://cognito-idp.{self.region}.amazonaws.com/"
             f"{self.user_pool_id}/.well-known/jwks.json"
         )
 
-    async def _get_jwks(self) -> dict:
+    async def _get_jwks(self, *, force_refresh: bool = False) -> dict:
         """Cognito から JWKS を取得してキャッシュする。
 
         TTL (JWKS_CACHE_TTL_SECONDS) を超えた場合は再取得する。
         """
         now = time.monotonic()
-        if self._jwks is None or (now - self._jwks_fetched_at) > JWKS_CACHE_TTL_SECONDS:
+        if (
+            force_refresh
+            or self._jwks is None
+            or (now - self._jwks_fetched_at) > JWKS_CACHE_TTL_SECONDS
+        ):
             async with httpx.AsyncClient() as client:
                 response = await client.get(self._jwks_url)
                 response.raise_for_status()
@@ -49,7 +55,7 @@ class CognitoJWTVerifier:
                 self._jwks_fetched_at = now
         return self._jwks
 
-    def _get_signing_key(self, token: str, jwks: dict) -> dict | None:
+    def _get_signing_key(self, token: str, jwks: dict) -> object | None:
         """トークンヘッダーの kid に対応する署名キーを JWKS から取得する。
 
         一致するキーが見つからない場合は None を返す。
@@ -59,7 +65,7 @@ class CognitoJWTVerifier:
 
         for key in jwks.get("keys", []):
             if key.get("kid") == kid:
-                return key
+                return jwt.PyJWK(key).key
         return None
 
     async def verify_token(self, token: str) -> dict:
@@ -72,7 +78,7 @@ class CognitoJWTVerifier:
             デコードされたトークンクレーム辞書。
 
         Raises:
-            JWTError: 署名検証失敗・有効期限切れ・不正なトークン形式の場合。
+            jwt.PyJWTError: 署名検証失敗・有効期限切れ・不正なトークン形式の場合。
         """
         # ----------------------------------------------------------------------
         # 開発環境での結合テスト用バイパス
@@ -83,32 +89,34 @@ class CognitoJWTVerifier:
         # 一切行わず、通常の JWT 検証にフォールスルーする。
         # ----------------------------------------------------------------------
         if settings.environment == "dev" and settings.integration_test_bypass_token:
-            if token == settings.integration_test_bypass_token:
+            if secrets.compare_digest(token, settings.integration_test_bypass_token):
                 return {
                     "sub": "integration-test-user-id",
                     "username": "integration-test-user",
                     "email": "integration-test-user@example.com",
-                    "token_use": "access",
+                    "token_use": "id",
                     "scope": "aws.cognito.signin.user.admin",
                 }
-            if (
-                settings.integration_test_bypass_token_2
-                and token == settings.integration_test_bypass_token_2
+            if settings.integration_test_bypass_token_2 and secrets.compare_digest(
+                token, settings.integration_test_bypass_token_2
             ):
                 return {
                     "sub": "integration-test-user-id-2",
                     "username": "integration-test-user-2",
                     "email": "integration-test-user-2@example.com",
-                    "token_use": "access",
+                    "token_use": "id",
                     "scope": "aws.cognito.signin.user.admin",
                 }
 
-        if settings.environment == "local" and token == "local-dev-token":  # noqa: S105
+        if settings.environment == "local" and secrets.compare_digest(
+            token,
+            "local-dev-token",  # noqa: S105
+        ):
             return {
                 "sub": "local-dev-user-id",
                 "username": "local-dev-user",
                 "email": "local-dev-user@example.com",
-                "token_use": "access",
+                "token_use": "id",
                 "scope": "aws.cognito.signin.user.admin",
             }
 
@@ -116,7 +124,16 @@ class CognitoJWTVerifier:
         signing_key = self._get_signing_key(token, jwks)
 
         if signing_key is None:
-            raise JWTError("Unable to find signing key")
+            async with self._jwks_refetch_lock:
+                # 別リクエストが待機中に再取得済みなら、その結果を再利用する。
+                if self._jwks is jwks:
+                    jwks = await self._get_jwks(force_refresh=True)
+                else:
+                    jwks = self._jwks
+                signing_key = self._get_signing_key(token, jwks)
+
+        if signing_key is None:
+            raise jwt.PyJWTError("Unable to find signing key")
 
         try:
             claims = jwt.decode(
@@ -125,13 +142,16 @@ class CognitoJWTVerifier:
                 algorithms=["RS256"],
                 audience=self.app_client_id,
                 issuer=f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool_id}",
+                options={"require": ["exp", "iat", "iss", "aud", "sub", "token_use"]},
             )
+            if claims.get("token_use") != "id":
+                raise jwt.InvalidTokenError("token_use must be id")
             return claims
-        except ExpiredSignatureError:
+        except jwt.ExpiredSignatureError:
             # 有効期限切れは専用のエラーメッセージに統一する
-            raise JWTError("Token has expired")
-        except JWTError as e:
-            raise JWTError(f"Token verification failed: {e}")
+            raise jwt.PyJWTError("Token has expired")
+        except jwt.PyJWTError as e:
+            raise jwt.PyJWTError(f"Token verification failed: {e}")
 
 
 # モジュールレベルのシングルトン（アプリ全体で JWKS キャッシュを共有する）

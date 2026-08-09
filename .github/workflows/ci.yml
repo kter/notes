@@ -64,19 +64,7 @@ jobs:
       - name: Lint frontend
         run: make lint-frontend
 
-      # Non-blocking for now: `tsc --noEmit` currently reports 7 pre-existing
-      # errors, all in test files and all predating this workflow --
-      #   src/hooks/useFolders.test.ts        TS2783 (duplicate `folders` key,
-      #                                       silently overwritten by the spread)
-      #   src/instrumentation-client.test.ts  TS2540 \
-      #   src/lib/logger.test.ts              TS2540  } `process.env.NODE_ENV` is
-      #   src/lib/sentry.test.ts              TS2540 /  read-only; use vi.stubEnv
-      # Fixing them is out of scope for "add a CI gate", but shipping a workflow
-      # that is red on day one would train everyone to ignore it. So the step
-      # runs and stays visible in the logs without blocking the merge.
-      # TODO: fix the 7 errors, then delete this continue-on-error line.
       - name: Typecheck frontend
-        continue-on-error: true
         run: cd frontend && npx tsc --noEmit
 
   terraform:

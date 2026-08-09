@@ -9,7 +9,7 @@ describe("Sentry browser config", () => {
     process.env.NEXT_PUBLIC_API_URL = "https://api.example.com";
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://public@example.ingest.sentry.io/123";
     process.env.NEXT_PUBLIC_ENVIRONMENT = "dev";
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
   });
 
   it("adds the backend API to trace propagation targets", () => {
@@ -44,7 +44,7 @@ describe("Sentry browser config", () => {
   });
 
   it("uses lower production sample rates", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
 
     const config = getSentryBrowserConfig();
 

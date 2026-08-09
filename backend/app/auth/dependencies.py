@@ -10,9 +10,9 @@
 import logging
 from typing import Annotated
 
+import jwt
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
 from sqlmodel import Session
 
 from app.auth.api_key_service import UserApiKeyService
@@ -51,7 +51,7 @@ async def _verify_bearer_token(token: str) -> dict:
             outcome="success",
         )
         return claims
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         log_event(
             logger,
             logging.WARNING,

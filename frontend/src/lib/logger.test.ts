@@ -9,7 +9,7 @@ describe("logger", () => {
   });
 
   it("suppresses info logs in production console output", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     logger.info("Informational message");
@@ -19,7 +19,7 @@ describe("logger", () => {
   });
 
   it("sends warnings to console and Sentry", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     logger.warn("Sync warning", { failedCount: 2 });
@@ -35,7 +35,7 @@ describe("logger", () => {
   });
 
   it("captures exceptions for error logs", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const error = new Error("boom");
 

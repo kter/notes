@@ -8,7 +8,7 @@ describe("instrumentation-client", () => {
     process.env.NEXT_PUBLIC_API_URL = "https://api.example.com";
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://public@example.ingest.sentry.io/123";
     process.env.NEXT_PUBLIC_ENVIRONMENT = "dev";
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
   });
 
   it("initializes the browser SDK and exports router tracing", async () => {

@@ -68,7 +68,7 @@ function useFoldersHarness(
   const [selectedFolderId, setSelectedFolderId] = useState(initialSelectedFolderId);
 
   return {
-    folders,
+    // `folders` は下の spread が返す値で上書きされるため、ここには置かない。
     selectedFolderId,
     ...useFolders(folders, setFolders, selectedFolderId, setSelectedFolderId, {
       onSnapshotSynced: onSnapshotSyncedMock,

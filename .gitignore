@@ -19,7 +19,10 @@ ENV/
 env/
 
 # uv
-uv.lock
+# uv.lock IS committed on purpose: backend/Dockerfile does
+#   COPY pyproject.toml uv.lock ./ && uv sync --frozen
+# so ignoring it made the image build depend on an untracked file, and
+# left dependency versions free to drift between builds.
 
 # Node.js
 node_modules/

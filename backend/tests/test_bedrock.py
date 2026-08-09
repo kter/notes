@@ -16,6 +16,22 @@ def mock_settings():
 
 
 @pytest.fixture
+def mock_summary_cache():
+    """summarize() が実 S3 を触らないようにサマリキャッシュを差し替える。
+
+    `summary_cache.py` はモジュール読み込み時にシングルトンを生成し、その中で
+    `boto3.client("s3")` を作る。つまりテストのフィクスチャが `boto3.client` に
+    パッチを当てるより前にクライアントが出来上がっており、パッチをすり抜ける。
+    結果、これらのテストは AWS 認証情報のあるマシンでのみ通り、CI では
+    NoCredentialsError で落ちていた。ここを塞いでユニットテストを密閉する。
+    """
+    cache = Mock()
+    cache.get_cached_summary.return_value = None
+    with patch("app.features.assistant.gateway.get_summary_cache", return_value=cache):
+        yield cache
+
+
+@pytest.fixture
 def mock_boto_client():
     with patch("boto3.client") as mock_client:
         client_instance = Mock()
@@ -24,7 +40,7 @@ def mock_boto_client():
 
 
 @pytest.mark.asyncio
-async def test_summarize_success(mock_boto_client, mock_settings):
+async def test_summarize_success(mock_boto_client, mock_settings, mock_summary_cache):
     service = BedrockGateway()
 
     # Mock response from Bedrock
@@ -164,7 +180,7 @@ def test_extract_edited_content():
 
 
 @pytest.mark.asyncio
-async def test_bedrock_error(mock_boto_client, mock_settings):
+async def test_bedrock_error(mock_boto_client, mock_settings, mock_summary_cache):
     service = BedrockGateway()
 
     mock_boto_client.invoke_model.side_effect = ClientError(

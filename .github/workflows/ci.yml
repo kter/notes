@@ -83,7 +83,14 @@ jobs:
       - name: Initialize Terraform without a backend
         run: terraform -chdir=terraform init -backend=false
 
+      # `init -backend=false` leaves the workspace as "default", but
+      # variables.tf does `local.env_config[terraform.workspace]` and that map
+      # only has dev/prd keys -- so validate fails with "Invalid index" unless a
+      # real workspace name is set. TF_WORKSPACE supplies one without needing a
+      # state backend, and avoids bending production config to suit CI.
       - name: Validate Terraform
+        env:
+          TF_WORKSPACE: dev
         run: terraform -chdir=terraform validate
 
       - name: Check Terraform formatting

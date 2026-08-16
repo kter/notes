@@ -23,6 +23,7 @@ import { markdownIndentKeymap } from "./extensions/markdownIndent";
 import { markdownListContinuationKeymap } from "./extensions/markdownListContinuation";
 import { indentGuide } from "./extensions/indentGuide";
 import { livePreview } from "./extensions/livePreview";
+import { handleTextPasteWithoutTrailingLineBreak } from "./extensions/paste";
 
 export interface MarkdownEditorHandle {
   getValue: () => string;
@@ -140,14 +141,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
             onBlurRef.current?.();
             return false;
           },
-          paste: (event) => {
+          paste: (event, view) => {
             const file = event.clipboardData?.files[0];
             if (file?.type.startsWith("image/")) {
               event.preventDefault();
               onPasteImageRef.current?.(file);
               return true;
             }
-            return false;
+            return handleTextPasteWithoutTrailingLineBreak(event, view);
           },
         }),
       ];

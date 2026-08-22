@@ -268,7 +268,7 @@ else
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval BYPASS_TOKEN := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token))
 	$(eval BYPASS_TOKEN_2 := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token_2))
-	cd backend && API_URL=$(API_URL) \
+	@cd backend && API_URL=$(API_URL) \
 		INTEGRATION_TEST_BYPASS_TOKEN=$(BYPASS_TOKEN) \
 		INTEGRATION_TEST_BYPASS_TOKEN_2=$(BYPASS_TOKEN_2) \
 		uv run --extra dev python -m pytest tests/integration -v
@@ -460,7 +460,7 @@ test-integration: tf-switch ## Run backend integration tests against the deploye
 	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
 	$(eval BYPASS_TOKEN := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token))
 	$(eval BYPASS_TOKEN_2 := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw integration_test_bypass_token_2))
-	cd backend && API_URL=$(API_URL) \
+	@cd backend && API_URL=$(API_URL) \
 		INTEGRATION_TEST_BYPASS_TOKEN=$(BYPASS_TOKEN) \
 		INTEGRATION_TEST_BYPASS_TOKEN_2=$(BYPASS_TOKEN_2) \
 		uv run --extra dev python -m pytest tests/integration -v

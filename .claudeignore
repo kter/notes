@@ -3,7 +3,7 @@ frontend/node_modules/
 frontend/out/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
-frontend/package-lock.json
+frontend/bun.lock
 backend/.venv/
 backend/uv.lock
 backend/.pytest_cache/

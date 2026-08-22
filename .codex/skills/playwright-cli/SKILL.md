@@ -9,7 +9,7 @@ Use this skill when browser work should be done from the terminal with `playwrig
 
 ## Quick workflow
 
-1. Confirm whether `playwright-cli` is available. If the global binary fails, try `npx playwright-cli`.
+1. Confirm whether `playwright-cli` is available. If the global binary fails, try `bun run playwright-cli`.
 2. Open a browser session and navigate to the target page.
 3. Take a snapshot before interacting so element refs are visible.
 4. Use element refs for clicks, fills, checks, and screenshots.
@@ -48,5 +48,5 @@ playwright-cli close
 If the plain command fails, switch to:
 
 ```bash
-npx playwright-cli open https://example.com
+bun run playwright-cli open https://example.com
 ```

@@ -24,13 +24,15 @@ env/
 # so ignoring it made the image build depend on an untracked file, and
 # left dependency versions free to drift between builds.
 
-# Node.js
+# JavaScript / Bun
 node_modules/
 .next/
 out/
+.bun/
 .npm
 *.log
 npm-debug.log*
+bun-error.log*
 
 # Terraform
 .terraform/

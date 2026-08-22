@@ -83,7 +83,7 @@ make test-e2e-local TEST_ARGS='tests/regression/settings.spec.ts'
 テストが **失敗した場合**: `frontend/playwright-report/index.html` を開いてトレースビューアーを確認する。トレース付きで再実行したい場合:
 
 ```bash
-cd frontend && E2E_TARGET=local npx playwright test --project=chromium --trace=on tests/golden-path.spec.ts
+cd frontend && E2E_TARGET=local bun run playwright test --project=chromium --trace=on tests/golden-path.spec.ts
 ```
 
 ---

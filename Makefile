@@ -40,7 +40,7 @@ dev-backend: ## Run backend locally
 
 .PHONY: dev-frontend
 dev-frontend: ## Run frontend locally
-	cd frontend && npm run dev
+	cd frontend && bun run dev
 
 .PHONY: dev
 dev: ## Show how to start the local dev environment (use `make dev-stack` for one-command startup)
@@ -98,7 +98,7 @@ dev-stack: tf-switch ## Run backend (8000) + frontend (3000) with auth bypass ag
 	    NEXT_PUBLIC_DEV_AUTH_BYPASS=true \
 	    NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) \
 	    NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) \
-	    npm run dev ) & \
+	    bun run dev ) & \
 	  wait
 
 .PHONY: smoke-local
@@ -190,11 +190,11 @@ build-frontend: tf-switch ## Build frontend for production
 	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
 	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
 	SENTRY_DSN=$$($(OPTIONAL_SSM_PARAMETER_SCRIPT) "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" "$(AWS_REGION)" "$(AWS_PROFILE)") && \
-	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" bun run build
 
 .PHONY: build-frontend-local
 build-frontend-local: ## Build frontend locally with local defaults and optional Sentry env vars
-	cd frontend && NEXT_PUBLIC_API_URL=$${NEXT_PUBLIC_API_URL:-http://localhost:8000} NEXT_PUBLIC_ENVIRONMENT=$${NEXT_PUBLIC_ENVIRONMENT:-dev} NEXT_PUBLIC_COGNITO_USER_POOL_ID=$${NEXT_PUBLIC_COGNITO_USER_POOL_ID:-local-user-pool} NEXT_PUBLIC_COGNITO_CLIENT_ID=$${NEXT_PUBLIC_COGNITO_CLIENT_ID:-local-client-id} npm run build
+	cd frontend && NEXT_PUBLIC_API_URL=$${NEXT_PUBLIC_API_URL:-http://localhost:8000} NEXT_PUBLIC_ENVIRONMENT=$${NEXT_PUBLIC_ENVIRONMENT:-dev} NEXT_PUBLIC_COGNITO_USER_POOL_ID=$${NEXT_PUBLIC_COGNITO_USER_POOL_ID:-local-user-pool} NEXT_PUBLIC_COGNITO_CLIENT_ID=$${NEXT_PUBLIC_COGNITO_CLIENT_ID:-local-client-id} bun run build
 
 
 .PHONY: invalidate-cloudfront
@@ -252,7 +252,7 @@ _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
 	@echo "Building frontend..."
 	@SENTRY_DSN=$$($(OPTIONAL_SSM_PARAMETER_SCRIPT) "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" "$(AWS_REGION)" "$(AWS_PROFILE)") && \
-	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" npm run build
+	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" bun run build
 	@echo "Syncing frontend files to S3..."
 	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
 	@echo "Creating CloudFront cache invalidation..."
@@ -416,11 +416,11 @@ test-app-contracts: ## Run high-value backend API contract regressions
 .PHONY: test-external-api
 test-external-api: ## Run external folder/note API key regressions
 	cd backend && uv run --extra dev python -m pytest tests/test_api_keys.py -q --tb=short
-	cd frontend && npm run test -- --run src/components/layout/SettingsDialog.test.tsx
+	cd frontend && bun run test --run src/components/layout/SettingsDialog.test.tsx
 
 .PHONY: test-sync
 test-sync: ## Run frontend sync and offline regression tests
-	cd frontend && npm run test -- --run src/hooks/useHomeData.test.ts src/hooks/useNotes.test.ts src/hooks/useOfflineSync.test.ts src/lib/syncQueue.test.ts src/lib/merge.test.ts
+	cd frontend && bun run test --run src/hooks/useHomeData.test.ts src/hooks/useNotes.test.ts src/hooks/useOfflineSync.test.ts src/lib/syncQueue.test.ts src/lib/merge.test.ts
 
 .PHONY: test-ai-regression
 test-ai-regression: ## Run backend AI regression tests
@@ -453,7 +453,7 @@ test-backend: ## Run backend unit/integration-free tests locally
 
 .PHONY: test-frontend
 test-frontend: ## Run frontend Vitest unit tests
-	cd frontend && npm run test -- --run
+	cd frontend && bun run test --run
 
 .PHONY: test-integration
 test-integration: tf-switch ## Run backend integration tests against the deployed environment selected by ENV
@@ -528,15 +528,15 @@ lint-backend: ## Run backend linter (ruff)
 
 .PHONY: format-frontend
 format-frontend: ## Run frontend auto-fixes (eslint --fix)
-	cd frontend && npm run lint -- --fix $(FRONTEND_PATH)
+	cd frontend && bun run lint --fix $(FRONTEND_PATH)
 
 .PHONY: format-check-frontend
 format-check-frontend: ## Check frontend formatting without modifying files
-	cd frontend && npm run lint -- --fix-dry-run $(FRONTEND_PATH)
+	cd frontend && bun run lint --fix-dry-run $(FRONTEND_PATH)
 
 .PHONY: lint-frontend
 lint-frontend: ## Run frontend linter (eslint)
-	cd frontend && npm run lint -- $(FRONTEND_PATH)
+	cd frontend && bun run lint $(FRONTEND_PATH)
 
 .PHONY: format-terraform
 format-terraform: ## Run Terraform formatter
@@ -578,45 +578,45 @@ claude-pre-tool-use: ## Block destructive Claude Bash commands based on CLAUDE_H
 
 .PHONY: test-e2e
 test-e2e: ## Run all Playwright projects on the host (use only if your host can run every browser)
-	cd frontend && E2E_TARGET=$(ENV) npx playwright test $(TEST_ARGS)
+	cd frontend && E2E_TARGET=$(ENV) bun run playwright test $(TEST_ARGS)
 
 .PHONY: test-e2e-dev
 test-e2e-dev: ## Run E2E tests against dev environment
-	cd frontend && PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 E2E_TARGET=dev npx playwright test $(TEST_ARGS)
+	cd frontend && PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 E2E_TARGET=dev bun run playwright test $(TEST_ARGS)
 
 .PHONY: test-e2e-prd
 test-e2e-prd: ## Run E2E tests against prd environment
-	cd frontend && E2E_TARGET=prd npx playwright test $(TEST_ARGS)
+	cd frontend && E2E_TARGET=prd bun run playwright test $(TEST_ARGS)
 
 .PHONY: test-e2e-host
 test-e2e-host: ## Run the host-supported Playwright projects: chromium + Mobile Chrome
-	cd frontend && E2E_TARGET=$(ENV) npx playwright test --project=chromium $(TEST_ARGS)
-	cd frontend && E2E_TARGET=$(ENV) npx playwright test --project="Mobile Chrome" $(TEST_ARGS)
+	cd frontend && E2E_TARGET=$(ENV) bun run playwright test --project=chromium $(TEST_ARGS)
+	cd frontend && E2E_TARGET=$(ENV) bun run playwright test --project="Mobile Chrome" $(TEST_ARGS)
 
 .PHONY: test-e2e-docker
 test-e2e-docker: ## Run E2E tests in Docker (PROJECT required, ENV=dev|prd)
 	$(if $(PROJECT),,$(error PROJECT is required, e.g. make test-e2e-docker PROJECT=webkit))
-	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) npx playwright test --project="$(PROJECT)" $(TEST_ARGS)'
+	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) ./node_modules/.bin/playwright test --project="$(PROJECT)" $(TEST_ARGS)'
 
 .PHONY: test-e2e-webkit-docker
 test-e2e-webkit-docker: ## Run WebKit E2E tests in Docker
-	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) npx playwright test --project=webkit $(TEST_ARGS)'
+	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) ./node_modules/.bin/playwright test --project=webkit $(TEST_ARGS)'
 
 .PHONY: test-e2e-mobile-safari-docker
 test-e2e-mobile-safari-docker: ## Run Mobile Safari E2E tests in Docker
-	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) npx playwright test --project="Mobile Safari" $(TEST_ARGS)'
+	$(PLAYWRIGHT_DOCKER_RUN) 'E2E_TARGET=$(ENV) ./node_modules/.bin/playwright test --project="Mobile Safari" $(TEST_ARGS)'
 
 .PHONY: test-e2e-regression
 test-e2e-regression: ## Run only the regression E2E suite (frontend/tests/regression/)
-	cd frontend && E2E_TARGET=$(ENV) npx playwright test tests/regression/ $(TEST_ARGS)
+	cd frontend && E2E_TARGET=$(ENV) bun run playwright test tests/regression/ $(TEST_ARGS)
 
 .PHONY: test-e2e-local
 test-e2e-local: ## Run Playwright Chromium against the local bypass stack (requires make dev-stack-backend running)
-	cd frontend && E2E_TARGET=local npx playwright test --project=chromium $(TEST_ARGS)
+	cd frontend && E2E_TARGET=local bun run playwright test --project=chromium $(TEST_ARGS)
 
 .PHONY: test-e2e-local-regression
 test-e2e-local-regression: ## Run regression suite against local bypass stack
-	cd frontend && E2E_TARGET=local npx playwright test --project=chromium tests/regression/ $(TEST_ARGS)
+	cd frontend && E2E_TARGET=local bun run playwright test --project=chromium tests/regression/ $(TEST_ARGS)
 
 .PHONY: test-e2e-all
 test-e2e-all: ## Run the CI-style Playwright split locally: host Chromium + Docker WebKit/Safari

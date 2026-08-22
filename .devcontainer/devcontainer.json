@@ -29,6 +29,6 @@
       ]
     }
   },
-  "postCreateCommand": "cd /workspace/backend && uv sync || true; cd /workspace/frontend && npm install || true",
+  "postCreateCommand": "cd /workspace/backend && uv sync || true; cd /workspace/frontend && bun install --frozen-lockfile || true",
   "remoteUser": "vscode"
 }

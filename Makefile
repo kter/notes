@@ -200,7 +200,7 @@ build-frontend-local: ## Build frontend locally with local defaults and optional
 .PHONY: invalidate-cloudfront
 invalidate-cloudfront: ## Create CloudFront cache invalidation
 	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
-	$(eval INVALIDATION_ID := $(shell aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE) --query 'Id' --output text))
+	$(eval INVALIDATION_ID := $(shell aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE) --query 'Invalidation.Id' --output text))
 	@echo "CloudFront invalidation created: $(INVALIDATION_ID)"
 	@echo "Waiting for invalidation to complete..."
 	@aws cloudfront wait invalidation-completed --id $(INVALIDATION_ID) --distribution-id $(CF_DIST) --profile $(AWS_PROFILE)

@@ -12,23 +12,18 @@ async function openSettings(page: Parameters<typeof waitForWorkspaceSnapshotRead
   const container = isMobile
     ? page.getByTestId('mobile-layout-folders')
     : page.getByTestId('desktop-layout');
-  // Wait for the workspace to finish loading (desktop-layout is replaced by a spinner
-  // while isDataLoading=true, e.g. during Lambda cold-start + snapshot fetch on dev).
+  // A shared remote test account can have a multi-megabyte snapshot, so wait for
+  // the actual control rather than treating the outer layout as ready.
   await expect(container).toBeVisible({ timeout: 60000 });
-  // The settings button title/aria-label is localized (en: "Settings", ja: "設定"),
-  // so match by accessible name in either language to keep the helper
-  // language-agnostic regardless of the shared dev account's saved locale.
-  const settingsButton = container
-    .getByRole('button', { name: /Settings|設定/ })
-    .first();
-  await expect(settingsButton).toBeVisible({ timeout: 30000 });
+  const settingsButton = container.getByTestId('settings-button').first();
+  await expect(settingsButton).toBeVisible({ timeout: 60000 });
   await settingsButton.click();
 }
 
 test.describe('Regression: Settings', () => {
   test('should display all expected controls', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip();
-    test.setTimeout(90000);
+    test.setTimeout(120000);
 
     await page.goto('/');
     await waitForWorkspaceSnapshotReady(page, SNAPSHOT_WARMUP);
@@ -51,7 +46,7 @@ test.describe('Regression: Settings', () => {
 
   test('should switch language and persist after save', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip();
-    test.setTimeout(150000);
+    test.setTimeout(240000);
 
     await page.goto('/');
     await waitForWorkspaceSnapshotReady(page, SNAPSHOT_WARMUP);

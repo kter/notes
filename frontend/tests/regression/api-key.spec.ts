@@ -19,13 +19,8 @@ async function openSettings(
   const container = isMobile
     ? page.getByTestId('mobile-layout-folders')
     : page.getByTestId('desktop-layout');
-  // The settings button title/aria-label is localized (en: "Settings", ja: "設定"),
-  // so match by accessible name in either language to keep the helper
-  // language-agnostic regardless of the shared dev account's saved locale.
-  const settingsButton = container
-    .getByRole('button', { name: /Settings|設定/ })
-    .first();
-  await expect(settingsButton).toBeVisible({ timeout: 15000 });
+  const settingsButton = container.getByTestId('settings-button').first();
+  await expect(settingsButton).toBeVisible({ timeout: 60000 });
   await settingsButton.click();
 }
 
@@ -93,7 +88,7 @@ test.describe('Regression: API Key Lifecycle', () => {
     'issue via UI, use against backend CRUD, revoke via UI, verify rejection',
     async ({ page, isMobile, browserName }) => {
       if (browserName === 'webkit') test.skip();
-      test.setTimeout(90_000);
+      test.setTimeout(180_000);
 
       // A. Setup
       await page.goto('/');

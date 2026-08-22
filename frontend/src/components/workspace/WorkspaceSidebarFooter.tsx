@@ -55,6 +55,7 @@ export const WorkspaceSidebarFooter = memo(function WorkspaceSidebarFooter({
           onClick={onOpenSettings}
           title={t("sidebar.settings")}
           aria-label={t("sidebar.settings")}
+          data-testid="settings-button"
         >
           <SettingsIcon className="h-4 w-4" />
         </Button>

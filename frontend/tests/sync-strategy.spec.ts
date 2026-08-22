@@ -1,7 +1,58 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+import { deleteNoteFixture } from './helpers/apiFixtures';
+
+interface WorkspaceChangesResponse {
+  applied?: Array<{ note?: { id?: string } }>;
+}
+
+async function createSyncedNote(
+  page: Page,
+  noteList: Locator,
+  editorLayout: Locator,
+): Promise<{ id: string; titleInput: Locator }> {
+  const createResponsePromise = page.waitForResponse((response) => {
+    if (!response.url().includes('/api/workspace/changes') || response.request().method() !== 'POST') {
+      return false;
+    }
+
+    try {
+      const body = response.request().postDataJSON() as {
+        changes?: Array<{ entity?: string; operation?: string }>;
+      };
+      return body.changes?.some(
+        (change) => change.entity === 'note' && change.operation === 'create',
+      ) ?? false;
+    } catch {
+      return false;
+    }
+  }, { timeout: 60000 });
+
+  await noteList.getByTestId('note-list-add-note-button').click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.status()).toBe(200);
+
+  const result = await createResponse.json() as WorkspaceChangesResponse;
+  const noteId = result.applied?.[0]?.note?.id;
+  expect(noteId, 'note create response must include the persistent note ID').toBeTruthy();
+
+  const titleInput = editorLayout.getByTestId('editor-title-input');
+  await expect(titleInput).toBeVisible({ timeout: 20000 });
+  await expect.poll(
+    () => new URL(page.url()).searchParams.get('note'),
+    { timeout: 60000 },
+  ).toBe(noteId);
+  await expect(editorLayout.getByTestId('sync-status')).toHaveText(/^Saved$|^保存しました$/i, {
+    timeout: 60000,
+  });
+
+  return { id: noteId!, titleInput };
+}
 
 test.describe('Sync Strategy', () => {
+  let createdNoteId: string | null = null;
+
   test.beforeEach(async ({ page, isMobile }) => {
+    createdNoteId = null;
     // Navigate to the app
     await page.goto('/');
 
@@ -16,6 +67,16 @@ test.describe('Sync Strategy', () => {
     await expect(addNoteButton).toBeVisible({ timeout: 30000 });
   });
 
+  test.afterEach(async ({ page }) => {
+    if (!createdNoteId) return;
+
+    try {
+      await deleteNoteFixture(page, createdNoteId);
+    } catch (error) {
+      console.warn('[sync-strategy.spec] failed to clean up note:', error);
+    }
+  });
+
   test('should save locally immediately and sync to server after delay', async ({ page, isMobile, browserName }) => {
     if (isMobile) test.skip(); // Flaky on mobile due to keyboard/viewport issues hiding status bar
     if (browserName === 'webkit') test.skip(); // Timing-based status assertions are flaky on WebKit
@@ -23,12 +84,10 @@ test.describe('Sync Strategy', () => {
     test.setTimeout(120000);
     // Create a new note to test with
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
-    await noteList.getByTestId('note-list-add-note-button').click();
-    
-    // Wait for editor to be ready
     const editorLayout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
-    const titleInput = editorLayout.getByTestId('editor-title-input');
-    await expect(titleInput).toBeVisible({ timeout: 20000 });
+    const createdNote = await createSyncedNote(page, noteList, editorLayout);
+    createdNoteId = createdNote.id;
+    const { titleInput } = createdNote;
 
     // Type in title
     await titleInput.fill('Sync Test Note');
@@ -69,11 +128,10 @@ test.describe('Sync Strategy', () => {
     if (browserName === 'webkit') test.skip(); // Timing-based status assertions are flaky on WebKit
     // Create new note
     const noteList = isMobile ? page.getByTestId('mobile-layout-notes') : page.getByTestId('desktop-layout');
-    await noteList.getByTestId('note-list-add-note-button').click();
-    
     const editorLayout = isMobile ? page.getByTestId('mobile-layout-editor') : page.getByTestId('desktop-layout');
-    const titleInput = editorLayout.getByTestId('editor-title-input');
-    await expect(titleInput).toBeVisible({ timeout: 20000 });
+    const createdNote = await createSyncedNote(page, noteList, editorLayout);
+    createdNoteId = createdNote.id;
+    const { titleInput } = createdNote;
 
     // Type something
     await titleInput.fill('Blur Test');

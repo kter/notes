@@ -26,7 +26,7 @@ In CI environments (e.g., GitHub Actions), store credentials as **Secrets**.
 - **Accessing in CI**:
   ```yaml
   - name: Run Playwright tests
-    run: npx playwright test
+    run: bun run playwright test
     env:
       E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
       E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}

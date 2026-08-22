@@ -11,7 +11,7 @@ Playwright CLI を使ったブラウザ自動化ツール（MCPより低コス�
 
 1. **確認**: `snapshot` / `click` / `screenshot` でブラウザ操作を対話的に確認
 2. **実装**: 確認したフローを `@playwright/test` でテストコードとして実装
-3. **検証**: `npx playwright test --headed` で実行、動画で動作確認
+3. **検証**: `bun run playwright test --headed` で実行、動画で動作確認
 
 ## Core Commands
 

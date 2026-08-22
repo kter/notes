@@ -122,7 +122,7 @@ export default defineConfig({
   /* Note: in local mode the backend must already be running via `make dev-stack-backend` */
   webServer: isLocalBypass
     ? {
-        command: "npm run dev",
+        command: "bun run dev",
         url: "http://localhost:3000",
         reuseExistingServer: !process.env.CI,
         env: {

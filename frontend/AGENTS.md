@@ -10,7 +10,7 @@ Inherit the repository-level guidance from the parent `AGENTS.md`. When frontend
 
 - Prefer root `make` targets for routine workflows.
 - Common entry points: `make dev-frontend`, `make test-frontend`, `make lint-frontend`, `make test-e2e ENV=dev`.
-- Use direct `npm` or `playwright` commands only for frontend-local debugging that is not exposed via the root `Makefile`.
+- Use direct `bun` or `playwright` commands only for frontend-local debugging that is not exposed via the root `Makefile`.
 
 ## Environment
 

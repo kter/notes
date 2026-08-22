@@ -18,6 +18,7 @@ A Mac Notes app clone web application with AI-powered features built using moder
 - TypeScript
 - Tailwind CSS
 - Shadcn/ui
+- Bun (package manager and script runner)
 
 ### Backend
 - FastAPI (Python 3.12)
@@ -79,7 +80,7 @@ DSQL constraints are first-class design inputs. The current persistence and boot
 
 ### Local Environment Setup (mise + direnv)
 
-This project uses **mise** for managing tool versions (Node.js, Python, Go) and **direnv** for automatically loading the environment. This ensures all developers use the same tool versions and environment variables.
+This project uses **mise** for managing tool versions (Bun, Node.js, Python, Terraform, and related tools) and **direnv** for automatically loading the environment. This ensures all developers use the same tool versions and environment variables.
 
 For detailed installation and concepts, refer to [this article](https://qiita.com/kter/items/8d3113ac3b83dc7abb8c).
 
@@ -122,6 +123,9 @@ mise trust
 
 # Install required tool versions specified in mise.toml
 mise install
+
+# Install frontend dependencies from the committed Bun lockfile
+cd frontend && bun install --frozen-lockfile && cd ..
 
 # Allow direnv to load the .envrc and mise environment
 direnv allow
@@ -310,7 +314,7 @@ E2E tests use Playwright across Chromium and Safari-family projects.
 2. Install Playwright browsers for host-side projects:
    ```bash
    cd frontend
-   npx playwright install
+   bun run playwright install
    ```
 
 3. Use Docker for `webkit` and `Mobile Safari`.

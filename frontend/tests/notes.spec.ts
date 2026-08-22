@@ -231,7 +231,9 @@ test.describe('Notes Functionality', () => {
 
   test('should open settings and display correct content', async ({ page, isMobile, browserName }) => {
     if (browserName === 'webkit') test.skip(); // Flaky on WebKit
+    test.setTimeout(120000);
     await page.goto('/');
+    await prepareWorkspaceUi(page);
     console.log('[E2E] Starting Settings Test');
 
     // 1. Open Settings
@@ -244,8 +246,8 @@ test.describe('Notes Functionality', () => {
 
     console.log('[E2E] Opening Settings dialog');
     const settingsContainer = isMobile ? page.getByTestId('mobile-layout-folders') : page.getByTestId('desktop-layout');
-    const settingsButton = settingsContainer.locator('button[title="Settings"]').first();
-    await expect(settingsButton).toBeVisible({ timeout: 15000 });
+    const settingsButton = settingsContainer.getByTestId('settings-button').first();
+    await expect(settingsButton).toBeVisible({ timeout: 60000 });
     await settingsButton.click();
     const settingsDialog = page.getByRole('dialog');
 

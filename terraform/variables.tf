@@ -44,11 +44,14 @@ variable "cognito_logout_urls" {
   default     = []
 }
 
-# Lambda image tag (use digest for production deployments)
+# Lambda image tag. Deliberately has no default: the digest that is actually
+# deployed lives only in Terraform state, so a default of "latest" would make
+# every apply that omits -var revert image_uri from the pinned digest back to a
+# mutable tag. Required means an apply without a digest fails instead.
+# The Makefile resolves it from ECR via $(TF_VAR_IMAGE).
 variable "lambda_image_tag" {
-  description = "Docker image tag for Lambda function (e.g., 'latest' or sha256 digest)"
+  description = "Docker image tag or sha256 digest for the Lambda image (required; see Makefile TF_VAR_IMAGE)"
   type        = string
-  default     = "latest"
 }
 
 variable "bootstrap_admin_emails" {

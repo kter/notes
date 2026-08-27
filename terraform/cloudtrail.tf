@@ -6,8 +6,10 @@ resource "aws_cloudtrail" "main" {
   enable_log_file_validation    = true
 
   event_selector {
-    read_write_type           = "All"
-    include_management_events = true
+    read_write_type = "All"
+    # 管理イベントは組織証跡 Default (848738341109) が全リージョン分を取得済み。
+    # ここで true にすると 2 コピー目として課金される (APN1-PaidEventsRecorded)。
+    include_management_events = false
 
     data_resource {
       type   = "AWS::Lambda::Function"

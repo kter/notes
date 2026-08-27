@@ -22,6 +22,12 @@ AWS_REGION ?= ap-northeast-1
 # Use deferred evaluation (=) so these are evaluated when used, picked up after profile/env is set
 AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
+
+# lambda_image_tag has no default (see terraform/variables.tf), so every
+# terraform plan/apply must supply the digest currently tagged `latest` in ECR.
+# Deferred (=) so the ECR call only happens for targets that reference it.
+LAMBDA_IMAGE_DIGEST = $(shell $(MAKE) --no-print-directory get-image-digest ENV=$(ENV) AWS_PROFILE=$(AWS_PROFILE))
+TF_VAR_IMAGE = -var="lambda_image_tag=$(LAMBDA_IMAGE_DIGEST)"
 SENTRY_DSN_PARAMETER_NAME_FRONTEND ?= /notes-app/$(ENV)/sentry-dsn-frontend
 SENTRY_DSN_PARAMETER_NAME_BACKEND ?= /notes-app/$(ENV)/sentry-dsn-backend
 OPTIONAL_SSM_PARAMETER_SCRIPT := ./scripts/get_optional_ssm_parameter.sh
@@ -305,7 +311,7 @@ tf-init: tf-switch ## Initialize Terraform for the current environment
 
 .PHONY: tf-plan
 tf-plan: tf-switch ## Run Terraform plan and validate with conftest policies
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform plan -out=tfplan.tfplan
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform plan $(TF_VAR_IMAGE) -out=tfplan.tfplan
 	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform show -json tfplan.tfplan > tfplan.json
 	$(CONFTEST) test terraform/tfplan.json --policy terraform/policies/
 
@@ -326,7 +332,7 @@ conftest-test-fixtures: conftest-verify ## Verify policy behaviour: valid plan p
 
 .PHONY: tf-apply
 tf-apply: tf-switch ## Run Terraform apply
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -auto-approve
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply $(TF_VAR_IMAGE) -auto-approve
 
 .PHONY: tf-output
 tf-output: tf-switch ## Show Terraform outputs
@@ -369,7 +375,7 @@ logs-request: ## Show API Gateway and Lambda log lines that match REQUEST_ID=<id
 
 .PHONY: update-cost-report
 update-cost-report: tf-switch ## Update cost report Lambda function code
-	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply -target=aws_lambda_function.cost_report -auto-approve
+	cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform apply $(TF_VAR_IMAGE) -target=aws_lambda_function.cost_report -auto-approve
 	@echo "Cost report Lambda updated!"
 
 .PHONY: test-cost-report

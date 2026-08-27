@@ -7,7 +7,9 @@
       "type": "aws_s3_bucket",
       "name": "bad_bucket",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "bucket": "my-bucket-prod",
@@ -24,7 +26,9 @@
       "type": "aws_s3_bucket_public_access_block",
       "name": "bad_bucket",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "bucket": "my-bucket-prod",
@@ -40,7 +44,9 @@
       "type": "aws_lambda_function",
       "name": "bad_lambda",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "function_name": "notes-app-bad-dev",
@@ -49,7 +55,8 @@
           "tags_all": {
             "Environment": "dev",
             "ManagedBy": "terraform"
-          }
+          },
+          "image_uri": "031921999648.dkr.ecr.ap-northeast-1.amazonaws.com/notes-app-api-dev:latest"
         }
       }
     },
@@ -58,7 +65,9 @@
       "type": "aws_iam_role_policy",
       "name": "bad_policy",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "bad-policy",
@@ -71,13 +80,19 @@
       "type": "aws_cognito_user_pool_client",
       "name": "bad_client",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "prevent_user_existence_errors": "LEGACY",
           "access_token_validity": 48,
           "token_validity_units": [
-            { "access_token": "hours", "id_token": "hours", "refresh_token": "days" }
+            {
+              "access_token": "hours",
+              "id_token": "hours",
+              "refresh_token": "days"
+            }
           ],
           "tags_all": {
             "Environment": "dev",
@@ -91,7 +106,9 @@
       "type": "aws_cloudfront_distribution",
       "name": "bad_cf",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "price_class": "PriceClass_All",
@@ -120,7 +137,9 @@
       "type": "aws_sqs_queue",
       "name": "no_dlq",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-jobs-dev",
@@ -137,13 +156,17 @@
       "type": "aws_ecr_repository",
       "name": "bad_ecr",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-api-dev",
           "force_delete": false,
           "image_scanning_configuration": [
-            { "scan_on_push": false }
+            {
+              "scan_on_push": false
+            }
           ],
           "tags_all": {
             "Environment": "dev",

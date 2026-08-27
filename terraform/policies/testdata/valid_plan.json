@@ -7,11 +7,15 @@
       "type": "aws_s3_bucket",
       "name": "frontend",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "bucket": "notes-app-frontend-dev",
-          "tags": { "Name": "notes-app-frontend-dev" },
+          "tags": {
+            "Name": "notes-app-frontend-dev"
+          },
           "tags_all": {
             "Name": "notes-app-frontend-dev",
             "Project": "notes-app",
@@ -26,7 +30,9 @@
       "type": "aws_s3_bucket_public_access_block",
       "name": "frontend",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "bucket": "notes-app-frontend-dev",
@@ -42,19 +48,24 @@
       "type": "aws_lambda_function",
       "name": "api",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "function_name": "notes-app-api-dev",
           "timeout": 60,
           "memory_size": 512,
-          "tags": { "Name": "notes-app-api-dev" },
+          "tags": {
+            "Name": "notes-app-api-dev"
+          },
           "tags_all": {
             "Name": "notes-app-api-dev",
             "Project": "notes-app",
             "Environment": "dev",
             "ManagedBy": "terraform"
-          }
+          },
+          "image_uri": "031921999648.dkr.ecr.ap-northeast-1.amazonaws.com/notes-app-api-dev@sha256:4995ed2e3daa57850eaf414a8922d8b541cb2100239a1b194f7e83acc04cdaa8"
         }
       }
     },
@@ -63,12 +74,16 @@
       "type": "aws_cloudwatch_log_group",
       "name": "api_lambda",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "/aws/lambda/notes-app-api-dev",
           "retention_in_days": 7,
-          "tags": { "Name": "notes-app-api-logs-dev" },
+          "tags": {
+            "Name": "notes-app-api-logs-dev"
+          },
           "tags_all": {
             "Name": "notes-app-api-logs-dev",
             "Project": "notes-app",
@@ -83,15 +98,21 @@
       "type": "aws_ecr_repository",
       "name": "api",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-api-dev",
           "force_delete": true,
           "image_scanning_configuration": [
-            { "scan_on_push": true }
+            {
+              "scan_on_push": true
+            }
           ],
-          "tags": { "Name": "notes-app-api-dev" },
+          "tags": {
+            "Name": "notes-app-api-dev"
+          },
           "tags_all": {
             "Name": "notes-app-api-dev",
             "Project": "notes-app",
@@ -106,12 +127,16 @@
       "type": "aws_iam_role",
       "name": "backend",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-backend-role-dev",
           "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"sts:AssumeRole\",\"Principal\":{\"Service\":[\"lambda.amazonaws.com\",\"ecs-tasks.amazonaws.com\"]}}]}",
-          "tags": { "Name": "notes-app-backend-role-dev" },
+          "tags": {
+            "Name": "notes-app-backend-role-dev"
+          },
           "tags_all": {
             "Name": "notes-app-backend-role-dev",
             "Project": "notes-app",
@@ -126,7 +151,9 @@
       "type": "aws_iam_role_policy",
       "name": "bedrock_access",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "bedrock-access",
@@ -139,14 +166,20 @@
       "type": "aws_cognito_user_pool_client",
       "name": "main",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-client-dev",
           "prevent_user_existence_errors": "ENABLED",
           "access_token_validity": 1,
           "token_validity_units": [
-            { "access_token": "hours", "id_token": "hours", "refresh_token": "days" }
+            {
+              "access_token": "hours",
+              "id_token": "hours",
+              "refresh_token": "days"
+            }
           ],
           "tags_all": {
             "Project": "notes-app",
@@ -161,7 +194,9 @@
       "type": "aws_cloudfront_distribution",
       "name": "main",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "price_class": "PriceClass_200",
@@ -179,7 +214,9 @@
               "acm_certificate_arn": "arn:aws:acm:us-east-1:123456789012:certificate/abc"
             }
           ],
-          "tags": { "Name": "notes-app-cdn-dev" },
+          "tags": {
+            "Name": "notes-app-cdn-dev"
+          },
           "tags_all": {
             "Name": "notes-app-cdn-dev",
             "Project": "notes-app",
@@ -194,12 +231,16 @@
       "type": "aws_sqs_queue",
       "name": "ai_edit_jobs",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-ai-edit-jobs-dev",
           "redrive_policy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:ap-northeast-1:123456789012:notes-app-ai-edit-jobs-dlq-dev\",\"maxReceiveCount\":3}",
-          "tags": { "Name": "notes-app-ai-edit-jobs-dev" },
+          "tags": {
+            "Name": "notes-app-ai-edit-jobs-dev"
+          },
           "tags_all": {
             "Name": "notes-app-ai-edit-jobs-dev",
             "Project": "notes-app",
@@ -214,12 +255,16 @@
       "type": "aws_sqs_queue",
       "name": "ai_edit_jobs_dlq",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "name": "notes-app-ai-edit-jobs-dlq-dev",
           "redrive_policy": "",
-          "tags": { "Name": "notes-app-ai-edit-jobs-dlq-dev" },
+          "tags": {
+            "Name": "notes-app-ai-edit-jobs-dlq-dev"
+          },
           "tags_all": {
             "Name": "notes-app-ai-edit-jobs-dlq-dev",
             "Project": "notes-app",
@@ -234,11 +279,15 @@
       "type": "aws_s3_bucket",
       "name": "cache",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "bucket": "notes-app-cache-dev",
-          "tags": { "Name": "notes-app-cache-dev" },
+          "tags": {
+            "Name": "notes-app-cache-dev"
+          },
           "tags_all": {
             "Name": "notes-app-cache-dev",
             "Project": "notes-app",
@@ -253,7 +302,9 @@
       "type": "aws_s3_bucket_lifecycle_configuration",
       "name": "cache",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "bucket": "notes-app-cache-dev",
@@ -261,7 +312,11 @@
             {
               "id": "expire-cache",
               "status": "Enabled",
-              "expiration": [{ "days": 30 }]
+              "expiration": [
+                {
+                  "days": 30
+                }
+              ]
             }
           ]
         }
@@ -272,11 +327,15 @@
       "type": "aws_dsql_cluster",
       "name": "main",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "before": null,
         "after": {
           "deletion_protection_enabled": false,
-          "tags": { "Name": "notes-app-dsql-dev" },
+          "tags": {
+            "Name": "notes-app-dsql-dev"
+          },
           "tags_all": {
             "Name": "notes-app-dsql-dev",
             "Project": "notes-app",

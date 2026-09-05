@@ -2,7 +2,8 @@
 
 責務: SQLModel エンジンの生成とセッション提供。
 主要なエクスポート: get_dsql_engine, get_session。
-呼び出し関係: bootstrap/database_bootstrap からエンジン生成時に呼ばれ、各ルーターでは
+呼び出し関係: get_dsql_engine は main / lambda_handler / worker_lambda_handler および
+    bootstrap/database_bootstrap から呼ばれ、get_session は各ルーターで
     FastAPI の Depends(get_session) 経由で使用される。
 """
 

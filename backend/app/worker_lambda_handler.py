@@ -7,9 +7,7 @@
 
 import logging
 
-from app.bootstrap import run_cold_start_database_bootstrap
-from app.bootstrap.database_bootstrap import create_database_schema
-from app.database import get_dsql_engine
+from app.bootstrap import bootstrap_database_schema, run_cold_start_database_bootstrap
 from app.features.assistant import run_edit_job_queue_records
 from app.logging_utils import bind_log_context, configure_logging, reset_log_context
 from app.observability import init_sentry
@@ -24,7 +22,7 @@ init_sentry()
 
 # コールドスタート時にDBスキーマを初期化
 run_cold_start_database_bootstrap(
-    initialize_database=lambda: create_database_schema(get_dsql_engine, logger=logger),
+    initialize_database=bootstrap_database_schema,
     logger=logger,
     context_label="AI edit worker cold start",
 )

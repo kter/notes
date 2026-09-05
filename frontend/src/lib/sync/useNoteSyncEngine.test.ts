@@ -262,6 +262,34 @@ describe("useNoteSyncEngine", () => {
     vi.useRealTimers();
   });
 
+  it("saves a content-only edit locally before the debounce fires", async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(window.navigator, "onLine", {
+      configurable: true,
+      value: true,
+    });
+
+    const initialNote = buildNote();
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, {
+        content: "Updated content",
+      });
+    });
+
+    // ローカルには即座に書き込まれ、notes[] には snippet だけが反映される。
+    expect(notesDB.saveNoteBody).toHaveBeenCalledWith(initialNote.id, "Updated content");
+    expect(notesDB.saveNote).not.toHaveBeenCalled();
+    expect(result.current.notes[0]?.snippet).toBe("Updated content");
+    // デバウンスが発火するまでサーバーへは送られない。
+    expect(result.current.syncStatus.remote).toBe("unsynced");
+
+    vi.useRealTimers();
+  });
+
   it("applies the synced snapshot after an online update succeeds", async () => {
     vi.useFakeTimers();
 

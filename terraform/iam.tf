@@ -51,11 +51,9 @@ resource "aws_iam_role_policy" "bedrock_access" {
         ]
       },
       {
-        # Required for Bedrock to auto-subscribe to models on first access
         Effect = "Allow"
         Action = [
-          "aws-marketplace:ViewSubscriptions",
-          "aws-marketplace:Subscribe"
+          "aws-marketplace:ViewSubscriptions"
         ]
         Resource = "*"
       }

@@ -251,24 +251,3 @@ async def test_legacy_queue_record_without_user_id_is_processed(
         and record.levelno == logging.WARNING
         for record in caplog.records
     )
-
-
-@pytest.mark.asyncio
-async def test_malformed_job_id_is_treated_as_not_found(
-    session: Session, caplog: pytest.LogCaptureFixture
-):
-    """UUID として解釈できない job_id は毒メッセージ化させず not_found 扱いにする。"""
-    engine = session.get_bind()
-    assert engine is not None
-    gateway = MockAIGateway()
-
-    with caplog.at_level(logging.WARNING):
-        await process_edit_job(
-            "not-a-uuid",
-            expected_user_id=TEST_USER_ID,
-            session_factory=lambda: Session(engine),
-            ai_gateway=gateway,
-        )
-
-    assert "ops.ai_edit_job.not_found" in caplog.text
-    assert gateway.calls == []

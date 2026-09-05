@@ -23,14 +23,16 @@ We keep DSQL-specific persistence rules behind backend services and repositories
 - Routers stay responsible for HTTP input/output and dependency wiring.
 - Services own use-case orchestration.
 - Repositories own user-scoped queries, ownership checks, timestamp touching, and DSQL-friendly persistence behavior.
-- Shared persistence helpers live in [`backend/app/core/persistence.py`](/home/ttakahashi/workspace/notes/backend/app/core/persistence.py).
+- Shared persistence helpers live in [`backend/app/core/persistence.py`](../../backend/app/core/persistence.py).
 
-Current reference points:
+Current reference points (the code moved to `backend/app/features/<feature>/` after this
+ADR was written; the rules are unchanged, the paths are not):
 
-- [`backend/app/repositories/note_repository.py`](/home/ttakahashi/workspace/notes/backend/app/repositories/note_repository.py)
-- [`backend/app/repositories/folder_repository.py`](/home/ttakahashi/workspace/notes/backend/app/repositories/folder_repository.py)
-- [`backend/app/services/note_service.py`](/home/ttakahashi/workspace/notes/backend/app/services/note_service.py)
-- [`backend/app/services/folder_service.py`](/home/ttakahashi/workspace/notes/backend/app/services/folder_service.py)
+- [`backend/app/features/workspace/repositories/notes.py`](../../backend/app/features/workspace/repositories/notes.py)
+- [`backend/app/features/workspace/repositories/folders.py`](../../backend/app/features/workspace/repositories/folders.py)
+- [`backend/app/features/assistant/repositories.py`](../../backend/app/features/assistant/repositories.py)
+- [`backend/app/features/workspace/use_cases/notes.py`](../../backend/app/features/workspace/use_cases/notes.py)
+- [`backend/app/features/workspace/use_cases/folders.py`](../../backend/app/features/workspace/use_cases/folders.py)
 
 ## Consequences
 

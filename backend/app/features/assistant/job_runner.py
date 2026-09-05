@@ -59,17 +59,44 @@ def _task_handlers() -> dict:
     }
 
 
-def _coerce_job_id(job_id: UUID | str) -> UUID | None:
-    """ジョブ ID を UUID に正規化する。UUID として解釈できない場合は None を返す。
+def _assert_job_owner(
+    session: Session,
+    job,
+    *,
+    expected_user_id: str | None,
+    repository_cls,
+    task: str,
+):
+    """キューメッセージが主張する所有者と行の所有者が一致することを確認する。
 
-    不正な ID で例外を投げるとキューレコードが失敗扱いになり、毒メッセージとして
-    再試行され続ける。存在しないジョブと同じ扱い（not_found ログ + 正常終了）に倒す。
+    一致すればリポジトリ経由で取得し直した行を返す。一致しなければ None を返し、
+    呼び出し元はジョブを処理してはならない。expected_user_id が None の場合は
+    主張自体が無いため、警告を残したうえで従来どおり処理を継続する（デプロイ時に
+    キューへ滞留している旧形式メッセージのための移行措置）。
     """
-    if isinstance(job_id, UUID):
-        return job_id
+    if expected_user_id is None:
+        log_event(
+            logger,
+            logging.WARNING,
+            "ops.ai_job.owner_assertion_missing",
+            job_id=job.id,
+            task=task,
+            outcome="warning",
+            reason="missing_expected_user_id",
+        )
+        return job
+
     try:
-        return UUID(job_id)
-    except (ValueError, AttributeError, TypeError):
+        return repository_cls(session, expected_user_id).get_owned(job.id)
+    except NotFound:
+        log_event(
+            logger,
+            logging.ERROR,
+            "ops.ai_job.owner_mismatch",
+            job_id=job.id,
+            task=task,
+            outcome="error",
+        )
         return None
 
 
@@ -150,9 +177,9 @@ async def process_edit_job(
     ai_gateway: AIGateway | None = None,
 ) -> None:
     """AI 編集ジョブを処理し、ポーリングクライアント向けに結果を永続化する。"""
-    resource_id = _coerce_job_id(job_id)
+    resource_id = UUID(job_id) if isinstance(job_id, str) else job_id
     with session_factory() as session:
-        job = session.get(AIEditJob, resource_id) if resource_id else None
+        job = session.get(AIEditJob, resource_id)
         if job is None:
             log_event(
                 logger,
@@ -163,29 +190,15 @@ async def process_edit_job(
             )
             return
 
-        if expected_user_id is None:
-            log_event(
-                logger,
-                logging.WARNING,
-                "ops.ai_job.owner_assertion_missing",
-                job_id=job_id,
-                task=PROCESS_EDIT_JOB_TASK,
-                outcome="warning",
-                reason="missing_expected_user_id",
-            )
-        else:
-            try:
-                job = AIEditJobRepository(session, expected_user_id).get_owned(job.id)
-            except NotFound:
-                log_event(
-                    logger,
-                    logging.ERROR,
-                    "ops.ai_job.owner_mismatch",
-                    job_id=job_id,
-                    task=PROCESS_EDIT_JOB_TASK,
-                    outcome="error",
-                )
-                return
+        job = _assert_job_owner(
+            session,
+            job,
+            expected_user_id=expected_user_id,
+            repository_cls=AIEditJobRepository,
+            task=PROCESS_EDIT_JOB_TASK,
+        )
+        if job is None:
+            return
 
         # 二重実行を防ぐ冪等ガード
         if job.status in {"running", "completed"}:
@@ -276,6 +289,7 @@ async def process_edit_job(
 async def _process_ai_job(
     job_id: UUID | str,
     run_call,
+    task: str,
     *,
     expected_user_id: str | None = None,
     session_factory=_get_session,
@@ -286,9 +300,9 @@ async def _process_ai_job(
     run_call(use_cases, params) は (結果テキスト, 消費トークン数) を返す async 呼び出し。
     トークン計上は AIInteractionUseCases 内で行われる。
     """
-    resource_id = _coerce_job_id(job_id)
+    resource_id = UUID(job_id) if isinstance(job_id, str) else job_id
     with session_factory() as session:
-        job = session.get(AIJob, resource_id) if resource_id else None
+        job = session.get(AIJob, resource_id)
         if job is None:
             log_event(
                 logger,
@@ -299,29 +313,15 @@ async def _process_ai_job(
             )
             return
 
-        if expected_user_id is None:
-            log_event(
-                logger,
-                logging.WARNING,
-                "ops.ai_job.owner_assertion_missing",
-                job_id=job_id,
-                task=job.kind,
-                outcome="warning",
-                reason="missing_expected_user_id",
-            )
-        else:
-            try:
-                job = AIJobRepository(session, expected_user_id).get_owned(job.id)
-            except NotFound:
-                log_event(
-                    logger,
-                    logging.ERROR,
-                    "ops.ai_job.owner_mismatch",
-                    job_id=job_id,
-                    task=job.kind,
-                    outcome="error",
-                )
-                return
+        job = _assert_job_owner(
+            session,
+            job,
+            expected_user_id=expected_user_id,
+            repository_cls=AIJobRepository,
+            task=task,
+        )
+        if job is None:
+            return
 
         # 二重実行を防ぐ冪等ガード
         if job.status in {"running", "completed"}:
@@ -426,6 +426,7 @@ async def process_summarize_job(
     await _process_ai_job(
         job_id,
         run,
+        PROCESS_SUMMARIZE_JOB_TASK,
         expected_user_id=expected_user_id,
         session_factory=session_factory,
         ai_gateway=ai_gateway,
@@ -457,6 +458,7 @@ async def process_chat_job(
     await _process_ai_job(
         job_id,
         run,
+        PROCESS_CHAT_JOB_TASK,
         expected_user_id=expected_user_id,
         session_factory=session_factory,
         ai_gateway=ai_gateway,

@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>セキュリティ・品質レビューレポート — Notes App (2026-05-18)</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222535;
+    --border: #2e3148;
+    --text: #e2e8f0;
+    --text-muted: #8892a4;
+    --critical: #ff4444;
+    --critical-bg: #2d0a0a;
+    --critical-border: #7a1a1a;
+    --high: #ff8c00;
+    --high-bg: #2d1800;
+    --high-border: #7a3d00;
+    --medium: #f0c040;
+    --medium-bg: #2a2000;
+    --medium-border: #6a5000;
+    --low: #4a9eff;
+    --low-bg: #0a1a2d;
+    --low-border: #1a3a6a;
+    --green: #22c55e;
+    --accent: #7c6af7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: .25rem; }
+  h2 { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; margin-bottom: .5rem; }
+  p { color: var(--text-muted); font-size: .9rem; }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: .8rem;
+    background: var(--surface2);
+    padding: .1rem .3rem;
+    border-radius: 3px;
+    color: #a5b4fc;
+  }
+
+  .header { margin-bottom: 2rem; }
+  .header-meta { color: var(--text-muted); font-size: .85rem; margin-top: .25rem; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .summary-card .count { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+  .summary-card .label { font-size: .75rem; color: var(--text-muted); margin-top: .25rem; text-transform: uppercase; letter-spacing: .05em; }
+  .summary-card.critical .count { color: var(--critical); }
+  .summary-card.high .count { color: var(--high); }
+  .summary-card.medium .count { color: var(--medium); }
+  .summary-card.low .count { color: var(--low); }
+
+  .category-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1rem;
+  }
+  .category-icon { font-size: 1.4rem; }
+  .category-title { font-size: 1.1rem; font-weight: 700; }
+  .category-counts { display: flex; gap: .5rem; margin-left: auto; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .15rem .5rem;
+    border-radius: 4px;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge.critical { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical-border); }
+  .badge.high { background: var(--high-bg); color: var(--high); border: 1px solid var(--high-border); }
+  .badge.medium { background: var(--medium-bg); color: var(--medium); border: 1px solid var(--medium-border); }
+  .badge.low { background: var(--low-bg); color: var(--low); border: 1px solid var(--low-border); }
+  .badge.count-badge { font-size: .65rem; min-width: 1.4rem; justify-content: center; }
+
+  .finding {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: .75rem;
+    overflow: hidden;
+  }
+  .finding-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    background: var(--surface2);
+    cursor: pointer;
+    user-select: none;
+  }
+  .finding-header:hover { background: var(--border); }
+  .finding.critical .finding-header { border-left: 3px solid var(--critical); }
+  .finding.high .finding-header { border-left: 3px solid var(--high); }
+  .finding.medium .finding-header { border-left: 3px solid var(--medium); }
+  .finding.low .finding-header { border-left: 3px solid var(--low); }
+  .finding-title { font-size: .9rem; font-weight: 600; flex: 1; }
+  .finding-file { font-size: .75rem; color: var(--text-muted); font-family: monospace; }
+  .finding-body {
+    padding: 1rem;
+    font-size: .875rem;
+    display: none;
+    border-top: 1px solid var(--border);
+  }
+  .finding-body.open { display: block; }
+  .finding-body p { color: var(--text); margin-bottom: .5rem; }
+  .finding-body .desc { color: var(--text-muted); margin-bottom: .75rem; line-height: 1.6; }
+  .finding-body .rec {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .75rem;
+    margin-top: .5rem;
+    font-size: .825rem;
+  }
+  .finding-body .rec-label { font-weight: 700; color: var(--green); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+
+  .chevron { transition: transform .2s; color: var(--text-muted); }
+  .finding-header.open .chevron { transform: rotate(90deg); }
+
+  .priority-section { margin-top: 2rem; }
+  .priority-list { list-style: none; }
+  .priority-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: .875rem;
+  }
+  .priority-list li:last-child { border-bottom: none; }
+  .priority-num {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: .7rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: .1rem;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: .825rem; margin-top: 1rem; }
+  th { background: var(--surface2); color: var(--text-muted); font-weight: 600; text-align: left; padding: .5rem .75rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+
+  .toggle-all { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); border-radius: 4px; padding: .3rem .75rem; font-size: .75rem; cursor: pointer; margin-bottom: 1rem; }
+  .toggle-all:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🛡 セキュリティ・品質レビューレポート</h1>
+  <div class="header-meta">Notes App — マルチエージェントレビュー実施日: 2026-05-18 | 調査範囲: backend / frontend / terraform / dependency / UI / code quality</div>
+</div>
+
+<!-- Executive Summary -->
+<h2>エグゼクティブサマリー</h2>
+<p>6専門エージェントによる並行調査の結果、合計 <strong>71件</strong> の問題が検出された。うち <strong>Critical 7件、High 26件</strong> は直ちに対処が必要。</p>
+
+<div class="summary-grid">
+  <div class="summary-card critical"><div class="count">7</div><div class="label">Critical</div></div>
+  <div class="summary-card high"><div class="count">26</div><div class="label">High</div></div>
+  <div class="summary-card medium"><div class="count">25</div><div class="label">Medium</div></div>
+  <div class="summary-card low"><div class="count">13</div><div class="label">Low</div></div>
+</div>
+
+<table>
+  <thead><tr><th>カテゴリ</th><th>Critical</th><th>High</th><th>Medium</th><th>Low</th><th>合計</th></tr></thead>
+  <tbody>
+    <tr><td>ランタイム・ライブラリ脆弱性</td><td><span class="badge critical">1</span></td><td><span class="badge high">4</span></td><td><span class="badge medium">1</span></td><td><span class="badge low">3</span></td><td>9</td></tr>
+    <tr><td>バックエンドアプリケーション</td><td><span class="badge critical">1</span></td><td><span class="badge high">5</span></td><td><span class="badge medium">4</span></td><td><span class="badge low">2</span></td><td>12</td></tr>
+    <tr><td>フロントエンドアプリケーション</td><td><span class="badge critical">1</span></td><td><span class="badge high">4</span></td><td><span class="badge medium">2</span></td><td><span class="badge low">0</span></td><td>7</td></tr>
+    <tr><td>インフラ (Terraform / AWS)</td><td><span class="badge critical">2</span></td><td><span class="badge high">7</span></td><td><span class="badge medium">7</span></td><td><span class="badge low">4</span></td><td>20</td></tr>
+    <tr><td>デザイン・UI/UX</td><td><span class="badge critical">0</span></td><td><span class="badge high">5</span></td><td><span class="badge medium">7</span></td><td><span class="badge low">3</span></td><td>15 (抜粋)</td></tr>
+    <tr><td>コードスメル・品質</td><td><span class="badge critical">0</span></td><td><span class="badge high">6</span></td><td><span class="badge medium">5</span></td><td><span class="badge low">1</span></td><td>12</td></tr>
+  </tbody>
+</table>
+
+<!-- IMMEDIATE PRIORITIES -->
+<h2>⚡ 最優先対応事項 (Top 10)</h2>
+<ul class="priority-list">
+  <li><div class="priority-num">1</div><div><strong>next.js RCE (CVE-2025-55182, CVSS 10.0)</strong> — <code>next@16.1.0</code> に認証不要RCEの脆弱性。野生での悪用確認済み。即時 <code>next@16.2.6</code> へアップグレード。</div></li>
+  <li><div class="priority-num">2</div><div><strong>devバイパストークンが本番DSQLへ到達可能</strong> — <code>dev-integration-test-token</code> が平文コミットされており、devが本番DSQLを共用するため実データへの完全アクセスが可能。バイパスを <code>local</code> 環境のみに制限、またはdev/prd DBを分離。</div></li>
+  <li><div class="priority-num">3</div><div><strong>Cognito MFA 無効</strong> — 本番認証プールにMFAなし。クレデンシャルスタッフィングで即座にアカウント乗っ取り可能。<code>mfa_configuration = "OPTIONAL"</code> へ変更。</div></li>
+  <li><div class="priority-num">4</div><div><strong>cryptography パッケージ — 秘密鍵漏洩 (CVE-2026-26007, CVSS 8.2)</strong> — <code>cryptography==46.0.3</code> にECC秘密鍵復元攻撃。<code>46.0.7+</code> へアップグレード。</div></li>
+  <li><div class="priority-num">5</div><div><strong>API Gateway: スロットリング・WAF未設定</strong> — DDoS/コスト爆発のリスク。バースト制限とWAF WebACLを設定。</div></li>
+  <li><div class="priority-num">6</div><div><strong>フロントエンドReDoS — ユーザー入力を直接 RegExp に渡す</strong> — 検索クエリに <code>(</code> 等を入力するとタブがフリーズ。即時エスケープ処理を追加。</div></li>
+  <li><div class="priority-num">7</div><div><strong>画像アップロードのMIMEタイプ検証不足</strong> — <code>Content-Type</code> ヘッダーのみで検証、マジックバイト確認なし。HTML/SVGをPNGとして偽装アップロード→格納型XSSの可能性。</div></li>
+  <li><div class="priority-num">8</div><div><strong>S3バケット暗号化の明示的設定なし</strong> — 3バケット全てにSSE設定なし（デフォルト暗号化に依存）。OPAポリシーの <code>warn</code> を <code>deny</code> に昇格。</div></li>
+  <li><div class="priority-num">9</div><div><strong>Bedrock historyフィールドのロールインジェクション</strong> — <code>list[dict]</code> 型で無検証のままBedrockへ渡す。AIの挙動操作・他ユーザーデータ漏洩のリスク。型付きPydanticモデルに変更。</div></li>
+  <li><div class="priority-num">10</div><div><strong>ECRイメージタグがミュータブル</strong> — <code>latest</code> タグが上書き可能でサプライチェーン攻撃のリスク。<code>image_tag_mutability = "IMMUTABLE"</code> に設定。</div></li>
+</ul>
+
+<!-- SECTION 1: RUNTIME/LIBRARY -->
+<h2>1. ランタイム・ライブラリ脆弱性</h2>
+<div class="category-section">
+  <div class="category-header">
+    <span class="category-icon">📦</span>
+    <span class="category-title">依存パッケージ・ランタイム</span>
+    <div class="category-counts">
+      <span class="badge critical count-badge">1C</span>
+      <span class="badge high count-badge">4H</span>
+      <span class="badge medium count-badge">1M</span>
+      <span class="badge low count-badge">3L</span>
+    </div>
+  </div>
+  <button class="toggle-all" onclick="toggleSection(this)">すべて展開</button>
+
+  <div class="finding critical">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge critical">Critical</span>
+      <span class="finding-title">next.js — CVE-2025-55182 / CVE-2025-66478 (RCE, CVSS 10.0)</span>
+      <span class="finding-file">package.json — next@16.1.0</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">React Flight/RSCプロトコルの安全でないデシリアライズにより、認証不要のリモートコード実行が可能。App Routerを使用するこのアプリは直接影響を受ける。野生での悪用が確認されており、Cobalt Strikeビーコン・クリプトマイナー・リバースシェルの投下が報告されている。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>next@16.2.6</code>、<code>react@19.2.4</code>、<code>react-dom@19.2.4</code> へ即時アップグレード。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">cryptography — CVE-2026-26007 (ECC秘密鍵復元, CVSS 8.2) + 2件</span>
+      <span class="finding-file">uv.lock — cryptography==46.0.3</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">CVE-2026-26007: ECCサブグループ攻撃による秘密鍵復元。CVE-2026-34073: DNS名前制約バイパス。CVE-2026-39892: バッファオーバーフロー。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>uv lock --upgrade-package cryptography</code> で <code>46.0.7+</code> に更新。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">ecdsa — CVE-2024-23342 (Minervaタイミング攻撃, 修正なし)</span>
+      <span class="finding-file">uv.lock — ecdsa==0.19.1 (python-joseの推移的依存)</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">CVSS 7.4。P-256のタイミングサイドチャネルにより統計的に秘密鍵を復元可能。修正予定なし。<code>python-jose</code> の推移的依存として引き込まれている。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>python-jose</code> から <code>joserfc</code> または <code>PyJWT + cryptography</code> へ移行。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">react/react-dom — CVE-2026-23864 (DoS)</span>
+      <span class="finding-file">package.json — react@19.2.3</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">React 19.2.3は複数のCVEを修正済みだが、CVE-2026-23864 (未認証DoS)が残存。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>react@19.2.4</code> / <code>react-dom@19.2.4</code> へアップグレード（next.js更新時に同時対応）。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">next.js — CVE-2025-55184 / CVE-2025-67779 (DoS, CVSS 7.5)</span>
+      <span class="finding-file">package.json — next@16.1.0</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">細工されたHTTPリクエストがApp Routerエンドポイントで無限ループを発生させる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>item 1と同じ — <code>next@16.2.6</code> へアップグレード。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">python-jose — 事実上メンテナンス放棄</span>
+      <span class="finding-file">uv.lock — python-jose==3.5.0</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">2024年初頭の3.5.0を最後に実質更新停止。サプライチェーンリスクが高い。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>joserfc</code> または <code>PyJWT + cryptography</code> への中期移行計画を策定。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">Dockerfile — Lambdaベースイメージのダイジェスト未固定</span>
+      <span class="finding-file">backend/Dockerfile — FROM public.ecr.aws/lambda/python:3.12</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">フローティングタグにより再ビルド時に意図しないOSレイヤーの変更が起きる可能性がある。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>SHA256ダイジストでイメージを固定。RenovateまたはDependabotで自動バンプ。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">mise.toml — 複数ツールが "latest" または緩いバージョン指定</span>
+      <span class="finding-file">mise.toml — terraform="1", awscli="latest" 等</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">ビルドの再現性がなく、壊れたリリースやサプライチェーン攻撃のリリースが透過的に引き込まれるリスク。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>全ツールを明示的なバージョンにピン留め。</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2: BACKEND -->
+<h2>2. バックエンドアプリケーション脆弱性</h2>
+<div class="category-section">
+  <div class="category-header">
+    <span class="category-icon">⚙️</span>
+    <span class="category-title">FastAPI / Python (backend/app/)</span>
+    <div class="category-counts">
+      <span class="badge critical count-badge">1C</span>
+      <span class="badge high count-badge">5H</span>
+      <span class="badge medium count-badge">4M</span>
+      <span class="badge low count-badge">2L</span>
+    </div>
+  </div>
+  <button class="toggle-all" onclick="toggleSection(this)">すべて展開</button>
+
+  <div class="finding critical">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge critical">Critical</span>
+      <span class="finding-title">devバイパストークンが本番DSQLデータベースへアクセス可能</span>
+      <span class="finding-file">app/auth/cognito.py:73-98, app/auth/app_user_service.py:73-81</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>"dev-integration-test-token"</code>、<code>"dev-integration-test-token-2"</code>、<code>"local-dev-token"</code> という平文トークンがリポジトリにコミットされており、<code>environment == "dev"</code> 時に署名検証なしで認証される。さらに <code>sub</code> が <code>"integration-test-user-id"</code> で始まるユーザーには自動的に <code>admin=True</code> が付与される。devは本番DSQLクラスターを共用するため、これらのトークンを知っているユーザーが本番データに管理者権限でアクセス可能。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>バイパスを <code>environment == "local"</code> のみに制限、またはdev/本番でDSQLクラスターを分離。バイパストークンをコミットせず、環境変数 <code>DEV_BYPASS_SECRET</code> で管理。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">APIキーをソルトなしSHA-256でハッシュ化</span>
+      <span class="finding-file">app/auth/api_key_service.py:119-121</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">生の <code>hashlib.sha256</code> でAPIキーを保存。作業因子もソルトもないためGPUブルートフォースに脆弱。テーブル流出時にレインボーテーブルで高速復元される。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>HMAC-SHA256（サーバーサイド秘密鍵使用）、bcrypt、またはargon2に変更。最低限ランダムソルトを追加。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">JWTエラー詳細がAPIレスポンスに露出</span>
+      <span class="finding-file">app/auth/dependencies.py:63-66</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">JWT検証失敗時に <code>detail=str(exc)</code> でライブラリ内部のエラーメッセージがそのままHTTP 401レスポンスに含まれる。JWT検証パイプラインの内部情報がトークン偽造攻撃の手がかりになる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>エラーメッセージを <code>"Invalid or expired token"</code> に統一。元の例外はサーバーサイドでのみログ記録。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">画像アップロード: Content-Typeヘッダーのみ検証 (マジックバイト未確認)</span>
+      <span class="finding-file">app/features/images/use_cases.py:38-41</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">クライアントが制御できる <code>file.content_type</code> のみで画像ファイルを検証。HTMLやSVG（埋め込みスクリプト付き）を <code>image/png</code> と偽ってアップロードし、CDN経由で配信させることで格納型XSSが可能。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>python-magic</code> でマジックバイト検証を追加。CDNでは <code>Content-Disposition: attachment</code> またはContent-Type強制を設定。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">Bedrock history フィールドへのロールインジェクション</span>
+      <span class="finding-file">app/features/assistant/schemas.py:42, gateway.py:192-200</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>ChatRequest.history</code> は <code>list[dict] | None</code> 型で無検証のままBedrockのmessagesに渡される。悪意あるクライアントが <code>{"role": "assistant", ...}</code> を注入して会話履歴を操作し、AIの動作を変えたり他ユーザーのノートコンテキストを引き出せる可能性がある。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>role: Literal["user", "assistant"]</code> と最大長制限を持つ型付き <code>ChatHistoryItem</code> Pydanticモデルを定義。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">CORS: 全メソッド・全ヘッダーを認証情報付きで許可</span>
+      <span class="finding-file">app/main.py:69-75</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>allow_methods=["*"]</code> と <code>allow_headers=["*"]</code> を <code>allow_credentials=True</code> と組み合わせることで、許可オリジンからのDELETE/PUT/PATCHを含む全メソッドと全カスタムヘッダーがクッキー・認証トークン付きで送信可能になる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>実際に使用するHTTPメソッドのみを列挙。<code>allow_headers</code> を <code>["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"]</code> に制限。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">認証・AIエンドポイントにレート制限なし</span>
+      <span class="finding-file">app/main.py (ミドルウェアなし), app/features/assistant/router.py</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">レート制限ミドルウェアが存在しない。有効なトークンを持つ攻撃者がAIエンドポイントを連打することで、月次カウンターが更新される前に大量のBedrockコストを発生させられる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>API GatewayレベルでのWAFスロットリング、またはSlowAPIミドルウェアによるIP/ユーザーごとのレート制限を追加。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">DomainError.detail が 500レスポンスに露出するフォールバック</span>
+      <span class="finding-file">app/http_errors.py:42-45</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">未処理の <code>DomainError</code> サブクラスは <code>detail=error.detail</code> がそのままクライアントへ返される。将来追加されたエラーが内部実装情報（テーブル名、クエリ等）を含む場合に情報漏洩となる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>フォールバックを <code>detail="An unexpected error occurred"</code> に変更し、詳細はサーバーサイドでのみERRORレベルでログ記録。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">管理者検索クエリに max_length 制限なし</span>
+      <span class="finding-file">app/features/admin/router.py:36, use_cases.py:55-63</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">検索パラメータ <code>q</code> に <code>min_length=1</code> はあるが <code>max_length</code> がない。100KBの文字列が <code>LIKE '%...%'</code> クエリとして送られるとDB CPUに不必要な負荷がかかる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>max_length=200</code> (または適切な値) を追加。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">JWKS キャッシュに TTL なし</span>
+      <span class="finding-file">app/auth/cognito.py:33-43</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">JWKSレスポンスがインスタンス変数に永続キャッシュされる。Cognitoが署名鍵をローテーションした場合、ウォームLambdaコンテナで認証が長時間失敗する可能性がある。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>24時間TTLを追加、または <code>kid</code> が見つからない場合に再フェッチするフォールバックを実装。</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: FRONTEND SECURITY -->
+<h2>3. フロントエンドアプリケーション脆弱性</h2>
+<div class="category-section">
+  <div class="category-header">
+    <span class="category-icon">🌐</span>
+    <span class="category-title">Next.js App Router (frontend/src/)</span>
+    <div class="category-counts">
+      <span class="badge critical count-badge">1C</span>
+      <span class="badge high count-badge">4H</span>
+      <span class="badge medium count-badge">2M</span>
+    </div>
+  </div>
+  <button class="toggle-all" onclick="toggleSection(this)">すべて展開</button>
+
+  <div class="finding critical">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge critical">Critical</span>
+      <span class="finding-title">ReDoS — ユーザー入力を直接 RegExp コンストラクタに渡す</span>
+      <span class="finding-file">components/layout/NoteList.tsx:118</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>new RegExp(`(${highlight})`, "gi")</code> で検索クエリをエスケープなしでそのまま使用。ユーザーが <code>(</code> を入力すると <code>SyntaxError</code> でノートリストが空白になる。<code>(((((((a+)+)+)+)+)+</code> のようなパターンでブラウザタブがフリーズする（Catastrophic Backtracking）。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&amp;')</code> でエスケープしてから RegExp に渡す。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">セキュリティHTTPヘッダー未設定 (CSP, X-Frame-Options 等)</span>
+      <span class="finding-file">next.config.ts (headers()エクスポートなし)</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">CSP、X-Frame-Options、X-Content-Type-Options、HSTS等のセキュリティヘッダーが全て未設定。静的エクスポートのためNext.jsレベルでは設定できないが、CloudFront/S3レベルでも設定されていない（インフラセクション M-3参照）。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>CloudFront Response Headers Policyにセキュリティヘッダーを追加。最低限HSTS、X-Content-Type-Options: nosniff、X-Frame-Options: DENYを設定。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">devバイパストークンがクライアントバンドルに平文で含まれる</span>
+      <span class="finding-file">src/lib/dev-bypass.ts:7-17</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>BYPASS_TOKEN = "local-dev-token"</code> がビルド時にJSバンドルに焼き込まれる。ステージング環境を検査することでトークン値が判明し、バックエンドが適切に検証しない場合に認証バイパスが成立する。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>トークン値をソースコードにハードコードしない。<code>NEXT_PUBLIC_DEV_BYPASS_TOKEN=...</code> 環境変数から読み込む形に変更。バックエンドはインターネット公開環境でバイパスを完全拒否。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">exportNotes で token が null の場合に "Bearer null" を送信</span>
+      <span class="finding-file">src/lib/api.ts:317</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>Authorization: `Bearer ${this.token}`</code> にnullガードがなく、未認証状態で <code>Authorization: Bearer null</code> という文字列リテラルがサーバーに送信される。他のメソッドは正しくガードしているが、このメソッドだけ漏れている。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>request()</code> と同様の条件付きヘッダー設定パターンを適用。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">Sentry Replay でレンダリングされたノートコンテンツが記録される可能性</span>
+      <span class="finding-file">src/lib/sentry.ts:55-59</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>replaysOnErrorSampleRate: 1.0</code> によりエラー時のセッションが100%記録される。<code>maskAllText: true</code> はフォーム入力をマスクするが、プレビューペインに表示されたMarkdownレンダリング済みコンテンツ（<code>prose</code> div）はマスク対象外の可能性がある。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>エディタプレビューコンテナをSentryの <code>block</code> リストに追加するか、マスキング設定が全コンテンツ領域をカバーしていることを確認。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">位置情報をサードパーティAPIに同意なく送信</span>
+      <span class="finding-file">src/components/WeatherWidget.tsx:89-91</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">ブラウザの位置情報APIで取得した緯度・経度を直接 <code>api.open-meteo.com</code> のURLクエリに埋め込んで送信。GDPR等のプライバシー規制ではサードパーティへの位置情報共有に明示的な開示が必要。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>位置情報取得前に「天気取得のためOpen-Meteoに位置情報が送信されます」という開示を追加。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">管理者ページにミドルウェアレベルの認証ガードなし</span>
+      <span class="finding-file">src/app/admin/page.tsx, src/components/admin/AdminConsole.tsx</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">静的エクスポートのため <code>/admin</code> のHTML+JSが未認証ユーザーにも配信される。<code>middleware.ts</code> が存在しない。バックエンドAPIは正しく認証を要求するが、管理画面の構造が露出する。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>middleware.ts</code> で未認証ユーザーを <code>/admin</code> からリダイレクト、またはサブドメイン + ネットワークレベルアクセス制御を導入。</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4: INFRASTRUCTURE -->
+<h2>4. インフラ脆弱性 (Terraform / AWS)</h2>
+<div class="category-section">
+  <div class="category-header">
+    <span class="category-icon">☁️</span>
+    <span class="category-title">AWS Infrastructure (terraform/)</span>
+    <div class="category-counts">
+      <span class="badge critical count-badge">2C</span>
+      <span class="badge high count-badge">7H</span>
+      <span class="badge medium count-badge">7M</span>
+      <span class="badge low count-badge">4L</span>
+    </div>
+  </div>
+  <button class="toggle-all" onclick="toggleSection(this)">すべて展開</button>
+
+  <div class="finding critical">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge critical">Critical</span>
+      <span class="finding-title">Cognito MFA 無効</span>
+      <span class="finding-file">terraform/cognito.tf — mfa_configuration = "OFF"</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">本番ユーザープールでMFAが完全無効。クレデンシャルスタッフィングやフィッシングでアカウントが即座に乗っ取られる。補完的な制御（適応型認証、IP制限等）も存在しない。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>mfa_configuration = "OPTIONAL"</code> に変更してユーザーがMFAを登録できるようにする。管理者ユーザーは強制。</div>
+    </div>
+  </div>
+
+  <div class="finding critical">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge critical">Critical</span>
+      <span class="finding-title">S3 バケット暗号化の明示的設定なし (OPAポリシー warn のみ)</span>
+      <span class="finding-file">terraform/s3_cloudfront.tf, s3_images.tf, s3_cache.tf</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">3バケット全てに <code>aws_s3_bucket_server_side_encryption_configuration</code> が設定されていない。AWSデフォルト暗号化は有効だがKMS CMKではなくSSE-S3（AWS管理鍵）。<code>policies/security/s3.rego</code> のOPAポリシーは <code>warn</code> のみで強制されていない。ユーザーアップロード画像バケットでは特にコンプライアンス上の問題となる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>各バケットに明示的なSSE設定を追加。images/cacheバケットはKMS CMKを使用。OPAポリシーの <code>warn</code> を <code>deny</code> に昇格。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">API Gateway: スロットリング・WAF 未設定</span>
+      <span class="finding-file">terraform/lambda.tf:161-183 — aws_apigatewayv2_stage.default</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">デフォルトステージに <code>throttling_burst_limit</code> / <code>throttling_rate_limit</code> の設定なし。WAF WebACLの関連付けもない。DDoS攻撃と予期しないLambda実行コストに対して無防備。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>default_route_settings</code> にスロットリングを追加。AWS WAF WebACL (AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet) を関連付け。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">API Gateway: JWT オーソライザーなし (認証をLambda内のみで実施)</span>
+      <span class="finding-file">terraform/lambda.tf:154-158 — aws_apigatewayv2_route.default</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">キャッチオール <code>$default</code> ルートに <code>authorization_type</code> が設定されていない。未認証リクエストもLambdaが起動してコスト・レイテンシが発生してから拒否される。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>CognitoをissuerとするJWTオーソライザーを追加。パブリックエンドポイント（<code>/auth/*</code>）のみ明示的に <code>NONE</code> に設定。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">ECR イメージタグがミュータブル</span>
+      <span class="finding-file">terraform/lambda.tf:111 — image_tag_mutability = "MUTABLE"</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>latest</code> タグが上書き可能なため、サプライチェーン攻撃や誤ったプッシュで本番Lambdaイメージが静かに置き換わる。タグレベルの監査証跡がない。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>image_tag_mutability = "IMMUTABLE"</code> に設定。本番はダイジェスト参照 (<code>@sha256:...</code>) でデプロイ。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">IAM: Lambdaランタイムロールに aws-marketplace:Subscribe 付与</span>
+      <span class="finding-file">terraform/iam.tf:48-57 — aws_iam_role_policy.bedrock_access</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">Bedrockアクセスポリシーが <code>aws-marketplace:Subscribe</code> を <code>Resource: "*"</code> で付与。Lambdaが侵害された場合、有料Marketplace製品への購読で多額の課金が発生しうる。ブートストラップ用の権限が常時ランタイムロールに残っている。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>ランタイムロールから <code>aws-marketplace:Subscribe</code> を削除。初回モデル購読はコンソールまたはデプロイ専用の権限昇格ロールで実施。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">IAM: CloudWatch Logs リソース ARN がワイルドカード</span>
+      <span class="finding-file">terraform/iam.tf:98, cost_report.tf:87</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>Resource = "arn:aws:logs:*:*:*"</code> により任意リージョン・任意アカウントの全ロググループへの書き込みが可能。侵害されたLambdaが他サービスのログを改ざんして監査証跡を汚染できる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>特定のロググループARNパターン (<code>arn:aws:logs:{region}:{account}:log-group:/aws/lambda/{project}-*</code>) に制限。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">SES: 任意の検証済みアイデンティティからの送信を許可</span>
+      <span class="finding-file">terraform/cost_report.tf:57-69 — ses:SendEmail Resource: "*"</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">コストレポートLambdaが任意のSES検証済みアイデンティティからメール送信可能。侵害された場合、自社の検証済みドメインを使ったフィッシングメールの送信に悪用されうる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>リソースを特定のSESアイデンティティARN (<code>arn:aws:ses:{region}:{account}:identity/{domain}</code>) に限定。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">SNS/SQS: 保存時暗号化なし</span>
+      <span class="finding-file">terraform/async_jobs.tf — SNS topic, SQS queues</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">AIジョブのペイロード（ユーザーノートコンテンツを含む可能性）がSNS/SQSに暗号化なしで保存される。DLQは最大14日間メッセージを保持。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>SQSに <code>kms_master_key_id = "alias/aws/sqs"</code>、SNSに <code>kms_master_key_id = "alias/aws/sns"</code> を設定。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">CloudFront: セキュリティレスポンスヘッダーポリシー未設定</span>
+      <span class="finding-file">terraform/s3_cloudfront.tf — aws_cloudfront_distribution.main</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">全キャッシュビヘイビアに <code>response_headers_policy_id</code> なし。HSTS、X-Content-Type-Options、X-Frame-Options、CSP、Referrer-Policy が未設定。初回訪問時のダウングレード攻撃が可能。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>aws_cloudfront_response_headers_policy</code> リソースを作成し、全キャッシュビヘイビアに適用。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">S3 バージョニング未設定 (images, frontend)</span>
+      <span class="finding-file">terraform/s3_images.tf, s3_cloudfront.tf</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">imagesバケットでバージョニングがないため誤削除・上書き時に復元不可。frontendバケットも同様。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>images・frontendバケットでバージョニングを有効化。ライフサイクルルールで旧バージョンを30-90日後に期限切れ設定。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">Lambda: APIロールに予約並列数・DLQ 未設定</span>
+      <span class="finding-file">terraform/lambda.tf — aws_lambda_function.api</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">予約並列数未設定のためトラフィックスパイク時にアカウントレベルの並列数を使い果たす可能性。APIロールにDLQがなく失敗が無音で失われる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>想定負荷に応じた <code>reserved_concurrent_executions</code> を設定。DLQ を追加して失敗の可視性を確保。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">CloudTrail 未設定</span>
+      <span class="finding-file">terraform/ (リソースなし)</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">CloudTrailリソースが存在しない。IAM、Cognito、S3、Bedrock、DSQLへのAPI呼び出しが事後調査不能。SOC 2・ISO 27001等の多くのコンプライアンスフレームワークでの必須要件。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>ログファイル検証有効・CloudWatch Logs統合でCloudTrailトレイルを追加。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">Cognitoリフレッシュトークン有効期限 30日</span>
+      <span class="finding-file">terraform/cognito.tf:75-81</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">リフレッシュトークンが盗まれた場合30日間サイレントアクセスが継続する。トークン失効メカニズムが可視的でない。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>本番では7-14日に短縮。Cognito Advanced Security (fraud detection) の有効化を検討。</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 5: UI/UX -->
+<h2>5. デザイン・UI/UX レビュー</h2>
+<div class="category-section">
+  <div class="category-header">
+    <span class="category-icon">🎨</span>
+    <span class="category-title">Next.js フロントエンド UI/UX</span>
+    <div class="category-counts">
+      <span class="badge high count-badge">5H</span>
+      <span class="badge medium count-badge">7M</span>
+      <span class="badge low count-badge">3L</span>
+    </div>
+  </div>
+  <button class="toggle-all" onclick="toggleSection(this)">すべて展開</button>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">window.confirm() を5箇所で使用 — 破壊的操作の確認UI</span>
+      <span class="finding-file">Sidebar.tsx:235, NoteList.tsx:108, EditorToolbar.tsx:382, ShareDialog.tsx:61, SettingsDialog.tsx:266</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">ネイティブの <code>window.confirm()</code> はスタイル変更不可・ブラウザのイベントループをブロック・i18n非対応（ブラウザが "OK/Cancel" を描画）・モバイルWebViewでアクセシビリティ問題あり。ダークテーマのアプリに突然ブラウザデフォルトダイアログが表示され、UXの一貫性が壊れる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>既存のRadix Dialog (<code>components/ui/dialog.tsx</code>) を使った汎用 <code>&lt;ConfirmDialog&gt;</code> コンポーネントを作成し、全5箇所を置換。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">shared/page.tsx の全テキストが英語ハードコード (i18n未対応)</span>
+      <span class="finding-file">src/app/shared/page.tsx:34-174</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">共有ノートページ（未認証で公開）が <code>useTranslation</code> を使用せず、エラーメッセージ・ラベル・CTAがすべて英語ハードコード。日本語ユーザーが共有リンクを受け取った場合に全て英語で表示される。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>useTranslation</code> を接続し全ユーザー向けテキストをロケールファイルに移動。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">EditorStatusBar の最終保存時刻が "ja-JP" 固定</span>
+      <span class="finding-file">src/components/layout/EditorStatusBar.tsx:133</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>new Date().toLocaleString("ja-JP", {...})</code> がハードコードされており、英語ユーザーでも日本語形式で日時が表示される (<code>2026/05/18 14:32</code>)。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>"ja-JP"</code> を <code>undefined</code> に変更してブラウザのシステムロケールに従わせる。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">ワークスペースのローディング状態が裸のテキストのみ</span>
+      <span class="finding-file">src/components/workspace/AuthenticatedWorkspace.tsx:43-49</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">データロード中に "読み込み中…" のテキストのみ表示。スピナーもスケルトンUIもなく、低速回線では数秒間空白のように見える。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>スピナー (<code>Loader2Icon animate-spin</code>) またはスリーカラムレイアウトのスケルトンUIに置換。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">WorkspaceSidebarFooter のボタンに aria-label なし・英語ハードコード title</span>
+      <span class="finding-file">src/components/workspace/WorkspaceSidebarFooter.tsx:54,63</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">Settings/Sign outのアイコンボタンに <code>title="Settings"</code>（英語固定）があるが <code>aria-label</code> がない。スクリーンリーダーに対してアプリ言語にかかわらず英語でアナウンスされる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>aria-label={t("sidebar.settings")}</code> などを追加（翻訳キーは両ロケールに既存）。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">EditorToolbar のカスタムドロップダウンがキーボード・スクリーンリーダー非対応</span>
+      <span class="finding-file">src/components/layout/EditorToolbar.tsx:173-197, 244-263</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">フォルダセレクターとエクスポートドロップダウンが <code>&lt;div&gt; + &lt;button&gt;</code> の手動実装。<code>role="menu"</code>・<code>aria-expanded</code>・キーボードナビゲーション（矢印キー・Escape）なし。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>既にAIChatPanelで使用されているRadix <code>Select</code> または <code>DropdownMenu</code> に置換。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">検索のNo results found が英語ハードコード</span>
+      <span class="finding-file">src/components/layout/NoteList.tsx:264</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>&lt;span&gt;No results found for "{searchQuery}"&lt;/span&gt;</code> が翻訳なしで表示される。日本語ユーザーが日本語で検索しても英語メッセージが表示される。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>翻訳キー <code>noteList.noResults</code> を追加して <code>t("noteList.noResults", {query: searchQuery})</code> に置換。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">AIChatPanel のモード切替ボタンに ARIA ロールなし</span>
+      <span class="finding-file">src/components/ai/AIChatPanel.tsx:248-272</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">Chat/Editのセグメントコントロールが <code>role="tablist"</code>/<code>role="tab"</code>/<code>aria-selected</code> なし。スクリーンリーダーがアクティブなモードを識別できない。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>role="tablist"</code> のラッパーを追加し、各ボタンに <code>role="tab"</code> と <code>aria-selected</code> を設定。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">&lt;html lang&gt; 属性が "en" 固定 — 言語設定に追従しない</span>
+      <span class="finding-file">src/app/layout.tsx:45</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">日本語を選択してもアシスト技術や検索エンジンには <code>lang="en"</code> が送信される。スクリーンリーダーの読み上げ言語が変わらない。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>LanguageProvider</code> 内で <code>document.documentElement.lang = resolvedLang</code> を <code>useEffect</code> で設定。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">WeatherWidget の絵文字アイコンに aria-label なし</span>
+      <span class="finding-file">src/components/WeatherWidget.tsx:160-162</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">天気の絵文字 <code>&lt;span&gt;{emoji}&lt;/span&gt;</code> に <code>aria-label</code>/<code>aria-hidden</code> なし。スクリーンリーダーが絵文字文字名を読み上げる。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>絵文字 span に <code>aria-hidden="true"</code>、外側コンテナに <code>aria-label={`${condition}, ${temp}°C`}</code> を追加。</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 6: CODE SMELLS -->
+<h2>6. コードスメル・リファクタリング候補</h2>
+<div class="category-section">
+  <div class="category-header">
+    <span class="category-icon">🔧</span>
+    <span class="category-title">Backend (Python) + Frontend (TypeScript)</span>
+    <div class="category-counts">
+      <span class="badge high count-badge">6H</span>
+      <span class="badge medium count-badge">5M</span>
+      <span class="badge low count-badge">1L</span>
+    </div>
+  </div>
+  <button class="toggle-all" onclick="toggleSection(this)">すべて展開</button>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">God Component: EditorPanel (878行, 18 useState, 13 useRef, 11 useEffect)</span>
+      <span class="finding-file">frontend/src/components/layout/EditorPanel.tsx</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">自動保存・タイトル/コンテンツ状態・スクロール同期・画像アップロード・印刷プレビュー・フルスクリーン・スプリットビューリサイズ・contentOverride・ハッシュ計算・requestIdleCallbackスケジューリング・アンマウント同期の12以上の責務を1コンポーネントが担う。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>useEditorAutoSave</code>・<code>useScrollSync</code>・<code>usePrintPreview</code>・<code>useEditorPreviewResize</code>・<code>useFullscreen</code> の各カスタムフックに分割。JSXレンダリングは <code>EditorSplitLayout</code> サブコンポーネントへ。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">変更ディスパッチロジックがフォルダ/ノートで構造的に複製</span>
+      <span class="finding-file">backend/app/features/workspace/use_cases/changes.py:98-180</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>_apply_folder_change</code> と <code>_apply_note_change</code> がほぼ同一構造。create/update/delete のディスパッチ・バージョン確認・レスポンス構築が重複。新しい操作タイプを追加する際に両方の変更が必要。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>汎用の <code>_dispatch_entity_change()</code> ヘルパーを抽出、またはエンティティごとにストラテジーマッピングを使用。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">useDebouncedAsync で any 型を使用 (同期フロー全体に影響)</span>
+      <span class="finding-file">frontend/src/lib/sync/useDebouncedAsync.ts:15,23</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">保存/同期フロー全体の中核フックで <code>any[]</code> を使用。stale-argsバグが型システムで検出不能。<code>// eslint-disable</code> で意図的に抑制されている。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>lastArgsRef</code> を <code>useRef&lt;Parameters&lt;T&gt; | null&gt;(null)</code> に変更して型安全性を確保。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">内部メソッドの型アノテーション欠如</span>
+      <span class="finding-file">backend/app/features/workspace/use_cases/changes.py:64,98,140,182</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>_apply_change</code>・<code>_apply_folder_change</code>・<code>_apply_note_change</code>・<code>_ensure_expected_version</code> の <code>change</code> 引数に型アノテーションなし。型は <code>WorkspaceChangeRequest</code> だがIDEや型チェッカーが追跡できない。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>全4メソッドに <code>change: WorkspaceChangeRequest</code> を追加。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">edit_jobs.py で raw session.commit() — エラーハンドリング層をバイパス</span>
+      <span class="finding-file">backend/app/features/assistant/use_cases/edit_jobs.py:52-54</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>create_job</code> が <code>self.session.commit()</code> を直接呼び出し。他のリポジトリは <code>commit_with_error_handling</code> を使用してDB例外をドメイン例外に変換しているが、このメソッドだけSQLAlchemy例外がルーターまで素通りする。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>commit_with_error_handling(self.session, "AIEditJob")</code> に置換。</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge high">High</span>
+      <span class="finding-title">usage_policy.py でf文字列ログ — 構造化ログ・リダクションをバイパス</span>
+      <span class="finding-file">backend/app/features/assistant/usage_policy.py:47-49,86-88</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">2箇所で <code>logger.info(f"...")</code> を使用。コードベース全体で使用される <code>log_event()</code>/<code>sanitize_log_value()</code> フレームワークをバイパスしており、CloudWatchで非構造化ログが出力される。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>log_event(logger, logging.INFO, "ops.token_usage.period_created", user_id=user_id, ...)</code> に統一。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">マジックナンバー 80 (スニペット長) が5箇所以上に散在</span>
+      <span class="finding-file">workspaceSync.ts:49, useNoteSyncEngine.ts:413,446,465, テストファイル</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">ノートスニペットのプレビュー文字数 <code>80</code> が5箇所にハードコード。変更時に全てを手動で更新する必要があり、テストのモックも同じ値に依存。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>export const NOTE_SNIPPET_LENGTH = 80</code> を共有定数ファイルで定義し全箇所を置換。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">useWorkspaceState が 40以上のプロパティを返す God Hook</span>
+      <span class="finding-file">frontend/src/hooks/workspace/useWorkspaceState.ts:268-332</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">フォルダ・ノート・AI・エディタ・モバイルビュー・検索・サイドバー・URL管理を1つのフックで返す。40以上のプロパティにより呼び出し元でのデストラクチャリングが困難で、stale closureのリスクも高い。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>useWorkspaceNavigation</code>・<code>useWorkspaceUI</code>・<code>useWorkspaceAI</code> に分割してページレベルで合成。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">changes.py: 未知の operation がデフォルトでdeleteにフォールスルー</span>
+      <span class="finding-file">backend/app/features/workspace/use_cases/changes.py:130-179</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>create</code>/<code>update</code> のみ明示的 <code>if</code> 分岐で、<code>delete</code> は暗黙のフォールスルー。未知のoperationが誤って削除を実行する。現在はPydanticで境界を防衛するが、内部実装でも明示すべき。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div>明示的な <code>elif change.operation == "delete":</code> を追加し、最終的に <code>else: raise ValidationFailed(...)</code> で網羅性を保証。</div>
+    </div>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge medium">Medium</span>
+      <span class="finding-title">API_BASE_URL / API_BASE が api.ts に重複定義</span>
+      <span class="finding-file">frontend/src/lib/api.ts:47,355</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc">同じ環境変数を読む2つの定数 <code>API_BASE_URL</code> と <code>API_BASE</code> が別名で定義。フォールバックURL変更時に両方を更新する必要がある。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>API_BASE</code> を削除し <code>getSharedNote</code> で <code>API_BASE_URL</code> を使用。</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-header" onclick="toggle(this)">
+      <span class="badge low">Low</span>
+      <span class="finding-title">スニペット切り詰めがUnicodeコードポイント単位でない</span>
+      <span class="finding-file">frontend/src/lib/workspaceSync.ts:49, useNoteSyncEngine.ts:413,446,465</span>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="finding-body">
+      <p class="desc"><code>content.slice(0, 80)</code> はJSのUTF-16コード単位で切り詰める。日本語・絵文字を含むノートで論理的に中途半端な位置で切れる可能性がある（サロゲートペアが壊れる場合は文字化け）。</p>
+      <div class="rec"><div class="rec-label">推奨対応</div><code>[...content].slice(0, 80).join("")</code> でUnicodeコードポイント単位に変更。グラフェムクラスタ単位が必要なら <code>Intl.Segmenter</code> を使用。</div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:.8rem;">
+  <p>このレポートは6専門エージェントによるマルチエージェントレビューによって生成された。調査日: 2026-05-18。</p>
+  <p style="margin-top:.5rem;">レビュー対象: ランタイム・ライブラリ脆弱性 / バックエンドアプリケーション / フロントエンドアプリケーション / インフラ (Terraform/AWS) / デザイン・UI/UX / コードスメル・品質</p>
+</div>
+
+<script>
+function toggle(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+  header.classList.toggle('open');
+}
+function toggleSection(btn) {
+  const section = btn.closest('.category-section');
+  const bodies = section.querySelectorAll('.finding-body');
+  const headers = section.querySelectorAll('.finding-header');
+  const allOpen = [...bodies].every(b => b.classList.contains('open'));
+  bodies.forEach(b => b.classList.toggle('open', !allOpen));
+  headers.forEach(h => h.classList.toggle('open', !allOpen));
+  btn.textContent = allOpen ? 'すべて展開' : 'すべて折りたたむ';
+}
+</script>
+</body>
+</html>

@@ -5,6 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.features.assistant.errors import (
+    AI_TIMEOUT_MESSAGE,
+    TOKEN_LIMIT_EXCEEDED_MESSAGE,
+)
 from app.features.assistant.gateway import (
     AIGateway,
     AIGatewayTimeoutError,
@@ -15,8 +19,10 @@ from app.features.assistant.job_runner import (
     process_edit_job,
     process_summarize_job,
 )
+from app.features.assistant.usage_policy import get_or_create_current_period
 from app.main import app
-from app.models import AIEditJob, Folder, Note
+from app.models import MONTHLY_TOKEN_LIMIT, AIEditJob, Folder, Note
+from tests.conftest import TEST_USER_ID
 
 
 def _run_ai_job(process_fn, job_id, session, ai_gateway):
@@ -405,6 +411,33 @@ def test_edit_timeout_returns_504(client: TestClient):
     assert "timed out" in response.json()["detail"].lower()
 
 
+def test_edit_timeout_returns_exact_detail(
+    client: TestClient,
+    mock_ai_service,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def timeout_edit(
+        content: str,
+        instruction: str,
+        model_id: str | None = None,
+        language: str = "auto",
+    ) -> tuple[str, int]:
+        raise AIGatewayTimeoutError("timed out")
+
+    monkeypatch.setattr(mock_ai_service, "edit", timeout_edit)
+
+    response = client.post(
+        "/api/ai/edit",
+        json={
+            "content": "Hello world",
+            "instruction": "Fix typos",
+        },
+    )
+
+    assert response.status_code == 504
+    assert response.json() == {"detail": AI_TIMEOUT_MESSAGE}
+
+
 def test_create_edit_job_and_poll_result(
     client: TestClient,
     session: Session,
@@ -446,6 +479,27 @@ def test_create_edit_job_and_poll_result(
     assert poll_data["status"] == "completed"
     assert poll_data["edited_content"] == "Edited: Hello world"
     assert poll_data["tokens_used"] == 30
+
+
+def test_create_edit_job_token_limit_returns_exact_detail(
+    client: TestClient,
+    session: Session,
+):
+    usage = get_or_create_current_period(session, TEST_USER_ID)
+    usage.tokens_used = MONTHLY_TOKEN_LIMIT
+    session.add(usage)
+    session.commit()
+
+    response = client.post(
+        "/api/ai/edit-jobs",
+        json={
+            "content": "Hello world",
+            "instruction": "Fix typos",
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json() == {"detail": TOKEN_LIMIT_EXCEEDED_MESSAGE}
 
 
 def test_edit_job_not_visible_to_other_user(

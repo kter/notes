@@ -17,6 +17,7 @@ from app.shared import (
     NotFound,
     QuotaExceeded,
     ShareExpired,
+    UpstreamTimeout,
     ValidationFailed,
 )
 
@@ -34,6 +35,11 @@ def to_http_exception(error: DomainError) -> HTTPException:
     if isinstance(error, QuotaExceeded):
         return HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=error.detail,
+        )
+    if isinstance(error, UpstreamTimeout):
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=error.detail,
         )
     if isinstance(error, ShareExpired):

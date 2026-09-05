@@ -229,3 +229,15 @@ class TestShareRoutesRequireAuth:
         """公開エンドポイントは認証を要求しない（404 であって 401 ではない）。"""
         response = client_without_auth.get(f"/api/shared/{uuid4()}")
         assert response.status_code == 404
+
+    def test_public_shared_note_is_readable_without_credentials(
+        self, client: TestClient, client_without_auth: TestClient
+    ):
+        """公開エンドポイントは資格情報なしで実際に 200 を返す。"""
+        note_id = client.post("/api/notes", json={"title": "Public"}).json()["id"]
+        token = client.post(f"/api/notes/{note_id}/share").json()["share_token"]
+
+        response = client_without_auth.get(f"/api/shared/{token}")
+
+        assert response.status_code == 200
+        assert response.json()["title"] == "Public"

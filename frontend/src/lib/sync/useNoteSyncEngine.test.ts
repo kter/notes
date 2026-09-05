@@ -7,6 +7,7 @@ import { notesDB } from "@/lib/indexedDB";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";
+import { noteBodyStore } from "./noteBodyStore";
 
 const getApiMock = vi.fn();
 const getWorkspaceSyncRequestMetadataMock = vi.fn(() => ({
@@ -503,6 +504,53 @@ describe("useNoteSyncEngine", () => {
 
     expect(result.current.syncStatus.local).toBe("failed");
     expect(result.current.syncStatus.lastError).toBe("Failed to save locally");
+  });
+
+  it("purges the locally stored body when deleting a note offline", async () => {
+    Object.defineProperty(window.navigator, "onLine", {
+      configurable: true,
+      value: false,
+    });
+    const initialNote = buildNote();
+    vi.mocked(notesDB.getNote).mockResolvedValue(initialNote);
+    noteBodyStore.set(initialNote.id, "body");
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleDeleteNote(initialNote.id);
+    });
+
+    expect(noteBodyStore.has(initialNote.id)).toBe(false);
+  });
+
+  it("purges the locally stored body when deleting a note online", async () => {
+    Object.defineProperty(window.navigator, "onLine", {
+      configurable: true,
+      value: true,
+    });
+    const initialNote = buildNote();
+    vi.mocked(notesDB.getNote).mockResolvedValue(initialNote);
+    noteBodyStore.set(initialNote.id, "body");
+    const snapshot = {
+      folders: [],
+      notes: [],
+      cursor: "cursor-2",
+      server_time: "2024-01-02T00:00:00.000Z",
+    };
+    getApiMock.mockResolvedValue({
+      applyWorkspaceChanges: vi.fn().mockResolvedValue({ applied: [], snapshot }),
+    });
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleDeleteNote(initialNote.id);
+    });
+
+    expect(noteBodyStore.has(initialNote.id)).toBe(false);
   });
 
   it("refreshes the workspace snapshot when an online update conflicts", async () => {

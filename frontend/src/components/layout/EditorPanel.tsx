@@ -28,6 +28,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorMarkdownPreview } from "./EditorMarkdownPreview";
 import { EditorStatusBar } from "./EditorStatusBar";
 import { useEditorDisplayMode } from "@/hooks/useEditorDisplayMode";
+import { noteBodyStore } from "@/lib/sync";
 
 /** 文字列をファイルとしてダウンロードさせるユーティリティ関数。Blob URL を一時生成して即解放する。 */
 function downloadFile(fileContent: string, filename: string, mimeType: string) {
@@ -103,9 +104,12 @@ export function EditorPanel({
     setEditorDisplayMode(editorDisplayMode === "live-preview" ? "raw" : "live-preview");
   }, [editorDisplayMode, setEditorDisplayMode]);
   // Initialize state from props - reliance on key={note.id} in parent to reset state on switch
+  const [initialBody] = useState(() =>
+    noteBodyStore.resolve(note?.id, note?.content ?? "")
+  );
   const [title, setTitle] = useState(note?.title ?? "");
-  const [content, setContent] = useState(note?.content ?? "");
-  const [committedContent, setCommittedContent] = useState(note?.content ?? "");
+  const [content, setContent] = useState(initialBody);
+  const [committedContent, setCommittedContent] = useState(initialBody);
   const deferredContent = useDeferredValue(committedContent);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -178,9 +182,9 @@ export function EditorPanel({
   const currentContentRef = useRef(content);
 
   // Update refs on mount (key={note.id} remounts on note switch).
-  // lastSaved refs track the persisted baseline; current refs track the live editor state.
-  // Use the initialized `content` state (which prefers noteBodyStore over note?.content)
-  // so that prior unsaved edits aren't clobbered by the stale prop value.
+  // Keep lastSaved refs seeded from note props: they are the persisted server baseline,
+  // so a recovered unsaved store body remains dirty and is flushed.
+  // Current refs use the initialized editor state, which prefers noteBodyStore.
   useEffect(() => {
     lastSavedTitle.current = note?.title ?? "";
     lastSavedContent.current = note?.content ?? "";
@@ -814,7 +818,7 @@ export function EditorPanel({
                       <MarkdownEditor
                         ref={editorRef}
                         key={note?.id}
-                        initialValue={note?.content ?? ""}
+                        initialValue={initialBody}
                         onChange={handleEditorChange}
                         onBlur={handleBlur}
                         onSelectionChange={onSelectionChange}

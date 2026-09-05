@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 
 from app.features.share.dependencies import (
+    RequireAuthenticatedUser,
     get_public_share_use_cases,
     get_share_use_cases,
 )
@@ -25,6 +26,7 @@ router = APIRouter()
     "/notes/{note_id}/share",
     response_model=NoteShareRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[RequireAuthenticatedUser],
 )
 def create_share(
     note_id: UUID,
@@ -34,7 +36,11 @@ def create_share(
     return use_cases.create_share(note_id)
 
 
-@router.get("/notes/{note_id}/share", response_model=NoteShareRead | None)
+@router.get(
+    "/notes/{note_id}/share",
+    response_model=NoteShareRead | None,
+    dependencies=[RequireAuthenticatedUser],
+)
 def get_share(
     note_id: UUID,
     use_cases: Annotated[ShareUseCases, Depends(get_share_use_cases)],
@@ -43,7 +49,11 @@ def get_share(
     return use_cases.get_share(note_id)
 
 
-@router.delete("/notes/{note_id}/share", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/notes/{note_id}/share",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[RequireAuthenticatedUser],
+)
 def delete_share(
     note_id: UUID,
     use_cases: Annotated[ShareUseCases, Depends(get_share_use_cases)],

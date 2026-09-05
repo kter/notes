@@ -46,9 +46,9 @@ export function useNoteFilter(
     const query = searchQuery.toLowerCase();
     return folderFiltered.filter((n) => {
       if (n.title?.toLowerCase().includes(query)) return true;
-      // Use noteBodyStore when available (has() distinguishes "empty" from "not loaded").
+      // Use noteBodyStore when available (resolve distinguishes "empty" from "not loaded").
       // Fall back to n.content (snapshot value) only for notes not yet opened in this session.
-      const body = noteBodyStore.has(n.id) ? noteBodyStore.get(n.id) : (n.content ?? "");
+      const body = noteBodyStore.resolve(n.id, n.content ?? "");
       return body.toLowerCase().includes(query);
     });
     // bodyVersion ensures re-evaluation when note bodies change in the store.

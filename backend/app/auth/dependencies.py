@@ -3,7 +3,7 @@
 責務: Bearer トークンおよび API キーを検証し、認証済みユーザー情報を返す。
 主要なエクスポート: get_current_user, get_current_app_user, require_admin,
     get_folder_note_user_id, および各種型エイリアス。
-呼び出し関係: ルーターの Depends から呼ばれ、cognito_verifier / UserApiKeyService
+呼び出し関係: ルーターの Depends から呼ばれ、CognitoJWTVerifier / UserApiKeyService
     / AppUserService を呼ぶ。
 """
 
@@ -17,7 +17,7 @@ from sqlmodel import Session
 
 from app.auth.api_key_service import UserApiKeyService
 from app.auth.app_user_service import AppUserService
-from app.auth.cognito import cognito_verifier
+from app.auth.cognito import CognitoJWTVerifier, get_cognito_verifier
 from app.database import get_session
 from app.logging_utils import bind_user_id, log_event
 from app.models import AppUser
@@ -30,7 +30,9 @@ api_key_header_security = APIKeyHeader(name="X-API-Key", auto_error=False)
 logger = logging.getLogger(__name__)
 
 
-async def _verify_bearer_token(token: str) -> dict:
+async def _verify_bearer_token(
+    token: str, verifier: CognitoJWTVerifier | None = None
+) -> dict:
     """Bearer トークンを検証してクレームを返す内部ヘルパー。
 
     検証成功時はログコンテキストと Sentry にユーザー ID を設定する。
@@ -39,7 +41,8 @@ async def _verify_bearer_token(token: str) -> dict:
         HTTPException: トークン検証失敗時に 401 を送出する。
     """
     try:
-        claims = await cognito_verifier.verify_token(token)
+        verifier = verifier if verifier is not None else get_cognito_verifier()
+        claims = await verifier.verify_token(token)
         user_id = claims.get("sub", "")
         if user_id:
             bind_user_id(user_id)

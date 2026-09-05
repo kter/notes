@@ -43,12 +43,7 @@ async def test_dispatch_edit_job_publishes_to_sns(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv(
         EDIT_JOB_TOPIC_ARN_ENV, "arn:aws:sns:ap-northeast-1:123456789012:edit-jobs"
     )
-    monkeypatch.setattr(
-        "app.features.assistant.job_runner.boto3.client",
-        lambda service_name: sns_client,
-    )
-
-    await dispatch_edit_job(job_id, TEST_USER_ID)
+    await dispatch_edit_job(job_id, TEST_USER_ID, publisher=sns_client)
 
     assert len(sns_client.published) == 1
     publish_call = sns_client.published[0]

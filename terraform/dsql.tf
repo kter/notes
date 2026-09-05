@@ -1,6 +1,6 @@
 # Aurora DSQL Cluster
 resource "aws_dsql_cluster" "main" {
-  deletion_protection_enabled = terraform.workspace == "prd" ? true : false
+  deletion_protection_enabled = true
 
   tags = {
     Name = "${var.project_name}-dsql-${terraform.workspace}"

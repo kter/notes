@@ -4,7 +4,7 @@
     実行し、結果をデータベースに永続化する。
 主要なエクスポート: dispatch_edit_job, process_edit_job,
     run_edit_job_from_event, run_edit_job_queue_records,
-    process_edit_job_queue_records
+    process_edit_job_queue_records、SNSPublisher。
 呼び出し関係: FastAPI ルーターおよび Lambda ハンドラから呼ばれ、
     AIInteractionUseCases を通じて AI ゲートウェイを実行する。
 """

@@ -88,9 +88,14 @@ class BedrockGateway(AIGateway):
             ),
         )
         self.model_id = settings.bedrock_model_id
-        self.summary_cache = (
-            summary_cache if summary_cache is not None else get_summary_cache()
-        )
+        # 遅延解決: chat / edit しか使わない経路で S3 クライアントを作らせない。
+        self._summary_cache = summary_cache
+
+    def _get_summary_cache(self) -> SummaryCache:
+        """初回の要約時に共有 SummaryCache を解決して返す。"""
+        if self._summary_cache is None:
+            self._summary_cache = get_summary_cache()
+        return self._summary_cache
 
     def _invoke_model(
         self,
@@ -156,7 +161,8 @@ class BedrockGateway(AIGateway):
         resolved_lang = self._resolve_language(language)
 
         # S3キャッシュを参照し、ヒットした場合はBedrockを呼び出さずにキャッシュを返す
-        cached_summary = self.summary_cache.get_cached_summary(content, model_id)
+        summary_cache = self._get_summary_cache()
+        cached_summary = summary_cache.get_cached_summary(content, model_id)
         if cached_summary:
             return cached_summary, 0  # キャッシュヒット: トークンは消費しない
 
@@ -170,7 +176,7 @@ class BedrockGateway(AIGateway):
 
         # Bedrockを呼び出して要約を生成し、結果をS3キャッシュに保存する
         summary, total_tokens = self._invoke_model(messages, system, model_id=model_id)
-        self.summary_cache.save_summary(content, model_id, summary)
+        summary_cache.save_summary(content, model_id, summary)
         return summary, total_tokens
 
     async def chat(

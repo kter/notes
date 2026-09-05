@@ -1,7 +1,7 @@
 """画像アップロードのアプリケーションユースケース。
 
 責務: アップロードファイルのバリデーション、S3 への保存、CDN URL の生成を行う。
-主要なエクスポート: ImageUploadUseCases, ALLOWED_MIME_TYPES, MAX_FILE_SIZE
+主要なエクスポート: ImageUploadUseCases, ALLOWED_MIME_TYPES, MAX_FILE_SIZE、S3ImageClient。
 呼び出し関係: images/router.py から呼ばれ、boto3 経由で S3 に書き込む。
 """
 

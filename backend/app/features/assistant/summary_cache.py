@@ -2,7 +2,7 @@
 
 責務: コンテンツとモデルIDのハッシュをキーとしてS3に要約を保存・取得する。
     キャッシュヒット時はBedrockを呼び出さないためトークン消費を抑制できる。
-主要なエクスポート: SummaryCache, get_summary_cache。
+主要なエクスポート: SummaryCache, S3SummaryCacheClient, get_summary_cache。
 呼び出し関係: gateway.py の BedrockGateway.summarize から呼ばれる。
 """
 

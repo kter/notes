@@ -12,6 +12,7 @@
  * 呼び出し関係: syncQueue、useNoteSyncEngine から使用される。
  */
 import { notesDB } from "@/lib/indexedDB";
+import { forgetNoteLocally } from "@/lib/sync/forgetNote";
 import { ApiError } from "@/lib/api";
 import type { Folder, Note, WorkspaceAppliedChange, WorkspaceSnapshotResponse } from "@/types";
 
@@ -86,7 +87,7 @@ export async function persistWorkspaceSnapshotIncremental(
       const note = notesById.get(id);
       if (!note) return Promise.resolve();
       return isDeletedEntity(note)
-        ? notesDB.deleteNote(id)
+        ? forgetNoteLocally(id)
         : notesDB.saveNote(withSnippet(note));
     }),
     ...[...appliedFolderIds].map((id) => {
@@ -121,7 +122,7 @@ export async function persistWorkspaceSnapshot(
       .map((folder) => notesDB.deleteFolder(folder.id)),
     ...snapshot.notes
       .filter(isDeletedEntity)
-      .map((note) => notesDB.deleteNote(note.id)),
+      .map((note) => forgetNoteLocally(note.id)),
   ]);
 
   setWorkspaceCursor(snapshot.cursor);

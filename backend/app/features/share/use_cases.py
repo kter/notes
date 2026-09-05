@@ -12,6 +12,7 @@ from uuid import UUID
 
 from sqlmodel import Session, select
 
+from app.core.persistence import is_soft_deleted
 from app.db_commit import commit_with_error_handling
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.logging_utils import log_event
@@ -108,7 +109,7 @@ class ShareUseCases:
                 raise ShareExpired("Share link has expired")
 
         note = self.session.get(Note, share.note_id)
-        if note is None or note.deleted_at is not None:
+        if note is None or is_soft_deleted(note):
             raise NotFound("Shared note not found")
 
         log_event(

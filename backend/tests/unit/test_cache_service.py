@@ -2,22 +2,17 @@ import hashlib
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.features.assistant.summary_cache import SummaryCache
+from app.features.assistant.summary_cache import (
+    SummaryCache,
+    _reset_summary_cache,
+    get_summary_cache,
+)
 
 
 class TestCacheService(unittest.TestCase):
     def setUp(self):
         self.mock_s3 = MagicMock()
-
-        self.boto3_client_patcher = patch("boto3.client")
-        self.mock_boto3_client = self.boto3_client_patcher.start()
-        self.mock_boto3_client.return_value = self.mock_s3
-
-        # Initialize service with mocked boto3
-        self.cache_service = SummaryCache()
-
-    def tearDown(self):
-        self.boto3_client_patcher.stop()
+        self.cache_service = SummaryCache(s3_client=self.mock_s3)
 
     def test_get_cached_summary_s3_hit(self):
         content = "test content"
@@ -67,3 +62,24 @@ class TestCacheService(unittest.TestCase):
             Key=content_hash,
             Body=summary.encode("utf-8"),
         )
+
+    def test_get_summary_cache_caches_until_reset(self):
+        first_cache = MagicMock()
+        second_cache = MagicMock()
+        _reset_summary_cache()
+
+        try:
+            with patch(
+                "app.features.assistant.summary_cache.SummaryCache",
+                side_effect=[first_cache, second_cache],
+            ) as cache_factory:
+                self.assertIs(get_summary_cache(), first_cache)
+                self.assertIs(get_summary_cache(), first_cache)
+                cache_factory.assert_called_once_with()
+
+                _reset_summary_cache()
+
+                self.assertIs(get_summary_cache(), second_cache)
+                self.assertEqual(cache_factory.call_count, 2)
+        finally:
+            _reset_summary_cache()

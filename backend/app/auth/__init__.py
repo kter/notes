@@ -1,6 +1,6 @@
 from app.auth.api_key_service import UserApiKeyService
 from app.auth.app_user_service import AppUserService
-from app.auth.cognito import cognito_verifier
+from app.auth.cognito import get_cognito_verifier
 from app.auth.dependencies import (
     AdminUser,
     CurrentAppUser,
@@ -17,7 +17,7 @@ from app.auth.dependencies import (
 __all__ = [
     "AppUserService",
     "UserApiKeyService",
-    "cognito_verifier",
+    "get_cognito_verifier",
     "get_folder_note_user_id",
     "get_current_app_user",
     "get_current_user",

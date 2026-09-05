@@ -3,10 +3,13 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from app.models import NoteShare
+from app.features.share.use_cases import ShareUseCases
+from app.models import Note, NoteShare
+from app.shared import NotFound
 from tests.conftest import TEST_USER_ID
 
 
@@ -133,6 +136,23 @@ class TestGetSharedNote:
         response = client.get(f"/api/shared/{fake_token}")
         assert response.status_code == 404
 
+    def test_get_soft_deleted_shared_note_returns_not_found(self, session: Session):
+        note = Note(
+            user_id=TEST_USER_ID,
+            title="Deleted",
+            content="Hidden",
+            deleted_at=datetime.now(UTC),
+        )
+        share = NoteShare(note_id=note.id)
+        session.add(note)
+        session.add(share)
+        session.commit()
+
+        with pytest.raises(NotFound) as exc_info:
+            ShareUseCases(session).get_shared_note(share.share_token)
+
+        assert exc_info.value.detail == "Shared note not found"
+
     def test_get_expired_shared_note_returns_410(
         self, client: TestClient, session: Session
     ):
@@ -182,3 +202,42 @@ class TestGetSharedNote:
 # test_cannot_delete_share_of_others_note) are covered by the shared ownership validation path
 # and tested in test_notes.py. The test fixture's make_client sharing global state prevents
 # reliable multi-user authorization tests in this context.
+
+
+class TestShareRoutesRequireAuth:
+    """認証必須の共有ルートが、依存の宣言だけで 401 を返すことを確認する。"""
+
+    def test_create_share_requires_authentication(
+        self, client_without_auth: TestClient
+    ):
+        response = client_without_auth.post(f"/api/notes/{uuid4()}/share")
+        assert response.status_code == 401
+
+    def test_get_share_requires_authentication(self, client_without_auth: TestClient):
+        response = client_without_auth.get(f"/api/notes/{uuid4()}/share")
+        assert response.status_code == 401
+
+    def test_delete_share_requires_authentication(
+        self, client_without_auth: TestClient
+    ):
+        response = client_without_auth.delete(f"/api/notes/{uuid4()}/share")
+        assert response.status_code == 401
+
+    def test_public_shared_note_route_stays_unauthenticated(
+        self, client_without_auth: TestClient
+    ):
+        """公開エンドポイントは認証を要求しない（404 であって 401 ではない）。"""
+        response = client_without_auth.get(f"/api/shared/{uuid4()}")
+        assert response.status_code == 404
+
+    def test_public_shared_note_is_readable_without_credentials(
+        self, client: TestClient, client_without_auth: TestClient
+    ):
+        """公開エンドポイントは資格情報なしで実際に 200 を返す。"""
+        note_id = client.post("/api/notes", json={"title": "Public"}).json()["id"]
+        token = client.post(f"/api/notes/{note_id}/share").json()["share_token"]
+
+        response = client_without_auth.get(f"/api/shared/{token}")
+
+        assert response.status_code == 200
+        assert response.json()["title"] == "Public"

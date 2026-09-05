@@ -1,7 +1,7 @@
 """Amazon Cognito JWT トークンの検証モジュール。
 
 責務: Cognito が発行した JWT をオンライン検証し、クレームを返す。
-主要なエクスポート: CognitoJWTVerifier クラス、cognito_verifier シングルトン。
+主要なエクスポート: CognitoJWTVerifier、get_cognito_verifier。
 呼び出し関係: app.auth.dependencies から呼ばれ、httpx / PyJWT を呼ぶ。
 """
 
@@ -14,8 +14,6 @@ import jwt
 
 from app.config import get_settings
 
-settings = get_settings()
-
 JWKS_CACHE_TTL_SECONDS = 3600
 
 
@@ -26,6 +24,7 @@ class CognitoJWTVerifier:
     """
 
     def __init__(self):
+        settings = get_settings()
         self.region = settings.cognito_region
         self.user_pool_id = settings.cognito_user_pool_id
         self.app_client_id = settings.cognito_app_client_id
@@ -80,6 +79,7 @@ class CognitoJWTVerifier:
         Raises:
             jwt.PyJWTError: 署名検証失敗・有効期限切れ・不正なトークン形式の場合。
         """
+        settings = get_settings()
         # ----------------------------------------------------------------------
         # 開発環境での結合テスト用バイパス
         #
@@ -154,5 +154,18 @@ class CognitoJWTVerifier:
             raise jwt.PyJWTError(f"Token verification failed: {e}")
 
 
-# モジュールレベルのシングルトン（アプリ全体で JWKS キャッシュを共有する）
-cognito_verifier = CognitoJWTVerifier()
+_cognito_verifier: CognitoJWTVerifier | None = None
+
+
+def get_cognito_verifier() -> CognitoJWTVerifier:
+    """初回利用時に生成したCognito検証器のシングルトンを返す。"""
+    global _cognito_verifier
+    if _cognito_verifier is None:
+        _cognito_verifier = CognitoJWTVerifier()
+    return _cognito_verifier
+
+
+def _reset_cognito_verifier_cache() -> None:
+    """テスト向けにCognito検証器のキャッシュを破棄する。"""
+    global _cognito_verifier
+    _cognito_verifier = None

@@ -1,4 +1,7 @@
 import asyncio
+import json
+import logging
+from datetime import datetime
 from uuid import UUID
 
 import pytest
@@ -6,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.features.assistant.errors import (
+    AI_EDIT_JOB_TIMEOUT_MESSAGE,
     AI_TIMEOUT_MESSAGE,
     TOKEN_LIMIT_EXCEEDED_MESSAGE,
 )
@@ -21,7 +25,7 @@ from app.features.assistant.job_runner import (
 )
 from app.features.assistant.usage_policy import get_or_create_current_period
 from app.main import app
-from app.models import MONTHLY_TOKEN_LIMIT, AIEditJob, Folder, Note
+from app.models import MONTHLY_TOKEN_LIMIT, AIEditJob, AIJob, Folder, Note
 from tests.conftest import TEST_USER_ID
 
 
@@ -43,9 +47,13 @@ def _run_ai_job(process_fn, job_id, session, ai_gateway):
 
 # Mock AI Service
 class MockAIGateway(AIGateway):
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
     ) -> tuple[str, int]:
+        self.calls.append("summarize")
         return f"Summary: {content[:10]}...", 20
 
     async def chat(
@@ -56,6 +64,7 @@ class MockAIGateway(AIGateway):
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
+        self.calls.append("chat")
         return f"Answer for '{question}' based on {len(content)} chars", 20
 
     async def edit(
@@ -65,6 +74,7 @@ class MockAIGateway(AIGateway):
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
+        self.calls.append("edit")
         return f"Edited: {content}", 30
 
 
@@ -74,6 +84,158 @@ def mock_ai_service():
     app.dependency_overrides[get_ai_gateway] = lambda: service
     yield service
     app.dependency_overrides.pop(get_ai_gateway, None)
+
+
+def _create_job_for_runner(
+    session: Session,
+    job_kind: str,
+    *,
+    status: str = "pending",
+    updated_at: datetime | None = None,
+):
+    """共通ランナーのテスト対象ジョブと公開処理関数を生成する。"""
+    if job_kind == "edit":
+        job = AIEditJob(
+            user_id="test-user-123",
+            content="Hello world",
+            instruction="Fix typos",
+            status=status,
+        )
+        process_fn = process_edit_job
+        gateway_call = "edit"
+    else:
+        note = Note(
+            title="Runner test note",
+            content="Content for runner tests",
+            user_id="test-user-123",
+        )
+        session.add(note)
+        session.flush()
+        job = AIJob(
+            user_id="test-user-123",
+            kind="summarize",
+            input=json.dumps({"note_id": str(note.id)}),
+            status=status,
+        )
+        process_fn = process_summarize_job
+        gateway_call = "summarize"
+
+    if updated_at is not None:
+        job.updated_at = updated_at
+    session.add(job)
+    session.commit()
+    return job, process_fn, gateway_call
+
+
+@pytest.mark.parametrize("job_kind", ["edit", "generic"])
+@pytest.mark.parametrize("status", ["running", "completed"])
+def test_ai_job_runner_skips_already_started_jobs(
+    session: Session,
+    mock_ai_service: MockAIGateway,
+    job_kind: str,
+    status: str,
+):
+    original_updated_at = datetime(2000, 1, 1)
+    job, process_fn, gateway_call = _create_job_for_runner(
+        session,
+        job_kind,
+        status=status,
+        updated_at=original_updated_at,
+    )
+
+    _run_ai_job(process_fn, str(job.id), session, mock_ai_service)
+
+    session.expire_all()
+    persisted_job = session.get(type(job), job.id)
+    assert persisted_job is not None
+    assert persisted_job.status == status
+    assert persisted_job.updated_at == original_updated_at
+    assert gateway_call not in mock_ai_service.calls
+
+
+@pytest.mark.parametrize("job_kind", ["edit", "generic"])
+def test_ai_job_runner_persists_timeout_failure(
+    session: Session,
+    mock_ai_service: MockAIGateway,
+    monkeypatch: pytest.MonkeyPatch,
+    job_kind: str,
+):
+    original_updated_at = datetime(2000, 1, 1)
+    job, process_fn, gateway_call = _create_job_for_runner(
+        session,
+        job_kind,
+        updated_at=original_updated_at,
+    )
+
+    async def raise_timeout(*args, **kwargs):
+        raise AIGatewayTimeoutError("timed out")
+
+    monkeypatch.setattr(mock_ai_service, gateway_call, raise_timeout)
+    _run_ai_job(process_fn, str(job.id), session, mock_ai_service)
+
+    session.expire_all()
+    persisted_job = session.get(type(job), job.id)
+    assert persisted_job is not None
+    assert persisted_job.status == "failed"
+    assert persisted_job.error_message == AI_EDIT_JOB_TIMEOUT_MESSAGE
+    assert persisted_job.completed_at is not None
+    assert persisted_job.updated_at > original_updated_at
+
+
+@pytest.mark.parametrize("job_kind", ["edit", "generic"])
+def test_ai_job_runner_refreshes_completion_timestamps_on_success(
+    session: Session,
+    mock_ai_service: MockAIGateway,
+    job_kind: str,
+):
+    original_updated_at = datetime(2000, 1, 1)
+    job, process_fn, _ = _create_job_for_runner(
+        session,
+        job_kind,
+        updated_at=original_updated_at,
+    )
+
+    _run_ai_job(process_fn, str(job.id), session, mock_ai_service)
+
+    session.expire_all()
+    persisted_job = session.get(type(job), job.id)
+    assert persisted_job is not None
+    assert persisted_job.status == "completed"
+    assert persisted_job.completed_at is not None
+    assert persisted_job.updated_at > original_updated_at
+
+
+@pytest.mark.parametrize(
+    ("process_fn", "expected_event"),
+    [
+        (process_edit_job, "ops.ai_edit_job.not_found"),
+        (process_summarize_job, "ops.ai_job.not_found"),
+    ],
+)
+def test_ai_job_runner_logs_missing_job(
+    session: Session,
+    mock_ai_service: MockAIGateway,
+    caplog: pytest.LogCaptureFixture,
+    process_fn,
+    expected_event: str,
+):
+    missing_job_id = UUID("00000000-0000-0000-0000-000000000000")
+
+    with caplog.at_level(logging.WARNING):
+        _run_ai_job(process_fn, str(missing_job_id), session, mock_ai_service)
+
+    matching_records = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == expected_event
+    ]
+    assert len(matching_records) == 1
+    assert matching_records[0].levelno == logging.WARNING
+    assert matching_records[0].details == {
+        "job_id": missing_job_id,
+        "outcome": "failure",
+    }
+    assert mock_ai_service.calls == []
 
 
 def test_summarize_note(

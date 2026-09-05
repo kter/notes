@@ -10,7 +10,11 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
 
-from app.auth.cognito import CognitoJWTVerifier
+from app.auth.cognito import (
+    CognitoJWTVerifier,
+    _reset_cognito_verifier_cache,
+    get_cognito_verifier,
+)
 from app.auth.dependencies import _verify_bearer_token
 
 
@@ -52,14 +56,38 @@ def rsa_key_pair():
 
 @pytest.fixture
 def mock_settings():
-    with patch("app.auth.cognito.settings") as mock_settings:
+    with patch("app.auth.cognito.get_settings") as get_settings:
+        mock_settings = Mock()
         mock_settings.cognito_region = "us-east-1"
         mock_settings.cognito_user_pool_id = "us-east-1_testpool"
         mock_settings.cognito_app_client_id = "test-client-id"
         mock_settings.environment = "prd"
         mock_settings.integration_test_bypass_token = ""
         mock_settings.integration_test_bypass_token_2 = ""
+        get_settings.return_value = mock_settings
         yield mock_settings
+
+
+def test_get_cognito_verifier_caches_until_reset():
+    first_verifier = Mock()
+    second_verifier = Mock()
+    _reset_cognito_verifier_cache()
+
+    try:
+        with patch(
+            "app.auth.cognito.CognitoJWTVerifier",
+            side_effect=[first_verifier, second_verifier],
+        ) as verifier_factory:
+            assert get_cognito_verifier() is first_verifier
+            assert get_cognito_verifier() is first_verifier
+            verifier_factory.assert_called_once_with()
+
+            _reset_cognito_verifier_cache()
+
+            assert get_cognito_verifier() is second_verifier
+            assert verifier_factory.call_count == 2
+    finally:
+        _reset_cognito_verifier_cache()
 
 
 @pytest.mark.asyncio
@@ -149,12 +177,11 @@ async def test_verify_token_rejects_non_id_token(rsa_key_pair, mock_settings):
 
 @pytest.mark.asyncio
 async def test_bearer_dependency_maps_pyjwt_error_to_401():
-    with patch(
-        "app.auth.dependencies.cognito_verifier.verify_token",
-        new=mock.AsyncMock(side_effect=jwt.PyJWTError("invalid token")),
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await _verify_bearer_token("invalid-token")
+    verifier = Mock()
+    verifier.verify_token = mock.AsyncMock(side_effect=jwt.PyJWTError("invalid token"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await _verify_bearer_token("invalid-token", verifier=verifier)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Invalid or expired token"

@@ -5,30 +5,30 @@ from unittest.mock import Mock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from app.features.assistant.gateway import EDIT_SINGLE_PASS_MAX_CHARS, BedrockGateway
+from app.features.assistant.gateway import (
+    EDIT_SINGLE_PASS_MAX_CHARS,
+    BedrockGateway,
+    _reset_ai_gateway_cache,
+    get_ai_gateway,
+)
 
 
 @pytest.fixture
 def mock_settings():
-    with patch("app.features.assistant.gateway.settings") as mock_settings:
-        mock_settings.aws_region = "us-east-1"
+    with patch("app.features.assistant.gateway.get_settings") as get_settings:
+        mock_settings = Mock()
+        mock_settings.bedrock_region = "us-east-1"
+        mock_settings.bedrock_model_id = "test-model"
+        get_settings.return_value = mock_settings
         yield mock_settings
 
 
 @pytest.fixture
 def mock_summary_cache():
-    """summarize() が実 S3 を触らないようにサマリキャッシュを差し替える。
-
-    `summary_cache.py` はモジュール読み込み時にシングルトンを生成し、その中で
-    `boto3.client("s3")` を作る。つまりテストのフィクスチャが `boto3.client` に
-    パッチを当てるより前にクライアントが出来上がっており、パッチをすり抜ける。
-    結果、これらのテストは AWS 認証情報のあるマシンでのみ通り、CI では
-    NoCredentialsError で落ちていた。ここを塞いでユニットテストを密閉する。
-    """
+    """summarize() が実 S3 を触らないように注入するキャッシュを返す。"""
     cache = Mock()
     cache.get_cached_summary.return_value = None
-    with patch("app.features.assistant.gateway.get_summary_cache", return_value=cache):
-        yield cache
+    return cache
 
 
 @pytest.fixture
@@ -39,9 +39,31 @@ def mock_boto_client():
         yield client_instance
 
 
+def test_get_ai_gateway_caches_until_reset():
+    first_gateway = Mock()
+    second_gateway = Mock()
+    _reset_ai_gateway_cache()
+
+    try:
+        with patch(
+            "app.features.assistant.gateway.BedrockGateway",
+            side_effect=[first_gateway, second_gateway],
+        ) as gateway_factory:
+            assert get_ai_gateway() is first_gateway
+            assert get_ai_gateway() is first_gateway
+            gateway_factory.assert_called_once_with()
+
+            _reset_ai_gateway_cache()
+
+            assert get_ai_gateway() is second_gateway
+            assert gateway_factory.call_count == 2
+    finally:
+        _reset_ai_gateway_cache()
+
+
 @pytest.mark.asyncio
 async def test_summarize_success(mock_boto_client, mock_settings, mock_summary_cache):
-    service = BedrockGateway()
+    service = BedrockGateway(summary_cache=mock_summary_cache)
 
     # Mock response from Bedrock
     mock_response_body = json.dumps(
@@ -62,20 +84,16 @@ async def test_summarize_success(mock_boto_client, mock_settings, mock_summary_c
 
     # Verify call args
     call_args = mock_boto_client.invoke_model.call_args[1]
-    # Check if modelId is correct (default from None in settings mock, assuming mock_settings allows usage)
-    # The code: effective_model_id = model_id or self.model_id
-    # mock_settings.bedrock_model_id calls. I need to make sure mock_settings has that attr
-    # Current mock_settings fixture only sets aws_region.
-    # Default behavior of MagicMock (settings) is to return Mocks for attributes.
-    # So self.model_id will be a Mock object.
-
     body = json.loads(call_args["body"])
     assert "Original content" in body["messages"][0]["content"]
+    mock_summary_cache.save_summary.assert_called_once_with(
+        "Original content", None, "This is a summary."
+    )
 
 
 @pytest.mark.asyncio
-async def test_chat_success(mock_boto_client, mock_settings):
-    service = BedrockGateway()
+async def test_chat_success(mock_boto_client, mock_settings, mock_summary_cache):
+    service = BedrockGateway(summary_cache=mock_summary_cache)
 
     mock_response_body = json.dumps(
         {
@@ -104,8 +122,8 @@ async def test_chat_success(mock_boto_client, mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_edit_success(mock_boto_client, mock_settings):
-    service = BedrockGateway()
+async def test_edit_success(mock_boto_client, mock_settings, mock_summary_cache):
+    service = BedrockGateway(summary_cache=mock_summary_cache)
 
     mock_response_body = json.dumps(
         {
@@ -133,8 +151,10 @@ async def test_edit_success(mock_boto_client, mock_settings):
 
 
 @pytest.mark.asyncio
-async def test_edit_fallback_no_tags(mock_boto_client, mock_settings):
-    service = BedrockGateway()
+async def test_edit_fallback_no_tags(
+    mock_boto_client, mock_settings, mock_summary_cache
+):
+    service = BedrockGateway(summary_cache=mock_summary_cache)
 
     mock_response_body = json.dumps(
         {
@@ -155,24 +175,22 @@ async def test_edit_fallback_no_tags(mock_boto_client, mock_settings):
 
 
 def test_extract_edited_content():
-    service = BedrockGateway()
-
     # With tags
-    result = service._extract_edited_content(
+    result = BedrockGateway._extract_edited_content(
         "Some preamble\n<edited_content>\nHello world\n</edited_content>\nSome postamble"
     )
     assert result == "Hello world"
 
     # Without tags (fallback)
-    result = service._extract_edited_content("Just plain text")
+    result = BedrockGateway._extract_edited_content("Just plain text")
     assert result == "Just plain text"
 
     # Empty tags
-    result = service._extract_edited_content("<edited_content></edited_content>")
+    result = BedrockGateway._extract_edited_content("<edited_content></edited_content>")
     assert result == ""
 
     # Preserve whitespace for chunk joins
-    result = service._extract_edited_content(
+    result = BedrockGateway._extract_edited_content(
         "<edited_content>\nHello world\n</edited_content>",
         preserve_whitespace=True,
     )
@@ -181,7 +199,7 @@ def test_extract_edited_content():
 
 @pytest.mark.asyncio
 async def test_bedrock_error(mock_boto_client, mock_settings, mock_summary_cache):
-    service = BedrockGateway()
+    service = BedrockGateway(summary_cache=mock_summary_cache)
 
     mock_boto_client.invoke_model.side_effect = ClientError(
         {"Error": {"Code": "ValidationException", "Message": "Bad request"}},
@@ -193,7 +211,6 @@ async def test_bedrock_error(mock_boto_client, mock_settings, mock_summary_cache
 
 
 def test_chunk_content_for_edit_preserves_text():
-    service = BedrockGateway()
     content = (
         "# Title\n\n"
         "Paragraph 1\n\n"
@@ -203,15 +220,17 @@ def test_chunk_content_for_edit_preserves_text():
         + ("Line in section B.\n" * 300)
     )
 
-    chunks = service._chunk_content_for_edit(content)
+    chunks = BedrockGateway._chunk_content_for_edit(content)
 
     assert len(chunks) > 1
     assert "".join(chunks) == content
 
 
 @pytest.mark.asyncio
-async def test_edit_large_content_uses_chunking(mock_boto_client, mock_settings):
-    service = BedrockGateway()
+async def test_edit_large_content_uses_chunking(
+    mock_boto_client, mock_settings, mock_summary_cache
+):
+    service = BedrockGateway(summary_cache=mock_summary_cache)
     content = "# Title\n\n" + ("teh quick brown fox.\n\n" * 1200)
     calls: list[str] = []
 

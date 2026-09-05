@@ -19,10 +19,9 @@ from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError
 from app.config import get_settings
 from app.core.prompts import get_prompt
 from app.features.assistant.schemas import BedrockMessage
-from app.features.assistant.summary_cache import get_summary_cache
+from app.features.assistant.summary_cache import SummaryCache, get_summary_cache
 from app.logging_utils import log_event
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 # Bedrock接続タイムアウト（秒）: ネットワーク確立までの上限
 BEDROCK_CONNECT_TIMEOUT_SECONDS = 5
@@ -76,7 +75,8 @@ class AIGateway(ABC):
 class BedrockGateway(AIGateway):
     """Amazon BedrockのClaude APIを使用する具体的なゲートウェイ実装。"""
 
-    def __init__(self):
+    def __init__(self, summary_cache: SummaryCache | None = None):
+        settings = get_settings()
         # Bedrockクライアントを初期化。タイムアウトはモジュール定数で制御する
         self.client = boto3.client(
             "bedrock-runtime",
@@ -88,6 +88,9 @@ class BedrockGateway(AIGateway):
             ),
         )
         self.model_id = settings.bedrock_model_id
+        self.summary_cache = (
+            summary_cache if summary_cache is not None else get_summary_cache()
+        )
 
     def _invoke_model(
         self,
@@ -153,8 +156,7 @@ class BedrockGateway(AIGateway):
         resolved_lang = self._resolve_language(language)
 
         # S3キャッシュを参照し、ヒットした場合はBedrockを呼び出さずにキャッシュを返す
-        summary_cache = get_summary_cache()
-        cached_summary = summary_cache.get_cached_summary(content, model_id)
+        cached_summary = self.summary_cache.get_cached_summary(content, model_id)
         if cached_summary:
             return cached_summary, 0  # キャッシュヒット: トークンは消費しない
 
@@ -168,7 +170,7 @@ class BedrockGateway(AIGateway):
 
         # Bedrockを呼び出して要約を生成し、結果をS3キャッシュに保存する
         summary, total_tokens = self._invoke_model(messages, system, model_id=model_id)
-        summary_cache.save_summary(content, model_id, summary)
+        self.summary_cache.save_summary(content, model_id, summary)
         return summary, total_tokens
 
     async def chat(
@@ -433,10 +435,18 @@ class BedrockGateway(AIGateway):
         return edited_content, total_tokens
 
 
-# モジュール起動時にシングルトンインスタンスを生成する
-bedrock_gateway = BedrockGateway()
+_ai_gateway: AIGateway | None = None
 
 
 def get_ai_gateway() -> AIGateway:
-    """アプリケーション全体で共有するAIゲートウェイのシングルトンを返す。"""
-    return bedrock_gateway
+    """初回利用時に生成したAIゲートウェイのシングルトンを返す。"""
+    global _ai_gateway
+    if _ai_gateway is None:
+        _ai_gateway = BedrockGateway()
+    return _ai_gateway
+
+
+def _reset_ai_gateway_cache() -> None:
+    """テスト向けにAIゲートウェイのキャッシュを破棄する。"""
+    global _ai_gateway
+    _ai_gateway = None

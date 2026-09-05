@@ -6,6 +6,7 @@
 """
 
 import uuid
+from typing import Protocol
 
 import boto3
 from botocore.exceptions import ClientError
@@ -26,6 +27,19 @@ MIME_TO_EXT = {
     "image/gif": "gif",
     "image/webp": "webp",
 }
+
+
+class S3ImageClient(Protocol):
+    """画像アップロードが利用するS3操作のインターフェース。"""
+
+    def put_object(
+        self,
+        *,
+        Bucket: str,
+        Key: str,
+        Body: bytes,
+        ContentType: str,
+    ) -> object: ...
 
 
 def _detect_mime_from_bytes(content: bytes) -> str | None:
@@ -52,6 +66,15 @@ def _detect_mime_from_bytes(content: bytes) -> str | None:
 
 class ImageUploadUseCases:
     """画像アップロードのアプリケーションユースケース。"""
+
+    def __init__(self, s3_client: S3ImageClient | None = None):
+        self._s3_client = s3_client
+
+    def _get_s3_client(self) -> S3ImageClient:
+        """初回アップロード時にS3クライアントを生成して返す。"""
+        if self._s3_client is None:
+            self._s3_client = boto3.client("s3")
+        return self._s3_client
 
     async def upload_image(self, file: UploadFile, user_id: str) -> str:
         """ファイルを検証して S3 に保存し、CDN URL を返す。"""
@@ -85,8 +108,7 @@ class ImageUploadUseCases:
         key = f"images/{user_id}/{uuid.uuid4()}.{ext}"
 
         try:
-            s3 = boto3.client("s3")
-            s3.put_object(
+            self._get_s3_client().put_object(
                 Bucket=settings.image_bucket_name,
                 Key=key,
                 Body=content,

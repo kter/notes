@@ -14,6 +14,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
+from typing import Protocol
 from uuid import UUID
 
 import boto3
@@ -43,6 +44,12 @@ PROCESS_CHAT_JOB_TASK = "process_ai_chat_job"
 EDIT_JOB_TOPIC_ARN_ENV = "AI_EDIT_JOB_TOPIC_ARN"
 
 
+class SNSPublisher(Protocol):
+    """AIジョブの通知に利用するSNS発行操作のインターフェース。"""
+
+    def publish(self, *, TopicArn: str, Message: str) -> object: ...
+
+
 def _get_session() -> Session:
     """DSQL エンジンから新しいデータベースセッションを生成して返す。"""
     return Session(get_dsql_engine())
@@ -61,6 +68,7 @@ async def dispatch_ai_job(
     job_id: UUID,
     task: str,
     background_tasks: BackgroundTasks | None = None,
+    publisher: SNSPublisher | None = None,
 ) -> None:
     """AI ジョブ（編集・要約・チャット）を SNS/SQS またはローカル実行へキューイングする。
 
@@ -70,7 +78,8 @@ async def dispatch_ai_job(
     topic_arn = os.getenv(EDIT_JOB_TOPIC_ARN_ENV)
 
     if topic_arn:
-        boto3.client("sns").publish(
+        publisher = publisher if publisher is not None else boto3.client("sns")
+        publisher.publish(
             TopicArn=topic_arn,
             Message=json.dumps({"task": task, "job_id": str(job_id)}),
         )
@@ -113,11 +122,16 @@ async def dispatch_ai_job(
 
 
 async def dispatch_edit_job(
-    job_id: UUID, background_tasks: BackgroundTasks | None = None
+    job_id: UUID,
+    background_tasks: BackgroundTasks | None = None,
+    publisher: SNSPublisher | None = None,
 ) -> None:
     """AI 編集ジョブをディスパッチする（dispatch_ai_job の編集用ラッパー）。"""
     await dispatch_ai_job(
-        job_id, PROCESS_EDIT_JOB_TASK, background_tasks=background_tasks
+        job_id,
+        PROCESS_EDIT_JOB_TASK,
+        background_tasks=background_tasks,
+        publisher=publisher,
     )
 
 

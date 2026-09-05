@@ -1,20 +1,29 @@
 """Tests for image upload endpoint."""
 
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 
 from app.auth import get_current_user, get_user_id
 from app.database import get_session
+from app.features.images.dependencies import get_image_upload_use_cases
+from app.features.images.use_cases import ImageUploadUseCases
 from app.main import app
 
 TEST_USER_ID = "test-user-123"
 
 
+@pytest.fixture(name="s3_client")
+def s3_client_fixture():
+    """画像アップロードに注入するS3クライアントを返す。"""
+    return MagicMock()
+
+
 @pytest.fixture(name="client")
-def client_fixture(session):
+def client_fixture(session, s3_client):
     """Create test client with mocked auth."""
 
     def get_session_override():
@@ -26,9 +35,15 @@ def client_fixture(session):
     def get_current_user_override() -> dict:
         return {"sub": TEST_USER_ID}
 
+    def get_image_upload_use_cases_override() -> ImageUploadUseCases:
+        return ImageUploadUseCases(s3_client=s3_client)
+
     app.dependency_overrides[get_session] = get_session_override
     app.dependency_overrides[get_user_id] = get_user_id_override
     app.dependency_overrides[get_current_user] = get_current_user_override
+    app.dependency_overrides[get_image_upload_use_cases] = (
+        get_image_upload_use_cases_override
+    )
 
     with TestClient(app) as client:
         yield client
@@ -37,13 +52,19 @@ def client_fixture(session):
 
 
 @pytest.fixture(name="unauthenticated_client")
-def unauthenticated_client_fixture(session):
+def unauthenticated_client_fixture(session, s3_client):
     """Create test client without auth override (no user)."""
 
     def get_session_override():
         yield session
 
+    def get_image_upload_use_cases_override() -> ImageUploadUseCases:
+        return ImageUploadUseCases(s3_client=s3_client)
+
     app.dependency_overrides[get_session] = get_session_override
+    app.dependency_overrides[get_image_upload_use_cases] = (
+        get_image_upload_use_cases_override
+    )
 
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
@@ -62,29 +83,44 @@ def make_png_bytes() -> bytes:
 
 
 class TestUploadImage:
-    def test_upload_valid_image_returns_url(self, client: TestClient):
+    def test_upload_valid_image_returns_url(
+        self, client: TestClient, s3_client: MagicMock
+    ):
         """Valid PNG upload should return 201 with a CDN URL."""
         png_bytes = make_png_bytes()
 
-        with patch("app.features.images.use_cases.boto3") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_boto3.client.return_value = mock_s3
-
-            response = client.post(
-                "/api/images",
-                files={"file": ("test.png", io.BytesIO(png_bytes), "image/png")},
-            )
+        response = client.post(
+            "/api/images",
+            files={"file": ("test.png", io.BytesIO(png_bytes), "image/png")},
+        )
 
         assert response.status_code == 201
         data = response.json()
         assert "url" in data
         assert data["url"].endswith(".png")
         # S3 key must start with "images/" so CloudFront path /images/* maps correctly
-        call_kwargs = mock_s3.put_object.call_args.kwargs
+        call_kwargs = s3_client.put_object.call_args.kwargs
         assert call_kwargs["Key"].startswith("images/")
         # CDN URL must not double the "images/" prefix
         assert data["url"].count("/images/") == 1
-        mock_s3.put_object.assert_called_once()
+        s3_client.put_object.assert_called_once()
+
+    def test_upload_s3_client_error_returns_500(
+        self, client: TestClient, s3_client: MagicMock
+    ):
+        """注入したS3クライアントの失敗をHTTP 500へ変換する。"""
+        s3_client.put_object.side_effect = ClientError(
+            {"Error": {"Code": "AccessDenied", "Message": "upload denied"}},
+            "PutObject",
+        )
+
+        response = client.post(
+            "/api/images",
+            files={"file": ("test.png", io.BytesIO(make_png_bytes()), "image/png")},
+        )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to upload image: upload denied"
 
     def test_upload_invalid_mime_type_returns_400(self, client: TestClient):
         """Non-image MIME type should return 400."""
@@ -114,14 +150,10 @@ class TestUploadImage:
         png_header = b"\x89PNG\r\n\x1a\n"
         exact_content = png_header + b"A" * (10 * 1024 * 1024 - len(png_header))
 
-        with patch("app.features.images.use_cases.boto3") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_boto3.client.return_value = mock_s3
-
-            response = client.post(
-                "/api/images",
-                files={"file": ("exact.png", io.BytesIO(exact_content), "image/png")},
-            )
+        response = client.post(
+            "/api/images",
+            files={"file": ("exact.png", io.BytesIO(exact_content), "image/png")},
+        )
 
         assert response.status_code == 201
 
@@ -142,14 +174,10 @@ class TestUploadImage:
         """JPEG upload should result in a .jpg extension in the URL."""
         jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 10  # minimal JPEG header
 
-        with patch("app.features.images.use_cases.boto3") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_boto3.client.return_value = mock_s3
-
-            response = client.post(
-                "/api/images",
-                files={"file": ("photo.jpg", io.BytesIO(jpeg_bytes), "image/jpeg")},
-            )
+        response = client.post(
+            "/api/images",
+            files={"file": ("photo.jpg", io.BytesIO(jpeg_bytes), "image/jpeg")},
+        )
 
         assert response.status_code == 201
         assert response.json()["url"].endswith(".jpg")
@@ -203,14 +231,10 @@ class TestUploadImage:
         # RIFF + 4-byte little-endian size + "WEBP" + minimal padding
         webp_bytes = b"RIFF" + b"\x24\x00\x00\x00" + b"WEBP" + b"VP8 " + b"\x00" * 20
 
-        with patch("app.features.images.use_cases.boto3") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_boto3.client.return_value = mock_s3
-
-            response = client.post(
-                "/api/images",
-                files={"file": ("img.webp", io.BytesIO(webp_bytes), "image/webp")},
-            )
+        response = client.post(
+            "/api/images",
+            files={"file": ("img.webp", io.BytesIO(webp_bytes), "image/webp")},
+        )
 
         assert response.status_code == 201
         assert response.json()["url"].endswith(".webp")
@@ -219,14 +243,10 @@ class TestUploadImage:
         """A minimal valid GIF (GIF89a) should pass magic-byte validation."""
         gif_bytes = b"GIF89a" + b"\x00" * 20
 
-        with patch("app.features.images.use_cases.boto3") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_boto3.client.return_value = mock_s3
-
-            response = client.post(
-                "/api/images",
-                files={"file": ("img.gif", io.BytesIO(gif_bytes), "image/gif")},
-            )
+        response = client.post(
+            "/api/images",
+            files={"file": ("img.gif", io.BytesIO(gif_bytes), "image/gif")},
+        )
 
         assert response.status_code == 201
         assert response.json()["url"].endswith(".gif")

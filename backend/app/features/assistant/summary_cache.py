@@ -8,6 +8,7 @@
 
 import hashlib
 import logging
+from typing import Protocol
 
 import boto3
 from botocore.exceptions import ClientError
@@ -16,15 +17,27 @@ from app.config import get_settings
 from app.logging_utils import log_event
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
+
+
+class S3SummaryCacheClient(Protocol):
+    """要約キャッシュが利用するS3操作のインターフェース。"""
+
+    def get_object(self, *, Bucket: str, Key: str) -> dict: ...
+
+    def put_object(self, *, Bucket: str, Key: str, Body: bytes) -> object: ...
 
 
 class SummaryCache:
     """S3を使った要約キャッシュ。キー = SHA256(content:model_id)。"""
 
-    def __init__(self):
+    def __init__(self, s3_client: S3SummaryCacheClient | None = None):
+        settings = get_settings()
         # S3クライアントをシングルトンで保持する
-        self.s3 = boto3.client("s3", region_name=settings.aws_region)
+        self.s3 = (
+            s3_client
+            if s3_client is not None
+            else boto3.client("s3", region_name=settings.aws_region)
+        )
         self.bucket = settings.cache_bucket_name
 
     def _calculate_hash(self, content: str, model_id: str) -> str:
@@ -103,10 +116,18 @@ class SummaryCache:
             )
 
 
-# モジュール起動時にシングルトンインスタンスを生成する
-summary_cache = SummaryCache()
+_summary_cache: SummaryCache | None = None
 
 
 def get_summary_cache() -> SummaryCache:
-    """アプリケーション全体で共有するSummaryCacheのシングルトンを返す。"""
-    return summary_cache
+    """初回利用時に生成したSummaryCacheのシングルトンを返す。"""
+    global _summary_cache
+    if _summary_cache is None:
+        _summary_cache = SummaryCache()
+    return _summary_cache
+
+
+def _reset_summary_cache() -> None:
+    """テスト向けにSummaryCacheのキャッシュを破棄する。"""
+    global _summary_cache
+    _summary_cache = None

@@ -5,7 +5,7 @@
  * エディタ入力ごとの不要な再レンダリングを防ぐ。
  *
  * 主なエクスポート:
- * - noteBodyStore: 命令的 API (get/set/delete/has/version/subscribe)
+ * - noteBodyStore: 命令的 API (get/resolve/set/delete/has/version/subscribe)
  * - useNoteBody: React コンポーネント向けフック (useSyncExternalStore ベース)
  *
  * アーキテクチャ上の重要な注意点:
@@ -57,6 +57,16 @@ export const noteBodyStore = {
    */
   has(id: string): boolean {
     return bodies.has(id);
+  },
+
+  /**
+   * 指定 noteId の本文を、未登録時のフォールバック付きで返す。
+   * id が null/undefined、または本文が未登録の場合は fallback を返す。
+   * 登録済みの空本文 "" はフォールバックせず、そのまま返す。
+   */
+  resolve(id: string | null | undefined, fallback: string): string {
+    if (id === null || id === undefined) return fallback;
+    return bodies.has(id) ? bodies.get(id)! : fallback;
   },
 
   /**

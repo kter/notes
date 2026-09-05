@@ -565,6 +565,7 @@ export function useNoteSyncEngine({
           return next;
         });
 
+        noteBodyStore.delete(id);
         await notesDB.deleteNote(id);
 
         if (navigator.onLine) {

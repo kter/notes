@@ -65,6 +65,27 @@ describe("noteBodyStore", () => {
     });
   });
 
+  describe("resolve", () => {
+    it("returns the fallback for an unknown id", () => {
+      expect(noteBodyStore.resolve("unknown", "fallback")).toBe("fallback");
+    });
+
+    it("returns the fallback when id is null or undefined", () => {
+      expect(noteBodyStore.resolve(null, "fallback")).toBe("fallback");
+      expect(noteBodyStore.resolve(undefined, "fallback")).toBe("fallback");
+    });
+
+    it("returns a stored empty string instead of the fallback", () => {
+      noteBodyStore.set("a", "");
+      expect(noteBodyStore.resolve("a", "fallback")).toBe("");
+    });
+
+    it("returns the stored body when present", () => {
+      noteBodyStore.set("a", "stored body");
+      expect(noteBodyStore.resolve("a", "fallback")).toBe("stored body");
+    });
+  });
+
   describe("version", () => {
     it("increments on set with new value", () => {
       const before = noteBodyStore.version();

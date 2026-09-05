@@ -32,6 +32,7 @@ import { useDebouncedAsync } from "./useDebouncedAsync";
 import { SYNC_RETRY_CONFIG } from "./syncConfig";
 import type { LocalSyncStatus, RemoteSyncStatus, SyncStatus } from "./types";
 import { noteBodyStore } from "./noteBodyStore";
+import { forgetNoteLocally } from "./forgetNote";
 
 const NOOP_SNAPSHOT_SYNC: (snapshot: WorkspaceSnapshotResponse) => void = () => {};
 
@@ -371,7 +372,7 @@ export function useNoteSyncEngine({
         setServerVersion(serverNote.id, serverNote.version);
         delete serverVersionByNoteIdRef.current[tempId];
 
-        await notesDB.deleteNote(tempId);
+        await forgetNoteLocally(tempId);
         await persistWorkspaceSnapshotIncremental(response.snapshot, response.applied);
         syncServerVersionsFromSnapshot(response.snapshot);
         handleSnapshotSynced(response.snapshot);
@@ -565,7 +566,7 @@ export function useNoteSyncEngine({
           return next;
         });
 
-        await notesDB.deleteNote(id);
+        await forgetNoteLocally(id);
 
         if (navigator.onLine) {
           try {

@@ -3,7 +3,7 @@
 責務: updated_at・version フィールドの管理と、ユーザー所有リソースの
     CRUD 基盤を提供する。
 主要なエクスポート: UserScopedRepository, utc_now, touch_updated_at,
-    bump_version, normalize_version
+    bump_version, normalize_version, is_soft_deleted
 呼び出し関係: NoteRepository・FolderRepository から継承され、
     app.db_commit を介してデータベースに書き込む。
 """
@@ -37,6 +37,13 @@ def normalize_version(resource: object) -> None:
         setattr(resource, "version", 1)
 
 
+def is_soft_deleted(resource: object) -> bool:
+    """リソースの `deleted_at` が非 NULL の場合に True を返す。"""
+    return (
+        hasattr(resource, "deleted_at") and getattr(resource, "deleted_at") is not None
+    )
+
+
 def bump_version(resource: object) -> None:
     """`version` フィールドを持つリソースのバージョンを 1 インクリメントする。"""
     if hasattr(resource, "version"):
@@ -58,11 +65,7 @@ class UserScopedRepository[TModel: SQLModel]:
         resource = self.session.get(self.model, resource_id)
         if resource is None or getattr(resource, "user_id", None) != self.user_id:
             raise NotFound(f"{self.resource_name} not found")
-        if (
-            not include_deleted
-            and hasattr(resource, "deleted_at")
-            and getattr(resource, "deleted_at") is not None
-        ):
+        if not include_deleted and is_soft_deleted(resource):
             raise NotFound(f"{self.resource_name} not found")
         normalize_version(resource)
         return resource

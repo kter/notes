@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlmodel import Session
 
 from app.db_commit import commit_with_error_handling
+from app.features.assistant.repositories import AIJobRepository
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     require_non_empty,
@@ -20,7 +21,6 @@ from app.features.assistant.use_cases.common import (
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIJob
 from app.models.enums import ChatScope
-from app.shared import NotFound
 
 
 class AIJobUseCases:
@@ -35,6 +35,7 @@ class AIJobUseCases:
         self.session = session
         self.user_id = user_id
         self.workspace_queries = workspace_queries
+        self.repository = AIJobRepository(session, user_id)
 
     def _create(self, kind: str, payload: dict) -> AIJob:
         """トークン制限チェック後に pending ジョブを永続化する共通処理。"""
@@ -90,7 +91,4 @@ class AIJobUseCases:
 
     def get_job(self, job_id: UUID) -> AIJob:
         """指定 ID の AI ジョブを取得する。所有者でない場合は NotFound を送出。"""
-        job = self.session.get(AIJob, job_id)
-        if job is None or job.user_id != self.user_id:
-            raise NotFound("AI job not found")
-        return job
+        return self.repository.get_owned(job_id)

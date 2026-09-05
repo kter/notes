@@ -4,12 +4,17 @@ from sqlmodel import Session
 from app.features.assistant.errors import AITokenLimitExceededError
 from app.features.assistant.gateway import AIGateway
 from app.features.assistant.usage_policy import get_usage_info, record_usage
-from app.features.assistant.use_cases import AIInteractionUseCases, EditJobUseCases
+from app.features.assistant.use_cases import (
+    AIInteractionUseCases,
+    AIJobUseCases,
+    EditJobUseCases,
+)
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import (
     AVAILABLE_MODELS,
     DEFAULT_LLM_MODEL_ID,
     AIEditJob,
+    AIJob,
     Note,
     UserSettings,
 )
@@ -178,6 +183,23 @@ def test_get_edit_job_enforces_user_scope(session: Session):
         use_cases.get_job(job.id)
 
     assert exc_info.value.detail == "Edit job not found"
+
+
+def test_get_ai_job_enforces_user_scope(session: Session):
+    job = AIJob(user_id=OTHER_USER_ID, kind="chat", input="{}")
+    session.add(job)
+    session.commit()
+
+    use_cases = AIJobUseCases(
+        session,
+        TEST_USER_ID,
+        WorkspaceQueryUseCases(session, TEST_USER_ID),
+    )
+
+    with pytest.raises(NotFound) as exc_info:
+        use_cases.get_job(job.id)
+
+    assert exc_info.value.detail == "AI job not found"
 
 
 @pytest.mark.asyncio

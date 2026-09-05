@@ -12,13 +12,13 @@ from uuid import UUID
 from sqlmodel import Session
 
 from app.db_commit import commit_with_error_handling
+from app.features.assistant.repositories import AIEditJobRepository
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     require_non_empty,
 )
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIEditJob, AIEditJobCreate
-from app.shared import NotFound
 
 
 class EditJobUseCases:
@@ -33,6 +33,7 @@ class EditJobUseCases:
         self.session = session
         self.user_id = user_id
         self.workspace_queries = workspace_queries
+        self.repository = AIEditJobRepository(session, user_id)
 
     def create_job(self, job_in: AIEditJobCreate) -> AIEditJob:
         """入力検証とトークン制限チェックを行い、pending 状態の AI 編集ジョブを作成する。"""
@@ -57,7 +58,4 @@ class EditJobUseCases:
 
     def get_job(self, job_id: UUID) -> AIEditJob:
         """指定 ID の AI 編集ジョブを取得する。所有者でない場合は NotFound を送出。"""
-        job = self.session.get(AIEditJob, job_id)
-        if job is None or job.user_id != self.user_id:
-            raise NotFound("Edit job not found")
-        return job
+        return self.repository.get_owned(job_id)

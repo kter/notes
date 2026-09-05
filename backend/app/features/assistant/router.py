@@ -88,7 +88,10 @@ async def create_summarize_job(
         _raise_ai_http_error(exc)
 
     await dispatch_ai_job(
-        job.id, PROCESS_SUMMARIZE_JOB_TASK, background_tasks=background_tasks
+        job.id,
+        job.user_id,
+        PROCESS_SUMMARIZE_JOB_TASK,
+        background_tasks=background_tasks,
     )
     return AIJobRead.model_validate(job)
 
@@ -118,7 +121,10 @@ async def create_chat_job(
         _raise_ai_http_error(exc)
 
     await dispatch_ai_job(
-        job.id, PROCESS_CHAT_JOB_TASK, background_tasks=background_tasks
+        job.id,
+        job.user_id,
+        PROCESS_CHAT_JOB_TASK,
+        background_tasks=background_tasks,
     )
     return AIJobRead.model_validate(job)
 
@@ -174,7 +180,7 @@ async def create_edit_job(
         _raise_ai_http_error(exc)
 
     # SNS/SQSまたはFastAPI BackgroundTasksを通じてジョブを非同期ディスパッチする
-    await dispatch_edit_job(job.id, background_tasks=background_tasks)
+    await dispatch_edit_job(job.id, job.user_id, background_tasks=background_tasks)
 
     return EditJobCreateResponse(job=AIEditJobRead.model_validate(job))
 

@@ -42,12 +42,12 @@ def _run_ai_job(process_fn, job_id, session, ai_gateway):
 # Mock AI Service
 class MockAIGateway(AIGateway):
     def __init__(self) -> None:
-        self.calls = {"summarize": 0, "chat": 0, "edit": 0}
+        self.calls: list[str] = []
 
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
     ) -> tuple[str, int]:
-        self.calls["summarize"] += 1
+        self.calls.append("summarize")
         return f"Summary: {content[:10]}...", 20
 
     async def chat(
@@ -58,7 +58,7 @@ class MockAIGateway(AIGateway):
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
-        self.calls["chat"] += 1
+        self.calls.append("chat")
         return f"Answer for '{question}' based on {len(content)} chars", 20
 
     async def edit(
@@ -68,7 +68,7 @@ class MockAIGateway(AIGateway):
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
-        self.calls["edit"] += 1
+        self.calls.append("edit")
         return f"Edited: {content}", 30
 
 
@@ -144,7 +144,7 @@ def test_ai_job_runner_skips_already_started_jobs(
     assert persisted_job is not None
     assert persisted_job.status == status
     assert persisted_job.updated_at == original_updated_at
-    assert mock_ai_service.calls[gateway_call] == 0
+    assert gateway_call not in mock_ai_service.calls
 
 
 @pytest.mark.parametrize("job_kind", ["edit", "generic"])
@@ -229,7 +229,7 @@ def test_ai_job_runner_logs_missing_job(
         "job_id": missing_job_id,
         "outcome": "failure",
     }
-    assert mock_ai_service.calls == {"summarize": 0, "chat": 0, "edit": 0}
+    assert mock_ai_service.calls == []
 
 
 def test_summarize_note(

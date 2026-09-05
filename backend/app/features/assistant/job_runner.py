@@ -31,12 +31,14 @@ from app.features.assistant.errors import (
     AITokenLimitExceededError,
 )
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
+from app.features.assistant.repositories import AIEditJobRepository, AIJobRepository
 from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.use_cases import AIInteractionUseCases
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.logging_utils import log_event
 from app.models import AIEditJob, AIJob
 from app.models.enums import ChatScope
+from app.shared import NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,7 @@ class AIJobRecordSpec:
     """
 
     model: type
+    repository_cls: type
     event_prefix: str
     extra_log_fields: Callable[[Any], dict[str, Any]]
     apply_result: Callable[[Any, str], None]
@@ -83,12 +86,14 @@ def _apply_ai_job_result(job: AIJob, result: str) -> None:
 
 AI_EDIT_JOB_SPEC = AIJobRecordSpec(
     model=AIEditJob,
+    repository_cls=AIEditJobRepository,
     event_prefix="ops.ai_edit_job",
     extra_log_fields=_edit_job_log_fields,
     apply_result=_apply_edit_result,
 )
 AI_JOB_SPEC = AIJobRecordSpec(
     model=AIJob,
+    repository_cls=AIJobRepository,
     event_prefix="ops.ai_job",
     extra_log_fields=_ai_job_log_fields,
     apply_result=_apply_ai_job_result,
@@ -109,8 +114,50 @@ def _task_handlers() -> dict:
     }
 
 
+def _assert_job_owner(
+    session: Session,
+    job,
+    *,
+    expected_user_id: str | None,
+    repository_cls,
+    task: str,
+):
+    """キューメッセージが主張する所有者と行の所有者が一致することを確認する。
+
+    一致すればリポジトリ経由で取得し直した行を返す。一致しなければ None を返し、
+    呼び出し元はジョブを処理してはならない。expected_user_id が None の場合は
+    主張自体が無いため、警告を残したうえで従来どおり処理を継続する（デプロイ時に
+    キューへ滞留している旧形式メッセージのための移行措置）。
+    """
+    if expected_user_id is None:
+        log_event(
+            logger,
+            logging.WARNING,
+            "ops.ai_job.owner_assertion_missing",
+            job_id=job.id,
+            task=task,
+            outcome="warning",
+            reason="missing_expected_user_id",
+        )
+        return job
+
+    try:
+        return repository_cls(session, expected_user_id).get_owned(job.id)
+    except NotFound:
+        log_event(
+            logger,
+            logging.ERROR,
+            "ops.ai_job.owner_mismatch",
+            job_id=job.id,
+            task=task,
+            outcome="error",
+        )
+        return None
+
+
 async def dispatch_ai_job(
     job_id: UUID,
+    user_id: str,
     task: str,
     background_tasks: BackgroundTasks | None = None,
 ) -> None:
@@ -124,7 +171,9 @@ async def dispatch_ai_job(
     if topic_arn:
         boto3.client("sns").publish(
             TopicArn=topic_arn,
-            Message=json.dumps({"task": task, "job_id": str(job_id)}),
+            Message=json.dumps(
+                {"task": task, "job_id": str(job_id), "user_id": user_id}
+            ),
         )
         log_event(
             logger,
@@ -140,7 +189,7 @@ async def dispatch_ai_job(
     process_fn = _task_handlers()[task]
 
     if background_tasks is not None:
-        background_tasks.add_task(process_fn, job_id)
+        background_tasks.add_task(process_fn, job_id, expected_user_id=user_id)
         log_event(
             logger,
             logging.INFO,
@@ -161,21 +210,24 @@ async def dispatch_ai_job(
         dispatch_mode="inline",
         outcome="running",
     )
-    await process_fn(job_id)
+    await process_fn(job_id, expected_user_id=user_id)
 
 
 async def dispatch_edit_job(
-    job_id: UUID, background_tasks: BackgroundTasks | None = None
+    job_id: UUID,
+    user_id: str,
+    background_tasks: BackgroundTasks | None = None,
 ) -> None:
     """AI 編集ジョブをディスパッチする（dispatch_ai_job の編集用ラッパー）。"""
     await dispatch_ai_job(
-        job_id, PROCESS_EDIT_JOB_TASK, background_tasks=background_tasks
+        job_id, user_id, PROCESS_EDIT_JOB_TASK, background_tasks=background_tasks
     )
 
 
 async def process_edit_job(
     job_id: UUID | str,
     *,
+    expected_user_id: str | None = None,
     session_factory=_get_session,
     ai_gateway: AIGateway | None = None,
 ) -> None:
@@ -191,6 +243,8 @@ async def process_edit_job(
         job_id,
         AI_EDIT_JOB_SPEC,
         run,
+        PROCESS_EDIT_JOB_TASK,
+        expected_user_id=expected_user_id,
         session_factory=session_factory,
         ai_gateway=ai_gateway,
     )
@@ -200,7 +254,9 @@ async def _run_ai_job(
     job_id: UUID | str,
     kind: AIJobRecordSpec,
     run_call: Callable[[AIInteractionUseCases, Any], Awaitable[tuple[str, int]]],
+    task: str,
     *,
+    expected_user_id: str | None = None,
     session_factory=_get_session,
     ai_gateway: AIGateway | None = None,
 ) -> None:
@@ -209,10 +265,9 @@ async def _run_ai_job(
     run_call(use_cases, job) は (結果テキスト, 消費トークン数) を返す async 呼び出し。
     トークン計上は AIInteractionUseCases 内で行われる。
     """
-    ai_gateway = ai_gateway or get_ai_gateway()
-
+    resource_id = UUID(job_id) if isinstance(job_id, str) else job_id
     with session_factory() as session:
-        job = session.get(kind.model, job_id)
+        job = session.get(kind.model, resource_id)
         if job is None:
             log_event(
                 logger,
@@ -223,9 +278,21 @@ async def _run_ai_job(
             )
             return
 
+        job = _assert_job_owner(
+            session,
+            job,
+            expected_user_id=expected_user_id,
+            repository_cls=kind.repository_cls,
+            task=task,
+        )
+        if job is None:
+            return
+
         # 二重実行を防ぐ冪等ガード
         if job.status in {"running", "completed"}:
             return
+
+        ai_gateway = ai_gateway or get_ai_gateway()
 
         job.status = "running"
         job.started_at = datetime.now(UTC)
@@ -311,6 +378,7 @@ async def _run_ai_job(
 async def process_summarize_job(
     job_id: UUID | str,
     *,
+    expected_user_id: str | None = None,
     session_factory=_get_session,
     ai_gateway: AIGateway | None = None,
 ) -> None:
@@ -324,6 +392,8 @@ async def process_summarize_job(
         job_id,
         AI_JOB_SPEC,
         run,
+        PROCESS_SUMMARIZE_JOB_TASK,
+        expected_user_id=expected_user_id,
         session_factory=session_factory,
         ai_gateway=ai_gateway,
     )
@@ -332,6 +402,7 @@ async def process_summarize_job(
 async def process_chat_job(
     job_id: UUID | str,
     *,
+    expected_user_id: str | None = None,
     session_factory=_get_session,
     ai_gateway: AIGateway | None = None,
 ) -> None:
@@ -355,6 +426,8 @@ async def process_chat_job(
         job_id,
         AI_JOB_SPEC,
         run,
+        PROCESS_CHAT_JOB_TASK,
+        expected_user_id=expected_user_id,
         session_factory=session_factory,
         ai_gateway=ai_gateway,
     )
@@ -401,7 +474,7 @@ async def process_edit_job_queue_records(
             if not job_id:
                 raise ValueError("Queue message is missing job_id")
 
-            await process_job_fn(job_id)
+            await process_job_fn(job_id, expected_user_id=payload.get("user_id"))
         except Exception:
             log_event(
                 logger,

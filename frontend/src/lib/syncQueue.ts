@@ -10,6 +10,7 @@
  */
 
 import { notesDB, type PendingChange, type SyncOperationType } from "./indexedDB";
+import { forgetNoteLocally } from "./sync/forgetNote";
 import { ApiError } from "./api";
 import {
   getWorkspaceSyncRequestMetadata,
@@ -239,7 +240,7 @@ class SyncQueueManager {
     for (const change of changes) {
       if (change.type === "create" && change.entityId.startsWith("temp-")) {
         if (change.entityType === "note") {
-          await notesDB.deleteNote(change.entityId);
+          await forgetNoteLocally(change.entityId);
         } else {
           await notesDB.deleteFolder(change.entityId);
         }

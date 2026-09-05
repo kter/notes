@@ -5,6 +5,7 @@ import { EditorPanel } from './EditorPanel'
 import type { Note } from '@/types'
 import { calculateHash } from '@/lib/utils'
 import { useApi } from '@/hooks/useApi'
+import { noteBodyStore } from '@/lib/sync'
 
 // Mock react-markdown
 vi.mock('react-markdown', () => ({
@@ -155,11 +156,13 @@ describe('EditorPanel', () => {
   }
 
   beforeEach(() => {
+    noteBodyStore.delete(mockNote.id)
     localStorage.clear()
     setViewportWidth(1280)
   })
 
   afterEach(() => {
+    noteBodyStore.delete(mockNote.id)
     localStorage.clear()
     setViewportWidth(1280)
     document.body.classList.remove('printing-note-preview')
@@ -170,6 +173,16 @@ describe('EditorPanel', () => {
 
     const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
     expect(textarea.value).toBe('Initial content')
+  })
+
+  it('prefers a newer unsaved body from noteBodyStore over stale note content', () => {
+    noteBodyStore.set(mockNote.id, 'newer unsaved text')
+    const staleNote = { ...mockNote, content: 'stale server text' }
+
+    render(<EditorPanel {...defaultProps} note={staleNote} />)
+
+    const textarea = screen.getByRole('textbox', { name: /content/i }) as HTMLTextAreaElement
+    expect(textarea.value).toBe('newer unsaved text')
   })
 
   it('disables content field sizing for the editor textarea', () => {

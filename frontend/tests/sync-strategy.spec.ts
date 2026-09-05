@@ -92,7 +92,7 @@ test.describe('Sync Strategy', () => {
     // Type in title
     await titleInput.fill('Sync Test Note');
     // Note: fill triggers input event, which triggers debounced update in EditorPanel (500ms)
-    // Then useNotes debounces server sync (5000ms)
+    // Then useNoteSyncEngine debounces server sync (5000ms)
 
     // Wait for the UI debounce (500ms) + small buffer
     await page.waitForTimeout(1000);

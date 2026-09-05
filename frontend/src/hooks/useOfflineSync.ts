@@ -8,7 +8,7 @@
  * 主なエクスポート:
  * - useOfflineSync: isOnline / syncStatus / pendingChangesCount / forceSync などを返す
  *
- * 呼び出し関係: useWorkspaceSyncState から呼ばれる。
+ * 呼び出し関係: useWorkspaceState から呼ばれる。
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";

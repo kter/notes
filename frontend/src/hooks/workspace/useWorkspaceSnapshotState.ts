@@ -9,7 +9,7 @@
  * - useWorkspaceSnapshotState: folders / setFolders / notes / setNotes /
  *                               isLoading / applySnapshot を返す
  *
- * 呼び出し関係: useWorkspaceSyncState および useHomeData から呼ばれる。
+ * 呼び出し関係: useWorkspaceState および useHomeData から呼ばれる。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 

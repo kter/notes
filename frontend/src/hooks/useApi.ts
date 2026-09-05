@@ -7,7 +7,7 @@
  * 主なエクスポート:
  * - useApi: 認証トークン付きAPIクライアントを返すフック
  *
- * 呼び出し関係: useFolders / useNotes / useOfflineSync など API を呼ぶすべてのフックから使用される。
+ * 呼び出し関係: useFolders / useNoteSyncEngine / useOfflineSync など API を呼ぶすべてのフックから使用される。
  */
 
 import { useCallback, useMemo } from "react";

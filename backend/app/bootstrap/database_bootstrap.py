@@ -2,7 +2,7 @@
 
 責務: Alembic マイグレーションの適用、レガシースキーマのハンドオフ、DSQL対応を行う。
 主要なエクスポート: DatabaseSchemaBootstrapper, RequestDatabaseInitializer,
-    create_database_schema, run_cold_start_database_bootstrap
+    create_database_schema, bootstrap_database_schema, run_cold_start_database_bootstrap
 呼び出し関係: アプリ起動時・リクエストミドルウェアから呼ばれ、SQLAlchemy/Alembic を呼ぶ。
 """
 
@@ -373,6 +373,19 @@ def create_database_schema(
 ) -> None:
     """DatabaseSchemaBootstrapper を生成して run() を呼ぶ便利関数。"""
     DatabaseSchemaBootstrapper(engine_factory, logger=logger).run()
+
+
+def bootstrap_database_schema() -> None:
+    """既定の DSQL エンジンファクトリでスキーマブートストラップを実行する。
+
+    エンジンの提供元は app.database、ブートストラップ方針はこのモジュールという
+    ADR 0002 の分担を保ったまま、呼び出し側が毎回同じ引数を組み立てずに済むようにする。
+    ログのロガー名は従来どおり app.database を維持する。
+    """
+    from app.database import get_dsql_engine
+    from app.database import logger as database_logger
+
+    create_database_schema(get_dsql_engine, logger=database_logger)
 
 
 def run_cold_start_database_bootstrap(

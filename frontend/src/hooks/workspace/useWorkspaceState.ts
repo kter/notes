@@ -115,10 +115,8 @@ export function useWorkspaceState(isAuthenticated: boolean) {
   }, []);
 
   const getCurrentEditorContent = useCallback((): string => {
-    return (
-      (nav.selectedNoteId && noteBodyStore.get(nav.selectedNoteId)) ||
-      editorContentRef.current
-    );
+    // resolve を使うことで、意図的に空にされた本文が ref のフォールバックに落ちない。
+    return noteBodyStore.resolve(nav.selectedNoteId, editorContentRef.current);
   }, [nav.selectedNoteId]);
 
   return {

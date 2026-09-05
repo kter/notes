@@ -66,7 +66,8 @@ export const noteBodyStore = {
    */
   resolve(id: string | null | undefined, fallback: string): string {
     if (id === null || id === undefined) return fallback;
-    return bodies.has(id) ? bodies.get(id)! : fallback;
+    const body = bodies.get(id);
+    return body === undefined ? fallback : body;
   },
 
   /**

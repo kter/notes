@@ -3,10 +3,13 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from app.models import NoteShare
+from app.features.share.use_cases import ShareUseCases
+from app.models import Note, NoteShare
+from app.shared import NotFound
 from tests.conftest import TEST_USER_ID
 
 
@@ -132,6 +135,23 @@ class TestGetSharedNote:
         fake_token = str(uuid4())
         response = client.get(f"/api/shared/{fake_token}")
         assert response.status_code == 404
+
+    def test_get_soft_deleted_shared_note_returns_not_found(self, session: Session):
+        note = Note(
+            user_id=TEST_USER_ID,
+            title="Deleted",
+            content="Hidden",
+            deleted_at=datetime.now(UTC),
+        )
+        share = NoteShare(note_id=note.id)
+        session.add(note)
+        session.add(share)
+        session.commit()
+
+        with pytest.raises(NotFound) as exc_info:
+            ShareUseCases(session).get_shared_note(share.share_token)
+
+        assert exc_info.value.detail == "Shared note not found"
 
     def test_get_expired_shared_note_returns_410(
         self, client: TestClient, session: Session

@@ -37,9 +37,13 @@ def _run_ai_job(process_fn, job_id, session, ai_gateway):
 
 # Mock AI Service
 class MockAIGateway(AIGateway):
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
     async def summarize(
         self, content: str, model_id: str | None = None, language: str = "auto"
     ) -> tuple[str, int]:
+        self.calls.append("summarize")
         return f"Summary: {content[:10]}...", 20
 
     async def chat(
@@ -50,6 +54,7 @@ class MockAIGateway(AIGateway):
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
+        self.calls.append("chat")
         return f"Answer for '{question}' based on {len(content)} chars", 20
 
     async def edit(
@@ -59,6 +64,7 @@ class MockAIGateway(AIGateway):
         model_id: str | None = None,
         language: str = "auto",
     ) -> tuple[str, int]:
+        self.calls.append("edit")
         return f"Edited: {content}", 30
 
 

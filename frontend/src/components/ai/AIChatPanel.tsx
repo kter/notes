@@ -212,6 +212,7 @@ export const AIChatPanel = memo(function AIChatPanel({
           "fixed md:relative inset-0 md:inset-auto w-full z-40 md:z-auto bg-background md:bg-transparent pb-14 md:pb-0"
         )}
         style={width ? { width: `${width}px` } : { width: '320px' }}
+        data-sentry-block
       >
       {/* Header */}
       <div className="p-4 border-b border-border/50">

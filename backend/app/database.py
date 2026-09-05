@@ -22,8 +22,6 @@ from app.logging_utils import log_event
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-settings = get_settings()
-
 _engine = None
 
 
@@ -43,6 +41,7 @@ def get_dsql_engine():
         )
         return _engine
 
+    settings = get_settings()
     dsql_endpoint = os.environ.get("DSQL_CLUSTER_ENDPOINT")
 
     if dsql_endpoint:

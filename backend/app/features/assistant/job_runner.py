@@ -5,7 +5,7 @@
     レコード種別ごとの差分は AIJobRecordSpec が保持する。
 主要なエクスポート: dispatch_ai_job, dispatch_edit_job, process_edit_job,
     process_summarize_job, process_chat_job, run_edit_job_from_event,
-    run_edit_job_queue_records, process_edit_job_queue_records
+    run_edit_job_queue_records, process_edit_job_queue_records、SNSPublisher。
 呼び出し関係: FastAPI ルーターおよび Lambda ハンドラから呼ばれ、
     AIInteractionUseCases を通じて AI ゲートウェイを実行する。
 """
@@ -17,7 +17,7 @@ import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 import boto3
@@ -47,6 +47,12 @@ PROCESS_SUMMARIZE_JOB_TASK = "process_ai_summarize_job"
 PROCESS_CHAT_JOB_TASK = "process_ai_chat_job"
 # 全ジョブ種別が共有する SNS トピック（編集ジョブ用に作成済みのものを再利用）
 EDIT_JOB_TOPIC_ARN_ENV = "AI_EDIT_JOB_TOPIC_ARN"
+
+
+class SNSPublisher(Protocol):
+    """AIジョブの通知に利用するSNS発行操作のインターフェース。"""
+
+    def publish(self, *, TopicArn: str, Message: str) -> object: ...
 
 
 @dataclass(frozen=True)
@@ -160,6 +166,7 @@ async def dispatch_ai_job(
     user_id: str,
     task: str,
     background_tasks: BackgroundTasks | None = None,
+    publisher: SNSPublisher | None = None,
 ) -> None:
     """AI ジョブ（編集・要約・チャット）を SNS/SQS またはローカル実行へキューイングする。
 
@@ -169,7 +176,8 @@ async def dispatch_ai_job(
     topic_arn = os.getenv(EDIT_JOB_TOPIC_ARN_ENV)
 
     if topic_arn:
-        boto3.client("sns").publish(
+        publisher = publisher if publisher is not None else boto3.client("sns")
+        publisher.publish(
             TopicArn=topic_arn,
             Message=json.dumps(
                 {"task": task, "job_id": str(job_id), "user_id": user_id}
@@ -217,10 +225,15 @@ async def dispatch_edit_job(
     job_id: UUID,
     user_id: str,
     background_tasks: BackgroundTasks | None = None,
+    publisher: SNSPublisher | None = None,
 ) -> None:
     """AI 編集ジョブをディスパッチする（dispatch_ai_job の編集用ラッパー）。"""
     await dispatch_ai_job(
-        job_id, user_id, PROCESS_EDIT_JOB_TASK, background_tasks=background_tasks
+        job_id,
+        user_id,
+        PROCESS_EDIT_JOB_TASK,
+        background_tasks=background_tasks,
+        publisher=publisher,
     )
 
 

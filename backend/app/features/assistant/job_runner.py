@@ -1,10 +1,11 @@
-"""AI 編集ジョブのディスパッチと処理ランナー。
+"""AI ジョブ（編集・要約・チャット）のディスパッチと処理ランナー。
 
-責務: AI 編集ジョブを SNS/SQS またはローカルバックグラウンドタスクで
-    実行し、結果をデータベースに永続化する。
-主要なエクスポート: dispatch_edit_job, process_edit_job,
-    run_edit_job_from_event, run_edit_job_queue_records,
-    process_edit_job_queue_records
+責務: AI ジョブを SNS/SQS またはローカルバックグラウンドタスクで実行し、
+    結果をデータベースに永続化する。状態機械は _run_ai_job に一本化され、
+    レコード種別ごとの差分は AIJobRecordSpec が保持する。
+主要なエクスポート: dispatch_ai_job, dispatch_edit_job, process_edit_job,
+    process_summarize_job, process_chat_job, run_edit_job_from_event,
+    run_edit_job_queue_records, process_edit_job_queue_records
 呼び出し関係: FastAPI ルーターおよび Lambda ハンドラから呼ばれ、
     AIInteractionUseCases を通じて AI ゲートウェイを実行する。
 """
@@ -47,8 +48,12 @@ EDIT_JOB_TOPIC_ARN_ENV = "AI_EDIT_JOB_TOPIC_ARN"
 
 
 @dataclass(frozen=True)
-class AIJobKind:
-    """ジョブ種別ごとに異なる永続化・ログ出力方法を表す記述子。"""
+class AIJobRecordSpec:
+    """ジョブレコードの種類ごとに異なる永続化・ログ出力方法を表す記述子。
+
+    app.models の AIJobKind（"summarize" | "chat"）とは別概念であることに注意。
+    こちらはどのテーブルの行を扱うかを表す。
+    """
 
     model: type
     event_prefix: str
@@ -56,8 +61,8 @@ class AIJobKind:
     apply_result: Callable[[Any, str], None]
 
 
-def _no_extra_log_fields(job: Any) -> dict[str, Any]:
-    """AI 編集ジョブ向けの空の追加ログフィールドを返す。"""
+def _edit_job_log_fields(job: Any) -> dict[str, Any]:
+    """AI 編集ジョブの追加ログフィールドを返す。編集ジョブには kind が無いため空。"""
     return {}
 
 
@@ -76,13 +81,13 @@ def _apply_ai_job_result(job: AIJob, result: str) -> None:
     job.result = result
 
 
-AI_EDIT_JOB_KIND = AIJobKind(
+AI_EDIT_JOB_SPEC = AIJobRecordSpec(
     model=AIEditJob,
     event_prefix="ops.ai_edit_job",
-    extra_log_fields=_no_extra_log_fields,
+    extra_log_fields=_edit_job_log_fields,
     apply_result=_apply_edit_result,
 )
-AI_JOB_KIND = AIJobKind(
+AI_JOB_SPEC = AIJobRecordSpec(
     model=AIJob,
     event_prefix="ops.ai_job",
     extra_log_fields=_ai_job_log_fields,
@@ -184,7 +189,7 @@ async def process_edit_job(
 
     await _run_ai_job(
         job_id,
-        AI_EDIT_JOB_KIND,
+        AI_EDIT_JOB_SPEC,
         run,
         session_factory=session_factory,
         ai_gateway=ai_gateway,
@@ -193,7 +198,7 @@ async def process_edit_job(
 
 async def _run_ai_job(
     job_id: UUID | str,
-    kind: AIJobKind,
+    kind: AIJobRecordSpec,
     run_call: Callable[[AIInteractionUseCases, Any], Awaitable[tuple[str, int]]],
     *,
     session_factory=_get_session,
@@ -317,7 +322,7 @@ async def process_summarize_job(
 
     await _run_ai_job(
         job_id,
-        AI_JOB_KIND,
+        AI_JOB_SPEC,
         run,
         session_factory=session_factory,
         ai_gateway=ai_gateway,
@@ -348,7 +353,7 @@ async def process_chat_job(
 
     await _run_ai_job(
         job_id,
-        AI_JOB_KIND,
+        AI_JOB_SPEC,
         run,
         session_factory=session_factory,
         ai_gateway=ai_gateway,

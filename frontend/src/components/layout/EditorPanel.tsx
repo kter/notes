@@ -21,7 +21,7 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toggleMarkdownCheckbox } from "@/lib/markdownCheckboxToggle";
-import type { SyncStatus } from "@/hooks/useNotes";
+import type { SyncStatus } from "@/lib/sync";
 import { calculateHash, cn } from "@/lib/utils";
 import { createPortal, flushSync } from "react-dom";
 import { EditorToolbar } from "./EditorToolbar";

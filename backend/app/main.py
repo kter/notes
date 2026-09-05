@@ -16,8 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.bootstrap import RequestDatabaseInitializer
+from app.bootstrap.database_bootstrap import create_database_schema
 from app.config import get_settings
-from app.database import create_db_and_tables, get_session
+from app.database import get_dsql_engine, get_session
 from app.features import admin, assistant, images, settings, share
 from app.features.workspace import (
     changes_router,
@@ -104,7 +105,9 @@ async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
     )
 
 
-database_initializer = RequestDatabaseInitializer(create_db_and_tables)
+database_initializer = RequestDatabaseInitializer(
+    lambda: create_database_schema(get_dsql_engine, logger=logger)
+)
 
 
 @app.middleware("http")

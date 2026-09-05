@@ -1,9 +1,9 @@
 """Aurora DSQL およびローカル開発向けのデータベース接続設定モジュール。
 
 責務: SQLModel エンジンの生成とセッション提供。
-主要なエクスポート: get_dsql_engine, create_db_and_tables, get_session。
-呼び出し関係: lambda_handler / worker_lambda_handler から初期化時に呼ばれ、
-    各ルーターでは FastAPI の Depends(get_session) 経由で使用される。
+主要なエクスポート: get_dsql_engine, get_session。
+呼び出し関係: bootstrap/database_bootstrap からエンジン生成時に呼ばれ、各ルーターでは
+    FastAPI の Depends(get_session) 経由で使用される。
 """
 
 import logging
@@ -15,7 +15,6 @@ import boto3
 import psycopg2
 from sqlmodel import Session, create_engine
 
-from app.bootstrap.database_bootstrap import create_database_schema
 from app.config import get_settings
 from app.logging_utils import log_event
 
@@ -176,14 +175,6 @@ def get_dsql_engine():
         )
 
     return _engine
-
-
-def create_db_and_tables() -> None:
-    """ハンドラーおよびテストから呼ばれるスキーマ初期化の互換ラッパー。
-
-    実装は app.bootstrap.database_bootstrap.create_database_schema に委譲する。
-    """
-    create_database_schema(get_dsql_engine, logger=logger)
 
 
 def get_session() -> Generator[Session, None, None]:

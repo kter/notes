@@ -426,7 +426,7 @@ test-external-api: ## Run external folder/note API key regressions
 
 .PHONY: test-sync
 test-sync: ## Run frontend sync and offline regression tests
-	cd frontend && bun run test --run src/hooks/useHomeData.test.ts src/hooks/useNotes.test.ts src/hooks/useOfflineSync.test.ts src/lib/syncQueue.test.ts src/lib/merge.test.ts
+	cd frontend && bun run test --run src/hooks/useHomeData.test.ts src/lib/sync/useNoteSyncEngine.test.ts src/hooks/useOfflineSync.test.ts src/lib/syncQueue.test.ts src/lib/merge.test.ts
 
 .PHONY: test-ai-regression
 test-ai-regression: ## Run backend AI regression tests

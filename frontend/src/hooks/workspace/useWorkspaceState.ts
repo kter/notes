@@ -3,8 +3,9 @@
 /**
  * ワークスペース全体の状態・データ・操作を合成するルートフック。
  *
- * 実際の状態は責務ごとに分割された 4 つのスライスが保持する:
- * - useWorkspaceSyncState     : データ層（folders / notes / 同期ステータス）
+ * 実際の状態は責務ごとに分割されたフックが保持する:
+ * - useWorkspaceSnapshotState : データ層（folders / notes）
+ * - useOfflineSync            : オフライン同期ステータス
  * - useWorkspaceUIState       : パネル開閉・モバイルビュー・チャット幅
  * - useWorkspaceNavigationState: 選択・検索・URL 同期・絞り込み
  * - useWorkspaceAIState       : チャット・トークン使用量・AI 編集
@@ -20,28 +21,33 @@
 import { useCallback, useRef } from "react";
 
 import { useFolders } from "@/hooks/useFolders";
-import { useNotes } from "@/hooks/useNotes";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { useNoteSyncEngine } from "@/lib/sync";
 import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 
 import { useWorkspaceAIState } from "./useWorkspaceAIState";
 import { useWorkspaceNavigationState } from "./useWorkspaceNavigationState";
-import { useWorkspaceSyncState } from "./useWorkspaceSyncState";
+import { useWorkspaceSnapshotState } from "./useWorkspaceSnapshotState";
 import { useWorkspaceUIState } from "./useWorkspaceUIState";
 
 export function useWorkspaceState(isAuthenticated: boolean) {
-  // データ層: フォルダ・ノート・同期ステータス
+  // データ層: フォルダ・ノート
   const {
     folders,
     setFolders,
     notes,
     setNotes,
     isLoading: isDataLoading,
+    applySnapshot,
+  } = useWorkspaceSnapshotState(isAuthenticated);
+
+  // オフライン同期層: スナップショット再適用・同期ステータス
+  const {
     isOnline,
     syncStatus: offlineSyncStatus,
     lastErrorMessage: offlineSyncErrorMessage,
     pendingChangesCount,
-    applySnapshot,
-  } = useWorkspaceSyncState(isAuthenticated);
+  } = useOfflineSync({ onSnapshotSynced: applySnapshot });
 
   // UI 層: パネル開閉・モバイルビュー・チャット幅
   const ui = useWorkspaceUIState();
@@ -69,14 +75,13 @@ export function useWorkspaceState(isAuthenticated: boolean) {
     handleDeleteNote,
     triggerServerSync,
     savedHashes,
-  } = useNotes(
-    notes,
+  } = useNoteSyncEngine({
     setNotes,
-    nav.selectedFolderId,
-    nav.selectedNoteId,
-    nav.handleSelectNote,
-    { onSnapshotSynced: applySnapshot }
-  );
+    selectedFolderId: nav.selectedFolderId,
+    selectedNoteId: nav.selectedNoteId,
+    setSelectedNoteId: nav.handleSelectNote,
+    onSnapshotSynced: applySnapshot,
+  });
 
   // AI 層: チャット・トークン使用量・AI 編集（ノート更新と UI トグルへ橋渡し）
   const ai = useWorkspaceAIState({

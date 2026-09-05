@@ -5,6 +5,7 @@ from app.shared.errors import (
     NotFound,
     QuotaExceeded,
     ShareExpired,
+    UpstreamTimeout,
     ValidationFailed,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "NotFound",
     "QuotaExceeded",
     "ShareExpired",
+    "UpstreamTimeout",
     "ValidationFailed",
 ]

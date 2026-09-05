@@ -15,7 +15,7 @@ import { Clock } from "@/components/Clock";
 import { WeatherWidget } from "@/components/WeatherWidget";
 import { TokenUsageIndicator } from "@/components/TokenUsageIndicator";
 import type { TokenUsageRead } from "@/types";
-import type { SyncStatus } from "@/hooks/useNotes";
+import type { SyncStatus } from "@/lib/sync";
 import {
   Tooltip,
   TooltipContent,

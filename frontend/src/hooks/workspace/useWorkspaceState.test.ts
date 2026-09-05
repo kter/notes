@@ -1,9 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const useWorkspaceSyncStateMock = vi.fn();
+const useWorkspaceSnapshotStateMock = vi.fn();
+const useOfflineSyncMock = vi.fn();
 const useFoldersMock = vi.fn();
-const useNotesMock = vi.fn();
+const useNoteSyncEngineMock = vi.fn();
 const useTokenUsageMock = vi.fn();
 const useAIChatMock = vi.fn();
 const useResizableMock = vi.fn();
@@ -18,16 +19,21 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
-vi.mock("./useWorkspaceSyncState", () => ({
-  useWorkspaceSyncState: (...args: unknown[]) => useWorkspaceSyncStateMock(...args),
+vi.mock("./useWorkspaceSnapshotState", () => ({
+  useWorkspaceSnapshotState: (...args: unknown[]) =>
+    useWorkspaceSnapshotStateMock(...args),
+}));
+
+vi.mock("@/hooks/useOfflineSync", () => ({
+  useOfflineSync: (...args: unknown[]) => useOfflineSyncMock(...args),
 }));
 
 vi.mock("@/hooks/useFolders", () => ({
   useFolders: (...args: unknown[]) => useFoldersMock(...args),
 }));
 
-vi.mock("@/hooks/useNotes", () => ({
-  useNotes: (...args: unknown[]) => useNotesMock(...args),
+vi.mock("@/lib/sync", () => ({
+  useNoteSyncEngine: (...args: unknown[]) => useNoteSyncEngineMock(...args),
 }));
 
 vi.mock("@/hooks/useTokenUsage", () => ({
@@ -54,7 +60,7 @@ describe("useWorkspaceState", () => {
     searchParamsStub.delete("note");
     searchParamsStub.delete("folder");
 
-    useWorkspaceSyncStateMock.mockReturnValue({
+    useWorkspaceSnapshotStateMock.mockReturnValue({
       folders: [{ id: "folder-1", name: "Folder 1" }],
       setFolders: vi.fn(),
       notes: [
@@ -70,6 +76,8 @@ describe("useWorkspaceState", () => {
       ],
       setNotes: vi.fn(),
       isLoading: false,
+    });
+    useOfflineSyncMock.mockReturnValue({
       isOnline: true,
       syncStatus: "idle",
       lastErrorMessage: null,
@@ -80,7 +88,7 @@ describe("useWorkspaceState", () => {
       handleRenameFolder: vi.fn(),
       handleDeleteFolder: vi.fn(),
     });
-    useNotesMock.mockReturnValue({
+    useNoteSyncEngineMock.mockReturnValue({
       syncStatus: { local: "saved", remote: "synced", isSaving: false },
       handleCreateNote: vi.fn(),
       handleUpdateNote: vi.fn(),
@@ -136,7 +144,7 @@ describe("useWorkspaceState", () => {
     const handleUpdateNote = vi.fn();
     const handleAcceptEdit = vi.fn().mockReturnValue("AI edited content");
 
-    useNotesMock.mockReturnValue({
+    useNoteSyncEngineMock.mockReturnValue({
       syncStatus: { local: "saved", remote: "synced", isSaving: false },
       handleCreateNote: vi.fn(),
       handleUpdateNote,
@@ -188,7 +196,7 @@ describe("useWorkspaceState", () => {
     const handleUpdateNote = vi.fn();
     const handleAcceptEdit = vi.fn().mockReturnValue("Edited content");
 
-    useNotesMock.mockReturnValue({
+    useNoteSyncEngineMock.mockReturnValue({
       syncStatus: { local: "saved", remote: "synced", isSaving: false },
       handleCreateNote: vi.fn(),
       handleUpdateNote,
@@ -243,7 +251,7 @@ describe("useWorkspaceState", () => {
   it("scopes contentOverride to the note it was created for and clears it on note switch", () => {
     const handleAcceptEdit = vi.fn().mockReturnValue("Edited content");
 
-    useNotesMock.mockReturnValue({
+    useNoteSyncEngineMock.mockReturnValue({
       syncStatus: { local: "saved", remote: "synced", isSaving: false },
       handleCreateNote: vi.fn(),
       handleUpdateNote: vi.fn(),
@@ -445,16 +453,12 @@ describe("useWorkspaceState", () => {
 
     it("skips URL hydration while data is loading", () => {
       searchParamsStub.set("note", "note-1");
-      useWorkspaceSyncStateMock.mockReturnValue({
+      useWorkspaceSnapshotStateMock.mockReturnValue({
         folders: [],
         setFolders: vi.fn(),
         notes: [],
         setNotes: vi.fn(),
         isLoading: true,
-        isOnline: true,
-        syncStatus: "idle",
-        lastErrorMessage: null,
-        pendingChangesCount: 0,
         applySnapshot: vi.fn(),
       });
 

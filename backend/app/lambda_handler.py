@@ -9,8 +9,7 @@ import logging
 
 from mangum import Mangum
 
-from app.bootstrap import run_cold_start_database_bootstrap
-from app.database import create_db_and_tables
+from app.bootstrap import bootstrap_database_schema, run_cold_start_database_bootstrap
 from app.logging_utils import configure_logging
 from app.main import app
 
@@ -21,7 +20,7 @@ logger.setLevel(logging.INFO)
 
 # コールドスタート時にDBスキーマを初期化
 run_cold_start_database_bootstrap(
-    initialize_database=create_db_and_tables,
+    initialize_database=bootstrap_database_schema,
     logger=logger,
     context_label="Lambda cold start",
 )

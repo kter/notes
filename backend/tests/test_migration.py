@@ -7,7 +7,7 @@ from sqlalchemy import inspect, text
 from sqlmodel import create_engine
 from sqlmodel.pool import StaticPool
 
-from app.database import create_db_and_tables
+from app.bootstrap import bootstrap_database_schema
 
 
 def _get_alembic_head() -> str:
@@ -55,7 +55,7 @@ def test_migration_bootstraps_legacy_schema_and_stamps_head():
         conn.commit()
 
     with patch("app.database.get_dsql_engine", return_value=engine):
-        create_db_and_tables()
+        bootstrap_database_schema()
 
     inspector = inspect(engine)
     user_settings_columns = {
@@ -93,7 +93,7 @@ def test_migration_applies_initial_revision_to_fresh_db():
     engine = _make_engine()
 
     with patch("app.database.get_dsql_engine", return_value=engine):
-        create_db_and_tables()
+        bootstrap_database_schema()
 
     inspector = inspect(engine)
     expected_tables = {
@@ -131,7 +131,7 @@ def test_migration_bootstraps_fresh_db_for_dsql_runtime():
 
     with patch("app.database.get_dsql_engine", return_value=engine):
         with patch.dict(os.environ, {"DSQL_CLUSTER_ENDPOINT": "test-cluster"}):
-            create_db_and_tables()
+            bootstrap_database_schema()
 
     inspector = inspect(engine)
     assert "alembic_version" in inspector.get_table_names()
@@ -195,7 +195,7 @@ def test_migration_bootstraps_existing_dsql_revision_to_head():
 
     with patch("app.database.get_dsql_engine", return_value=engine):
         with patch.dict(os.environ, {"DSQL_CLUSTER_ENDPOINT": "test-cluster"}):
-            create_db_and_tables()
+            bootstrap_database_schema()
 
     inspector = inspect(engine)
     assert "ai_edit_jobs" in inspector.get_table_names()
@@ -222,8 +222,8 @@ def test_migration_idempotent():
     engine = _make_engine()
 
     with patch("app.database.get_dsql_engine", return_value=engine):
-        create_db_and_tables()
-        create_db_and_tables()
+        bootstrap_database_schema()
+        bootstrap_database_schema()
 
     with engine.connect() as conn:
         version = conn.execute(

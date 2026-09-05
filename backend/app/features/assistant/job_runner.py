@@ -1,10 +1,11 @@
-"""AI 編集ジョブのディスパッチと処理ランナー。
+"""AI ジョブ（編集・要約・チャット）のディスパッチと処理ランナー。
 
-責務: AI 編集ジョブを SNS/SQS またはローカルバックグラウンドタスクで
-    実行し、結果をデータベースに永続化する。
-主要なエクスポート: dispatch_edit_job, process_edit_job,
-    run_edit_job_from_event, run_edit_job_queue_records,
-    process_edit_job_queue_records
+責務: AI ジョブを SNS/SQS またはローカルバックグラウンドタスクで実行し、
+    結果をデータベースに永続化する。状態機械は _run_ai_job に一本化され、
+    レコード種別ごとの差分は AIJobRecordSpec が保持する。
+主要なエクスポート: dispatch_ai_job, dispatch_edit_job, process_edit_job,
+    process_summarize_job, process_chat_job, run_edit_job_from_event,
+    run_edit_job_queue_records, process_edit_job_queue_records
 呼び出し関係: FastAPI ルーターおよび Lambda ハンドラから呼ばれ、
     AIInteractionUseCases を通じて AI ゲートウェイを実行する。
 """
@@ -13,7 +14,10 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import boto3
@@ -41,6 +45,54 @@ PROCESS_SUMMARIZE_JOB_TASK = "process_ai_summarize_job"
 PROCESS_CHAT_JOB_TASK = "process_ai_chat_job"
 # 全ジョブ種別が共有する SNS トピック（編集ジョブ用に作成済みのものを再利用）
 EDIT_JOB_TOPIC_ARN_ENV = "AI_EDIT_JOB_TOPIC_ARN"
+
+
+@dataclass(frozen=True)
+class AIJobRecordSpec:
+    """ジョブレコードの種類ごとに異なる永続化・ログ出力方法を表す記述子。
+
+    app.models の AIJobKind（"summarize" | "chat"）とは別概念であることに注意。
+    こちらはどのテーブルの行を扱うかを表す。
+    """
+
+    model: type
+    event_prefix: str
+    extra_log_fields: Callable[[Any], dict[str, Any]]
+    apply_result: Callable[[Any, str], None]
+
+
+def _edit_job_log_fields(job: Any) -> dict[str, Any]:
+    """AI 編集ジョブの追加ログフィールドを返す。編集ジョブには kind が無いため空。"""
+    return {}
+
+
+def _ai_job_log_fields(job: AIJob) -> dict[str, Any]:
+    """汎用 AI ジョブの種別ログフィールドを返す。"""
+    return {"kind": job.kind}
+
+
+def _apply_edit_result(job: AIEditJob, result: str) -> None:
+    """AI 編集ジョブへ編集結果を設定する。"""
+    job.edited_content = result
+
+
+def _apply_ai_job_result(job: AIJob, result: str) -> None:
+    """汎用 AI ジョブへ実行結果を設定する。"""
+    job.result = result
+
+
+AI_EDIT_JOB_SPEC = AIJobRecordSpec(
+    model=AIEditJob,
+    event_prefix="ops.ai_edit_job",
+    extra_log_fields=_edit_job_log_fields,
+    apply_result=_apply_edit_result,
+)
+AI_JOB_SPEC = AIJobRecordSpec(
+    model=AIJob,
+    event_prefix="ops.ai_job",
+    extra_log_fields=_ai_job_log_fields,
+    apply_result=_apply_ai_job_result,
+)
 
 
 def _get_session() -> Session:
@@ -128,125 +180,44 @@ async def process_edit_job(
     ai_gateway: AIGateway | None = None,
 ) -> None:
     """AI 編集ジョブを処理し、ポーリングクライアント向けに結果を永続化する。"""
-    ai_gateway = ai_gateway or get_ai_gateway()
 
-    with session_factory() as session:
-        job = session.get(AIEditJob, job_id)
-        if job is None:
-            log_event(
-                logger,
-                logging.WARNING,
-                "ops.ai_edit_job.not_found",
-                job_id=job_id,
-                outcome="failure",
-            )
-            return
-
-        # 二重実行を防ぐ冪等ガード
-        if job.status in {"running", "completed"}:
-            return
-
-        job.status = "running"
-        job.started_at = datetime.now(UTC)
-        job.updated_at = job.started_at
-        session.add(job)
-        session.commit()
-        log_event(
-            logger,
-            logging.INFO,
-            "ops.ai_edit_job.started",
-            job_id=job.id,
-            outcome="running",
+    async def run(use_cases: AIInteractionUseCases, job: AIEditJob) -> tuple[str, int]:
+        return await use_cases.execute_edit(
+            content=job.content,
+            instruction=job.instruction,
         )
 
-        try:
-            workspace_queries = WorkspaceQueryUseCases(session, job.user_id)
-            interaction_use_cases = AIInteractionUseCases(
-                session=session,
-                user_id=job.user_id,
-                ai_gateway=ai_gateway,
-                workspace_queries=workspace_queries,
-            )
-            edited_content, tokens_used = await interaction_use_cases.execute_edit(
-                content=job.content,
-                instruction=job.instruction,
-            )
-
-            job.status = "completed"
-            job.edited_content = edited_content
-            job.tokens_used = tokens_used
-            job.error_message = None
-            log_event(
-                logger,
-                logging.INFO,
-                "ops.ai_edit_job.completed",
-                job_id=job.id,
-                tokens_used=tokens_used,
-                outcome="success",
-            )
-        except AIApplicationTimeoutError:
-            job.status = "failed"
-            job.error_message = AI_EDIT_JOB_TIMEOUT_MESSAGE
-            log_event(
-                logger,
-                logging.ERROR,
-                "ops.ai_edit_job.failed",
-                job_id=job.id,
-                outcome="timeout",
-                reason="ai_timeout",
-            )
-        except AITokenLimitExceededError as exc:
-            job.status = "failed"
-            job.error_message = str(exc)
-            log_event(
-                logger,
-                logging.WARNING,
-                "ops.ai_edit_job.failed",
-                job_id=job.id,
-                outcome="failure",
-                reason="token_limit_exceeded",
-            )
-        except Exception as exc:
-            log_event(
-                logger,
-                logging.ERROR,
-                "ops.ai_edit_job.failed",
-                job_id=job_id,
-                outcome="error",
-                reason=exc.__class__.__name__,
-                exc_info=True,
-            )
-            job.status = "failed"
-            job.error_message = str(exc)
-        finally:
-            now = datetime.now(UTC)
-            job.completed_at = now if job.status in {"completed", "failed"} else None
-            job.updated_at = now
-            session.add(job)
-            session.commit()
+    await _run_ai_job(
+        job_id,
+        AI_EDIT_JOB_SPEC,
+        run,
+        session_factory=session_factory,
+        ai_gateway=ai_gateway,
+    )
 
 
-async def _process_ai_job(
+async def _run_ai_job(
     job_id: UUID | str,
-    run_call,
+    kind: AIJobRecordSpec,
+    run_call: Callable[[AIInteractionUseCases, Any], Awaitable[tuple[str, int]]],
     *,
     session_factory=_get_session,
     ai_gateway: AIGateway | None = None,
 ) -> None:
-    """汎用 AI ジョブ（要約・チャット）を処理し結果を永続化する共通ランナー。
+    """AI ジョブを処理し結果を永続化する共通状態機械。
 
-    run_call(use_cases, params) は (結果テキスト, 消費トークン数) を返す async 呼び出し。
+    run_call(use_cases, job) は (結果テキスト, 消費トークン数) を返す async 呼び出し。
     トークン計上は AIInteractionUseCases 内で行われる。
     """
     ai_gateway = ai_gateway or get_ai_gateway()
 
     with session_factory() as session:
-        job = session.get(AIJob, job_id)
+        job = session.get(kind.model, job_id)
         if job is None:
             log_event(
                 logger,
                 logging.WARNING,
-                "ops.ai_job.not_found",
+                f"{kind.event_prefix}.not_found",
                 job_id=job_id,
                 outcome="failure",
             )
@@ -264,14 +235,13 @@ async def _process_ai_job(
         log_event(
             logger,
             logging.INFO,
-            "ops.ai_job.started",
+            f"{kind.event_prefix}.started",
             job_id=job.id,
-            kind=job.kind,
+            **kind.extra_log_fields(job),
             outcome="running",
         )
 
         try:
-            params = json.loads(job.input)
             workspace_queries = WorkspaceQueryUseCases(session, job.user_id)
             interaction_use_cases = AIInteractionUseCases(
                 session=session,
@@ -279,18 +249,18 @@ async def _process_ai_job(
                 ai_gateway=ai_gateway,
                 workspace_queries=workspace_queries,
             )
-            result, tokens_used = await run_call(interaction_use_cases, params)
+            result, tokens_used = await run_call(interaction_use_cases, job)
 
             job.status = "completed"
-            job.result = result
+            kind.apply_result(job, result)
             job.tokens_used = tokens_used
             job.error_message = None
             log_event(
                 logger,
                 logging.INFO,
-                "ops.ai_job.completed",
+                f"{kind.event_prefix}.completed",
                 job_id=job.id,
-                kind=job.kind,
+                **kind.extra_log_fields(job),
                 tokens_used=tokens_used,
                 outcome="success",
             )
@@ -300,9 +270,9 @@ async def _process_ai_job(
             log_event(
                 logger,
                 logging.ERROR,
-                "ops.ai_job.failed",
+                f"{kind.event_prefix}.failed",
                 job_id=job.id,
-                kind=job.kind,
+                **kind.extra_log_fields(job),
                 outcome="timeout",
                 reason="ai_timeout",
             )
@@ -312,9 +282,9 @@ async def _process_ai_job(
             log_event(
                 logger,
                 logging.WARNING,
-                "ops.ai_job.failed",
+                f"{kind.event_prefix}.failed",
                 job_id=job.id,
-                kind=job.kind,
+                **kind.extra_log_fields(job),
                 outcome="failure",
                 reason="token_limit_exceeded",
             )
@@ -322,7 +292,7 @@ async def _process_ai_job(
             log_event(
                 logger,
                 logging.ERROR,
-                "ops.ai_job.failed",
+                f"{kind.event_prefix}.failed",
                 job_id=job_id,
                 outcome="error",
                 reason=exc.__class__.__name__,
@@ -346,11 +316,16 @@ async def process_summarize_job(
 ) -> None:
     """キュー済みの要約ジョブを処理する。"""
 
-    async def run(use_cases: AIInteractionUseCases, params: dict):
+    async def run(use_cases: AIInteractionUseCases, job: AIJob) -> tuple[str, int]:
+        params = json.loads(job.input)
         return await use_cases.summarize_note(UUID(params["note_id"]))
 
-    await _process_ai_job(
-        job_id, run, session_factory=session_factory, ai_gateway=ai_gateway
+    await _run_ai_job(
+        job_id,
+        AI_JOB_SPEC,
+        run,
+        session_factory=session_factory,
+        ai_gateway=ai_gateway,
     )
 
 
@@ -362,7 +337,8 @@ async def process_chat_job(
 ) -> None:
     """キュー済みのチャットジョブを処理する。"""
 
-    async def run(use_cases: AIInteractionUseCases, params: dict):
+    async def run(use_cases: AIInteractionUseCases, job: AIJob) -> tuple[str, int]:
+        params = json.loads(job.input)
         raw_history = params.get("history") or []
         # gateway.chat は各メッセージで .model_dump() を呼ぶため BedrockMessage に復元する
         history = [BedrockMessage(**msg) for msg in raw_history] or None
@@ -375,8 +351,12 @@ async def process_chat_job(
             selected_content=params.get("selected_content"),
         )
 
-    await _process_ai_job(
-        job_id, run, session_factory=session_factory, ai_gateway=ai_gateway
+    await _run_ai_job(
+        job_id,
+        AI_JOB_SPEC,
+        run,
+        session_factory=session_factory,
+        ai_gateway=ai_gateway,
     )
 
 

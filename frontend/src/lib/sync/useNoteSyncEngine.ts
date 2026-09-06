@@ -497,11 +497,11 @@ export function useNoteSyncEngine({
         });
         try {
           if (noteForLocalSave) {
-            // For metadata-only changes: noteBodyStore may have a newer body than notes[]
-            // (because isContentOnly saves update the store but not notes[]).
-            // Use the store value as the authoritative body for the IDB record.
+            // 本文の優先順位は noteBodyStore が持つ。ストアに無いノート
+            // (今セッションで開いていない) では undefined が返り、IndexedDB に
+            // 残っている本文をそのまま使う。ここで "" を書くと本文が消える。
             const latestBody =
-              bodyOnly ?? noteBodyStore.get(id) ?? noteForLocalSave.content ?? "";
+              bodyOnly ?? noteBodyStore.bodyForPersist(id) ?? noteForLocalSave.content ?? "";
             const updatedNote = {
               ...noteForLocalSave,
               ...metadataUpdates,

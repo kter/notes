@@ -5,8 +5,13 @@
  * エディタ入力ごとの不要な再レンダリングを防ぐ。
  *
  * 主なエクスポート:
- * - noteBodyStore: 命令的 API (get/resolve/set/delete/has/version/subscribe)
+ * - noteBodyStore: 命令的 API (resolve/bodyForPersist/set/delete/has/version/subscribe)
  * - useNoteBody: React コンポーネント向けフック (useSyncExternalStore ベース)
+ *
+ * 本文の「どれが最新か」を決める規則はこのモジュールだけが持つ。読み出しは
+ * resolve、IndexedDB へ書く値は bodyForPersist を通す。以前は呼び出し側ごとに
+ * 4 通りのフォールバック式が手書きされており、そのうち 1 つが壊れていた
+ * (下記 bodyForPersist の説明を参照)。
  *
  * アーキテクチャ上の重要な注意点:
  * - このストアはモジュールスコープのシングルトンであるため、
@@ -45,13 +50,6 @@ function notify(): void {
 
 export const noteBodyStore = {
   /**
-   * 指定 noteId の本文を返す。未登録の場合は空文字列を返す。
-   */
-  get(id: string): string {
-    return bodies.get(id) ?? "";
-  },
-
-  /**
    * 指定 noteId の本文がストアに存在するかを返す。
    * get との違い: 未登録ノートの "" と、登録済みの空本文 "" を区別できる。
    */
@@ -68,6 +66,25 @@ export const noteBodyStore = {
     if (id === null || id === undefined) return fallback;
     const body = bodies.get(id);
     return body === undefined ? fallback : body;
+  },
+
+  /**
+   * IndexedDB へ保存する本文を返す。ストアに無い場合は undefined を返す。
+   *
+   * undefined は「このノートの本文には触るな」という意味であり、空文字列とは
+   * 明確に区別される。今セッションで一度も開いていないノートのメタデータだけを
+   * 更新するとき、本文はストアに存在しない。ここで "" を返すと、その空文字列が
+   * IndexedDB の本文を上書きしてしまう。
+   *
+   * 実際にそうなっていた。以前の呼び出し側はこう書いていた:
+   *
+   *     bodyOnly ?? noteBodyStore.get(id) ?? noteForLocalSave.content ?? ""
+   *
+   * get は未登録でも "" を返し undefined を返さないため、第 3 項は到達不能。
+   * つまりメタデータのみの保存が本文を空にしていた。
+   */
+  bodyForPersist(id: string): string | undefined {
+    return bodies.get(id);
   },
 
   /**

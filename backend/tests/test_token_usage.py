@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.features.assistant.gateway import AIGateway, get_ai_gateway
+from app.features.assistant.gateway import AIGateway, AIRequest, get_ai_gateway
 from app.features.assistant.job_runner import process_chat_job, process_summarize_job
 from app.features.assistant.usage_policy import (
     check_limit,
@@ -42,18 +42,15 @@ def _run_ai_job(process_fn, job_id, session, ai_gateway):
 
 # Mock AI Service that returns token counts
 class MockAIGatewayWithTokens(AIGateway):
-    async def summarize(
-        self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> tuple[str, int]:
+    async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
         return f"Summary: {content[:10]}...", 150
 
     async def chat(
         self,
         content: str,
         question: str,
+        request: AIRequest,
         history: list[dict] | None = None,
-        model_id: str | None = None,
-        language: str = "auto",
     ) -> tuple[str, int]:
         return f"Answer for '{question}' based on {len(content)} chars", 200
 
@@ -61,8 +58,7 @@ class MockAIGatewayWithTokens(AIGateway):
         self,
         content: str,
         instruction: str,
-        model_id: str | None = None,
-        language: str = "auto",
+        request: AIRequest,
     ) -> tuple[str, int]:
         return f"Edited: {content}", 100
 

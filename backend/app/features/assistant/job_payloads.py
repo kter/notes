@@ -31,6 +31,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.features.assistant.errors import UnsupportedJobKind
 from app.features.assistant.schemas import BedrockMessage
 from app.models.enums import ChatScope
 
@@ -68,10 +69,6 @@ _INPUT_BY_KIND: dict[str, type[SummarizeJobInput] | type[ChatJobInput]] = {
     SummarizeJobInput.kind: SummarizeJobInput,
     ChatJobInput.kind: ChatJobInput,
 }
-
-
-class UnsupportedJobKind(ValueError):
-    """未知の kind をデコードしようとした場合に送出される。"""
 
 
 def encode(job_input: AIJobInput) -> str:

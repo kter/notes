@@ -8,6 +8,7 @@
     run_edit_job_queue_records, process_edit_job_queue_records、SNSPublisher。
 呼び出し関係: FastAPI ルーターおよび Lambda ハンドラから呼ばれ、
     AIInteractionUseCases を通じて AI ゲートウェイを実行する。
+    ワイヤ上のペイロード（AIJob.input と SQS 通知）の型は job_payloads が所有する。
 """
 
 import asyncio

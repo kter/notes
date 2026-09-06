@@ -19,9 +19,9 @@ from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.usage_policy import record_usage
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,
-    get_user_settings,
     require_non_empty,
 )
+from app.features.settings.repository import UserSettingsRepository
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models.enums import ChatScope
 
@@ -113,7 +113,9 @@ class AIInteractionUseCases:
     ) -> tuple[str, int]:
         """トークン制限チェック・設定取得・使用量記録を行い AI 呼び出しを実行する。"""
         ensure_token_limit(self.session, self.user_id)
-        model_id, language = get_user_settings(self.session, self.user_id)
+        model_id, language = UserSettingsRepository(
+            self.session, self.user_id
+        ).resolve_for_ai()
 
         try:
             response, tokens_used = await ai_call(model_id, language)

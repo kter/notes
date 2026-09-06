@@ -7,7 +7,7 @@
     から利用される。ADR 0001 のリポジトリ規約に従い user_id スコープを持つ。
 
 このモジュールが存在する理由:
-    以前は 3 つの feature がそれぞれ `session.get(UserSettings, user_id)` を直接呼び、
+    以前は 4 つの箇所がそれぞれ `session.get(UserSettings, user_id)` を直接呼び、
     許可モデル一覧の検証と `resolve_model_id` の適用を各々で再実装していた。結果として
     settings は退役モデルを既定値に丸めて返す一方、admin は生値を返すという食い違いが
     生じ、管理コンソールが settings API 自身は 400 で弾く ID を表示しうる状態だった。
@@ -28,39 +28,32 @@ from app.models import (
     UserSettingsRead,
     resolve_model_id,
 )
+from app.models.token_usage import MONTHLY_TOKEN_LIMIT
 from app.shared import ValidationFailed
-
-
-def _default_token_limit() -> int:
-    """UserSettings.token_limit の既定値を返す。"""
-    return UserSettings.model_fields["token_limit"].default
 
 
 class UserSettingsRepository:
     """user_id スコープの UserSettings リポジトリ。
 
-    インターフェースは 5 メソッドのみで、許可値の検証・退役モデルの解決・
-    未作成ユーザーの既定値・更新日時の更新はすべて実装側に隠す。
+    許可値の検証・退役モデルの解決・未作成ユーザーの既定値・更新日時の更新は
+    すべて実装側に隠す。生の行は外に出さない（読み出しは `read()` を通す）。
+
+    `UserScopedRepository` を継承しないのは、UserSettings が user_id を主キーとする
+    1 行きりのレコードで、UUID 主キー・ソフトデリート・version を前提とした共通 CRUD
+    ヘルパーが噛み合わないため。
     """
 
     def __init__(self, session: Session, user_id: str):
         self.session = session
         self.user_id = user_id
 
-    def get(self) -> UserSettings | None:
-        """保存済みの UserSettings を返す。未作成の場合は None を返す。"""
-        return self.session.get(UserSettings, self.user_id)
-
     def get_or_create(self) -> UserSettings:
         """UserSettings を返す。未作成の場合はデフォルト値で作成してから返す。"""
-        settings = self.get()
+        settings = self._get()
         if settings is not None:
             return settings
 
-        settings = UserSettings(
-            user_id=self.user_id,
-            llm_model_id=DEFAULT_LLM_MODEL_ID,
-        )
+        settings = UserSettings(user_id=self.user_id)
         self.session.add(settings)
         commit_with_error_handling(self.session, "UserSettings")
         self.session.refresh(settings)
@@ -82,15 +75,19 @@ class UserSettingsRepository:
         呼び出し側が同一トランザクションで他エンティティも更新する場合
         （admin のユーザー更新など）に使う。単独の更新には `apply_update` を使う。
         """
-        settings = self.get()
+        settings = self._get()
         if settings is None:
             settings = UserSettings(user_id=self.user_id)
 
         if llm_model_id is not None:
-            settings.llm_model_id = self._validated_model_id(llm_model_id)
+            settings.llm_model_id = self._validated(
+                llm_model_id, AVAILABLE_MODELS, "model ID"
+            )
 
         if language is not None:
-            settings.language = self._validated_language(language)
+            settings.language = self._validated(
+                language, AVAILABLE_LANGUAGES, "language"
+            )
 
         if token_limit is not None:
             settings.token_limit = token_limit
@@ -116,20 +113,24 @@ class UserSettingsRepository:
         self.session.refresh(settings)
         return settings
 
-    def to_read(self, settings: UserSettings | None) -> UserSettingsRead:
-        """UserSettings を API 表現に変換する。None の場合は既定値で構築する。
+    def read(self, settings: UserSettings | None = None) -> UserSettingsRead:
+        """設定を API 表現で返す。未作成の場合は既定値で構築する。
+
+        `settings` を渡すとその行を変換する（更新直後の再読み込みを避けるため）。
+        省略した場合は保存済みの行を読みに行く。
 
         退役したモデル ID は必ず `resolve_model_id` を通して既定値に丸める。
         生の値を返すと、この API 自身が受け付けない ID を返すことになり、
         読み出した値をそのまま書き戻すと 400 になってしまう。
         """
+        settings = settings if settings is not None else self._get()
         if settings is None:
             now = datetime.now(UTC)
             return UserSettingsRead(
                 user_id=self.user_id,
                 llm_model_id=DEFAULT_LLM_MODEL_ID,
                 language=DEFAULT_LANGUAGE,
-                token_limit=_default_token_limit(),
+                token_limit=UserSettings.model_fields["token_limit"].default,
                 created_at=now,
                 updated_at=now,
             )
@@ -149,25 +150,26 @@ class UserSettingsRepository:
         未作成ユーザーには既定値を返す。退役モデルは既定値に丸めるため、
         InvokeModel が存在しないモデル ID で失敗し続けることはない。
         """
-        settings = self.get()
+        settings = self._get()
         if settings is None:
             return DEFAULT_LLM_MODEL_ID, DEFAULT_LANGUAGE
         return resolve_model_id(settings.llm_model_id), settings.language
 
-    @staticmethod
-    def _validated_model_id(model_id: str) -> str:
-        """許可モデル一覧に含まれる ID のみを返し、それ以外は ValidationFailed。"""
-        valid_ids = [model["id"] for model in AVAILABLE_MODELS]
-        if model_id not in valid_ids:
-            raise ValidationFailed(f"Invalid model ID. Must be one of: {valid_ids}")
-        return model_id
+    def token_limit(self) -> int:
+        """ユーザー固有の月次トークン上限を返す。未設定の場合はグローバル既定値。"""
+        settings = self._get()
+        if settings is None:
+            return MONTHLY_TOKEN_LIMIT
+        return settings.token_limit
+
+    def _get(self) -> UserSettings | None:
+        """保存済みの UserSettings 行を返す。未作成の場合は None。"""
+        return self.session.get(UserSettings, self.user_id)
 
     @staticmethod
-    def _validated_language(language: str) -> str:
-        """許可言語一覧に含まれる値のみを返し、それ以外は ValidationFailed。"""
-        valid_languages = [item["id"] for item in AVAILABLE_LANGUAGES]
-        if language not in valid_languages:
-            raise ValidationFailed(
-                f"Invalid language. Must be one of: {valid_languages}"
-            )
-        return language
+    def _validated(value: str, allowed: list[dict], label: str) -> str:
+        """許可一覧に含まれる値のみを返し、それ以外は ValidationFailed を送出する。"""
+        valid = [item["id"] for item in allowed]
+        if value not in valid:
+            raise ValidationFailed(f"Invalid {label}. Must be one of: {valid}")
+        return value

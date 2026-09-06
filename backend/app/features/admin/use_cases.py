@@ -177,5 +177,4 @@ class AdminUseCases:
         以前ここで生値を返していたため、管理コンソールが設定 API 自身は 400 で
         弾く ID を表示しうる状態になっていた。
         """
-        repo = UserSettingsRepository(self.session, user_id)
-        return repo.to_read(repo.get())
+        return UserSettingsRepository(self.session, user_id).read()

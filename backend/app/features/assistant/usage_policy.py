@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlmodel import Session, select
 
 from app.db_commit import commit_with_error_handling
+from app.features.settings.repository import UserSettingsRepository
 from app.logging_utils import log_event
 from app.models.token_usage import (
     MONTHLY_TOKEN_LIMIT,
@@ -21,7 +22,6 @@ from app.models.token_usage import (
     _get_period_end,
     _get_period_start,
 )
-from app.models.user_settings import UserSettings
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +66,11 @@ def get_current_period_usage(session: Session, user_id: str) -> TokenUsage | Non
     return session.exec(statement).first()
 
 
-def _get_user_token_limit(session: Session, user_id: str) -> int:
-    """UserSettings からユーザー固有のトークン上限を取得する。未設定の場合はグローバルデフォルトを返す。"""
-    settings = session.get(UserSettings, user_id)
-    if settings is not None:
-        return settings.token_limit
-    return MONTHLY_TOKEN_LIMIT
-
-
 def check_limit(session: Session, user_id: str) -> bool:
     """ユーザーが月次トークン上限を超過していないかを確認する。上限内なら True を返す。"""
     usage = get_or_create_current_period(session, user_id)
-    return usage.tokens_used < _get_user_token_limit(session, user_id)
+    limit = UserSettingsRepository(session, user_id).token_limit()
+    return usage.tokens_used < limit
 
 
 def record_usage(session: Session, user_id: str, tokens: int) -> TokenUsage:
@@ -105,7 +98,7 @@ def get_usage_info(session: Session, user_id: str) -> TokenUsageRead:
     usage = get_or_create_current_period(session, user_id)
     return TokenUsageRead(
         tokens_used=usage.tokens_used,
-        token_limit=_get_user_token_limit(session, user_id),
+        token_limit=UserSettingsRepository(session, user_id).token_limit(),
         period_start=usage.period_start,
         period_end=usage.period_end,
     )
@@ -116,7 +109,7 @@ def get_usage_snapshot(session: Session, user_id: str) -> TokenUsageRead:
     usage = get_current_period_usage(session, user_id)
     return TokenUsageRead(
         tokens_used=usage.tokens_used if usage else 0,
-        token_limit=_get_user_token_limit(session, user_id),
+        token_limit=UserSettingsRepository(session, user_id).token_limit(),
         period_start=usage.period_start if usage else _get_period_start(),
         period_end=usage.period_end if usage else _get_period_end(),
     )

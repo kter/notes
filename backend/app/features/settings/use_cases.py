@@ -41,7 +41,7 @@ class SettingsUseCases:
         """設定を取得して SettingsResponse を返す。設定が未作成の場合はデフォルト値で作成する。"""
         settings = self.settings_repo.get_or_create()
         return SettingsResponse(
-            settings=self.settings_repo.to_read(settings),
+            settings=self.settings_repo.read(settings),
             available_models=self.available_models(),
             available_languages=self.available_languages(),
             token_usage=get_usage_info(self.session, self.user_id),
@@ -63,7 +63,7 @@ class SettingsUseCases:
             outcome="success",
         )
         return SettingsResponse(
-            settings=self.settings_repo.to_read(settings),
+            settings=self.settings_repo.read(settings),
             available_models=self.available_models(),
             available_languages=self.available_languages(),
             token_usage=get_usage_info(self.session, self.user_id),

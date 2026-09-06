@@ -1,8 +1,8 @@
 """UserSettingsRepository のユニットテスト。
 
 UserSettings のポリシー（許可値の検証・退役モデルの解決・未作成ユーザーの既定値）は
-このリポジトリが唯一の所有者である。以前は settings / admin / assistant の 3 箇所で
-再実装されており、admin だけが resolve_model_id を通していなかった。
+このリポジトリが唯一の所有者である。以前は settings / admin / assistant / usage_policy の
+4 箇所が UserSettings を直接読んでおり、admin だけが resolve_model_id を通していなかった。
 """
 
 import pytest
@@ -14,6 +14,7 @@ from app.models import (
     DEFAULT_LLM_MODEL_ID,
     UserSettings,
 )
+from app.models.token_usage import MONTHLY_TOKEN_LIMIT
 from app.shared import ValidationFailed
 
 USER_ID = "settings-repo-user"
@@ -42,9 +43,9 @@ class TestGetOrCreate:
         assert second.language == "ja"
 
 
-class TestToRead:
+class TestRead:
     def test_missing_settings_yields_defaults(self, repo: UserSettingsRepository):
-        read = repo.to_read(None)
+        read = repo.read()
         assert read.user_id == USER_ID
         assert read.llm_model_id == DEFAULT_LLM_MODEL_ID
         assert read.language == DEFAULT_LANGUAGE
@@ -60,7 +61,7 @@ class TestToRead:
         session.add(UserSettings(user_id=USER_ID, llm_model_id=RETIRED_MODEL_ID))
         session.commit()
 
-        assert repo.to_read(repo.get()).llm_model_id == DEFAULT_LLM_MODEL_ID
+        assert repo.read().llm_model_id == DEFAULT_LLM_MODEL_ID
 
     def test_available_model_is_returned_as_is(
         self, session: Session, repo: UserSettingsRepository
@@ -68,7 +69,7 @@ class TestToRead:
         session.add(UserSettings(user_id=USER_ID, llm_model_id=DEFAULT_LLM_MODEL_ID))
         session.commit()
 
-        assert repo.to_read(repo.get()).llm_model_id == DEFAULT_LLM_MODEL_ID
+        assert repo.read().llm_model_id == DEFAULT_LLM_MODEL_ID
 
 
 class TestStageUpdate:
@@ -107,15 +108,28 @@ class TestStageUpdate:
         """stage_update はセッションに載せるだけで、コミットは呼び出し側が行う。"""
         repo.stage_update(language="en")
         session.rollback()
-        assert repo.get() is None
+        assert session.get(UserSettings, USER_ID) is None
 
 
 class TestApplyUpdate:
-    def test_commits_and_returns_updated_settings(self, repo: UserSettingsRepository):
+    def test_commits_and_returns_updated_settings(
+        self, session: Session, repo: UserSettingsRepository
+    ):
         updated = repo.apply_update(language="en", token_limit=100)
         assert updated.language == "en"
         assert updated.token_limit == 100
-        assert repo.get() is not None
+        assert session.get(UserSettings, USER_ID) is not None
+
+
+class TestTokenLimit:
+    def test_global_default_when_settings_missing(self, repo: UserSettingsRepository):
+        assert repo.token_limit() == MONTHLY_TOKEN_LIMIT
+
+    def test_per_user_override(self, session: Session, repo: UserSettingsRepository):
+        session.add(UserSettings(user_id=USER_ID, token_limit=7))
+        session.commit()
+
+        assert repo.token_limit() == 7
 
 
 class TestResolveForAi:

@@ -1,6 +1,13 @@
 from fastapi.testclient import TestClient
 
-from app.models import AppUser, Folder, Note, TokenUsage, UserSettings
+from app.models import (
+    DEFAULT_LLM_MODEL_ID,
+    AppUser,
+    Folder,
+    Note,
+    TokenUsage,
+    UserSettings,
+)
 
 
 def seed_admin_user(session, user_id: str, email: str, admin: bool = True) -> AppUser:
@@ -122,8 +129,6 @@ class TestAdminSettingsConsistency:
     def test_admin_detail_resolves_a_retired_model_like_the_settings_api(
         self, make_client, session
     ):
-        from app.models import DEFAULT_LLM_MODEL_ID
-
         seed_admin_user(session, "admin-user", "admin@example.com", admin=True)
         seed_admin_user(session, "target-user", "member@example.com", admin=False)
         session.add(
@@ -144,8 +149,6 @@ class TestAdminSettingsConsistency:
         )
 
     def test_admin_list_resolves_a_retired_model(self, make_client, session):
-        from app.models import DEFAULT_LLM_MODEL_ID
-
         seed_admin_user(session, "admin-user", "admin@example.com", admin=True)
         seed_admin_user(session, "target-user", "member@example.com", admin=False)
         session.add(

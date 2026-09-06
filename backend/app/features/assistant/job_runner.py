@@ -11,7 +11,6 @@
 """
 
 import asyncio
-import json
 import logging
 import os
 from collections.abc import Awaitable, Callable
@@ -31,13 +30,17 @@ from app.features.assistant.errors import (
     AITokenLimitExceededError,
 )
 from app.features.assistant.gateway import AIGateway, get_ai_gateway
+from app.features.assistant.job_payloads import (
+    ChatJobInput,
+    JobEnvelope,
+    SummarizeJobInput,
+    decode_as,
+)
 from app.features.assistant.repositories import AIEditJobRepository, AIJobRepository
-from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.use_cases import AIInteractionUseCases
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.logging_utils import log_event
 from app.models import AIEditJob, AIJob
-from app.models.enums import ChatScope
 from app.shared import NotFound
 
 logger = logging.getLogger(__name__)
@@ -179,9 +182,9 @@ async def dispatch_ai_job(
         publisher = publisher if publisher is not None else boto3.client("sns")
         publisher.publish(
             TopicArn=topic_arn,
-            Message=json.dumps(
-                {"task": task, "job_id": str(job_id), "user_id": user_id}
-            ),
+            Message=JobEnvelope(
+                task=task, job_id=str(job_id), user_id=user_id
+            ).to_message(),
         )
         log_event(
             logger,
@@ -398,8 +401,8 @@ async def process_summarize_job(
     """キュー済みの要約ジョブを処理する。"""
 
     async def run(use_cases: AIInteractionUseCases, job: AIJob) -> tuple[str, int]:
-        params = json.loads(job.input)
-        return await use_cases.summarize_note(UUID(params["note_id"]))
+        job_input = decode_as(job.kind, job.input, SummarizeJobInput)
+        return await use_cases.summarize_note(job_input.note_id)
 
     await _run_ai_job(
         job_id,
@@ -422,17 +425,14 @@ async def process_chat_job(
     """キュー済みのチャットジョブを処理する。"""
 
     async def run(use_cases: AIInteractionUseCases, job: AIJob) -> tuple[str, int]:
-        params = json.loads(job.input)
-        raw_history = params.get("history") or []
-        # gateway.chat は各メッセージで .model_dump() を呼ぶため BedrockMessage に復元する
-        history = [BedrockMessage(**msg) for msg in raw_history] or None
+        job_input = decode_as(job.kind, job.input, ChatJobInput)
         return await use_cases.chat_with_context(
-            scope=ChatScope(params["scope"]),
-            question=params["question"],
-            history=history,
-            note_id=UUID(params["note_id"]) if params.get("note_id") else None,
-            folder_id=UUID(params["folder_id"]) if params.get("folder_id") else None,
-            selected_content=params.get("selected_content"),
+            scope=job_input.scope,
+            question=job_input.question,
+            history=job_input.history or None,
+            note_id=job_input.note_id,
+            folder_id=job_input.folder_id,
+            selected_content=job_input.selected_content,
         )
 
     await _run_ai_job(
@@ -451,17 +451,6 @@ def run_edit_job_from_event(job_id: str) -> None:
     asyncio.run(process_edit_job(job_id))
 
 
-def _extract_job_payload(record: dict) -> dict:
-    """SQS レコードから SNS ラップを展開してジョブペイロードを返す。"""
-    body = record.get("body", "")
-    payload = json.loads(body)
-
-    if payload.get("Type") == "Notification" and "Message" in payload:
-        payload = json.loads(payload["Message"])
-
-    return payload
-
-
 async def process_edit_job_queue_records(
     records: list[dict],
     *,
@@ -477,17 +466,12 @@ async def process_edit_job_queue_records(
     for record in records:
         message_id = record.get("messageId", "unknown")
         try:
-            payload = _extract_job_payload(record)
-            task = payload.get("task")
-            process_job_fn = handlers.get(task)
+            envelope = JobEnvelope.from_sqs_record(record)
+            process_job_fn = handlers.get(envelope.task)
             if process_job_fn is None:
-                raise ValueError(f"Unsupported queue task: {task}")
+                raise ValueError(f"Unsupported queue task: {envelope.task}")
 
-            job_id = payload.get("job_id")
-            if not job_id:
-                raise ValueError("Queue message is missing job_id")
-
-            await process_job_fn(job_id, expected_user_id=payload.get("user_id"))
+            await process_job_fn(envelope.job_id, expected_user_id=envelope.user_id)
         except Exception:
             log_event(
                 logger,

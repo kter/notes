@@ -6,11 +6,12 @@ import pytest
 from botocore.exceptions import ClientError
 
 from app.features.assistant.gateway import (
-    EDIT_SINGLE_PASS_MAX_CHARS,
+    AIRequest,
     BedrockGateway,
     _reset_ai_gateway_cache,
     get_ai_gateway,
 )
+from app.features.assistant.markdown_chunks import EDIT_SINGLE_PASS_MAX_CHARS
 
 
 @pytest.fixture
@@ -76,7 +77,7 @@ async def test_summarize_success(mock_boto_client, mock_settings, mock_summary_c
         "body": Mock(read=Mock(return_value=mock_response_body.encode()))
     }
 
-    summary, total_tokens = await service.summarize("Original content")
+    summary, total_tokens = await service.summarize("Original content", AIRequest())
 
     assert summary == "This is a summary."
     assert isinstance(total_tokens, int)
@@ -108,6 +109,7 @@ async def test_chat_success(mock_boto_client, mock_settings, mock_summary_cache)
     answer, total_tokens = await service.chat(
         content="Context info",
         question="User question",
+        request=AIRequest(),
     )
 
     assert answer == "Chat answer."
@@ -138,6 +140,7 @@ async def test_edit_success(mock_boto_client, mock_settings, mock_summary_cache)
     edited, total_tokens = await service.edit(
         content="Original text",
         instruction="Fix typos",
+        request=AIRequest(),
     )
 
     assert edited == "Edited text here."
@@ -169,32 +172,10 @@ async def test_edit_fallback_no_tags(
     edited, _ = await service.edit(
         content="Original text",
         instruction="Fix typos",
+        request=AIRequest(),
     )
 
     assert edited == "Edited text without tags."
-
-
-def test_extract_edited_content():
-    # With tags
-    result = BedrockGateway._extract_edited_content(
-        "Some preamble\n<edited_content>\nHello world\n</edited_content>\nSome postamble"
-    )
-    assert result == "Hello world"
-
-    # Without tags (fallback)
-    result = BedrockGateway._extract_edited_content("Just plain text")
-    assert result == "Just plain text"
-
-    # Empty tags
-    result = BedrockGateway._extract_edited_content("<edited_content></edited_content>")
-    assert result == ""
-
-    # Preserve whitespace for chunk joins
-    result = BedrockGateway._extract_edited_content(
-        "<edited_content>\nHello world\n</edited_content>",
-        preserve_whitespace=True,
-    )
-    assert result == "\nHello world\n"
 
 
 @pytest.mark.asyncio
@@ -207,23 +188,7 @@ async def test_bedrock_error(mock_boto_client, mock_settings, mock_summary_cache
     )
 
     with pytest.raises(ClientError):
-        await service.summarize("Fail content")
-
-
-def test_chunk_content_for_edit_preserves_text():
-    content = (
-        "# Title\n\n"
-        "Paragraph 1\n\n"
-        "## Section A\n\n"
-        + ("Line in section A.\n" * 300)
-        + "\n## Section B\n\n"
-        + ("Line in section B.\n" * 300)
-    )
-
-    chunks = BedrockGateway._chunk_content_for_edit(content)
-
-    assert len(chunks) > 1
-    assert "".join(chunks) == content
+        await service.summarize("Fail content", AIRequest())
 
 
 @pytest.mark.asyncio
@@ -257,6 +222,7 @@ async def test_edit_large_content_uses_chunking(
     edited, total_tokens = await service.edit(
         content=content,
         instruction="Fix typos",
+        request=AIRequest(),
     )
 
     assert len(content) > EDIT_SINGLE_PASS_MAX_CHARS

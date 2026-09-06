@@ -14,7 +14,11 @@ from sqlmodel import Session
 
 from app.features.assistant.context_builder import ContextBuilder
 from app.features.assistant.errors import AI_TIMEOUT_MESSAGE, AIApplicationTimeoutError
-from app.features.assistant.gateway import AIGateway, AIGatewayTimeoutError
+from app.features.assistant.gateway import (
+    AIGateway,
+    AIGatewayTimeoutError,
+    AIRequest,
+)
 from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.usage_policy import record_usage
 from app.features.assistant.use_cases.common import (
@@ -47,11 +51,7 @@ class AIInteractionUseCases:
         note = self.workspace_queries.get_owned_note(note_id)
         require_non_empty(note.content, "Note content is empty")
         return await self._run_ai_call(
-            lambda model_id, language: self.ai_gateway.summarize(
-                note.content,
-                model_id=model_id,
-                language=language,
-            )
+            lambda request: self.ai_gateway.summarize(note.content, request)
         )
 
     async def chat_with_context(
@@ -73,12 +73,11 @@ class AIInteractionUseCases:
                 scope=scope, note_id=note_id, folder_id=folder_id
             )
         return await self._run_ai_call(
-            lambda model_id, language: self.ai_gateway.chat(
+            lambda request: self.ai_gateway.chat(
                 content=content,
                 question=question,
+                request=request,
                 history=history,
-                model_id=model_id,
-                language=language,
             )
         )
 
@@ -99,24 +98,23 @@ class AIInteractionUseCases:
     async def execute_edit(self, *, content: str, instruction: str) -> tuple[str, int]:
         """AI 編集を直接実行し、(編集済みコンテンツ, 使用トークン数) を返す。"""
         return await self._run_ai_call(
-            lambda model_id, language: self.ai_gateway.edit(
+            lambda request: self.ai_gateway.edit(
                 content=content,
                 instruction=instruction,
-                model_id=model_id,
-                language=language,
+                request=request,
             )
         )
 
     async def _run_ai_call(
         self,
-        ai_call: Callable[[str, str], Awaitable[tuple[str, int]]],
+        ai_call: Callable[[AIRequest], Awaitable[tuple[str, int]]],
     ) -> tuple[str, int]:
         """トークン制限チェック・設定取得・使用量記録を行い AI 呼び出しを実行する。"""
         ensure_token_limit(self.session, self.user_id)
         model_id, language = get_user_settings(self.session, self.user_id)
 
         try:
-            response, tokens_used = await ai_call(model_id, language)
+            response, tokens_used = await ai_call(AIRequest(model_id, language))
         except AIGatewayTimeoutError as exc:
             raise AIApplicationTimeoutError(AI_TIMEOUT_MESSAGE) from exc
 

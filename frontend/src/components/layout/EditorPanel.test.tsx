@@ -185,6 +185,49 @@ describe('EditorPanel', () => {
     expect(textarea.value).toBe('newer unsaved text')
   })
 
+  describe('summarize flushes pending edits', () => {
+    // 以前 EditorToolbar は親の 4 つの ref を直接読み書きし、dirty 判定を
+    // EditorPanel.handleBlur と別ファイルで複製していた。フラッシュ経路には
+    // テストが無く、EditorToolbar 自体にもテストファイルが無かった。
+    it('saves an unsaved title before calling onSummarize', () => {
+      const onUpdateNote = vi.fn()
+      const onSummarize = vi.fn()
+      render(
+        <EditorPanel {...defaultProps} onUpdateNote={onUpdateNote} onSummarize={onSummarize} />
+      )
+
+      const titleInput = screen.getByRole('textbox', { name: /title/i })
+      fireEvent.change(titleInput, { target: { value: 'Renamed before summarizing' } })
+
+      onUpdateNote.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: 'editor.summarizeNote' }))
+
+      expect(onUpdateNote).toHaveBeenCalledWith(
+        mockNote.id,
+        expect.objectContaining({ title: 'Renamed before summarizing' })
+      )
+      expect(onSummarize).toHaveBeenCalledWith(mockNote.id)
+      // 保存が先、要約が後
+      expect(onUpdateNote.mock.invocationCallOrder[0]).toBeLessThan(
+        onSummarize.mock.invocationCallOrder[0]
+      )
+    })
+
+    it('does not save again when nothing changed', () => {
+      const onUpdateNote = vi.fn()
+      const onSummarize = vi.fn()
+      render(
+        <EditorPanel {...defaultProps} onUpdateNote={onUpdateNote} onSummarize={onSummarize} />
+      )
+
+      onUpdateNote.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: 'editor.summarizeNote' }))
+
+      expect(onUpdateNote).not.toHaveBeenCalled()
+      expect(onSummarize).toHaveBeenCalledWith(mockNote.id)
+    })
+  })
+
   it('disables content field sizing for the editor textarea', () => {
     render(<EditorPanel {...defaultProps} />)
 

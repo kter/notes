@@ -19,6 +19,7 @@ from app.features.admin.schemas import (
     AdminUserUpdateRequest,
 )
 from app.features.assistant.usage_policy import get_usage_snapshot
+from app.features.settings.repository import UserSettingsRepository
 from app.logging_utils import log_event
 from app.models import (
     AVAILABLE_LANGUAGES,
@@ -27,10 +28,8 @@ from app.models import (
     AppUserRead,
     Folder,
     Note,
-    UserSettings,
     UserSettingsRead,
 )
-from app.models.user_settings import DEFAULT_LANGUAGE, DEFAULT_LLM_MODEL_ID
 from app.shared import NotFound, ValidationFailed
 
 logger = logging.getLogger(__name__)
@@ -86,10 +85,9 @@ class AdminUseCases:
         if app_user is None:
             raise NotFound("User not found")
 
-        settings = self.session.get(UserSettings, user_id)
         return AdminUserDetailResponse(
             user=AppUserRead.model_validate(app_user),
-            settings=self._build_settings_read(settings, user_id),
+            settings=self._settings_read(user_id),
             token_usage=get_usage_snapshot(self.session, user_id),
             note_count=self._count_for_user(Note, user_id),
             folder_count=self._count_for_user(Folder, user_id),
@@ -105,7 +103,6 @@ class AdminUseCases:
         if app_user is None:
             raise NotFound("User not found")
 
-        settings = self.session.get(UserSettings, user_id)
         now = datetime.now(UTC)
 
         if payload.admin is not None and payload.admin != app_user.admin:
@@ -119,30 +116,14 @@ class AdminUseCases:
             or payload.language is not None
             or payload.token_limit is not None
         ):
-            if settings is None:
-                settings = UserSettings(user_id=user_id)
-
-            if payload.llm_model_id is not None:
-                valid_ids = [model["id"] for model in AVAILABLE_MODELS]
-                if payload.llm_model_id not in valid_ids:
-                    raise ValidationFailed(
-                        f"Invalid model ID. Must be one of: {valid_ids}"
-                    )
-                settings.llm_model_id = payload.llm_model_id
-
-            if payload.language is not None:
-                valid_languages = [language["id"] for language in AVAILABLE_LANGUAGES]
-                if payload.language not in valid_languages:
-                    raise ValidationFailed(
-                        f"Invalid language. Must be one of: {valid_languages}"
-                    )
-                settings.language = payload.language
-
-            if payload.token_limit is not None:
-                settings.token_limit = payload.token_limit
-
-            settings.updated_at = now
-            self.session.add(settings)
+            # 検証・既定値・updated_at の更新はすべてリポジトリが所有する。
+            # AppUser の変更と同一トランザクションでコミットしたいので、
+            # ここではコミットしない stage_update を使う。
+            UserSettingsRepository(self.session, user_id).stage_update(
+                llm_model_id=payload.llm_model_id,
+                language=payload.language,
+                token_limit=payload.token_limit,
+            )
 
         commit_with_error_handling(self.session, "AdminUserUpdate")
         log_event(
@@ -164,10 +145,9 @@ class AdminUseCases:
 
     def _build_list_item(self, app_user: AppUser) -> AdminUserListItem:
         """AppUser から一覧表示用の AdminUserListItem を組み立てて返す。"""
-        settings = self.session.get(UserSettings, app_user.user_id)
         return AdminUserListItem(
             user=AppUserRead.model_validate(app_user),
-            settings=self._build_settings_read(settings, app_user.user_id),
+            settings=self._settings_read(app_user.user_id),
             token_usage=get_usage_snapshot(self.session, app_user.user_id),
             note_count=self._count_for_user(Note, app_user.user_id),
             folder_count=self._count_for_user(Folder, app_user.user_id),
@@ -190,19 +170,12 @@ class AdminUseCases:
         if admin_count <= 1:
             raise ValidationFailed("Cannot remove the last admin user")
 
-    @staticmethod
-    def _build_settings_read(
-        settings: UserSettings | None, user_id: str
-    ) -> UserSettingsRead:
-        """UserSettings（未作成の場合はデフォルト値）から UserSettingsRead を構築して返す。"""
-        now = datetime.now(UTC)
-        return UserSettingsRead(
-            user_id=user_id,
-            llm_model_id=settings.llm_model_id if settings else DEFAULT_LLM_MODEL_ID,
-            language=settings.language if settings else DEFAULT_LANGUAGE,
-            token_limit=settings.token_limit
-            if settings
-            else UserSettings.model_fields["token_limit"].default,
-            created_at=settings.created_at if settings else now,
-            updated_at=settings.updated_at if settings else now,
-        )
+    def _settings_read(self, user_id: str) -> UserSettingsRead:
+        """指定ユーザーの設定を API 表現で返す。未作成の場合は既定値になる。
+
+        退役モデルの解決を含む変換ポリシーは UserSettingsRepository が所有する。
+        以前ここで生値を返していたため、管理コンソールが設定 API 自身は 400 で
+        弾く ID を表示しうる状態になっていた。
+        """
+        repo = UserSettingsRepository(self.session, user_id)
+        return repo.to_read(repo.get())

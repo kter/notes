@@ -108,3 +108,57 @@ class TestAdminUserManagement:
         assert data["settings"]["user_id"] == "target-user"
         assert data["settings"]["token_limit"] > 0
         assert data["token_usage"]["tokens_used"] == 0
+
+
+class TestAdminSettingsConsistency:
+    """管理コンソールとユーザー設定 API が同じ設定表現を返すことを固定する。
+
+    以前は admin 側だけが resolve_model_id を通しておらず、設定 API 自身が 400 で
+    弾く退役モデル ID を管理コンソールが表示しうる状態だった。
+    """
+
+    RETIRED_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+
+    def test_admin_detail_resolves_a_retired_model_like_the_settings_api(
+        self, make_client, session
+    ):
+        from app.models import DEFAULT_LLM_MODEL_ID
+
+        seed_admin_user(session, "admin-user", "admin@example.com", admin=True)
+        seed_admin_user(session, "target-user", "member@example.com", admin=False)
+        session.add(
+            UserSettings(user_id="target-user", llm_model_id=self.RETIRED_MODEL_ID)
+        )
+        session.commit()
+
+        admin_client = make_client("admin-user")
+        detail = admin_client.get("/api/admin/users/target-user")
+        assert detail.status_code == 200
+        assert detail.json()["settings"]["llm_model_id"] == DEFAULT_LLM_MODEL_ID
+
+        target_settings = make_client("target-user").get("/api/settings")
+        assert target_settings.status_code == 200
+        assert (
+            target_settings.json()["settings"]["llm_model_id"]
+            == detail.json()["settings"]["llm_model_id"]
+        )
+
+    def test_admin_list_resolves_a_retired_model(self, make_client, session):
+        from app.models import DEFAULT_LLM_MODEL_ID
+
+        seed_admin_user(session, "admin-user", "admin@example.com", admin=True)
+        seed_admin_user(session, "target-user", "member@example.com", admin=False)
+        session.add(
+            UserSettings(user_id="target-user", llm_model_id=self.RETIRED_MODEL_ID)
+        )
+        session.commit()
+
+        response = make_client("admin-user").get("/api/admin/users")
+
+        assert response.status_code == 200
+        target = next(
+            item
+            for item in response.json()["users"]
+            if item["user"]["user_id"] == "target-user"
+        )
+        assert target["settings"]["llm_model_id"] == DEFAULT_LLM_MODEL_ID

@@ -17,6 +17,7 @@ from app.shared import (
     NotFound,
     QuotaExceeded,
     ShareExpired,
+    UpstreamFailure,
     UpstreamTimeout,
     ValidationFailed,
 )
@@ -44,6 +45,11 @@ def to_http_exception(error: DomainError) -> HTTPException:
         )
     if isinstance(error, ShareExpired):
         return HTTPException(status_code=status.HTTP_410_GONE, detail=error.detail)
+    if isinstance(error, UpstreamFailure):
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error.detail,
+        )
     if isinstance(error, ValidationFailed):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

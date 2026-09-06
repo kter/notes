@@ -46,6 +46,14 @@ class AIJob(SQLModel, table=True):
     started_at: datetime | None = Field(default=None)  # 処理開始日時
     completed_at: datetime | None = Field(default=None)  # 処理完了日時
 
+    def apply_result(self, result: str) -> None:
+        """実行結果を書き込む。job_lifecycle の状態機械から呼ばれる。"""
+        self.result = result
+
+    def log_fields(self) -> dict[str, str]:
+        """ジョブのログイベントに添える識別情報を返す。"""
+        return {"record": "ai_job", "kind": self.kind}
+
 
 class AIJobRead(SQLModel):
     """AI ジョブ取得レスポンススキーマ。ポーリング時にクライアントへ返す。

@@ -44,6 +44,14 @@ class AIEditJob(SQLModel, table=True):
     started_at: datetime | None = Field(default=None)  # 処理開始日時
     completed_at: datetime | None = Field(default=None)  # 処理完了日時
 
+    def apply_result(self, result: str) -> None:
+        """編集結果を書き込む。job_lifecycle の状態機械から呼ばれる。"""
+        self.edited_content = result
+
+    def log_fields(self) -> dict[str, str]:
+        """ジョブのログイベントに添える識別情報を返す。編集ジョブに kind は無い。"""
+        return {"record": "ai_edit_job"}
+
 
 class AIEditJobCreate(SQLModel):
     """AI編集ジョブ作成リクエストスキーマ。"""

@@ -3,7 +3,7 @@
 責務: アプリケーション全体で共有するドメインエラーの基底クラスと
     サブクラスを提供する。
 主要なエクスポート: DomainError, NotFound, Forbidden, ConflictDetected,
-    QuotaExceeded, UpstreamTimeout, ValidationFailed, ShareExpired
+    QuotaExceeded, UpstreamTimeout, UpstreamFailure, ValidationFailed, ShareExpired
 呼び出し関係: ユースケース・リポジトリ層で送出され、
     app.http_errors の to_http_exception で HTTP 例外へ変換される。
 """
@@ -35,6 +35,14 @@ class QuotaExceeded(DomainError):
 
 class UpstreamTimeout(DomainError):
     """上流サービス（AI プロバイダー等）がタイムアウトした場合に送出される。"""
+
+
+class UpstreamFailure(DomainError):
+    """上流サービス（S3 等）の呼び出しがタイムアウト以外の理由で失敗した場合に送出される。
+
+    利用者側の入力に問題は無いため 500 を返す。detail はそのまま返るので、
+    上流の生レスポンスをここに入れないこと。
+    """
 
 
 class ValidationFailed(DomainError):

@@ -2,7 +2,7 @@
 
 責務: 長い Markdown を構造を壊さずに編集単位へ分割し、モデル応答から
     タグで囲まれた本文を取り出す。AWS にも Bedrock にも依存しない純粋なテキスト処理。
-主要なエクスポート: needs_chunking, chunk_for_edit, extract_tagged
+主要なエクスポート: needs_chunking, chunk_for_edit, join_chunks, extract_tagged。
 呼び出し関係: features/assistant/gateway.py の edit 経路から呼ばれる。
 
 このモジュールが独立している理由:
@@ -12,7 +12,7 @@
 
 不変条件:
     chunk_for_edit は分割のみを行い、内容を書き換えない。
-    すなわち常に ``"".join(chunk_for_edit(text)) == text`` が成り立つ。
+    すなわち常に ``join_chunks(chunk_for_edit(text)) == text`` が成り立つ。
 """
 
 import re
@@ -39,7 +39,8 @@ def extract_tagged(text: str, tag: str, *, preserve_whitespace: bool = False) ->
     タグが見つからない場合は応答全体を返す（モデルがタグを省略した場合の保険）。
     チャンク結合時は前後の空白を保持する（preserve_whitespace=True）。
     """
-    match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
+    escaped = re.escape(tag)
+    match = re.search(rf"<{escaped}>(.*?)</{escaped}>", text, re.DOTALL)
     if match:
         content = match.group(1)
         return content if preserve_whitespace else content.strip()
@@ -68,6 +69,16 @@ def chunk_for_edit(content: str) -> list[str]:
         )
 
     return _merge_segments(normalized_segments, EDIT_CHUNK_TARGET_CHARS)
+
+
+def join_chunks(chunks: list[str]) -> str:
+    """chunk_for_edit で分割したチャンク（または編集済みチャンク）を連結する。
+
+    分割と連結を同じモジュールが所有することで、両者の契約が離れないようにする。
+    編集済みチャンクを連結する側は extract_tagged に preserve_whitespace=True を
+    渡す必要がある点に注意（前後の空白を落とすとチャンク境界が壊れる）。
+    """
+    return "".join(chunks)
 
 
 def _split_into_segments(content: str) -> list[str]:

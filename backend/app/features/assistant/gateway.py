@@ -3,7 +3,7 @@
 責務: 要約・チャット・編集の3操作をBedrockのClaude APIにマッピングする。
     リクエスト整形とタイムアウト変換のみを担い、Markdown の分割・抽出は
     markdown_chunks が所有する。
-主要なエクスポート: AIGateway (抽象基底), BedrockGateway, get_ai_gateway。
+主要なエクスポート: AIRequest, AIGateway (抽象基底), BedrockGateway, get_ai_gateway。
 呼び出し関係: use_cases/ai_interactions.py から呼ばれ、
     summary_cache・core/prompts・markdown_chunks を利用する。
 """
@@ -23,6 +23,7 @@ from app.core.prompts import get_prompt
 from app.features.assistant.markdown_chunks import (
     chunk_for_edit,
     extract_tagged,
+    join_chunks,
     needs_chunking,
 )
 from app.features.assistant.schemas import BedrockMessage
@@ -61,6 +62,18 @@ class AIRequest:
     def resolved_language(self) -> str:
         """プロンプト選択に使う言語。'auto' は英語 'en' にフォールバックする。"""
         return "en" if self.language == "auto" else self.language
+
+
+@dataclass(frozen=True)
+class ChunkContext:
+    """分割編集における「全体の何番目のチャンクか」という文脈。
+
+    index / count / 空白保持は常に一緒に動くため、1つの値にまとめる。
+    シングルパス編集ではこの文脈自体が存在しない（None）。
+    """
+
+    index: int
+    count: int
 
 
 class AIGateway(ABC):
@@ -165,7 +178,7 @@ class BedrockGateway(AIGateway):
 
     async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
         """ノートコンテンツの要約を生成する。S3キャッシュヒット時はトークン消費 0 を返す。"""
-        model_id = request.model_id
+        model_id = request.model_id  # キャッシュキーには解決前の生の値を使う
 
         # S3キャッシュを参照し、ヒットした場合はBedrockを呼び出さずにキャッシュを返す
         summary_cache = self._get_summary_cache()
@@ -254,11 +267,13 @@ class BedrockGateway(AIGateway):
         instruction: str,
         model_id: str | None,
         system: str,
-        chunk_index: int | None = None,
-        chunk_count: int | None = None,
-        preserve_whitespace: bool = False,
+        chunk: ChunkContext | None = None,
     ) -> tuple[str, int]:
-        """単一チャンクをBedrockで編集し、(編集済みコンテンツ, 消費トークン数) を返す。"""
+        """単一チャンクをBedrockで編集し、(編集済みコンテンツ, 消費トークン数) を返す。
+
+        chunk が None ならシングルパス編集。分割編集では前後の空白を保持しないと
+        チャンク結合時に Markdown の境界が壊れる。
+        """
         response_text, total_tokens = self._invoke_model(
             [
                 {
@@ -266,8 +281,8 @@ class BedrockGateway(AIGateway):
                     "content": self._build_edit_message(
                         content=content,
                         instruction=instruction,
-                        chunk_index=chunk_index,
-                        chunk_count=chunk_count,
+                        chunk_index=chunk.index if chunk else None,
+                        chunk_count=chunk.count if chunk else None,
                     ),
                 }
             ],
@@ -276,7 +291,7 @@ class BedrockGateway(AIGateway):
             max_tokens=8192,  # 編集はトークン上限を広めに設定する
         )
         edited_content = extract_tagged(
-            response_text, "edited_content", preserve_whitespace=preserve_whitespace
+            response_text, "edited_content", preserve_whitespace=chunk is not None
         )
         return edited_content, total_tokens
 
@@ -289,11 +304,12 @@ class BedrockGateway(AIGateway):
         超過する場合はチャンク分割して EDIT_MAX_CONCURRENCY の並列度で処理し、
         結果を順序通りに結合して返す。
         """
-        model_id = request.model_id
         system = get_prompt("edit", request.resolved_language)
         # 短いコンテンツはシングルパスで処理する（チャンク分割のオーバーヘッドを回避）
         if not needs_chunking(content):
-            return self._edit_single_chunk(content, instruction, model_id, system)
+            return self._edit_single_chunk(
+                content, instruction, request.model_id, system
+            )
 
         # 長いコンテンツはチャンク分割して並列処理する
         chunks = chunk_for_edit(content)
@@ -307,11 +323,9 @@ class BedrockGateway(AIGateway):
                     self._edit_single_chunk,
                     chunk,
                     instruction,
-                    model_id,
+                    request.model_id,
                     system,
-                    index,
-                    len(chunks),
-                    True,  # チャンク結合時の空白を保持する
+                    ChunkContext(index=index, count=len(chunks)),
                 )
                 return index, edited_chunk, chunk_tokens
 
@@ -322,7 +336,7 @@ class BedrockGateway(AIGateway):
         # gather の結果は順不同になる可能性があるため、インデックスで並べ直す
         results.sort(key=lambda item: item[0])
 
-        edited_content = "".join(chunk for _, chunk, _ in results)
+        edited_content = join_chunks([chunk for _, chunk, _ in results])
         total_tokens = sum(chunk_tokens for _, _, chunk_tokens in results)
         return edited_content, total_tokens
 

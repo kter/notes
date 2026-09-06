@@ -114,7 +114,9 @@ class AIInteractionUseCases:
         model_id, language = get_user_settings(self.session, self.user_id)
 
         try:
-            response, tokens_used = await ai_call(AIRequest(model_id, language))
+            response, tokens_used = await ai_call(
+                AIRequest(model_id=model_id, language=language)
+            )
         except AIGatewayTimeoutError as exc:
             raise AIApplicationTimeoutError(AI_TIMEOUT_MESSAGE) from exc
 

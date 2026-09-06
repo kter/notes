@@ -10,6 +10,7 @@ from app.features.assistant.markdown_chunks import (
     EDIT_SINGLE_PASS_MAX_CHARS,
     chunk_for_edit,
     extract_tagged,
+    join_chunks,
     needs_chunking,
 )
 
@@ -65,7 +66,7 @@ class TestChunkForEdit:
         chunks = chunk_for_edit(content)
 
         assert len(chunks) > 1
-        assert "".join(chunks) == content
+        assert join_chunks(chunks) == content
 
     def test_code_fences_are_never_split(self):
         """コードフェンス内で分割すると、片側だけ閉じていない Markdown が出来る。"""
@@ -74,7 +75,7 @@ class TestChunkForEdit:
 
         chunks = chunk_for_edit(content)
 
-        assert "".join(chunks) == content
+        assert join_chunks(chunks) == content
         for chunk in chunks:
             # 各チャンク内のフェンス数が偶数なら、フェンスをまたいで割れていない。
             # （フェンス自体が EDIT_CHUNK_MAX_CHARS を超えて強制分割される場合を除く）
@@ -89,7 +90,7 @@ class TestChunkForEdit:
 
         assert len(chunks) > 1
         assert all(len(chunk) <= EDIT_CHUNK_MAX_CHARS for chunk in chunks)
-        assert "".join(chunks) == content
+        assert join_chunks(chunks) == content
 
     def test_chunks_break_on_line_boundaries(self):
         """行の途中で割ると、モデルに壊れた Markdown を渡すことになる。
@@ -103,6 +104,6 @@ class TestChunkForEdit:
         chunks = chunk_for_edit(content)
 
         assert len(chunks) > 1
-        assert "".join(chunks) == content
+        assert join_chunks(chunks) == content
         for chunk in chunks[:-1]:
             assert chunk.endswith("\n")

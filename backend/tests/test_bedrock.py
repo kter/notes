@@ -3,9 +3,10 @@ import re
 from unittest.mock import Mock, patch
 
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ConnectTimeoutError, ReadTimeoutError
 
 from app.features.assistant.gateway import (
+    AIGatewayTimeoutError,
     AIRequest,
     BedrockGateway,
     _reset_ai_gateway_cache,
@@ -195,29 +196,39 @@ async def test_bedrock_error(mock_boto_client, mock_settings, mock_summary_cache
 async def test_edit_large_content_uses_chunking(
     mock_boto_client, mock_settings, mock_summary_cache
 ):
+    """長いコンテンツが分割・並列実行され、順序通りに結合されることを確認する。
+
+    private メソッドではなく boto3 クライアントの seam を通して検証する。
+    """
     service = BedrockGateway(summary_cache=mock_summary_cache)
     content = "# Title\n\n" + ("teh quick brown fox.\n\n" * 1200)
     calls: list[str] = []
 
-    def fake_invoke_model(
-        messages: list[dict],
-        system: str | None = None,
-        model_id: str | None = None,
-        max_tokens: int = 4096,
-    ) -> tuple[str, int]:
-        message = messages[0]["content"]
+    def fake_invoke_model(**kwargs):
+        body = json.loads(kwargs["body"])
+        message = body["messages"][0]["content"]
         match = re.search(
             r"<current_content>\n(.*)\n</current_content>", message, re.DOTALL
         )
         assert match is not None
         chunk = match.group(1)
         calls.append(chunk)
-        return (
-            f"<edited_content>{chunk.replace('teh', 'the')}</edited_content>",
-            11,
+        response_body = json.dumps(
+            {
+                "content": [
+                    {
+                        "text": (
+                            f"<edited_content>{chunk.replace('teh', 'the')}"
+                            "</edited_content>"
+                        )
+                    }
+                ],
+                "usage": {"input_tokens": 6, "output_tokens": 5},
+            }
         )
+        return {"body": Mock(read=Mock(return_value=response_body.encode()))}
 
-    service._invoke_model = Mock(side_effect=fake_invoke_model)
+    mock_boto_client.invoke_model.side_effect = fake_invoke_model
 
     edited, total_tokens = await service.edit(
         content=content,
@@ -229,6 +240,30 @@ async def test_edit_large_content_uses_chunking(
     assert len(calls) > 1
     assert edited == content.replace("teh", "the")
     assert total_tokens == 11 * len(calls)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "timeout_error",
+    [
+        ConnectTimeoutError(endpoint_url="https://bedrock-runtime.example"),
+        ReadTimeoutError(endpoint_url="https://bedrock-runtime.example"),
+    ],
+    ids=["connect", "read"],
+)
+async def test_bedrock_timeout_maps_to_gateway_timeout(
+    mock_boto_client, mock_settings, mock_summary_cache, timeout_error
+):
+    """boto3 のタイムアウトはアダプタ境界で AIGatewayTimeoutError に変換される。
+
+    上位層はこの例外だけを見て 504 を返すため、変換が抜けると
+    ClientError が 500 として漏れる。
+    """
+    service = BedrockGateway(summary_cache=mock_summary_cache)
+    mock_boto_client.invoke_model.side_effect = timeout_error
+
+    with pytest.raises(AIGatewayTimeoutError):
+        await service.summarize("Any content", AIRequest())
 
 
 # 退役済み Bedrock モデル ID の一覧。

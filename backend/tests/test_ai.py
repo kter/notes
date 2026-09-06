@@ -208,7 +208,7 @@ def test_ai_job_runner_refreshes_completion_timestamps_on_success(
 @pytest.mark.parametrize(
     ("process_fn", "expected_event"),
     [
-        (process_edit_job, "ops.ai_edit_job.not_found"),
+        (process_edit_job, "ops.ai_job.not_found"),
         (process_summarize_job, "ops.ai_job.not_found"),
     ],
 )

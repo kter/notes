@@ -65,10 +65,6 @@ vi.mock("@/lib/workspaceSync", () => ({
   persistWorkspaceSnapshotIncremental: vi.fn().mockResolvedValue(undefined),
   refreshWorkspaceSnapshot: (...args: unknown[]) =>
     refreshWorkspaceSnapshotMock(...args),
-  isConflictApiError: (error: unknown) =>
-    error instanceof ApiError && error.status === 409,
-  isAuthApiError: (error: unknown) =>
-    error instanceof ApiError && error.status === 401,
   getWorkspaceSyncRequestMetadata: () => getWorkspaceSyncRequestMetadataMock(),
   withSnippet: (note: Note) => ({ ...note, snippet: (note.content ?? "").slice(0, 80) }),
 }));

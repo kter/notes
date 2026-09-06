@@ -6,12 +6,8 @@
 主要なエクスポート: run_job。
 呼び出し関係: job_runner.py の process_* から呼ばれる。
 
-このモジュールが独立している理由:
-    以前は 507 行の job_runner に、トランスポート・状態機械・レコード種別の
-    3 つの無関係な軸が同居していた。レコード種別ごとの差分は AIJobRecordSpec
-    という 5 フィールドの記述子が吸収していたが、実際の差は「結果をどの列に
-    書くか」「ログに kind を出すか」の 2 点だけで、どちらもモデル自身が
-    答えられる。記述子を消し、リポジトリ 1 つを渡す形にした。
+扱う行の種別（AIJob / AIEditJob）はリポジトリ 1 つで表す。結果をどの列に書くか、
+ログに何を添えるかはモデル自身（apply_result / log_fields）が知っている。
 """
 
 import logging
@@ -22,6 +18,7 @@ from uuid import UUID
 
 from sqlmodel import Session
 
+from app.core.persistence import UserScopedRepository
 from app.database import get_dsql_engine
 from app.features.assistant.errors import (
     AI_EDIT_JOB_TIMEOUT_MESSAGE,
@@ -51,7 +48,7 @@ def assert_job_owner(
     job: Any,
     *,
     expected_user_id: str | None,
-    repository_cls: type,
+    repository_cls: type[UserScopedRepository[Any]],
     task: str,
 ) -> Any | None:
     """キューメッセージが主張する所有者と行の所有者が一致することを確認する。
@@ -89,7 +86,7 @@ def assert_job_owner(
 
 async def run_job(
     job_id: UUID | str,
-    repository_cls: type,
+    repository_cls: type[UserScopedRepository[Any]],
     run_call: Callable[[AIInteractionUseCases, Any], Awaitable[tuple[str, int]]],
     task: str,
     *,

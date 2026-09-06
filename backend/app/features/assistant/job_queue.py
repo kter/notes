@@ -7,11 +7,8 @@
     select_job_queue, EDIT_JOB_TOPIC_ARN_ENV。
 呼び出し関係: job_runner.dispatch_ai_job から使われ、JobEnvelope を送る。
 
-このモジュールが独立している理由:
-    以前は「どこで実行するか」「ジョブの状態がどう動くか」「どのテーブルの行か」の
-    3 つが 1 つの関数の中で絡み合っていた。トランスポートは 3 つの実装が実在する
-    （本番の SNS、ローカル開発の BackgroundTasks、テストのインライン実行）ため、
-    シームとして切り出す価値がある。
+送り先が 3 つ実在する（本番の SNS、ローカル開発の BackgroundTasks、
+それも無い環境でのインライン実行）ため、ここはシームとして切り出してある。
 """
 
 import logging
@@ -44,7 +41,11 @@ class SNSPublisher(Protocol):
 class JobQueue(Protocol):
     """ジョブ通知の送り先。"""
 
+    # 監査ログに残す送り先の名前
     dispatch_mode: str
+    # enqueue がその場でジョブを走らせ切るなら True。
+    # ログを出す順序と outcome の両方がこれで決まる。
+    runs_synchronously: bool
 
     async def enqueue(self, envelope: JobEnvelope) -> None:
         """ジョブ通知を送る。"""
@@ -55,6 +56,7 @@ class SNSQueue:
     """本番経路。共有 SNS トピックへ publish し、SQS 経由でワーカーが受け取る。"""
 
     dispatch_mode = "sns"
+    runs_synchronously = False
 
     def __init__(self, topic_arn: str, publisher: SNSPublisher | None = None):
         self.topic_arn = topic_arn
@@ -70,6 +72,7 @@ class BackgroundTaskQueue:
     """ローカル開発経路。FastAPI のレスポンス返却後に同一プロセスで実行する。"""
 
     dispatch_mode = "background_tasks"
+    runs_synchronously = False
 
     def __init__(self, background_tasks: BackgroundTasks, handlers: JobHandlers):
         self.background_tasks = background_tasks
@@ -90,6 +93,7 @@ class InlineQueue:
     """
 
     dispatch_mode = "inline"
+    runs_synchronously = True
 
     def __init__(self, handlers: JobHandlers):
         self.handlers = handlers
@@ -120,8 +124,24 @@ def select_job_queue(
 
 
 async def dispatch(queue: JobQueue, envelope: JobEnvelope) -> None:
-    """通知を送り、送り先の種別を含めて監査ログに残す。"""
+    """通知を送り、送り先の種別を含めて監査ログに残す。
+
+    インライン実行は enqueue がジョブ本体を走らせ切ってしまうため、ログは先に出す。
+    そうしないとジョブ自身の started / completed より後ろにずれ、
+    ハンドラーが例外を投げた場合は 1 行も残らない。
+    非同期の送り先は逆に、送信が成功してからでないと queued とは言えない。
+    """
+    if queue.runs_synchronously:
+        _log_dispatched(queue, envelope)
+        await queue.enqueue(envelope)
+        return
+
     await queue.enqueue(envelope)
+    _log_dispatched(queue, envelope)
+
+
+def _log_dispatched(queue: JobQueue, envelope: JobEnvelope) -> None:
+    """ディスパッチを監査ログに記録する。"""
     log_event(
         logger,
         logging.INFO,
@@ -129,8 +149,7 @@ async def dispatch(queue: JobQueue, envelope: JobEnvelope) -> None:
         job_id=envelope.job_id,
         task=envelope.task,
         dispatch_mode=queue.dispatch_mode,
-        # インライン実行はこの時点で完了しているため queued ではない
-        outcome="running" if queue.dispatch_mode == "inline" else "queued",
+        outcome="running" if queue.runs_synchronously else "queued",
     )
 
 

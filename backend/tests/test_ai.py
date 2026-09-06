@@ -70,6 +70,7 @@ class MockAIGateway(AIGateway):
         content: str,
         instruction: str,
         request: AIRequest,
+        on_usage=None,
     ) -> tuple[str, int]:
         self.calls.append("edit")
         return f"Edited: {content}", 30
@@ -547,6 +548,7 @@ def test_edit_timeout_returns_504(client: TestClient):
             content: str,
             instruction: str,
             request: AIRequest,
+            on_usage=None,
         ) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 
@@ -575,6 +577,7 @@ def test_edit_timeout_returns_exact_detail(
         content: str,
         instruction: str,
         request: AIRequest,
+        on_usage=None,
     ) -> tuple[str, int]:
         raise AIGatewayTimeoutError("timed out")
 
@@ -703,6 +706,7 @@ def test_edit_job_failure_is_persisted(
             content: str,
             instruction: str,
             request: AIRequest,
+            on_usage=None,
         ) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 

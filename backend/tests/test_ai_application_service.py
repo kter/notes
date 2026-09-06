@@ -60,6 +60,7 @@ class CapturingAIGateway(AIGateway):
         content: str,
         instruction: str,
         request: AIRequest,
+        on_usage=None,
     ) -> tuple[str, int]:
         self.calls.append(
             {
@@ -240,3 +241,69 @@ async def test_chat_with_selection_scope_raises_when_content_empty(session: Sess
             question="What does this mean?",
             selected_content="",
         )
+
+
+class ChunkedEditGateway(AIGateway):
+    """分割編集を模したゲートウェイ。チャンクごとに消費を報告する。"""
+
+    def __init__(self, chunk_tokens: list[int]) -> None:
+        self.chunk_tokens = chunk_tokens
+
+    async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
+        raise NotImplementedError
+
+    async def chat(
+        self,
+        content: str,
+        question: str,
+        request: AIRequest,
+        history: list[dict] | None = None,
+    ) -> tuple[str, int]:
+        raise NotImplementedError
+
+    async def edit(
+        self,
+        content: str,
+        instruction: str,
+        request: AIRequest,
+        on_usage=None,
+    ) -> tuple[str, int]:
+        for tokens in self.chunk_tokens:
+            if on_usage is not None:
+                on_usage(tokens)
+        return "edited", sum(self.chunk_tokens)
+
+
+@pytest.mark.asyncio
+async def test_chunked_edit_records_usage_per_chunk(session: Session):
+    """分割編集の消費がチャンクごとに計上されること。
+
+    以前は全チャンク完了後に 1 回だけ計上していたため、上限間際のユーザーが
+    1 リクエストで並列にどこまでも超過でき、その事実が記録に残らなかった。
+    """
+    session.add(
+        UserSettings(
+            user_id=TEST_USER_ID,
+            llm_model_id=AVAILABLE_MODELS[0]["id"],
+            language="en",
+            token_limit=1000,
+        )
+    )
+    session.commit()
+
+    ai_gateway = ChunkedEditGateway([300, 300, 300, 300])
+    use_cases = AIInteractionUseCases(
+        session,
+        TEST_USER_ID,
+        ai_gateway,
+        WorkspaceQueryUseCases(session, TEST_USER_ID),
+    )
+
+    _, tokens_used = await use_cases.execute_edit(content="body", instruction="fix")
+
+    assert tokens_used == 1200
+    assert get_usage_info(session, TEST_USER_ID).tokens_used == 1200
+
+    # 超過したので、次のリクエストは受け付けない
+    with pytest.raises(AITokenLimitExceededError):
+        await use_cases.execute_edit(content="body", instruction="fix again")

@@ -4,8 +4,8 @@ import unittest
 from unittest.mock import MagicMock
 
 from app.features.assistant.errors import AITokenLimitExceededError
+from app.features.assistant.token_budget import TokenBudget
 from app.features.assistant.usage_policy import check_limit
-from app.features.assistant.use_cases.common import ensure_token_limit
 from app.models.token_usage import MONTHLY_TOKEN_LIMIT, TokenUsage
 
 
@@ -50,15 +50,15 @@ class TestCheckLimit(unittest.TestCase):
         self.assertFalse(check_limit(session, "user-a"))
 
 
-class TestEnsureTokenLimit(unittest.TestCase):
+class TestAssertAvailable(unittest.TestCase):
     """Tests for the assistant token limit policy helper."""
 
     def test_raises_domain_error_when_limit_exceeded(self):
         session = _make_session(MONTHLY_TOKEN_LIMIT)
         with self.assertRaises(AITokenLimitExceededError):
-            ensure_token_limit(session, "user-b")
+            TokenBudget(session, "user-b").assert_available()
 
     def test_no_exception_when_within_limit(self):
         session = _make_session(0)
         # Should not raise
-        ensure_token_limit(session, "user-b")
+        TokenBudget(session, "user-b").assert_available()

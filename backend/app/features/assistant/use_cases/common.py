@@ -1,17 +1,11 @@
 """assistant ユースケース群で共有するヘルパー関数。
 
-責務: 入力値の空チェックとトークン制限ガードを提供する。
-主要なエクスポート: require_non_empty, ensure_token_limit
+責務: 入力値の空チェックを提供する。
+主要なエクスポート: require_non_empty
 呼び出し関係: AIInteractionUseCases および EditJobUseCases から呼ばれる。
+    トークン上限のガードは token_budget.TokenBudget が持つ。
 """
 
-from sqlmodel import Session
-
-from app.features.assistant.errors import (
-    TOKEN_LIMIT_EXCEEDED_MESSAGE,
-    AITokenLimitExceededError,
-)
-from app.features.assistant.usage_policy import check_limit
 from app.shared import ValidationFailed
 
 
@@ -19,9 +13,3 @@ def require_non_empty(value: str, detail: str) -> None:
     """値が空文字またはホワイトスペースのみの場合に ValidationFailed を送出する。"""
     if not value.strip():
         raise ValidationFailed(detail)
-
-
-def ensure_token_limit(session: Session, user_id: str) -> None:
-    """トークン上限を超過している場合に AITokenLimitExceededError を送出する。"""
-    if not check_limit(session, user_id):
-        raise AITokenLimitExceededError(TOKEN_LIMIT_EXCEEDED_MESSAGE)

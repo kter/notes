@@ -12,7 +12,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlmodel import Session
 
-from app.auth import FolderNoteUserId, UserId
+from app.auth import BearerOrApiKeyUserId, UserId
 from app.database import get_session
 from app.features.workspace.use_cases import (
     FolderUseCases,
@@ -26,7 +26,7 @@ from app.features.workspace.use_cases import (
 
 def get_folder_use_cases(
     session: Annotated[Session, Depends(get_session)],
-    user_id: FolderNoteUserId,
+    user_id: BearerOrApiKeyUserId,
 ) -> FolderUseCases:
     """フォルダ CRUD ユースケースを生成して返す。"""
     return FolderUseCases(session, user_id)
@@ -34,7 +34,7 @@ def get_folder_use_cases(
 
 def get_note_use_cases(
     session: Annotated[Session, Depends(get_session)],
-    user_id: FolderNoteUserId,
+    user_id: BearerOrApiKeyUserId,
 ) -> NoteUseCases:
     """ノート CRUD ユースケースを生成して返す。"""
     return NoteUseCases(session, user_id)

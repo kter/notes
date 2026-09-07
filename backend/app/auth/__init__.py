@@ -3,22 +3,25 @@ from app.auth.app_user_service import AppUserService
 from app.auth.cognito import get_cognito_verifier
 from app.auth.dependencies import (
     AdminUser,
+    BearerOrApiKeyUserId,
     CurrentAppUser,
     CurrentUser,
-    FolderNoteUserId,
     UserId,
+    get_bearer_or_api_key_user_id,
     get_current_app_user,
     get_current_user,
-    get_folder_note_user_id,
     get_user_id,
     require_admin,
 )
+from app.auth.principal import Credential, Principal
 
 __all__ = [
+    "Credential",
+    "Principal",
     "AppUserService",
     "UserApiKeyService",
     "get_cognito_verifier",
-    "get_folder_note_user_id",
+    "get_bearer_or_api_key_user_id",
     "get_current_app_user",
     "get_current_user",
     "get_user_id",
@@ -26,6 +29,6 @@ __all__ = [
     "AdminUser",
     "CurrentAppUser",
     "CurrentUser",
-    "FolderNoteUserId",
+    "BearerOrApiKeyUserId",
     "UserId",
 ]

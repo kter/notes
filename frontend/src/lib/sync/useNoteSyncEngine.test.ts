@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api";
 import { notesDB } from "@/lib/indexedDB";
+import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";
@@ -287,6 +288,39 @@ describe("useNoteSyncEngine", () => {
     expect(result.current.notes[0]?.snippet).toBe("Updated content");
     // デバウンスが発火するまでサーバーへは送られない。
     expect(result.current.syncStatus.remote).toBe("unsynced");
+
+    vi.useRealTimers();
+  });
+
+  it("does not blank the stored body when only metadata changes on an unopened note", async () => {
+    // 回帰テスト: 以前の優先順位式は
+    //   bodyOnly ?? noteBodyStore.get(id) ?? note.content ?? ""
+    // で、get が未登録でも "" を返すため第 3 項に到達せず、今セッションで
+    // 一度も開いていないノートのタイトル変更が IndexedDB の本文を空にしていた。
+    vi.useFakeTimers();
+    Object.defineProperty(window.navigator, "onLine", {
+      configurable: true,
+      value: true,
+    });
+
+    const initialNote = buildNote({ content: "Body written in an earlier session" });
+    noteBodyStore.delete(initialNote.id);
+
+    const { result } = renderHook(() =>
+      useNoteSyncEngineHarness([initialNote], null, initialNote.id)
+    );
+
+    await act(async () => {
+      await result.current.handleUpdateNote(initialNote.id, { title: "Renamed" });
+    });
+
+    expect(notesDB.saveNote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: initialNote.id,
+        title: "Renamed",
+        content: "Body written in an earlier session",
+      })
+    );
 
     vi.useRealTimers();
   });

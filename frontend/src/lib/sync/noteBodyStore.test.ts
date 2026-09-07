@@ -8,20 +8,41 @@ afterEach(() => {
 });
 
 describe("noteBodyStore", () => {
-  describe("get / set", () => {
+  describe("bodyForPersist", () => {
+    it("returns undefined for a note that was never opened this session", () => {
+      // undefined は「本文に触るな」の意味。"" を返すと IndexedDB の本文を
+      // 空文字列で上書きしてしまう。
+      expect(noteBodyStore.bodyForPersist("never-opened")).toBeUndefined();
+    });
+
+    it("distinguishes a deliberately emptied body from an absent one", () => {
+      noteBodyStore.set("emptied", "");
+
+      expect(noteBodyStore.bodyForPersist("emptied")).toBe("");
+      expect(noteBodyStore.bodyForPersist("absent")).toBeUndefined();
+    });
+
+    it("returns the stored body once the note has been edited", () => {
+      noteBodyStore.set("a", "edited body");
+
+      expect(noteBodyStore.bodyForPersist("a")).toBe("edited body");
+    });
+  });
+
+  describe("resolve / set", () => {
     it("returns empty string for unknown id", () => {
-      expect(noteBodyStore.get("unknown")).toBe("");
+      expect(noteBodyStore.resolve("unknown", "")).toBe("");
     });
 
     it("stores and retrieves a value", () => {
       noteBodyStore.set("a", "hello");
-      expect(noteBodyStore.get("a")).toBe("hello");
+      expect(noteBodyStore.resolve("a", "")).toBe("hello");
     });
 
     it("overwrites an existing value", () => {
       noteBodyStore.set("a", "first");
       noteBodyStore.set("a", "second");
-      expect(noteBodyStore.get("a")).toBe("second");
+      expect(noteBodyStore.resolve("a", "")).toBe("second");
     });
 
     it("does not notify listeners when setting the same value", () => {
@@ -118,7 +139,7 @@ describe("noteBodyStore", () => {
     it("removes a stored value", () => {
       noteBodyStore.set("a", "data");
       noteBodyStore.delete("a");
-      expect(noteBodyStore.get("a")).toBe("");
+      expect(noteBodyStore.resolve("a", "fallback")).toBe("fallback");
     });
 
     it("is a no-op and does not notify for unknown id", () => {

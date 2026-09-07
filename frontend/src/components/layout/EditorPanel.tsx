@@ -486,16 +486,27 @@ export function EditorPanel({
     },
   }), [setEditorContent]);
 
+  // 未保存の編集を確定する。dirty 判定はこの 1 箇所だけが持つ。
+  // 以前は EditorToolbar が親の 4 つの ref を直接読み書きして同じ判定を
+  // 複製しており、「何を dirty とみなすか」を変えるには 2 ファイルを
+  // 触る必要があった。
+  const flushPendingEdits = useCallback(() => {
+    if (!note) return;
+    // 最新値を取るために state ではなく ref を見る
+    const titleChanged = currentTitleRef.current !== lastSavedTitle.current;
+    const contentChanged = currentContentRef.current !== lastSavedContent.current;
+    if (!titleChanged && !contentChanged) return;
+
+    const updates: { title?: string; content?: string } = {};
+    if (titleChanged) updates.title = currentTitleRef.current;
+    if (contentChanged) updates.content = currentContentRef.current;
+    onUpdateNote(note.id, updates);
+    lastSavedTitle.current = currentTitleRef.current;
+    lastSavedContent.current = currentContentRef.current;
+  }, [note, onUpdateNote]);
+
   const handleBlur = () => {
-    // Use refs to check for changes to ensure we have the latest values
-    if (note && (currentTitleRef.current !== lastSavedTitle.current || currentContentRef.current !== lastSavedContent.current)) {
-      const updates: { title?: string; content?: string } = {};
-      if (currentTitleRef.current !== lastSavedTitle.current) updates.title = currentTitleRef.current;
-      if (currentContentRef.current !== lastSavedContent.current) updates.content = currentContentRef.current;
-      onUpdateNote(note.id, updates);
-      lastSavedTitle.current = currentTitleRef.current;
-      lastSavedContent.current = currentContentRef.current;
-    }
+    flushPendingEdits();
 
     if (note && triggerServerSync) {
       triggerServerSync(note.id);
@@ -715,10 +726,7 @@ export function EditorPanel({
             isEditorCollapsed={isEditorCollapsed}
             isFullscreen={isFullscreen}
             hasPendingEditProposal={!!pendingEditProposal}
-            currentTitleRef={currentTitleRef}
-            currentContentRef={currentContentRef}
-            lastSavedTitleRef={lastSavedTitle}
-            lastSavedContentRef={lastSavedContent}
+            onFlushPendingEdits={flushPendingEdits}
             onUpdateNote={onUpdateNote}
             onSummarize={onSummarize}
             onOpenChat={onOpenChat}

@@ -1,5 +1,6 @@
 resource "aws_sns_topic" "ai_edit_jobs" {
-  name = "${var.project_name}-ai-edit-jobs-${terraform.workspace}"
+  name              = "${var.project_name}-ai-edit-jobs-${terraform.workspace}"
+  kms_master_key_id = "alias/aws/sns"
 
   tags = {
     Name = "${var.project_name}-ai-edit-jobs-${terraform.workspace}"
@@ -9,6 +10,7 @@ resource "aws_sns_topic" "ai_edit_jobs" {
 resource "aws_sqs_queue" "ai_edit_jobs_dlq" {
   name                      = "${var.project_name}-ai-edit-jobs-dlq-${terraform.workspace}"
   message_retention_seconds = 1209600
+  kms_master_key_id         = "alias/aws/sqs"
 
   tags = {
     Name = "${var.project_name}-ai-edit-jobs-dlq-${terraform.workspace}"
@@ -19,6 +21,7 @@ resource "aws_sqs_queue" "ai_edit_jobs" {
   name                       = "${var.project_name}-ai-edit-jobs-${terraform.workspace}"
   visibility_timeout_seconds = 180
   message_retention_seconds  = 1209600
+  kms_master_key_id          = "alias/aws/sqs"
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.ai_edit_jobs_dlq.arn

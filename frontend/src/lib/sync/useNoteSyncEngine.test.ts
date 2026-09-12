@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api";
 import { notesDB } from "@/lib/indexedDB";
-import { noteBodyStore } from "@/lib/sync/noteBodyStore";
 import { syncQueue } from "@/lib/syncQueue";
 import { calculateHash } from "@/lib/utils";
 import type { Note } from "@/types";

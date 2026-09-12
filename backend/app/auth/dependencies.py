@@ -1,8 +1,9 @@
 """FastAPI 依存性注入による認証・認可ヘルパーモジュール。
 
 責務: Bearer トークンおよび API キーを検証し、認証済みユーザー情報を返す。
+    ルートが受け付ける資格情報の種類は require_principal の引数として宣言する。
 主要なエクスポート: get_current_user, get_current_app_user, require_admin,
-    get_folder_note_user_id, および各種型エイリアス。
+    require_principal, および各種型エイリアス。
 呼び出し関係: ルーターの Depends から呼ばれ、CognitoJWTVerifier / UserApiKeyService
     / AppUserService を呼ぶ。
 """
@@ -18,6 +19,7 @@ from sqlmodel import Session
 from app.auth.api_key_service import UserApiKeyService
 from app.auth.app_user_service import AppUserService
 from app.auth.cognito import CognitoJWTVerifier, get_cognito_verifier
+from app.auth.principal import Credential, Principal
 from app.database import get_session
 from app.logging_utils import bind_user_id, log_event
 from app.models import AppUser
@@ -87,15 +89,14 @@ async def get_current_user(
     return await _verify_bearer_token(credentials.credentials)
 
 
-def get_current_app_user(
-    current_user: Annotated[dict, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)],
-) -> AppUser:
-    """JWT クレームからアプリローカルのユーザープロファイルを取得・作成する。
+def _app_user_from_claims(claims: dict, session: Session) -> AppUser:
+    """検証済みクレームからアプリローカルのユーザープロファイルを取得・作成する。
 
-    sub クレームが空の場合は 401 を送出する。
+    sub クレームが空の場合は 401 を送出する。Bearer で認証するすべての経路が
+    ここを通る。以前は API キー併用の依存関数がこの連鎖を手で書き直しており、
+    その経路にだけ sub 欠落の 401 が無かった。
     """
-    user_id = current_user.get("sub", "")
+    user_id = claims.get("sub", "")
     if not user_id:
         log_event(
             logger,
@@ -109,7 +110,15 @@ def get_current_app_user(
             detail="Missing user subject",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return AppUserService(session).ensure_app_user(current_user)
+    return AppUserService(session).ensure_app_user(claims)
+
+
+def get_current_app_user(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AppUser:
+    """JWT クレームからアプリローカルのユーザープロファイルを取得・作成する。"""
+    return _app_user_from_claims(current_user, session)
 
 
 def get_user_id(app_user: Annotated[AppUser, Depends(get_current_app_user)]) -> str:
@@ -136,38 +145,10 @@ def require_admin(
     return app_user
 
 
-async def get_folder_note_user_id(
-    bearer_credentials: Annotated[
-        HTTPAuthorizationCredentials | None, Security(optional_bearer_security)
-    ],
-    api_key: Annotated[str | None, Security(api_key_header_security)],
-    session: Annotated[Session, Depends(get_session)],
-) -> str:
-    """フォルダ・ノート CRUD のユーザー ID を取得する依存関数。
-
-    Bearer トークンと X-API-Key ヘッダーのどちらかで認証できる。
-    どちらも提供されていない場合は 401 を送出する。
-    """
-    if bearer_credentials is not None:
-        # Bearer トークンが提供された場合は JWT で認証する
-        claims = await _verify_bearer_token(bearer_credentials.credentials)
-        return AppUserService(session).ensure_app_user(claims).user_id
-
-    if api_key is not None:
-        stored_key = UserApiKeyService(session).authenticate(api_key)
-        if stored_key is not None:
-            bind_user_id(stored_key.user_id)
-            set_sentry_user_context(stored_key.user_id)
-            log_event(
-                logger,
-                logging.INFO,
-                "security.auth.api_key_authenticated",
-                outcome="success",
-                api_key_id=stored_key.id,
-            )
-            return stored_key.user_id
-
-        # API キーが提供されたが無効だった場合
+def _principal_from_api_key(api_key: str, session: Session) -> Principal:
+    """X-API-Key を検証して Principal を返す。無効なキーは 401。"""
+    stored_key = UserApiKeyService(session).authenticate(api_key)
+    if stored_key is None:
         log_event(
             logger,
             logging.WARNING,
@@ -180,17 +161,76 @@ async def get_folder_note_user_id(
             detail="Invalid API key",
         )
 
-    # 認証情報が何も提供されなかった場合
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-        headers={"WWW-Authenticate": "Bearer"},
+    bind_user_id(stored_key.user_id)
+    set_sentry_user_context(stored_key.user_id)
+    log_event(
+        logger,
+        logging.INFO,
+        "security.auth.api_key_authenticated",
+        outcome="success",
+        api_key_id=stored_key.id,
     )
+    return Principal(user_id=stored_key.user_id, credential="api_key")
+
+
+def require_principal(*allowed: Credential):
+    """指定した資格情報で認証された Principal を返す依存関数を組み立てる。
+
+    ルートが受け付ける資格情報の種類を、型エイリアスの名前ではなく引数として
+    宣言する。以前は `UserId` と `FolderNoteUserId` という 2 つのエイリアスが
+    どちらも str に解決され、後者だけが X-API-Key を受け付けていた。名前が
+    示していたのは「今どのルートで使われているか」であって能力ではなく、
+    新しいエンドポイントの作者は補完で選ぶだけで認証面を決めていた。
+    """
+    if "api_key" in allowed:
+
+        async def dependency(
+            bearer_credentials: Annotated[
+                HTTPAuthorizationCredentials | None,
+                Security(optional_bearer_security),
+            ],
+            api_key: Annotated[str | None, Security(api_key_header_security)],
+            session: Annotated[Session, Depends(get_session)],
+        ) -> Principal:
+            if bearer_credentials is not None:
+                claims = await _verify_bearer_token(bearer_credentials.credentials)
+                app_user = _app_user_from_claims(claims, session)
+                return Principal(user_id=app_user.user_id, credential="bearer")
+
+            if api_key is not None:
+                return _principal_from_api_key(api_key, session)
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        return dependency
+
+    async def bearer_only_dependency(
+        credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        session: Annotated[Session, Depends(get_session)],
+    ) -> Principal:
+        claims = await _verify_bearer_token(credentials.credentials)
+        app_user = _app_user_from_claims(claims, session)
+        return Principal(user_id=app_user.user_id, credential="bearer")
+
+    return bearer_only_dependency
+
+
+async def get_bearer_or_api_key_user_id(
+    principal: Annotated[Principal, Depends(require_principal("bearer", "api_key"))],
+) -> str:
+    """Bearer または X-API-Key で認証されたユーザー ID を返す。"""
+    return principal.user_id
 
 
 # 依存性注入で使用する型エイリアス
 CurrentUser = Annotated[dict, Depends(get_current_user)]
 CurrentAppUser = Annotated[AppUser, Depends(get_current_app_user)]
 AdminUser = Annotated[AppUser, Depends(require_admin)]
+# Bearer のみ。API キーでは通らない。
 UserId = Annotated[str, Depends(get_user_id)]
-FolderNoteUserId = Annotated[str, Depends(get_folder_note_user_id)]
+# Bearer に加えて X-API-Key も受け付ける。外部連携向けに開いている面。
+BearerOrApiKeyUserId = Annotated[str, Depends(get_bearer_or_api_key_user_id)]

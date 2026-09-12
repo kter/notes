@@ -56,6 +56,7 @@ export function getSentryBrowserConfig() {
       Sentry.replayIntegration({
         maskAllText: true,
         blockAllMedia: true,
+        block: [".cm-content", ".cm-editor", "[data-sentry-block]"],
       }),
     ],
   };

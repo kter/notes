@@ -131,6 +131,20 @@ class TestUpdateSettings:
         settings = data["settings"]
         assert settings["llm_model_id"] == valid_model_id
 
+    def test_first_ever_update_rejects_invalid_model_id(self, client: TestClient):
+        """設定が未作成のユーザーでも許可モデル検証を通ることを固定する。
+
+        以前は新規作成パスだけが検証を素通りしており、初回更新で選択不可能な
+        モデル ID をそのまま永続化できてしまっていた。
+        """
+        response = client.put(
+            "/api/settings",
+            json={"llm_model_id": "invalid-model-that-does-not-exist"},
+        )
+
+        assert response.status_code == 400
+        assert "Invalid model ID" in response.json()["detail"]
+
     def test_update_settings_rejects_token_limit(self, client: TestClient):
         """Token limit must not be user-editable from the settings endpoint."""
         response = client.put(

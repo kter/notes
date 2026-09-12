@@ -7,13 +7,19 @@
     既存の EditJobUseCases（編集専用）を要約・チャット向けに一般化したもの。
 """
 
-import json
 from uuid import UUID
 
 from sqlmodel import Session
 
 from app.db_commit import commit_with_error_handling
+from app.features.assistant.job_payloads import (
+    AIJobInput,
+    ChatJobInput,
+    SummarizeJobInput,
+    encode,
+)
 from app.features.assistant.repositories import AIJobRepository
+from app.features.assistant.schemas import BedrockMessage
 from app.features.assistant.use_cases.common import (
     ensure_token_limit,
     require_non_empty,
@@ -37,14 +43,17 @@ class AIJobUseCases:
         self.workspace_queries = workspace_queries
         self.repository = AIJobRepository(session, user_id)
 
-    def _create(self, kind: str, payload: dict) -> AIJob:
-        """トークン制限チェック後に pending ジョブを永続化する共通処理。"""
+    def _create(self, job_input: AIJobInput) -> AIJob:
+        """トークン制限チェック後に pending ジョブを永続化する共通処理。
+
+        kind の正は AIJob.kind 列で、入力モデル側の ClassVar と一致させる。
+        """
         ensure_token_limit(self.session, self.user_id)
         job = AIJob(
             user_id=self.user_id,
-            kind=kind,
+            kind=job_input.kind,
             status="pending",
-            input=json.dumps(payload),
+            input=encode(job_input),
         )
         self.session.add(job)
         commit_with_error_handling(self.session, "AIJob")
@@ -54,14 +63,14 @@ class AIJobUseCases:
     def create_summarize_job(self, note_id: UUID) -> AIJob:
         """要約ジョブを作成する。ノートの所有権・存在を作成時に検証する。"""
         self.workspace_queries.get_owned_note(note_id)
-        return self._create("summarize", {"note_id": str(note_id)})
+        return self._create(SummarizeJobInput(note_id=note_id))
 
     def create_chat_job(
         self,
         *,
         scope: ChatScope,
         question: str,
-        history: list | None = None,
+        history: list[BedrockMessage] | None = None,
         note_id: UUID | None = None,
         folder_id: UUID | None = None,
         selected_content: str | None = None,
@@ -73,21 +82,16 @@ class AIJobUseCases:
         if note_id is not None:
             self.workspace_queries.get_owned_note(note_id)
 
-        payload = {
-            "scope": scope.value,
-            "question": question,
-            # BedrockMessage 等の pydantic オブジェクト or dict を JSON 化する
-            "history": [
-                msg.model_dump() if hasattr(msg, "model_dump") else dict(msg)
-                for msg in history
-            ]
-            if history
-            else None,
-            "note_id": str(note_id) if note_id else None,
-            "folder_id": str(folder_id) if folder_id else None,
-            "selected_content": selected_content,
-        }
-        return self._create("chat", payload)
+        return self._create(
+            ChatJobInput(
+                scope=scope,
+                question=question,
+                history=history or None,
+                note_id=note_id,
+                folder_id=folder_id,
+                selected_content=selected_content,
+            )
+        )
 
     def get_job(self, job_id: UUID) -> AIJob:
         """指定 ID の AI ジョブを取得する。所有者でない場合は NotFound を送出。"""

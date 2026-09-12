@@ -2,11 +2,12 @@
 
 責務: AI操作に関するエラー種別を一元管理する。
 主要なエクスポート: AITokenLimitExceededError, AIApplicationTimeoutError,
-    TOKEN_LIMIT_EXCEEDED_MESSAGE, AI_TIMEOUT_MESSAGE, AI_EDIT_JOB_TIMEOUT_MESSAGE。
-呼び出し関係: usage_policy, job_runner, use_cases から参照される。
+    UnsupportedJobKind, TOKEN_LIMIT_EXCEEDED_MESSAGE, AI_TIMEOUT_MESSAGE,
+    AI_EDIT_JOB_TIMEOUT_MESSAGE。
+呼び出し関係: usage_policy, job_runner, job_payloads, use_cases から参照される。
 """
 
-from app.shared import QuotaExceeded, UpstreamTimeout
+from app.shared import QuotaExceeded, UpstreamTimeout, ValidationFailed
 
 # ユーザー向けエラーメッセージ定数
 TOKEN_LIMIT_EXCEEDED_MESSAGE = "Monthly token limit exceeded. Your usage will reset at the beginning of next month."  # noqa: S105
@@ -22,3 +23,11 @@ class AITokenLimitExceededError(QuotaExceeded):
 
 class AIApplicationTimeoutError(UpstreamTimeout):
     """上流AIプロバイダー（Bedrock等）がタイムアウトした場合に送出される。"""
+
+
+class UnsupportedJobKind(ValidationFailed):
+    """AI ジョブの種別が未知、またはハンドラーの期待と食い違う場合に送出される。
+
+    ジョブ実行中に出た場合は job_runner の汎用ハンドラーが failed として
+    記録する（再試行しても直らないため）。
+    """

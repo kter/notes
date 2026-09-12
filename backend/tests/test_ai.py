@@ -16,6 +16,7 @@ from app.features.assistant.errors import (
 from app.features.assistant.gateway import (
     AIGateway,
     AIGatewayTimeoutError,
+    AIRequest,
     get_ai_gateway,
 )
 from app.features.assistant.job_runner import (
@@ -50,9 +51,7 @@ class MockAIGateway(AIGateway):
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    async def summarize(
-        self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> tuple[str, int]:
+    async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
         self.calls.append("summarize")
         return f"Summary: {content[:10]}...", 20
 
@@ -60,9 +59,8 @@ class MockAIGateway(AIGateway):
         self,
         content: str,
         question: str,
+        request: AIRequest,
         history: list[dict] | None = None,
-        model_id: str | None = None,
-        language: str = "auto",
     ) -> tuple[str, int]:
         self.calls.append("chat")
         return f"Answer for '{question}' based on {len(content)} chars", 20
@@ -71,8 +69,7 @@ class MockAIGateway(AIGateway):
         self,
         content: str,
         instruction: str,
-        model_id: str | None = None,
-        language: str = "auto",
+        request: AIRequest,
     ) -> tuple[str, int]:
         self.calls.append("edit")
         return f"Edited: {content}", 30
@@ -533,18 +530,15 @@ def test_edit_unowned_note(make_client, session: Session, mock_ai_service):
 
 def test_edit_timeout_returns_504(client: TestClient):
     class TimeoutAIGateway(AIGateway):
-        async def summarize(
-            self, content: str, model_id: str | None = None, language: str = "auto"
-        ) -> tuple[str, int]:
+        async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 
         async def chat(
             self,
             content: str,
             question: str,
+            request: AIRequest,
             history: list[dict] | None = None,
-            model_id: str | None = None,
-            language: str = "auto",
         ) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 
@@ -552,8 +546,7 @@ def test_edit_timeout_returns_504(client: TestClient):
             self,
             content: str,
             instruction: str,
-            model_id: str | None = None,
-            language: str = "auto",
+            request: AIRequest,
         ) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 
@@ -581,8 +574,7 @@ def test_edit_timeout_returns_exact_detail(
     async def timeout_edit(
         content: str,
         instruction: str,
-        model_id: str | None = None,
-        language: str = "auto",
+        request: AIRequest,
     ) -> tuple[str, int]:
         raise AIGatewayTimeoutError("timed out")
 
@@ -694,18 +686,15 @@ def test_edit_job_failure_is_persisted(
     client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ):
     class TimeoutAIGateway(AIGateway):
-        async def summarize(
-            self, content: str, model_id: str | None = None, language: str = "auto"
-        ) -> tuple[str, int]:
+        async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 
         async def chat(
             self,
             content: str,
             question: str,
+            request: AIRequest,
             history: list[dict] | None = None,
-            model_id: str | None = None,
-            language: str = "auto",
         ) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 
@@ -713,8 +702,7 @@ def test_edit_job_failure_is_persisted(
             self,
             content: str,
             instruction: str,
-            model_id: str | None = None,
-            language: str = "auto",
+            request: AIRequest,
         ) -> tuple[str, int]:
             raise AIGatewayTimeoutError("timed out")
 

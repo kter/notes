@@ -2,7 +2,7 @@ import pytest
 from sqlmodel import Session
 
 from app.features.assistant.errors import AITokenLimitExceededError
-from app.features.assistant.gateway import AIGateway
+from app.features.assistant.gateway import AIGateway, AIRequest
 from app.features.assistant.usage_policy import get_usage_info, record_usage
 from app.features.assistant.use_cases import (
     AIInteractionUseCases,
@@ -27,15 +27,13 @@ class CapturingAIGateway(AIGateway):
     def __init__(self) -> None:
         self.calls: list[dict[str, str]] = []
 
-    async def summarize(
-        self, content: str, model_id: str | None = None, language: str = "auto"
-    ) -> tuple[str, int]:
+    async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
         self.calls.append(
             {
                 "operation": "summarize",
                 "content": content,
-                "model_id": model_id or "",
-                "language": language,
+                "model_id": request.model_id or "",
+                "language": request.language,
             }
         )
         return "summary", 12
@@ -44,16 +42,15 @@ class CapturingAIGateway(AIGateway):
         self,
         content: str,
         question: str,
+        request: AIRequest,
         history: list[dict] | None = None,
-        model_id: str | None = None,
-        language: str = "auto",
     ) -> tuple[str, int]:
         self.calls.append(
             {
                 "operation": "chat",
                 "content": content,
-                "model_id": model_id or "",
-                "language": language,
+                "model_id": request.model_id or "",
+                "language": request.language,
             }
         )
         return "answer", 8
@@ -62,15 +59,14 @@ class CapturingAIGateway(AIGateway):
         self,
         content: str,
         instruction: str,
-        model_id: str | None = None,
-        language: str = "auto",
+        request: AIRequest,
     ) -> tuple[str, int]:
         self.calls.append(
             {
                 "operation": "edit",
                 "content": content,
-                "model_id": model_id or "",
-                "language": language,
+                "model_id": request.model_id or "",
+                "language": request.language,
             }
         )
         return f"edited: {content}", 5

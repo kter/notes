@@ -15,11 +15,10 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { notesDB } from "@/lib/indexedDB";
 import { logger } from "@/lib/logger";
 import { syncQueue } from "@/lib/syncQueue";
+import { classifyChangeFailure } from "@/lib/sync/changeOutcome";
 import { calculateHash } from "@/lib/utils";
 import {
   getWorkspaceSyncRequestMetadata,
-  isAuthApiError,
-  isConflictApiError,
   persistWorkspaceSnapshotIncremental,
   refreshWorkspaceSnapshot,
   withSnippet,
@@ -195,7 +194,8 @@ export function useNoteSyncEngine({
             setRemoteStatus("synced");
             setLocalStatus("saved");
           } catch (error) {
-            if (isConflictApiError(error)) {
+            const failure = classifyChangeFailure(error);
+            if (failure.kind === "conflict") {
               const apiClient = await getApi();
               const snapshot = await refreshWorkspaceSnapshot(apiClient, {
                 onSnapshotSynced: handleSnapshotSynced,
@@ -206,7 +206,7 @@ export function useNoteSyncEngine({
               return;
             }
             // 401: セッション失効。リトライでは回復しないため即時中断しバナーを表示する。
-            if (isAuthApiError(error)) {
+            if (failure.kind === "sessionExpired") {
               logger.warn("Session expired during note sync", error);
               await syncQueue.addChange("update", "note", id, updates, {
                 expectedVersion,
@@ -378,7 +378,8 @@ export function useNoteSyncEngine({
         handleSnapshotSynced(response.snapshot);
         setRemoteStatus("synced");
       } catch (error) {
-        if (isConflictApiError(error)) {
+        const failure = classifyChangeFailure(error);
+        if (failure.kind === "conflict") {
           const apiClient = await getApi();
           const snapshot = await refreshWorkspaceSnapshot(apiClient, {
             onSnapshotSynced: handleSnapshotSynced,
@@ -388,7 +389,7 @@ export function useNoteSyncEngine({
           setLastError(t("sync.conflictReloaded"));
           return;
         }
-        if (isAuthApiError(error)) {
+        if (failure.kind === "sessionExpired") {
           logger.warn("Session expired during note create", error);
           await syncQueue.addChange("create", "note", tempId, {
             title: "",
@@ -587,7 +588,8 @@ export function useNoteSyncEngine({
             delete serverVersionByNoteIdRef.current[id];
             handleSnapshotSynced(response.snapshot);
           } catch (error) {
-            if (isConflictApiError(error)) {
+            const failure = classifyChangeFailure(error);
+            if (failure.kind === "conflict") {
               const apiClient = await getApi();
               const snapshot = await refreshWorkspaceSnapshot(apiClient, {
                 onSnapshotSynced: handleSnapshotSynced,
@@ -597,7 +599,7 @@ export function useNoteSyncEngine({
               setLastError(t("sync.conflictReloaded"));
               return;
             }
-            if (isAuthApiError(error)) {
+            if (failure.kind === "sessionExpired") {
               logger.warn("Session expired during note delete", error);
               if (!id.startsWith("temp-")) {
                 await syncQueue.addChange("delete", "note", id, undefined, {

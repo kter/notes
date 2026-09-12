@@ -27,10 +27,6 @@ vi.mock("./workspaceSync", () => ({
     await notesDB.saveFolders(snapshot.folders);
     await notesDB.saveNotes(snapshot.notes);
   }),
-  isConflictApiError: (error: unknown) =>
-    error instanceof ApiError && error.status === 409,
-  isAuthApiError: (error: unknown) =>
-    error instanceof ApiError && error.status === 401,
   refreshWorkspaceSnapshot: vi.fn(async (apiClient: {
     getWorkspaceSnapshot: () => Promise<{
       cursor: string;

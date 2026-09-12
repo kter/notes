@@ -14,12 +14,13 @@
 import { useCallback } from "react";
 
 import { useApi } from "./useApi";
+import { useAuth } from "@/lib/auth-context";
 import { notesDB } from "@/lib/indexedDB";
 import { logger } from "@/lib/logger";
+import { classifyChangeFailure } from "@/lib/sync/changeOutcome";
 import { syncQueue } from "@/lib/syncQueue";
 import {
   getWorkspaceSyncRequestMetadata,
-  isConflictApiError,
   persistWorkspaceSnapshot,
   refreshWorkspaceSnapshot,
 } from "@/lib/workspaceSync";
@@ -55,6 +56,7 @@ export function useFolders(
   options: UseFoldersOptions
 ): UseFoldersReturn {
   const { getApi } = useApi();
+  const { notifySessionExpired } = useAuth();
   const onSnapshotSynced = options.onSnapshotSynced;
 
   const handleCreateFolder = useCallback(
@@ -102,20 +104,26 @@ export function useFolders(
           onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
-          if (isConflictApiError(error)) {
+          const failure = classifyChangeFailure(error);
+          if (failure.kind === "conflict") {
             // バージョン競合: 最新サーバー状態を再取得して整合性を回復する
             const apiClient = await getApi();
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
-          logger.error("Failed to create folder", error);
+          if (failure.kind === "sessionExpired") {
+            logger.warn("Session expired during folder create", error);
+            notifySessionExpired();
+          } else {
+            logger.error("Failed to create folder", failure.error);
+          }
         }
       }
 
       // オフライン時は syncQueue に積んで復帰後に送信する
       await syncQueue.addChange("create", "folder", tempId, { name });
     },
-    [getApi, onSnapshotSynced, setFolders]
+    [getApi, notifySessionExpired, onSnapshotSynced, setFolders]
   );
 
   const handleRenameFolder = useCallback(
@@ -161,12 +169,18 @@ export function useFolders(
           onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
-          if (isConflictApiError(error)) {
+          const failure = classifyChangeFailure(error);
+          if (failure.kind === "conflict") {
             const apiClient = await getApi();
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
-          logger.error("Failed to rename folder", error);
+          if (failure.kind === "sessionExpired") {
+            logger.warn("Session expired during folder rename", error);
+            notifySessionExpired();
+          } else {
+            logger.error("Failed to rename folder", failure.error);
+          }
         }
       }
 
@@ -174,7 +188,7 @@ export function useFolders(
         expectedVersion: existingFolder.version,
       });
     },
-    [folders, getApi, onSnapshotSynced, setFolders]
+    [folders, getApi, notifySessionExpired, onSnapshotSynced, setFolders]
   );
 
   const handleDeleteFolder = useCallback(
@@ -218,12 +232,18 @@ export function useFolders(
           onSnapshotSynced(response.snapshot);
           return;
         } catch (error) {
-          if (isConflictApiError(error)) {
+          const failure = classifyChangeFailure(error);
+          if (failure.kind === "conflict") {
             const apiClient = await getApi();
             await refreshWorkspaceSnapshot(apiClient, { onSnapshotSynced });
             return;
           }
-          logger.error("Failed to delete folder", error);
+          if (failure.kind === "sessionExpired") {
+            logger.warn("Session expired during folder delete", error);
+            notifySessionExpired();
+          } else {
+            logger.error("Failed to delete folder", failure.error);
+          }
         }
       }
 
@@ -231,7 +251,15 @@ export function useFolders(
         expectedVersion: existingFolder.version,
       });
     },
-    [folders, getApi, onSnapshotSynced, selectedFolderId, setFolders, setSelectedFolderId]
+    [
+      folders,
+      getApi,
+      notifySessionExpired,
+      onSnapshotSynced,
+      selectedFolderId,
+      setFolders,
+      setSelectedFolderId,
+    ]
   );
 
   return {

@@ -26,7 +26,9 @@ resource "aws_cognito_user_pool" "main" {
 
   # Email configuration
   email_configuration {
-    email_sending_account = "COGNITO_DEFAULT"
+    email_sending_account = var.ses_email_identity_arn != "" ? "DEVELOPER" : "COGNITO_DEFAULT"
+    source_arn            = var.ses_email_identity_arn != "" ? var.ses_email_identity_arn : null
+    from_email_address    = var.cognito_from_email != "" ? var.cognito_from_email : null
   }
 
   # Schema attributes

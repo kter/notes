@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import boto3
@@ -81,7 +82,11 @@ class AIGateway(ABC):
 
     @abstractmethod
     async def summarize(self, content: str, request: AIRequest) -> tuple[str, int]:
-        """コンテンツの要約を生成し、(要約文, 消費トークン数) を返す。"""
+        """コンテンツの要約を生成し、(要約文, 消費トークン数) を返す。
+
+        キャッシュヒット時は 0 を返す。0 をどう扱うか（課金するか）は
+        呼び出し側の TokenBudget が決める。
+        """
 
     @abstractmethod
     async def chat(
@@ -95,9 +100,18 @@ class AIGateway(ABC):
 
     @abstractmethod
     async def edit(
-        self, content: str, instruction: str, request: AIRequest
+        self,
+        content: str,
+        instruction: str,
+        request: AIRequest,
+        on_usage: Callable[[int], None] | None = None,
     ) -> tuple[str, int]:
-        """指示に従ってコンテンツを編集し、(編集済みコンテンツ, 消費トークン数) を返す。"""
+        """指示に従ってコンテンツを編集し、(編集済みコンテンツ, 消費トークン数) を返す。
+
+        長いコンテンツは内部で分割され複数回モデルを呼ぶ。on_usage を渡すと
+        1 回分が終わるたびに消費トークン数が通知される。呼び出し側が
+        「全部終わってから 1 回だけ計上する」のを避けられるようにするため。
+        """
 
 
 class BedrockGateway(AIGateway):
@@ -296,7 +310,11 @@ class BedrockGateway(AIGateway):
         return edited_content, total_tokens
 
     async def edit(
-        self, content: str, instruction: str, request: AIRequest
+        self,
+        content: str,
+        instruction: str,
+        request: AIRequest,
+        on_usage: Callable[[int], None] | None = None,
     ) -> tuple[str, int]:
         """指示に従ってコンテンツを編集する。
 
@@ -307,9 +325,12 @@ class BedrockGateway(AIGateway):
         system = get_prompt("edit", request.resolved_language)
         # 短いコンテンツはシングルパスで処理する（チャンク分割のオーバーヘッドを回避）
         if not needs_chunking(content):
-            return self._edit_single_chunk(
+            edited, tokens = self._edit_single_chunk(
                 content, instruction, request.model_id, system
             )
+            if on_usage is not None:
+                on_usage(tokens)
+            return edited, tokens
 
         # 長いコンテンツはチャンク分割して並列処理する
         chunks = chunk_for_edit(content)
@@ -327,6 +348,10 @@ class BedrockGateway(AIGateway):
                     system,
                     ChunkContext(index=index, count=len(chunks)),
                 )
+                # チャンク単位で消費を報告する。全チャンク完了を待ってから
+                # まとめて計上すると、その間の超過が記録に残らない。
+                if on_usage is not None:
+                    on_usage(chunk_tokens)
                 return index, edited_chunk, chunk_tokens
 
         # 全チャンクを並列処理し、完了を待機する

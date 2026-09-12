@@ -20,10 +20,8 @@ from app.features.assistant.job_payloads import (
 )
 from app.features.assistant.repositories import AIJobRepository
 from app.features.assistant.schemas import BedrockMessage
-from app.features.assistant.use_cases.common import (
-    ensure_token_limit,
-    require_non_empty,
-)
+from app.features.assistant.token_budget import TokenBudget
+from app.features.assistant.use_cases.common import require_non_empty
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models import AIJob
 from app.models.enums import ChatScope
@@ -48,7 +46,7 @@ class AIJobUseCases:
 
         kind の正は AIJob.kind 列で、入力モデル側の ClassVar と一致させる。
         """
-        ensure_token_limit(self.session, self.user_id)
+        TokenBudget(self.session, self.user_id).assert_available()
         job = AIJob(
             user_id=self.user_id,
             kind=job_input.kind,

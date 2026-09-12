@@ -59,6 +59,7 @@ class MockAIGatewayWithTokens(AIGateway):
         content: str,
         instruction: str,
         request: AIRequest,
+        on_usage=None,
     ) -> tuple[str, int]:
         return f"Edited: {content}", 100
 

@@ -20,11 +20,8 @@ from app.features.assistant.gateway import (
     AIRequest,
 )
 from app.features.assistant.schemas import BedrockMessage
-from app.features.assistant.usage_policy import record_usage
-from app.features.assistant.use_cases.common import (
-    ensure_token_limit,
-    require_non_empty,
-)
+from app.features.assistant.token_budget import BudgetTicket, TokenBudget
+from app.features.assistant.use_cases.common import require_non_empty
 from app.features.settings.repository import UserSettingsRepository
 from app.features.workspace.use_cases import WorkspaceQueryUseCases
 from app.models.enums import ChatScope
@@ -51,7 +48,9 @@ class AIInteractionUseCases:
         note = self.workspace_queries.get_owned_note(note_id)
         require_non_empty(note.content, "Note content is empty")
         return await self._run_ai_call(
-            lambda request: self.ai_gateway.summarize(note.content, request)
+            lambda request, ticket: _settling(
+                self.ai_gateway.summarize(note.content, request), ticket
+            )
         )
 
     async def chat_with_context(
@@ -73,11 +72,14 @@ class AIInteractionUseCases:
                 scope=scope, note_id=note_id, folder_id=folder_id
             )
         return await self._run_ai_call(
-            lambda request: self.ai_gateway.chat(
-                content=content,
-                question=question,
-                request=request,
-                history=history,
+            lambda request, ticket: _settling(
+                self.ai_gateway.chat(
+                    content=content,
+                    question=question,
+                    request=request,
+                    history=history,
+                ),
+                ticket,
             )
         )
 
@@ -98,30 +100,42 @@ class AIInteractionUseCases:
     async def execute_edit(self, *, content: str, instruction: str) -> tuple[str, int]:
         """AI 編集を直接実行し、(編集済みコンテンツ, 使用トークン数) を返す。"""
         return await self._run_ai_call(
-            lambda request: self.ai_gateway.edit(
+            # 編集はチャンクごとに消費が報告されるため、ここでは settle しない。
+            lambda request, ticket: self.ai_gateway.edit(
                 content=content,
                 instruction=instruction,
                 request=request,
+                on_usage=ticket.settle,
             )
         )
 
     async def _run_ai_call(
         self,
-        ai_call: Callable[[AIRequest], Awaitable[tuple[str, int]]],
+        ai_call: Callable[[AIRequest, BudgetTicket], Awaitable[tuple[str, int]]],
     ) -> tuple[str, int]:
-        """トークン制限チェック・設定取得・使用量記録を行い AI 呼び出しを実行する。"""
-        ensure_token_limit(self.session, self.user_id)
+        """予算を確保し、ユーザー設定を解決したうえで AI 呼び出しを実行する。
+
+        上限判定と使用量の計上はどちらも TokenBudget が持つ。呼び出し側は
+        チケットに実消費を報告するだけでよい。
+        """
         model_id, language = UserSettingsRepository(
             self.session, self.user_id
         ).resolve_for_ai()
+        request = AIRequest(model_id=model_id, language=language)
 
-        try:
-            response, tokens_used = await ai_call(
-                AIRequest(model_id=model_id, language=language)
-            )
-        except AIGatewayTimeoutError as exc:
-            raise AIApplicationTimeoutError(AI_TIMEOUT_MESSAGE) from exc
+        with TokenBudget(self.session, self.user_id).reserve() as ticket:
+            try:
+                response, tokens_used = await ai_call(request, ticket)
+            except AIGatewayTimeoutError as exc:
+                raise AIApplicationTimeoutError(AI_TIMEOUT_MESSAGE) from exc
 
-        if tokens_used > 0:
-            record_usage(self.session, self.user_id, tokens_used)
         return response, tokens_used
+
+
+async def _settling(
+    call: Awaitable[tuple[str, int]], ticket: BudgetTicket
+) -> tuple[str, int]:
+    """1 回で完結する AI 呼び出しの消費を、完了時にチケットへ報告する。"""
+    response, tokens_used = await call
+    ticket.settle(tokens_used)
+    return response, tokens_used

@@ -30,6 +30,7 @@ import {
   persistWorkspaceSnapshot,
   withSnippet,
 } from "@/lib/workspaceSync";
+import { chooseSnapshotStrategy } from "@/lib/sync/snapshotStrategy";
 import { useApi } from "@/hooks/useApi";
 import type { Folder, Note, WorkspaceSnapshotResponse } from "@/types";
 
@@ -80,21 +81,23 @@ export function useWorkspaceSnapshotState(isAuthenticated: boolean) {
           setIsLoading(false);
         }
 
-        if (navigator.onLine) {
+        // 取得方針の判断は snapshotStrategy が持つ。ここは結果に従うだけ。
+        const strategy = chooseSnapshotStrategy({
+          hasLocalCache: localFolders.length > 0 || localNotes.length > 0,
+          cursor: getWorkspaceCursor(),
+          isOnline: navigator.onLine,
+        });
+
+        if (strategy.kind !== "localOnly") {
           const apiClient = await getApi();
-          // ローカルキャッシュとカーソルがある再訪時は差分のみ取得し、初回は全件取得する。
-          const cursor = getWorkspaceCursor();
-          const useDelta =
-            cursor !== null &&
-            (localFolders.length > 0 || localNotes.length > 0);
           const snapshot = await apiClient.getWorkspaceSnapshot(
-            useDelta ? cursor : undefined
+            strategy.kind === "delta" ? strategy.cursor : undefined
           );
           if (!isActive) {
             return;
           }
 
-          if (useDelta) {
+          if (strategy.kind === "delta") {
             // 差分: tombstone を含む delta をローカルへ適用（取りこぼし防止）
             const deltaNotes = snapshot.notes.map((note) =>
               isDeletedEntity(note) ? note : withSnippet(note)

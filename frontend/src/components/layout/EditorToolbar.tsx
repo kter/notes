@@ -48,12 +48,9 @@ interface EditorToolbarProps {
   isEditorCollapsed: boolean;
   isFullscreen: boolean;
   hasPendingEditProposal: boolean;
-  // Stable refs for accessing live editor state without taking a content/title dep
-  currentTitleRef: { current: string };
-  currentContentRef: { current: string };
-  lastSavedTitleRef: { current: string };
-  lastSavedContentRef: { current: string };
   // Callbacks (all should be stable useCallback references from parent)
+  /** 未保存の編集を確定する。dirty 判定は EditorPanel が所有する。 */
+  onFlushPendingEdits: () => void;
   onUpdateNote: (
     id: string,
     updates: { title?: string; content?: string; folder_id?: string | null }
@@ -89,10 +86,7 @@ export const EditorToolbar = memo(function EditorToolbar({
   isEditorCollapsed,
   isFullscreen,
   hasPendingEditProposal,
-  currentTitleRef,
-  currentContentRef,
-  lastSavedTitleRef,
-  lastSavedContentRef,
+  onFlushPendingEdits,
   onUpdateNote,
   onSummarize,
   onOpenChat,
@@ -137,19 +131,8 @@ export const EditorToolbar = memo(function EditorToolbar({
   };
 
   const handleSummarizeClick = () => {
-    if (
-      currentTitleRef.current !== lastSavedTitleRef.current ||
-      currentContentRef.current !== lastSavedContentRef.current
-    ) {
-      const updates: { title?: string; content?: string } = {};
-      if (currentTitleRef.current !== lastSavedTitleRef.current)
-        updates.title = currentTitleRef.current;
-      if (currentContentRef.current !== lastSavedContentRef.current)
-        updates.content = currentContentRef.current;
-      onUpdateNote(noteId, updates);
-      lastSavedTitleRef.current = currentTitleRef.current;
-      lastSavedContentRef.current = currentContentRef.current;
-    }
+    // 要約は保存済みの本文を対象にするため、先に未保存分を確定させる。
+    onFlushPendingEdits();
     onSummarize(noteId);
   };
 

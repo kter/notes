@@ -11,12 +11,11 @@
 
 import { notesDB, type PendingChange, type SyncOperationType } from "./indexedDB";
 import { forgetNoteLocally } from "./sync/forgetNote";
+import { isAuthApiError, isConflictApiError } from "./sync/changeOutcome";
 import { ApiError } from "./api";
 import {
   getWorkspaceSyncRequestMetadata,
   persistWorkspaceSnapshot,
-  isAuthApiError,
-  isConflictApiError,
   refreshWorkspaceSnapshot,
 } from "./workspaceSync";
 import type {

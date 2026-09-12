@@ -4,18 +4,18 @@
 主要なエクスポート: router
 呼び出し関係: アプリケーションの main ルーターにマウントされ、
     ImageUploadUseCases を通じてストレージ処理を呼び出す。
+    エラーの HTTP 変換は main.py の DomainError ハンドラーに任せる。
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartParser
 from starlette.requests import Request
 
 from app.auth import UserId
 from app.features.images.dependencies import get_image_upload_use_cases
-from app.features.images.errors import ImageUploadFailedError
 from app.features.images.schemas import ImageUploadResponse
 from app.features.images.use_cases import MAX_FILE_SIZE, ImageUploadUseCases
 from app.shared import ValidationFailed
@@ -40,20 +40,8 @@ async def upload_image(
     form = await request.form(max_part_size=MAX_FILE_SIZE + 1024 * 1024)
     file = form.get("file")
     if not isinstance(file, UploadFile):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A file upload is required.",
-        )
-    try:
-        url = await use_cases.upload_image(file, user_id)
-    except ValidationFailed as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=exc.detail,
-        ) from exc
-    except ImageUploadFailedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+        raise ValidationFailed("A file upload is required.")
+    # ValidationFailed / ImageUploadFailedError はどちらも DomainError なので、
+    # main.py の共通ハンドラーが HTTP へ変換する。他の 5 feature と同じ扱い。
+    url = await use_cases.upload_image(file, user_id)
     return ImageUploadResponse(url=url)

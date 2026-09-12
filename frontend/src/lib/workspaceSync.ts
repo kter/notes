@@ -13,7 +13,6 @@
  */
 import { notesDB } from "@/lib/indexedDB";
 import { forgetNoteLocally } from "@/lib/sync/forgetNote";
-import { ApiError } from "@/lib/api";
 import type { Folder, Note, WorkspaceAppliedChange, WorkspaceSnapshotResponse } from "@/types";
 
 const WORKSPACE_CURSOR_STORAGE_KEY = "notes-workspace-cursor";
@@ -175,21 +174,6 @@ export function getWorkspaceSyncRequestMetadata(): {
     device_id: getWorkspaceDeviceId(),
     ...(cursor ? { base_cursor: cursor } : {}),
   };
-}
-
-/**
- * HTTP 409 競合エラーかどうかを型ガード付きで判定する。
- */
-export function isConflictApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError && error.status === 409;
-}
-
-/**
- * HTTP 401 認証エラーかどうかを型ガード付きで判定する。
- * セッション完全失効時に返される。リトライでは回復しないため非リトライ扱いとする。
- */
-export function isAuthApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError && error.status === 401;
 }
 
 /**

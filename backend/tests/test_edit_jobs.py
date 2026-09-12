@@ -66,8 +66,9 @@ async def test_dispatch_edit_job_falls_back_to_background_tasks(
 
     await dispatch_edit_job(job_id, TEST_USER_ID, background_tasks=background_tasks)
 
+    # ジョブ ID は JobEnvelope を通るため、SNS 経路と同じく文字列で渡る。
     assert background_tasks.calls == [
-        (process_edit_job, (job_id,), {"expected_user_id": TEST_USER_ID}),
+        (process_edit_job, (str(job_id),), {"expected_user_id": TEST_USER_ID}),
     ]
 
 

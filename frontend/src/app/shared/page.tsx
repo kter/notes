@@ -15,11 +15,14 @@ import { getSharedNote, ApiError } from "@/lib/api";
 import type { SharedNote } from "@/types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkMetadata } from "@/lib/remark-frontmatter";
 import { Loader2Icon } from "lucide-react";
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
+
+const REMARK_PLUGINS = [remarkGfm, remarkMetadata];
 
 function SharedNoteContent() {
   const searchParams = useSearchParams();
@@ -139,7 +142,7 @@ function SharedNoteContent() {
 
           {/* Content */}
           <article className="markdown-preview prose prose-sm sm:prose-base dark:prose-invert max-w-none mb-16">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>
               {note.content || t("shared.noContent")}
             </ReactMarkdown>
           </article>

@@ -22,6 +22,25 @@ function renderPreview(content: string) {
 }
 
 describe("EditorMarkdownPreview — markdown rendering", () => {
+  it("renders leading YAML as metadata while preserving body source lines", () => {
+    const yaml = 'title: "SRE NEXT 2026 レポート"\nemoji: "🚒"\ntype: "idea"\ntopics: ["sre", "srenext"]\npublished: false';
+    const { container, getByTestId } = renderPreview(
+      `---\n${yaml}\n---\n\n## 概要\n\n- [ ] todo\n- [x] done`
+    );
+
+    const metadata = getByTestId("markdown-frontmatter");
+    expect(metadata).toHaveClass("markdown-frontmatter");
+    expect(metadata.querySelector("pre")?.textContent).toBe(yaml);
+    expect(metadata.querySelector("h1, h2, hr")).toBeNull();
+    expect(container.querySelector("h1, hr")).toBeNull();
+    expect(container.querySelectorAll("h2")).toHaveLength(1);
+    expect(container.querySelector("h2")?.textContent).toBe("概要");
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0].closest("[data-source-line]")).toHaveAttribute("data-source-line", "11");
+    expect(checkboxes[1].closest("[data-source-line]")).toHaveAttribute("data-source-line", "12");
+  });
+
   it("renders headings as h1-h3 elements", () => {
     const { container } = renderPreview("# Title\n\n## Section\n\n### Sub");
     expect(container.querySelector("h1")?.textContent).toBe("Title");

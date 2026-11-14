@@ -214,6 +214,26 @@
   padding: 0;
 }
 
+.markdown-preview .markdown-frontmatter {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.markdown-preview .markdown-frontmatter pre {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  background-color: transparent;
+  color: inherit;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+}
+
 .markdown-preview blockquote {
   border-left: 4px solid var(--border);
   padding-left: 1rem;
@@ -298,6 +318,15 @@
     color: black !important;
     padding: 24px 32px 32px;
     box-sizing: border-box;
+  }
+
+  body.printing-note-preview .note-print-portal .markdown-frontmatter {
+    color: #4b5563;
+    border-color: #d1d5db;
+  }
+
+  body.printing-note-preview .note-print-portal .markdown-frontmatter pre {
+    white-space: pre-wrap;
   }
 
   body.printing-note-preview .note-print-title {

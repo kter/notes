@@ -51,15 +51,6 @@ vi.mock("@/lib/api", () => ({
     },
 }));
 
-// Mock ReactMarkdown since it can be complex to render in tests
-vi.mock("react-markdown", () => ({
-    default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-vi.mock("remark-gfm", () => ({
-    default: () => { },
-}));
-
 describe("SharedNotePage", () => {
     const mockSearchParams = {
         get: vi.fn(),
@@ -102,6 +93,24 @@ describe("SharedNotePage", () => {
         });
     });
 
+    it("renders shared frontmatter as metadata above the body", async () => {
+        mockSearchParams.get.mockReturnValue("valid-token");
+        (getSharedNote as Mock).mockResolvedValue({
+            id: "1",
+            title: "Shared draft",
+            content: "---\ntitle: Draft\npublished: false\n---\n\n## Body",
+            updated_at: new Date().toISOString(),
+        });
+
+        const { container } = render(<SharedNotePage />);
+
+        const metadata = await screen.findByTestId("markdown-frontmatter");
+        expect(metadata.querySelector("pre")?.textContent).toBe("title: Draft\npublished: false");
+        expect(metadata.querySelector("h1, h2, hr")).toBeNull();
+        expect(screen.getByRole("heading", { name: "Body" })).toBeInTheDocument();
+        expect(container.querySelector("article hr")).toBeNull();
+    });
+
     it("renders the shared note content and conversion elements when loaded successfully", async () => {
         mockSearchParams.get.mockReturnValue("valid-token");
         const mockNote = {
@@ -116,7 +125,7 @@ describe("SharedNotePage", () => {
 
         await waitFor(() => {
             expect(screen.getByText("Test Note")).toBeInTheDocument();
-            expect(screen.getByText("# Hello World")).toBeInTheDocument();
+            expect(screen.getByRole("heading", { name: "Hello World" })).toBeInTheDocument();
         });
 
         // Verification of Conversion Elements

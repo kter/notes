@@ -7,14 +7,6 @@ import { calculateHash } from '@/lib/utils'
 import { useApi } from '@/hooks/useApi'
 import { noteBodyStore } from '@/lib/sync'
 
-// Mock react-markdown
-vi.mock('react-markdown', () => ({
-   
-  default: ({ children }: { children: string }) => {
-    return <div data-testid="markdown-preview">{children}</div>
-  },
-}))
-
 // Mock DiffView
 vi.mock('@/components/ai/DiffView', () => ({
   DiffView: ({ onAccept, onReject }: { onAccept: () => void; onReject: () => void }) => (
@@ -81,16 +73,6 @@ Object.defineProperty(document, 'execCommand', {
   value: vi.fn().mockReturnValue(true),
   writable: true,
 })
-
-// Mock remark-gfm
-vi.mock('remark-gfm', () => ({
-  default: () => {},
-}))
-
-// Mock remark-source-line
-vi.mock('@/lib/remark-source-line', () => ({
-  remarkSourceLine: () => {},
-}))
 
 // Mock useTranslation
 vi.mock('@/hooks/useTranslation', () => ({
@@ -323,7 +305,7 @@ describe('EditorPanel', () => {
     expect(screen.queryByTestId('editor-print-preview')).not.toBeInTheDocument()
   })
 
-  it('prints the rendered preview content and cleans up print mode', async () => {
+  it.each([false, true])('prints rendered content and cleans up print mode (frontmatter: %s)', async (withFrontmatter) => {
     const printMock = vi.fn()
     const originalPrint = window.print
     const originalRequestAnimationFrame = window.requestAnimationFrame
@@ -351,14 +333,20 @@ describe('EditorPanel', () => {
     render(<EditorPanel {...defaultProps} />)
 
     fireEvent.change(screen.getByTestId('editor-title-input'), { target: { value: 'Printed title' } })
-    fireEvent.change(screen.getByRole('textbox', { name: /content/i }), { target: { value: '# Printed body' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /content/i }), { target: { value: `${withFrontmatter ? '---\ntitle: Draft\n---\n\n' : ''}# Printed body` } })
     fireEvent.click(screen.getByTestId('editor-print-button'))
 
     const printPreview = screen.getByTestId('editor-print-preview')
     expect(printPreview).toHaveClass('note-print-portal')
     expect(document.body).toContainElement(printPreview)
     expect(within(printPreview).getByText('Printed title')).toBeInTheDocument()
-    expect(within(printPreview).getByText('# Printed body')).toBeInTheDocument()
+    expect(within(printPreview).getByRole('heading', { name: 'Printed body', hidden: true })).toBeInTheDocument()
+    if (withFrontmatter) {
+      const metadata = within(printPreview).getByTestId('markdown-frontmatter')
+      expect(metadata.querySelector('pre')?.textContent).toBe('title: Draft')
+      expect(metadata.querySelector('h1, h2, hr')).toBeNull()
+      expect(printPreview.querySelector('hr')).toBeNull()
+    }
     expect(document.body).toHaveClass('printing-note-preview')
     expect(printMock).toHaveBeenCalledTimes(1)
 

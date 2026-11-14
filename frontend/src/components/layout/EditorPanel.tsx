@@ -20,6 +20,7 @@ import { MarkdownEditor, type MarkdownEditorHandle } from "@/components/editor/M
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkMetadata } from "@/lib/remark-frontmatter";
 import { toggleMarkdownCheckbox } from "@/lib/markdownCheckboxToggle";
 import type { SyncStatus } from "@/lib/sync";
 import { calculateHash, cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ const PREVIEW_RESIZE_HANDLE_WIDTH_PX = 8;
 const EDITOR_PREVIEW_WIDTH_STORAGE_KEY = "notes-editor-preview-width";
 const EDITOR_PREVIEW_LAST_WIDTH_STORAGE_KEY = "notes-editor-preview-last-width";
 const PRINT_MODE_BODY_CLASS = "printing-note-preview";
+const PRINT_REMARK_PLUGINS = [remarkGfm, remarkMetadata];
 
 interface EditorPanelProps {
   note: Note | null;
@@ -678,7 +680,7 @@ export function EditorPanel({
           >
             <h1 className="note-print-title">{printSnapshot.title || t("noteList.untitled")}</h1>
             <div className="markdown-preview prose prose-sm max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={PRINT_REMARK_PLUGINS}>
                 {printSnapshot.content || `*${t("editor.previewPlaceholder")}*`}
               </ReactMarkdown>
             </div>

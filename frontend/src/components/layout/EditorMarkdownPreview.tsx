@@ -1,6 +1,6 @@
 /**
  * Markdown コンテンツをリアルタイムでプレビュー表示するコンポーネント。
- * remarkGfm（GFM 拡張）と remarkSourceLine（チェックボックスのソース行追跡）プラグインを適用する。
+ * GFM 拡張・フロントマター表示・チェックボックスのソース行追跡プラグインを適用する。
  * deferredContent を受け取ることで、エディタの入力と描画コストを分離しタイピングの遅延を防ぐ。
  *
  * 主なエクスポート:
@@ -14,12 +14,12 @@ import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { remarkMetadata } from "@/lib/remark-frontmatter";
 import { remarkSourceLine } from "@/lib/remark-source-line";
 import { cn } from "@/lib/utils";
 
-// remarkGfm（テーブル・タスクリスト等の GFM 拡張）と remarkSourceLine（チェックボックス用行番号注入）を
-// 毎レンダーで再生成しないよう定数として外部に定義する
-const REMARK_PLUGINS = [remarkGfm, remarkSourceLine];
+// プラグイン配列を毎レンダーで再生成しないよう定数として外部に定義する
+const REMARK_PLUGINS = [remarkGfm, remarkMetadata, remarkSourceLine];
 
 interface EditorMarkdownPreviewProps {
   deferredContent: string;

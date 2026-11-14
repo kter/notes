@@ -56,8 +56,12 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  # MFA configuration (optional)
-  mfa_configuration = "OFF"
+  # MFA configuration
+  mfa_configuration = "OPTIONAL"
+
+  software_token_mfa_configuration {
+    enabled = true
+  }
 
   # Feature plan tier. ESSENTIALS 以上で WebAuthn (パスキー) 設定が有効になる。
   user_pool_tier = "ESSENTIALS"

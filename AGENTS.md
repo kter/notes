@@ -69,17 +69,17 @@ Claude Code on the web と Codex Cloud には AWS の認証情報を渡してい
 
 | 項目 | Claude Code on the web | Codex Cloud |
 | --- | --- | --- |
-| Python / Node / bun | 未計測 | 未計測 |
-| `uv python install 3.12.3` の可否 | 未計測 | 未計測 |
-| terraform / conftest の取得元に届くか | 未計測 | 未計測 |
-| Docker | 未計測 | 未計測 |
-| `gh` | 未計測 | 未計測 |
-| キャッシュの書き込み（`$HOME`） | 未計測 | 未計測 |
-| 外部通信 | 未計測 | 未計測 |
-| Chromium（`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`） | 未計測 | 未計測 |
-| 注入される AWS 系の環境変数 | 未計測 | 未計測 |
-| AGENTS.md を読むか（CLAUDE.md なしで） | 未計測 | 未計測 |
-| `make check` の終了コード | 未計測 | 未計測 |
+| Python / Node / bun | 3.13.18 が既定（3.12.3 も同梱）/ 22.23.4 / bun は setup.sh が 1.4.0 を入れる。backend の .venv は setup.sh が 3.12.3 に固定する | 未計測 |
+| `uv python install 3.12.3` の可否 | 可 | 未計測 |
+| terraform / conftest の取得元に届くか | 届く（releases.hashicorp.com、GitHub releases のアセット）。github.com のページ自体は 400/403 を返すが、アセットの取得は通る | 未計測 |
+| Docker | CLI のみ。デーモンなし | 未計測 |
+| `gh` | 2.89.0。`GH_TOKEN` はあるが GraphQL は 403。REST の `gh api` を使う | 未計測 |
+| キャッシュの書き込み（`$HOME`） | 可 | 未計測 |
+| 外部通信 | プロキシ経由。パッケージレジストリ・hashicorp・fonts.googleapis.com に届く | 未計測 |
+| Chromium（`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`） | `/usr/bin/google-chrome`（Chrome for Testing 153）。`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` も注入されている | 未計測 |
+| 注入される AWS 系の環境変数 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_CA_BUNDLE` と `~/.aws/config`。プレースホルダーとみられる。**使わない** | 未計測 |
+| AGENTS.md を読むか（CLAUDE.md なしで） | 読む | 未計測 |
+| `make check` の終了コード | 0（2026-11-15、#184） | 未計測 |
 
 ## Agent skills
 

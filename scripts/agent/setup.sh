@@ -134,8 +134,10 @@ if ! uv python find "$PYTHON_VERSION" >/dev/null 2>&1; then
   uv python install "$PYTHON_VERSION" \
     || die "uv python install $PYTHON_VERSION failed (needs github.com release downloads)"
 fi
-log "uv sync --extra dev in backend"
-(cd backend && uv sync --extra dev)
+log "uv sync --extra dev in backend (Python $PYTHON_VERSION, same as CI)"
+# backend/ has no .python-version, so pin it here; otherwise uv picks the
+# newest interpreter on PATH (3.13 on Claude Code on the web).
+(cd backend && uv sync --extra dev --python "$PYTHON_VERSION")
 
 # --- bun + frontend (ci.yml: frontend job) ----------------------------------
 if [ "$(version_of bun --version)" != "$BUN_VERSION" ]; then

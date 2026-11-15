@@ -10,6 +10,15 @@ export AWS_PAGER=
 # Disable Terraform interactive input prompts
 export TF_INPUT=0
 
+# Tools pinned by scripts/agent/setup.sh (cloud agents) live in .tools/bin.
+# Put them first on PATH when present so `make check` and the Claude/Codex Stop
+# hooks (which call make from a non-login shell) find the pinned versions.
+ifneq ($(wildcard $(CURDIR)/.tools/bin),)
+export PATH := $(CURDIR)/.tools/bin:$(PATH)
+endif
+# Cache locations setup.sh chose when $$HOME was not writable.
+-include $(CURDIR)/.tools/env.mk
+
 # conftest binary — resolve via mise shim so it works inside git hooks
 # (git hooks run in a non-interactive shell that may not have mise in PATH)
 CONFTEST ?= $(shell mise which conftest 2>/dev/null || echo conftest)
@@ -411,6 +420,46 @@ clean: ## Clean build artifacts
 
 .PHONY: test
 test: test-backend test-frontend test-lint ## Run the default fast suite: backend + frontend unit tests + lint
+
+# `make check` mirrors the jobs in .github/workflows/ci.yml (backend ->
+# frontend -> terraform, same commands, same order) without AWS. It is the
+# completion check for cloud agents; see AGENTS.md. Every step runs with
+# AWS_PROFILE/AWS_DEFAULT_PROFILE removed: clouds inject them, and this
+# Makefile's `AWS_PROFILE = $(ENV)` would otherwise pass "dev" to children.
+# `terraform init` contacts the registry even when providers are installed, so
+# with no network (Codex task phase) it falls back to the providers that
+# setup.sh fetched into $(CHECK_TF_DATA); validate still checks the config.
+CHECK_ENV = env -u AWS_PROFILE -u AWS_DEFAULT_PROFILE
+CHECK_TF_DATA = $(CURDIR)/.tools/terraform-check
+CHECK_TF = $(CHECK_ENV) TF_DATA_DIR=$(CHECK_TF_DATA) terraform
+
+.PHONY: check
+check: ## Run the CI checks (ci.yml) locally without AWS; needs scripts/agent/setup.sh first
+	@missing=""; \
+	for tool in uv bun terraform $(CONFTEST); do \
+		command -v "$$tool" >/dev/null 2>&1 || missing="$$missing $$tool"; \
+	done; \
+	for path in backend/.venv frontend/node_modules; do \
+		[ -e "$$path" ] || missing="$$missing $$path"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "make check: missing:$$missing" >&2; \
+		echo "make check: run 'bash scripts/agent/setup.sh' first" >&2; \
+		exit 1; \
+	fi
+	$(CHECK_ENV) $(MAKE) --no-print-directory test-backend
+	$(CHECK_ENV) $(MAKE) --no-print-directory lint-backend
+	$(CHECK_ENV) $(MAKE) --no-print-directory format-check-backend
+	$(CHECK_ENV) $(MAKE) --no-print-directory test-frontend
+	$(CHECK_ENV) $(MAKE) --no-print-directory lint-frontend
+	cd frontend && $(CHECK_ENV) bun run tsc --noEmit
+	$(CHECK_TF) -chdir=terraform init -backend=false -input=false || { \
+		[ -d "$(CHECK_TF_DATA)/providers" ] || exit 1; \
+		echo "make check: terraform init failed (offline?); validating with the providers fetched by setup.sh" >&2; \
+	}
+	TF_WORKSPACE=dev $(CHECK_TF) -chdir=terraform validate
+	$(CHECK_ENV) terraform fmt -check -recursive terraform/
+	$(CHECK_ENV) $(MAKE) --no-print-directory conftest-verify
 
 .PHONY: test-unit
 test-unit: test-backend test-frontend ## Run all unit tests across backend and frontend

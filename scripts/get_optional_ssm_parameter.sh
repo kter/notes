@@ -4,14 +4,21 @@ set -euo pipefail
 
 parameter_name="${1:?parameter name is required}"
 aws_region="${2:?aws region is required}"
-aws_profile="${3:?aws profile is required}"
+# Optional: empty means "use the credentials in the environment" (GitHub
+# Actions OIDC, Makefile DEPLOY_CREDENTIALS=env). Local runs pass the profile.
+aws_profile="${3:-}"
+
+profile_args=()
+if [ -n "$aws_profile" ]; then
+  profile_args=(--profile "$aws_profile")
+fi
 
 if response="$(
   aws ssm get-parameter \
     --name "$parameter_name" \
     --with-decryption \
     --region "$aws_region" \
-    --profile "$aws_profile" \
+    "${profile_args[@]}" \
     --query 'Parameter.Value' \
     --output text 2>&1
 )"; then

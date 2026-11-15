@@ -1,0 +1,200 @@
+name: Deploy
+
+# Manual, approval-gated deploy of main to dev or prd.
+#
+#   prepare (environment plan-<env>, no reviewer)
+#     - refuses unless ci.yml succeeded on main for this commit
+#     - builds the backend image and pushes it as :git-<sha> (never :latest)
+#     - AWS role notes-gha-plan-<env>: ECR push only. No Terraform, no state,
+#       no secrets are reachable before approval.
+#   deploy (environment deploy-<env>, required reviewer)
+#     - terraform plan with the new digest, conftest, values-free Job Summary,
+#       refuses to delete/replace data resources unless allow_data_loss
+#     - terraform apply of that saved plan, then ECR :latest -> digest
+#     - frontend build + S3 sync + CloudFront invalidation
+#     - AWS role notes-gha-deploy-<env> (terraform/ci-bootstrap)
+#
+# Terraform output can contain secret values and this repository is public:
+# every Terraform command writes to files under RUNNER_TEMP and failures print
+# a fixed message only. See scripts/ci/deploy_steps.sh and docs/agents/deploy.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Target environment
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - prd
+      target:
+        description: What to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+      allow_data_loss:
+        description: Apply even if the plan deletes or replaces a data resource (DSQL, S3 bucket, Cognito user pool, SSM parameter, DynamoDB)
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.env }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Check CI and build image (${{ inputs.env }}, ${{ inputs.target }})
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: plan-${{ inputs.env }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    outputs:
+      image_digest: ${{ steps.build.outputs.image_digest }}
+    env:
+      DEPLOY_ENV: ${{ inputs.env }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+    steps:
+      - name: Validate inputs
+        run: |
+          case "$DEPLOY_ENV" in dev|prd) ;; *) echo "::error::invalid env"; exit 1 ;; esac
+          case "$DEPLOY_TARGET" in all|backend|frontend) ;; *) echo "::error::invalid target"; exit 1 ;; esac
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require a successful CI run on main for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/deploy_steps.sh check-ci
+
+      - name: Configure AWS credentials (ECR push only)
+        if: inputs.target != 'frontend'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: notes-plan-${{ inputs.env }}-${{ github.run_id }}
+          aws-region: ap-northeast-1
+
+      - name: Build and push backend image
+        id: build
+        if: inputs.target != 'frontend'
+        run: scripts/ci/deploy_steps.sh build-image
+
+      - name: Job summary
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.image_digest }}
+        run: |
+          {
+            echo "### Deploy request"
+            echo ""
+            echo "- environment: \`${DEPLOY_ENV}\`"
+            echo "- target: \`${DEPLOY_TARGET}\`"
+            echo "- commit: \`${GITHUB_SHA}\`"
+            echo "- image: \`${IMAGE_DIGEST:-not built (frontend only)}\`"
+            echo ""
+            echo "Approving deploy-${DEPLOY_ENV} runs terraform plan and, if policy checks pass, applies it in the same job."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Plan, apply and deploy (${{ inputs.env }}, ${{ inputs.target }})
+    needs: prepare
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: deploy-${{ inputs.env }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOY_ENV: ${{ inputs.env }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      ALLOW_DATA_LOSS: ${{ inputs.allow_data_loss }}
+      IMAGE_DIGEST: ${{ needs.prepare.outputs.image_digest }}
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      # providers.tf: no AWS profile, use the OIDC credentials from the environment.
+      TF_VAR_use_workspace_profile: "false"
+      # Optional environment secrets; empty means the variable default ("").
+      TF_VAR_bootstrap_admin_emails: ${{ secrets.BOOTSTRAP_ADMIN_EMAILS }}
+      TF_VAR_bootstrap_admin_user_ids: ${{ secrets.BOOTSTRAP_ADMIN_USER_IDS }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # terraform_wrapper must stay false: the wrapper copies stdout/stderr
+      # into step outputs and the log, which would expose plan values.
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.5
+          terraform_wrapper: false
+
+      - name: Install conftest
+        if: inputs.target != 'frontend'
+        env:
+          CONFTEST_VERSION: 0.68.2
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" \
+            --output "${RUNNER_TEMP}/conftest.tar.gz"
+          mkdir -p "${RUNNER_TEMP}/conftest-bin"
+          tar -xzf "${RUNNER_TEMP}/conftest.tar.gz" -C "${RUNNER_TEMP}/conftest-bin" conftest
+          echo "${RUNNER_TEMP}/conftest-bin" >> "${GITHUB_PATH}"
+
+      - name: Set up Bun
+        if: inputs.target != 'backend'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Install frontend dependencies
+        if: inputs.target != 'backend'
+        run: cd frontend && bun install --frozen-lockfile
+
+      - name: Configure AWS credentials (deploy)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: notes-deploy-${{ inputs.env }}-${{ github.run_id }}
+          role-duration-seconds: 7200
+          aws-region: ap-northeast-1
+
+      - name: Terraform init
+        run: scripts/ci/deploy_steps.sh tf-init
+
+      - name: Terraform plan, policy check and summary
+        if: inputs.target != 'frontend'
+        run: scripts/ci/deploy_steps.sh tf-plan
+
+      - name: Terraform apply
+        if: inputs.target != 'frontend'
+        run: scripts/ci/deploy_steps.sh tf-apply
+
+      - name: Point ECR latest at the deployed image
+        if: inputs.target != 'frontend'
+        run: scripts/ci/deploy_steps.sh retag-latest
+
+      - name: Deploy frontend
+        if: inputs.target != 'backend'
+        run: scripts/ci/deploy_steps.sh frontend
+
+      - name: Remove plan files and logs
+        if: always()
+        run: scripts/ci/deploy_steps.sh cleanup

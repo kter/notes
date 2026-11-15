@@ -91,8 +91,16 @@ jobs:
           TF_WORKSPACE: dev
         run: terraform -chdir=terraform validate
 
+      # The GitHub Actions deploy roles (applied locally by the owner).
+      # The fmt check below already covers it through -recursive.
+      - name: Validate ci-bootstrap Terraform
+        run: make ci-bootstrap-validate
+
       - name: Check Terraform formatting
         run: terraform fmt -check -recursive terraform/
+
+      - name: Test deploy workflow helper scripts
+        run: make test-ci-scripts
 
       - name: Install conftest
         env:

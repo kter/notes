@@ -22,6 +22,7 @@ This repository is a Mac Notes app clone with AI-powered features built on a ser
 - Add reusable workflow shortcuts to the root `Makefile`.
 - Run cross-stack workflows, deployment, and Terraform operations from the repository root.
 - Use root `make` targets for project workflows. Do not run direct `aws`, `terraform apply`, `docker build`, or `docker push` deployment commands.
+- Deploys from GitHub Actions use `.github/workflows/deploy.yml` (see `docs/agents/deploy.md`). Agents may start one with `gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches -f ref=main -f 'inputs[env]=dev' -f 'inputs[target]=all'` and report the run URL. Never approve it: do not call the `pending_deployments` or review APIs. Codex Cloud cannot dispatch; hand the deploy back to a human.
 
 ## Common Commands
 

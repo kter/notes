@@ -1,3 +1,13 @@
+# true (default): the provider uses the AWS profile named after the workspace,
+# which is how every local `make tf-*` target has always worked.
+# false: no profile; credentials come from the environment. Only the GitHub
+# Actions deploy workflow sets this (TF_VAR_use_workspace_profile=false).
+variable "use_workspace_profile" {
+  description = "Use the AWS profile named after the workspace (false = credentials from the environment, for CI)"
+  type        = bool
+  default     = true
+}
+
 variable "aws_region" {
   description = "AWS region"
   type        = string
@@ -58,12 +68,14 @@ variable "bootstrap_admin_emails" {
   description = "Comma-separated list of emails to bootstrap as admin users"
   type        = string
   default     = ""
+  sensitive   = true
 }
 
 variable "bootstrap_admin_user_ids" {
   description = "Comma-separated list of user IDs to bootstrap as admin users"
   type        = string
   default     = ""
+  sensitive   = true
 }
 
 variable "sentry_traces_sample_rate" {

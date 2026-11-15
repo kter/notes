@@ -9,6 +9,8 @@ plan/apply output and conftest messages can. Nothing the script prints to the
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
 import stat
@@ -60,6 +62,39 @@ exit 0
 """
 
 
+AWS_STUB = """#!/usr/bin/env bash
+echo "aws $*" >> "$STUB_DIR/calls"
+case "$1 $2" in
+  "ecr batch-get-image") cat "$STUB_DIR/batch-get-image.json" ;;
+  "ecr put-image")
+    for a in "$@"; do case "$a" in file://*) cp "${a#file://}" "$STUB_DIR/put-manifest" ;; esac; done
+    if [ "${STUB_PUT_EXISTS:-}" = 1 ]; then
+      echo "An error occurred (ImageAlreadyExistsException) when calling the PutImage operation" >&2
+      exit 254
+    fi
+    ;;
+  "ecr describe-images") echo "$STUB_DESCRIBE_DIGEST" ;;
+  "ecr get-login-password") echo password ;;
+  "sts get-caller-identity") echo 123456789012 ;;
+  *) echo "unexpected aws call: $*" >&2; exit 1 ;;
+esac
+"""
+
+DOCKER_STUB = """#!/usr/bin/env bash
+echo "docker $*" >> "$STUB_DIR/calls"
+case "$1" in
+  inspect) echo "sha256:configdigest" ;;
+esac
+exit 0
+"""
+
+GH_STUB = """#!/usr/bin/env bash
+echo "gh $*" >> "$STUB_DIR/calls"
+[ "${STUB_GH_FAIL:-}" = 1 ] && { echo "HTTP 403 with details" >&2; exit 1; }
+echo "${STUB_GH_COUNT:-0}"
+"""
+
+
 def write_exe(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
@@ -79,6 +114,13 @@ class DeployStepsTest(unittest.TestCase):
         self.summary.touch()
         write_exe(self.bin / "terraform", TERRAFORM_STUB)
         write_exe(self.bin / "conftest", CONFTEST_STUB)
+        write_exe(self.bin / "aws", AWS_STUB)
+        write_exe(self.bin / "docker", DOCKER_STUB)
+        write_exe(self.bin / "gh", GH_STUB)
+        self.stub_dir = self.tmp / "stub"
+        self.stub_dir.mkdir()
+        self.github_output = self.tmp / "github_output"
+        self.github_output.touch()
 
     def run_step(self, step: str, **extra: str) -> subprocess.CompletedProcess[str]:
         env = {
@@ -91,6 +133,10 @@ class DeployStepsTest(unittest.TestCase):
             "IMAGE_DIGEST": DIGEST,
             "STUB_PLAN_JSON": str(FIXTURE),
             "ALLOW_DATA_LOSS": "true",
+            "STUB_DIR": str(self.stub_dir),
+            "GITHUB_OUTPUT": str(self.github_output),
+            "GITHUB_REPOSITORY": "kter/notes",
+            "GH_TOKEN": "dummy",
         }
         env.update(extra)
         return subprocess.run(
@@ -159,6 +205,96 @@ class DeployStepsTest(unittest.TestCase):
         result = self.run_step("tf-apply", STUB_APPLY_FAIL="1")
         self.assertNotEqual(result.returncode, 0)
         self.assert_no_secret(result)
+
+    # --- retag-latest -------------------------------------------------------
+
+    def prepare_manifest(self) -> str:
+        manifest = '{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json"}'
+        digest = "sha256:" + hashlib.sha256(manifest.encode()).hexdigest()
+        (self.stub_dir / "batch-get-image.json").write_text(
+            json.dumps(
+                {
+                    "images": [
+                        {
+                            "imageManifest": manifest,
+                            "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return digest
+
+    def test_retag_puts_the_exact_manifest_bytes(self) -> None:
+        digest = self.prepare_manifest()
+        result = self.run_step("retag-latest", IMAGE_DIGEST=digest, STUB_DESCRIBE_DIGEST=digest)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        put = (self.stub_dir / "put-manifest").read_bytes()
+        self.assertEqual("sha256:" + hashlib.sha256(put).hexdigest(), digest)
+        calls = (self.stub_dir / "calls").read_text(encoding="utf-8")
+        self.assertIn("--image-tag latest", calls)
+        self.assertIn(f"--image-digest {digest}", calls)
+        self.assertIn("--image-ids imageTag=latest", calls)
+        self.assertNotIn("--profile", calls)
+
+    def test_retag_accepts_latest_already_at_digest(self) -> None:
+        digest = self.prepare_manifest()
+        result = self.run_step(
+            "retag-latest", IMAGE_DIGEST=digest, STUB_DESCRIBE_DIGEST=digest, STUB_PUT_EXISTS="1"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_retag_fails_when_latest_does_not_move(self) -> None:
+        digest = self.prepare_manifest()
+        result = self.run_step("retag-latest", IMAGE_DIGEST=digest, STUB_DESCRIBE_DIGEST=DIGEST)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_retag_refuses_a_manifest_with_another_digest(self) -> None:
+        self.prepare_manifest()
+        result = self.run_step("retag-latest", IMAGE_DIGEST=DIGEST, STUB_DESCRIBE_DIGEST=DIGEST)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("does not hash to IMAGE_DIGEST", result.stderr)
+        self.assertFalse((self.stub_dir / "put-manifest").exists())
+
+    # --- build-image ---------------------------------------------------------
+
+    def test_build_image_pushes_git_sha_tag_and_outputs_registry_digest(self) -> None:
+        result = self.run_step("build-image", STUB_DESCRIBE_DIGEST=DIGEST)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self.github_output.read_text(encoding="utf-8").splitlines(), [f"image_digest={DIGEST}"]
+        )
+        calls = (self.stub_dir / "calls").read_text(encoding="utf-8")
+        tag = "notes-app-api-dev:git-" + "0" * 40
+        self.assertIn(f"docker push 123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/{tag}", calls)
+        self.assertIn("--image-ids imageTag=git-" + "0" * 40, calls)
+        self.assertNotIn(":latest", calls)
+        self.assertNotIn("--profile", calls)
+
+    def test_build_image_rejects_a_non_digest(self) -> None:
+        result = self.run_step("build-image", STUB_DESCRIBE_DIGEST="None")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.github_output.read_text(encoding="utf-8"), "")
+
+    # --- check-ci --------------------------------------------------------------
+
+    def test_check_ci_passes_with_a_successful_run(self) -> None:
+        result = self.run_step("check-ci", STUB_GH_COUNT="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = (self.stub_dir / "calls").read_text(encoding="utf-8")
+        self.assertIn("actions/workflows/ci.yml/runs?head_sha=" + "0" * 40, calls)
+        self.assertIn("status=success", calls)
+
+    def test_check_ci_fails_without_a_successful_run(self) -> None:
+        result = self.run_step("check-ci", STUB_GH_COUNT="0")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("has not succeeded on main", result.stderr)
+
+    def test_check_ci_api_failure_prints_fixed_message(self) -> None:
+        result = self.run_step("check-ci", STUB_GH_FAIL="1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("HTTP 403 with details", result.stderr)
 
     def test_cleanup_removes_plan_files(self) -> None:
         for name in ("tfplan", "tfplan.json", "plan.txt", "apply.txt"):

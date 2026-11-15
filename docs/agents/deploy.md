@@ -21,6 +21,9 @@
 承認の時点では plan はまだ無い。plan と apply は承認後の同じジョブで続けて走るので、Job Summary を見てから止めることはできない。
 IAM やデータ資源を触る変更は、承認する前にローカルで `make tf-plan ENV=<env>` を確認する。
 
+承認待ちの実行は `deploy-<env>` の concurrency グループを占有する。古いコミットの実行を後から承認すると古いコードがデプロイされるので、
+不要になった承認待ちは Reject する。
+
 `target=frontend` はイメージのビルドも plan・apply もせず、state の出力を読んでフロントだけを更新する。
 dev の結合テスト（`_deploy-test`）は CI では実行しない。バイパストークンを読む必要があるからだ。
 
@@ -30,6 +33,8 @@ dev の結合テスト（`_deploy-test`）は CI では実行しない。バイ�
 
 - Terraform の出力はすべて `$RUNNER_TEMP` のファイルに書き、ログにも成果物にも Job Summary にも出さない。
 - 失敗時は決まった文言と終了コードだけを出す。原因はローカルで同じ make ターゲットを実行して調べる。
+  ローカルのプロファイルは管理者権限なので、ロールの権限不足はローカルでは再現しない。その場合は CloudTrail を
+  ユーザー名（セッション名）`notes-deploy-<env>-<run_id>` / `notes-plan-<env>-<run_id>` で絞って AccessDenied を探す。
 - Job Summary は `scripts/ci/summarize_plan.py` が作る。読むのはリソースのアドレスとアクション名だけ。
 - conftest のメッセージは属性値を含みうるので、件数だけを出す。
 - `TF_LOG` は使わない。アーティファクトは作らない。`setup-terraform` の wrapper は無効にしている。
@@ -80,7 +85,9 @@ gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches \
    `deploy-*` では「Prevent self-review」は付けない（承認者が kter 一人のため）。
 4. ローカルで `TF_VAR_bootstrap_admin_emails` / `TF_VAR_bootstrap_admin_user_ids` を設定して apply している場合は、
    同じ値を `deploy-<env>` の environment secret `BOOTSTRAP_ADMIN_EMAILS` / `BOOTSTRAP_ADMIN_USER_IDS` に入れる。
-   入れないと CI の apply で Lambda の環境変数が空に戻る。他の `TF_VAR_*` をローカルで渡している場合も同じ扱いになる。
+   入れないと CI の apply で Lambda の環境変数が空に戻る。`cognito_callback_urls` / `cognito_logout_urls` /
+   `sentry_traces_sample_rate` などをローカルで渡している場合も、CI では既定値に戻る。
+5. 最初の実行は `env=dev`、`target=backend` にして、plan の要約と apply の結果を確かめる。
 
 ## 権限の範囲と残っているリスク
 
@@ -93,3 +100,6 @@ gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches \
 - `notes-gha-plan-<env>` は ECR リポジトリが MUTABLE なので `:latest` も上書きできる。ローカルの `make tf-plan` /
   `tf-apply` は `:latest` のダイジェストを使うので、ローカルで apply する前に plan のイメージを確かめる。
 - `.terraform.lock.hcl` は git 管理外なので、CI は実行のたびにプロバイダを `~> 5.0` の範囲で解決する。
+  ローカルの lock より新しいプロバイダで apply されると、次のローカル実行で `terraform init -upgrade` が要ることがある。
+- CI のフロントビルドには `frontend/.env.local` も `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` も無い。
+  `NEXT_PUBLIC_*` は Makefile が渡すので同じになるが、ローカルでソースマップを Sentry に上げているなら CI では上がらない。

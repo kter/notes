@@ -42,7 +42,9 @@ DATA_RESOURCE_TYPES = frozenset(
 DATA_RESOURCE_PREFIXES = ("aws_dsql_",)
 IAM_PREFIX = "aws_iam_"
 
-KNOWN_ACTIONS = frozenset({"no-op", "create", "read", "update", "delete"})
+# "forget" comes from `removed` blocks with destroy = false (Terraform 1.7+).
+# Anything else fails closed: the summary errors and the deploy stops.
+KNOWN_ACTIONS = frozenset({"no-op", "create", "read", "update", "delete", "forget"})
 
 FAILURE_MESSAGE = "summarize_plan: could not summarize the plan (details withheld)"
 

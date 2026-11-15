@@ -387,6 +387,8 @@ ci-bootstrap-plan: ## Plan the GitHub Actions OIDC roles for ENV (owner, local, 
 ci-bootstrap-apply: ## Apply the plan saved by ci-bootstrap-plan for ENV, then print the role ARNs
 	@case "$(ENV)" in dev|prd) ;; *) echo "ENV must be dev or prd" >&2; exit 1 ;; esac
 	@test -f $(CI_BOOTSTRAP_DIR)/$(CI_BOOTSTRAP_PLAN) || { echo "Run 'make ci-bootstrap-plan ENV=$(ENV)' first" >&2; exit 1; }
+	# Re-point the backend at ENV: planning dev then prd leaves .terraform on prd.
+	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform init -reconfigure -input=false -backend-config=backends/$(ENV).hcl
 	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform apply -input=false $(CI_BOOTSTRAP_PLAN)
 	rm -f $(CI_BOOTSTRAP_DIR)/$(CI_BOOTSTRAP_PLAN)
 	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform output

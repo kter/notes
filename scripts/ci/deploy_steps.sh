@@ -183,7 +183,13 @@ step_retag_latest() {
     application/vnd.docker.distribution.manifest.list.v2+json \
     application/vnd.oci.image.index.v1+json \
     --output json >"$image_json" 2>/dev/null || fail retag-get-image $?
-  jq -er '.images[0].imageManifest' "$image_json" >"$manifest" 2>/dev/null || fail retag-manifest 1
+  # -j: no trailing newline. The file must hold the exact manifest bytes, or
+  # it hashes to a different digest and put-image --image-digest rejects it.
+  jq -ej '.images[0].imageManifest' "$image_json" >"$manifest" 2>/dev/null || fail retag-manifest 1
+  if [ "sha256:$(sha256sum "$manifest" | cut -d' ' -f1)" != "$IMAGE_DIGEST" ]; then
+    echo "::error::the manifest fetched from ECR does not hash to IMAGE_DIGEST" >&2
+    exit 1
+  fi
   media_type="$(jq -er '.images[0].imageManifestMediaType' "$image_json" 2>/dev/null)" || fail retag-media-type 1
 
   # put-image with the exact manifest bytes and media type keeps the digest.

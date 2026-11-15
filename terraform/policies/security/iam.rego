@@ -132,3 +132,21 @@ deny contains msg if {
 		[rc.address, svc],
 	)
 }
+
+# ---------------------------------------------------------------------------
+# Check 4: Every IAM role carries the app permissions boundary
+# (terraform/ci-bootstrap aws_iam_policy.app_boundary). The CI deploy role can
+# only create roles with it, so a role without it fails at apply time anyway;
+# this catches it at plan time with a clear message.
+# ---------------------------------------------------------------------------
+deny contains msg if {
+	rc := input.resource_changes[_]
+	rc.type == "aws_iam_role"
+	resource_applies(rc)
+	not endswith(object.get(rc.change.after, "permissions_boundary", ""), ":policy/notes-boundary-app-roles")
+
+	msg := sprintf(
+		"[IAM] %s: role must set permissions_boundary = local.app_role_boundary_arn",
+		[rc.address],
+	)
+}

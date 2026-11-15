@@ -55,6 +55,7 @@ assert_other_aws_errors_fail() {
 
 printf '%s\n' '#!/usr/bin/env bash' > "$fake_aws"
 printf '%s\n' 'set -euo pipefail' >> "$fake_aws"
+printf '%s\n' 'if [ -n "${AWS_STUB_ARGS_FILE:-}" ]; then printf "%s\n" "$*" > "$AWS_STUB_ARGS_FILE"; fi' >> "$fake_aws"
 printf '%s\n' 'case "${AWS_STUB_MODE:-}" in' >> "$fake_aws"
 printf '%s\n' '  success)' >> "$fake_aws"
 printf '%s\n' "    printf '%s\\n' 'https://public@example.ingest.sentry.io/123'" >> "$fake_aws"
@@ -74,6 +75,51 @@ printf '%s\n' '    ;;' >> "$fake_aws"
 printf '%s\n' 'esac' >> "$fake_aws"
 chmod +x "$fake_aws"
 
+assert_profile_is_passed_when_given() {
+  local args_file="$tmpdir/args-profile"
+
+  PATH="$tmpdir:$PATH" AWS_STUB_MODE=success AWS_STUB_ARGS_FILE="$args_file" \
+    "$script_path" "/notes-app/prd/sentry-dsn-frontend" "ap-northeast-1" "prd" >/dev/null
+
+  case "$(cat "$args_file")" in
+    *"--profile prd"*) ;;
+    *)
+      echo "expected --profile prd in aws args" >&2
+      exit 1
+      ;;
+  esac
+}
+
+assert_profile_is_omitted_when_empty() {
+  local args_file="$tmpdir/args-env"
+  local output
+
+  output="$(
+    PATH="$tmpdir:$PATH" AWS_STUB_MODE=success AWS_STUB_ARGS_FILE="$args_file" \
+      "$script_path" "/notes-app/prd/sentry-dsn-frontend" "ap-northeast-1" ""
+  )"
+  assert_eq "$output" "https://public@example.ingest.sentry.io/123"
+
+  case "$(cat "$args_file")" in
+    *--profile*)
+      echo "expected no --profile when the profile argument is empty" >&2
+      exit 1
+      ;;
+  esac
+
+  # Omitting the third argument entirely behaves the same way.
+  PATH="$tmpdir:$PATH" AWS_STUB_MODE=success AWS_STUB_ARGS_FILE="$args_file" \
+    "$script_path" "/notes-app/prd/sentry-dsn-frontend" "ap-northeast-1" >/dev/null
+  case "$(cat "$args_file")" in
+    *--profile*)
+      echo "expected no --profile when the profile argument is omitted" >&2
+      exit 1
+      ;;
+  esac
+}
+
 assert_success_with_value
+assert_profile_is_passed_when_given
+assert_profile_is_omitted_when_empty
 assert_missing_parameter_returns_empty
 assert_other_aws_errors_fail

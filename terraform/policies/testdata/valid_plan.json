@@ -142,7 +142,8 @@
             "Project": "notes-app",
             "Environment": "dev",
             "ManagedBy": "terraform"
-          }
+          },
+          "permissions_boundary": "arn:aws:iam::123456789012:policy/notes-boundary-app-roles"
         }
       }
     },

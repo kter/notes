@@ -28,8 +28,29 @@ CONFTEST ?= $(shell mise which conftest 2>/dev/null || echo conftest)
 AWS_PROFILE = $(ENV)
 AWS_REGION ?= ap-northeast-1
 
+# Where AWS credentials come from for the targets the GitHub Actions deploy
+# workflow calls (ecr-login, build-backend, push-backend, get-image-digest,
+# _deploy-frontend).
+#   profile (default): ENV names the AWS profile, exactly as before.
+#   env: credentials come from the environment (GitHub OIDC); no --profile and
+#        no AWS_PROFILE is passed anywhere. Other targets still assume profiles.
+DEPLOY_CREDENTIALS ?= profile
+ifeq ($(DEPLOY_CREDENTIALS),env)
+AWS_PROFILE :=
+unexport AWS_PROFILE
+AWS_PROFILE_OPT :=
+AWS_PROFILE_ENV :=
+else
+AWS_PROFILE_OPT = --profile $(AWS_PROFILE)
+AWS_PROFILE_ENV = AWS_PROFILE=$(AWS_PROFILE)
+endif
+
+# Tag that build-backend / push-backend / get-image-digest operate on. Local
+# deploys keep using `latest`; CI pushes an immutable-by-convention git-<sha>.
+IMAGE_TAG ?= latest
+
 # Use deferred evaluation (=) so these are evaluated when used, picked up after profile/env is set
-AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity --profile $(AWS_PROFILE) --query Account --output text 2>/dev/null)
+AWS_ACCOUNT_ID = $(shell aws sts get-caller-identity $(AWS_PROFILE_OPT) --query Account --output text 2>/dev/null)
 ECR_REPO = $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/notes-app-api-$(ENV)
 
 # lambda_image_tag has no default (see terraform/variables.tf), so every
@@ -134,25 +155,25 @@ db-revision: ## Create a new backend Alembic revision (MESSAGE="...")
 
 .PHONY: ecr-login
 ecr-login: ## Login to ECR
-	aws ecr get-login-password --region $(AWS_REGION) --profile $(AWS_PROFILE) | \
+	aws ecr get-login-password --region $(AWS_REGION) $(AWS_PROFILE_OPT) | \
 		docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 .PHONY: build-backend
 build-backend: ## Build backend Docker image
-	cd backend && docker buildx build --provenance=false --load -t $(ECR_REPO):latest .
+	cd backend && docker buildx build --provenance=false --load -t $(ECR_REPO):$(IMAGE_TAG) .
 
 .PHONY: push-backend
 push-backend: ecr-login build-backend ## Build and push backend Docker image to ECR
-	docker push $(ECR_REPO):latest
-	@echo "Image pushed: $(ECR_REPO):latest"
-	$(eval DIGEST := $(shell docker inspect --format='{{.Id}}' $(ECR_REPO):latest | awk -F ':' '{print $$2}'))
+	docker push $(ECR_REPO):$(IMAGE_TAG)
+	@echo "Image pushed: $(ECR_REPO):$(IMAGE_TAG)"
+	$(eval DIGEST := $(shell docker inspect --format='{{.Id}}' $(ECR_REPO):$(IMAGE_TAG) | awk -F ':' '{print $$2}'))
 	@echo "Backend digest: $(DIGEST)"
 
 .PHONY: get-image-digest
-get-image-digest: ## Get the latest image digest from ECR
+get-image-digest: ## Get the image digest for IMAGE_TAG (default: latest) from ECR
 	@aws ecr describe-images --repository-name notes-app-api-$(ENV) \
-		--image-ids imageTag=latest \
-		--profile $(AWS_PROFILE) \
+		--image-ids imageTag=$(IMAGE_TAG) \
+		$(AWS_PROFILE_OPT) \
 		--query 'imageDetails[0].imageDigest' \
 		--output text
 
@@ -260,18 +281,18 @@ _deploy-backend: ## Build, push, and deploy all Lambda functions via Terraform (
 
 .PHONY: _deploy-frontend
 _deploy-frontend: ## Build and deploy frontend to S3 (optimized)
-	$(eval API_URL := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw api_url))
-	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_id))
-	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cognito_user_pool_client_id))
-	$(eval BUCKET := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw frontend_bucket_name))
-	$(eval CF_DIST := $(shell cd terraform && AWS_PROFILE=$(AWS_PROFILE) terraform output -raw cloudfront_distribution_id))
+	$(eval API_URL := $(shell cd terraform && $(AWS_PROFILE_ENV) terraform output -raw api_url))
+	$(eval COGNITO_USER_POOL_ID := $(shell cd terraform && $(AWS_PROFILE_ENV) terraform output -raw cognito_user_pool_id))
+	$(eval COGNITO_CLIENT_ID := $(shell cd terraform && $(AWS_PROFILE_ENV) terraform output -raw cognito_user_pool_client_id))
+	$(eval BUCKET := $(shell cd terraform && $(AWS_PROFILE_ENV) terraform output -raw frontend_bucket_name))
+	$(eval CF_DIST := $(shell cd terraform && $(AWS_PROFILE_ENV) terraform output -raw cloudfront_distribution_id))
 	@echo "Building frontend..."
 	@SENTRY_DSN=$$($(OPTIONAL_SSM_PARAMETER_SCRIPT) "$(SENTRY_DSN_PARAMETER_NAME_FRONTEND)" "$(AWS_REGION)" "$(AWS_PROFILE)") && \
 	cd frontend && NEXT_PUBLIC_API_URL=$(API_URL) NEXT_PUBLIC_ENVIRONMENT=$(ENV) NEXT_PUBLIC_COGNITO_USER_POOL_ID=$(COGNITO_USER_POOL_ID) NEXT_PUBLIC_COGNITO_CLIENT_ID=$(COGNITO_CLIENT_ID) NEXT_PUBLIC_SENTRY_DSN="$$SENTRY_DSN" bun run build
 	@echo "Syncing frontend files to S3..."
-	aws s3 sync frontend/out/ s3://$(BUCKET) --delete --profile $(AWS_PROFILE)
+	aws s3 sync frontend/out/ s3://$(BUCKET) --delete $(AWS_PROFILE_OPT)
 	@echo "Creating CloudFront cache invalidation..."
-	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" --profile $(AWS_PROFILE)
+	aws cloudfront create-invalidation --distribution-id $(CF_DIST) --paths "/*" $(AWS_PROFILE_OPT)
 	@echo "Frontend deployed to $(BUCKET)"
 	@echo "Note: CloudFront cache invalidation is in progress. Changes may take a few minutes to propagate."
 
@@ -354,6 +375,42 @@ tf-fmt: ## Format Terraform configuration
 .PHONY: tf-validate
 tf-validate: ## Validate Terraform configuration
 	cd terraform && terraform validate
+
+# -----------------------------------------------------------------------------
+# GitHub Actions deploy roles (terraform/ci-bootstrap). The owner runs these
+# locally, once per account, with an admin profile; CI never applies them.
+# State: notes-app/ci-bootstrap.tfstate in the same bucket as the app state.
+# The plan file is per ENV so a dev plan cannot be applied to prd.
+# -----------------------------------------------------------------------------
+CI_BOOTSTRAP_DIR := terraform/ci-bootstrap
+CI_BOOTSTRAP_PLAN = ci-bootstrap-$(ENV).tfplan
+
+.PHONY: ci-bootstrap-plan
+ci-bootstrap-plan: ## Plan the GitHub Actions OIDC roles for ENV (owner, local, admin profile)
+	@case "$(ENV)" in dev|prd) ;; *) echo "ENV must be dev or prd" >&2; exit 1 ;; esac
+	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform init -reconfigure -input=false -backend-config=backends/$(ENV).hcl
+	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform plan -input=false \
+		-var="environment=$(ENV)" -var="aws_profile=$(ENV)" -out=$(CI_BOOTSTRAP_PLAN)
+
+.PHONY: ci-bootstrap-apply
+ci-bootstrap-apply: ## Apply the plan saved by ci-bootstrap-plan for ENV, then print the role ARNs
+	@case "$(ENV)" in dev|prd) ;; *) echo "ENV must be dev or prd" >&2; exit 1 ;; esac
+	@test -f $(CI_BOOTSTRAP_DIR)/$(CI_BOOTSTRAP_PLAN) || { echo "Run 'make ci-bootstrap-plan ENV=$(ENV)' first" >&2; exit 1; }
+	# Re-point the backend at ENV: planning dev then prd leaves .terraform on prd.
+	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform init -reconfigure -input=false -backend-config=backends/$(ENV).hcl
+	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform apply -input=false $(CI_BOOTSTRAP_PLAN)
+	rm -f $(CI_BOOTSTRAP_DIR)/$(CI_BOOTSTRAP_PLAN)
+	cd $(CI_BOOTSTRAP_DIR) && AWS_PROFILE=$(ENV) terraform output
+
+.PHONY: ci-bootstrap-validate
+ci-bootstrap-validate: ## Validate terraform/ci-bootstrap without a backend or AWS credentials
+	terraform -chdir=$(CI_BOOTSTRAP_DIR) init -backend=false -input=false
+	terraform -chdir=$(CI_BOOTSTRAP_DIR) validate
+
+.PHONY: test-ci-scripts
+test-ci-scripts: ## Test the deploy workflow helper scripts (no AWS)
+	python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+	bash scripts/test_get_optional_ssm_parameter.sh
 
 # =============================================================================
 # Utilities

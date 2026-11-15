@@ -14,6 +14,89 @@ locals {
   app_role_arn_pattern   = "arn:aws:iam::${local.account_id}:role/notes-app-*"
   app_policy_arn_pattern = "arn:aws:iam::${local.account_id}:policy/notes-app-*"
   ci_role_arn_pattern    = "arn:aws:iam::${local.account_id}:role/notes-gha-*"
+
+  # Deliberately outside notes-app-*, so ManageAppPolicies below cannot edit it.
+  # terraform/main.tf builds the same ARN; keep the two in step.
+  app_boundary_name = "notes-boundary-app-roles"
+  app_boundary_arn  = "arn:aws:iam::${local.account_id}:policy/${local.app_boundary_name}"
+}
+
+# -----------------------------------------------------------------------------
+# Permissions boundary for every notes-app-* role. The deploy role can create
+# and edit notes-app-* roles, so without a boundary it could build a strong
+# app role, pass it to a Lambda and run code with more than its own access.
+# The deploy role may only create a notes-app-* role with this boundary set
+# (ManageAppRoles / CreateAppRolesWithBoundary) and may not remove it or edit
+# this policy (deploy_guardrails). The boundary caps app roles at: no IAM
+# writes except passing notes-app-* roles, no role chaining, and no writes to
+# the Terraform state bucket or lock table.
+# -----------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "app_boundary" {
+  statement {
+    sid         = "AllowAllButIdentityAndChaining"
+    effect      = "Allow"
+    not_actions = ["iam:*", "sts:AssumeRole", "organizations:*", "account:*"]
+    resources   = ["*"]
+  }
+
+  statement {
+    sid    = "AllowIamReadAndServiceLinkedRoles"
+    effect = "Allow"
+    actions = [
+      "iam:CreateServiceLinkedRole",
+      "iam:Get*",
+      "iam:List*",
+    ]
+    resources = ["*"]
+  }
+
+  # AWSBackupServiceRolePolicyForRestores passes roles during restores.
+  statement {
+    sid       = "AllowPassingAppRoles"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
+    resources = [local.app_role_arn_pattern]
+  }
+
+  statement {
+    sid    = "DenyWritingTerraformState"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteBucket",
+      "s3:DeleteBucketPolicy",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+      "s3:PutBucketPolicy",
+      "s3:PutBucketPublicAccessBlock",
+      "s3:PutBucketVersioning",
+      "s3:PutLifecycleConfiguration",
+      "s3:PutObject",
+    ]
+    resources = [
+      "arn:aws:s3:::${local.state_bucket}",
+      "arn:aws:s3:::${local.state_bucket}/*",
+    ]
+  }
+
+  statement {
+    sid    = "DenyWritingLockTable"
+    effect = "Deny"
+    actions = [
+      "dynamodb:DeleteItem",
+      "dynamodb:DeleteTable",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:UpdateTable",
+    ]
+    resources = ["arn:aws:dynamodb:${var.aws_region}:${local.account_id}:table/${local.lock_table}"]
+  }
+}
+
+resource "aws_iam_policy" "app_boundary" {
+  name        = local.app_boundary_name
+  description = "Permissions boundary for notes-app-* roles (managed by terraform/ci-bootstrap)"
+  policy      = data.aws_iam_policy_document.app_boundary.json
 }
 
 # -----------------------------------------------------------------------------
@@ -156,7 +239,6 @@ data "aws_iam_policy_document" "deploy_app_iam" {
     sid    = "ManageAppRoles"
     effect = "Allow"
     actions = [
-      "iam:CreateRole",
       "iam:DeleteRole",
       "iam:DeleteRolePolicy",
       "iam:DetachRolePolicy",
@@ -169,6 +251,24 @@ data "aws_iam_policy_document" "deploy_app_iam" {
       "iam:UpdateRoleDescription",
     ]
     resources = [local.app_role_arn_pattern]
+  }
+
+  # A notes-app-* role can only be created, or have its boundary set, with the
+  # app boundary. Removing it is denied in deploy_guardrails.
+  statement {
+    sid    = "CreateAppRolesWithBoundary"
+    effect = "Allow"
+    actions = [
+      "iam:CreateRole",
+      "iam:PutRolePermissionsBoundary",
+    ]
+    resources = [local.app_role_arn_pattern]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [local.app_boundary_arn]
+    }
   }
 
   # Attach only AWS service-role managed policies (what backup.tf and iam.tf
@@ -218,6 +318,27 @@ data "aws_iam_policy_document" "deploy_guardrails" {
     effect    = "Deny"
     actions   = ["iam:*"]
     resources = [local.ci_role_arn_pattern]
+  }
+
+  statement {
+    sid       = "DenyRemovingAppRoleBoundary"
+    effect    = "Deny"
+    actions   = ["iam:DeleteRolePermissionsBoundary"]
+    resources = [local.app_role_arn_pattern]
+  }
+
+  statement {
+    sid    = "DenyEditingAppBoundary"
+    effect = "Deny"
+    actions = [
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicy",
+      "iam:DeletePolicyVersion",
+      "iam:SetDefaultPolicyVersion",
+      "iam:TagPolicy",
+      "iam:UntagPolicy",
+    ]
+    resources = [local.app_boundary_arn]
   }
 
   statement {

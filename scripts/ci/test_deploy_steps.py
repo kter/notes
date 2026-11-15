@@ -121,6 +121,14 @@ class DeployStepsTest(unittest.TestCase):
         self.stub_dir.mkdir()
         self.github_output = self.tmp / "github_output"
         self.github_output.touch()
+        # Same plan (secret included) without the data-resource delete/replace,
+        # so tf-plan succeeds. The data-loss test uses FIXTURE as is.
+        plan = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        for rc in plan["resource_changes"]:
+            if "delete" in rc["change"]["actions"]:
+                rc["change"]["actions"] = ["update"]
+        self.safe_plan = self.tmp / "plan_without_data_loss.json"
+        self.safe_plan.write_text(json.dumps(plan), encoding="utf-8")
 
     def run_step(self, step: str, **extra: str) -> subprocess.CompletedProcess[str]:
         env = {
@@ -131,8 +139,7 @@ class DeployStepsTest(unittest.TestCase):
             "GITHUB_SHA": "0" * 40,
             "GITHUB_STEP_SUMMARY": str(self.summary),
             "IMAGE_DIGEST": DIGEST,
-            "STUB_PLAN_JSON": str(FIXTURE),
-            "ALLOW_DATA_LOSS": "true",
+            "STUB_PLAN_JSON": str(self.safe_plan),
             "STUB_DIR": str(self.stub_dir),
             "GITHUB_OUTPUT": str(self.github_output),
             "GITHUB_REPOSITORY": "kter/notes",
@@ -171,8 +178,11 @@ class DeployStepsTest(unittest.TestCase):
         self.assertIn("conftest: failures=1", result.stdout)
         self.assertFalse((self.runner_temp / "tfplan.json").exists())
 
-    def test_data_loss_blocks_unless_allowed(self) -> None:
-        result = self.run_step("tf-plan", ALLOW_DATA_LOSS="false")
+    def test_data_loss_blocks_and_cannot_be_overridden(self) -> None:
+        # ALLOW_DATA_LOSS was an input once; it must have no effect now.
+        result = self.run_step(
+            "tf-plan", STUB_PLAN_JSON=str(FIXTURE), ALLOW_DATA_LOSS="true"
+        )
         self.assertNotEqual(result.returncode, 0)
         self.assert_no_secret(result)
         self.assertIn("replaces or deletes 2 data resource(s)", result.stderr)

@@ -24,7 +24,8 @@ resource "aws_backup_plan" "dsql" {
 
 # IAM Role for AWS Backup
 resource "aws_iam_role" "backup" {
-  name = "${var.project_name}-backup-role-${terraform.workspace}"
+  name                 = "${var.project_name}-backup-role-${terraform.workspace}"
+  permissions_boundary = local.app_role_boundary_arn
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

@@ -1,6 +1,7 @@
 # IAM Role for Backend (Lambda/ECS) to access Bedrock and DSQL
 resource "aws_iam_role" "backend" {
-  name = "${var.project_name}-backend-role-${terraform.workspace}"
+  name                 = "${var.project_name}-backend-role-${terraform.workspace}"
+  permissions_boundary = local.app_role_boundary_arn
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

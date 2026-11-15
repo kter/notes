@@ -9,7 +9,8 @@ name: Deploy
 #       no secrets are reachable before approval.
 #   deploy (environment deploy-<env>, required reviewer)
 #     - terraform plan with the new digest, conftest, values-free Job Summary,
-#       refuses to delete/replace data resources unless allow_data_loss
+#       refuses to delete/replace data resources (those changes are deployed
+#       by the owner from a workstation, see docs/agents/deploy.md)
 #     - terraform apply of that saved plan, then ECR :latest -> digest
 #     - frontend build + S3 sync + CloudFront invalidation
 #     - AWS role notes-gha-deploy-<env> (terraform/ci-bootstrap)
@@ -38,11 +39,6 @@ on:
           - all
           - backend
           - frontend
-      allow_data_loss:
-        description: Apply even if the plan deletes or replaces a data resource (DSQL, S3 bucket, Cognito user pool, SSM parameter, DynamoDB)
-        required: false
-        default: false
-        type: boolean
 
 permissions: {}
 
@@ -123,7 +119,6 @@ jobs:
     env:
       DEPLOY_ENV: ${{ inputs.env }}
       DEPLOY_TARGET: ${{ inputs.target }}
-      ALLOW_DATA_LOSS: ${{ inputs.allow_data_loss }}
       IMAGE_DIGEST: ${{ needs.prepare.outputs.image_digest }}
       TF_IN_AUTOMATION: "1"
       TF_INPUT: "0"

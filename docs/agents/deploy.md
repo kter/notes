@@ -13,7 +13,8 @@
 2. `deploy` ジョブ（GitHub environment `deploy-<env>`、kter の承認が必要）
    - 承認後に `terraform plan` を実行し、conftest で検査し、値を含まない要約を Job Summary に書く。
    - データ資源（DSQL・S3 バケット・Cognito ユーザープール・SSM パラメータ・DynamoDB）の削除か置き換えが
-     plan に含まれていたら apply せずに止まる。意図した変更なら `allow_data_loss=true` で起動し直す。
+     plan に含まれていたら apply せずに止まる。CI から止めを外す入力は無い（起動する側が付けられ、承認は plan より前に行うため）。
+     意図した変更なら、オーナーが手元で `make tf-plan` の差分を見てからデプロイする。
    - 保存した plan を `terraform apply` し、ECR の `:latest` をデプロイしたダイジェストに付け替える。
    - `target` が `all` か `frontend` なら、`make _deploy-frontend` でフロントをビルドして S3 に同期し、CloudFront を無効化する。
    - 使う AWS ロールは `notes-gha-deploy-<env>`（PowerUserAccess と `notes-app-*` に限った IAM）。
@@ -50,7 +51,7 @@ gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches \
 
 - 起動したら実行の URL を報告する（`gh api 'repos/kter/notes/actions/workflows/deploy.yml/runs?per_page=1' --jq '.workflow_runs[0].html_url'`）。
 - 承認はしない。`pending_deployments` やレビュー承認の API は呼ばない。承認は人が GitHub の画面で行う。
-- `allow_data_loss=true` は人に指示されたときだけ付ける。
+- plan がデータ資源の削除か置き換えで止まったら、起動し直さずに人に戻す。
 - Codex Cloud は `gh` で dispatch できないので、起動を人に依頼して戻す。
 
 ## 初回の準備（オーナーが一度だけ行う）
@@ -71,6 +72,10 @@ gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches \
    ```
 
    state は app と同じバケットの `notes-app/ci-bootstrap.tfstate` に入る。
+   このとき permissions boundary のポリシー `notes-boundary-app-roles` もできる。app の Terraform は
+   すべての `notes-app-*` ロールにこれを付けるので、**そのアカウントで ci-bootstrap を apply するまでは、
+   手元の `make tf-plan` / `tf-apply` も失敗する**。apply 後の最初の app の apply で、既存の 3 ロール
+   （backend・backup・cost-report）に boundary が付く（ロールの作り直しは起きない）。
 3. GitHub の Settings → Environments に 4 つの environment を作る。
 
    | environment | Required reviewers | Deployment branches | 変数 `AWS_ROLE_ARN` |
@@ -87,6 +92,7 @@ gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches \
    同じ値を `deploy-<env>` の environment secret `BOOTSTRAP_ADMIN_EMAILS` / `BOOTSTRAP_ADMIN_USER_IDS` に入れる。
    入れないと CI の apply で Lambda の環境変数が空に戻る。`cognito_callback_urls` / `cognito_logout_urls` /
    `sentry_traces_sample_rate` などをローカルで渡している場合も、CI では既定値に戻る。
+   （2026-08-27 に手元で作られた `terraform/tfplan.json` では、これらはすべて既定値だった。）
 5. 最初の実行は `env=dev`、`target=backend` にして、plan の要約と apply の結果を確かめる。
 
 ## 権限の範囲と残っているリスク
@@ -94,12 +100,14 @@ gh api -X POST repos/kter/notes/actions/workflows/deploy.yml/dispatches \
 - `notes-gha-deploy-<env>` は `notes-gha-*` ロールと OIDC プロバイダの変更、`sts:AssumeRole`（ロールの乗り継ぎ）、
   ci-bootstrap の state の書き換え、state バケットとロックテーブルの設定変更を明示的に拒否される。
 - IAM は `notes-app-*` のロールとポリシーに限る。マネージドポリシーのアタッチは `aws:policy/service-role/*` と
-  `notes-app-*` のカスタマー管理ポリシーだけ。ただしインラインポリシー（`iam:PutRolePolicy`）の中身は制限できないので、
-  広い権限の `notes-app-*` ロールを作って Lambda に渡せば Deny を回避できる。塞ぐには `notes-app-*` ロールに
-  permissions boundary を付ける必要があり、今回は入れていない。
+  `notes-app-*` のカスタマー管理ポリシーだけ。インラインポリシー（`iam:PutRolePolicy`）の中身は制限できないので、
+  `notes-app-*` ロールには permissions boundary `notes-boundary-app-roles`（ci-bootstrap が管理）を付けている。
+  deploy ロールは boundary 付きでしかロールを作れず、boundary の削除とポリシーの編集は拒否される。
+  boundary の上限は「IAM の書き込みは `notes-app-*` ロールの PassRole だけ、`sts:AssumeRole` なし、
+  Terraform の state バケットとロックテーブルへの書き込みなし」。conftest も boundary の無いロールを plan の段階で落とす。
 - `notes-gha-plan-<env>` は ECR リポジトリが MUTABLE なので `:latest` も上書きできる。ローカルの `make tf-plan` /
   `tf-apply` は `:latest` のダイジェストを使うので、ローカルで apply する前に plan のイメージを確かめる。
-- `.terraform.lock.hcl` は git 管理外なので、CI は実行のたびにプロバイダを `~> 5.0` の範囲で解決する。
-  ローカルの lock より新しいプロバイダで apply されると、次のローカル実行で `terraform init -upgrade` が要ることがある。
+- `.terraform.lock.hcl`（app と ci-bootstrap の両方）は commit している。プロバイダを上げるときは
+  `terraform init -upgrade` の結果を PR で入れる。
 - CI のフロントビルドには `frontend/.env.local` も `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` も無い。
   `NEXT_PUBLIC_*` は Makefile が渡すので同じになるが、ローカルでソースマップを Sentry に上げているなら CI では上がらない。

@@ -9,7 +9,8 @@ data "archive_file" "cost_report" {
 
 # IAM Role for Cost Report Lambda
 resource "aws_iam_role" "cost_report" {
-  name = "${var.project_name}-cost-report-${terraform.workspace}"
+  name                 = "${var.project_name}-cost-report-${terraform.workspace}"
+  permissions_boundary = local.app_role_boundary_arn
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

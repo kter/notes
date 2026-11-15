@@ -38,7 +38,6 @@ bun-error.log*
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
 tfplan
 *.tfplan
 terraform/tfplan.json

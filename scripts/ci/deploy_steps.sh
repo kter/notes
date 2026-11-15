@@ -24,7 +24,7 @@
 # Required env: DEPLOY_ENV (dev|prd), RUNNER_TEMP, GITHUB_SHA. Per step:
 #   check-ci: GH_TOKEN, GITHUB_REPOSITORY
 #   build-image: GITHUB_OUTPUT
-#   tf-plan: IMAGE_DIGEST, GITHUB_STEP_SUMMARY, ALLOW_DATA_LOSS (true|false)
+#   tf-plan: IMAGE_DIGEST, GITHUB_STEP_SUMMARY
 #   retag-latest: IMAGE_DIGEST
 
 set -uo pipefail
@@ -152,8 +152,10 @@ step_tf_plan() {
   if [ -z "$data_loss" ]; then
     fail plan-counts 1
   fi
-  if [ "$data_loss" -gt 0 ] && [ "${ALLOW_DATA_LOSS:-false}" != "true" ]; then
-    echo "::error::The plan replaces or deletes ${data_loss} data resource(s) (see the Job Summary). Not applying. Re-run with allow_data_loss=true only if that is intended." >&2
+  # No override input on purpose: whoever dispatches could set it, and the
+  # approver approves before the plan exists. The owner deploys these locally.
+  if [ "$data_loss" -gt 0 ]; then
+    echo "::error::The plan replaces or deletes ${data_loss} data resource(s) (see the Job Summary). Not applying. The owner deploys this change from a workstation (docs/agents/deploy.md)." >&2
     exit 1
   fi
   echo "Plan ready (sha256 of plan.txt is in the Job Summary)."

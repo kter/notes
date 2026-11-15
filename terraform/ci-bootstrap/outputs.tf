@@ -17,3 +17,8 @@ output "github_environments" {
     deploy = local.deploy_github_environment
   }
 }
+
+output "app_boundary_arn" {
+  description = "Permissions boundary that every notes-app-* role must carry (terraform/main.tf local.app_role_boundary_arn)"
+  value       = aws_iam_policy.app_boundary.arn
+}

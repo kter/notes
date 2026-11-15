@@ -70,3 +70,17 @@ after-login.png
 
 terraform/cost_report.zip
 *.zip
+
+# Local-only files: agent task logs, personal notes, and private reviews.
+# Keep them out of commits (the repository is public).
+.agent-runs/
+.agent-tasks/
+.claude/settings.local.json
+notes/
+srenext.md
+sample.html
+docs/repo-review-*.md
+docs/security-review-*.html
+
+# Tools and caches installed by scripts/agent/setup.sh (cloud agents).
+.tools/

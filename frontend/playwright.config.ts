@@ -32,6 +32,14 @@ if (isLocalBypass) {
   process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
 }
 
+// Cloud agents cannot download Playwright's browsers but ship a Chromium of
+// their own (e.g. /usr/bin/google-chrome, /usr/bin/chromium). When this is set,
+// Chromium-based projects launch that binary; unset keeps Playwright's default.
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const chromiumLaunch = chromiumExecutablePath
+  ? { launchOptions: { executablePath: chromiumExecutablePath } }
+  : {};
+
 console.log(`[E2E] Target Environment: ${targetEnv}`);
 console.log(`[E2E] Base URL: ${baseURL}`);
 console.log(`[E2E] Auth bypass: ${isLocalBypass}`);
@@ -71,12 +79,21 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     // In local bypass mode, skip the auth setup project — no login needed
-    ...(isLocalBypass ? [] : [{ name: "setup", testMatch: /.*\.setup\.ts/ }]),
+    ...(isLocalBypass
+      ? []
+      : [
+          {
+            name: "setup",
+            testMatch: /.*\.setup\.ts/,
+            use: { ...chromiumLaunch },
+          },
+        ]),
 
     {
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumLaunch,
         ...(isLocalBypass
           ? {}
           : { storageState: "playwright/.auth/user.json" }),
@@ -100,6 +117,7 @@ export default defineConfig({
       name: "Mobile Chrome",
       use: {
         ...devices["Pixel 5"],
+        ...chromiumLaunch,
         ...(isLocalBypass
           ? {}
           : { storageState: "playwright/.auth/user.json" }),

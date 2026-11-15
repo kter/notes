@@ -1,9 +1,9 @@
 name: CI
 
 on:
+  # Every PR, whatever its base: cloud agents sometimes open PRs against a
+  # feature branch. Pushes still only trigger on main.
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main

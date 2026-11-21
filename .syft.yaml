@@ -2,7 +2,7 @@
 # The workflow exports backend/requirements-runtime.txt (no dev extra) and installs
 # frontend/node_modules with --production; the lock files themselves are skipped.
 exclude:
-  - ./.github/**
+  - "**/.github/**"
   - ./terraform/**
   - ./scripts/**
   - ./docs/**

@@ -51,7 +51,7 @@ jobs:
 
       - name: Install frontend runtime packages
         working-directory: frontend
-        run: bun install --frozen-lockfile --production
+        run: bun install --frozen-lockfile --production --omit=peer
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0

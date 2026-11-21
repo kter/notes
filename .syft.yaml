@@ -1,0 +1,7 @@
+# Scope of the SBOM sent to SBOM Tracker: only what runs in production
+# (backend Python packages and frontend packages).
+exclude:
+  - ./terraform/**
+  - ./scripts/**
+  - ./docs/**
+  - ./**/test-results/**

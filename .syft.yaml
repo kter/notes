@@ -1,0 +1,15 @@
+# Scope of the SBOM sent to SBOM Tracker: only what runs in production.
+# The workflow exports backend/requirements-runtime.txt (no dev extra) and installs
+# frontend/node_modules with --production; the lock files themselves are skipped.
+exclude:
+  - "**/.github/**"
+  - ./terraform/**
+  - ./scripts/**
+  - ./docs/**
+  - ./**/test-results/**
+  - ./backend/uv.lock
+  - ./backend/pyproject.toml
+  - ./frontend/bun.lock
+# Read installed packages from frontend/node_modules (not enabled for directory scans by default).
+select-catalogers:
+  - "+javascript-package-cataloger"
